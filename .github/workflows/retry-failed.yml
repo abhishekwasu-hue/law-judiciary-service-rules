@@ -1,0 +1,39 @@
+name: Retry failed PDFs via mirrors
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  retry:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Retry failed PDFs with browser headers, Wayback Machine and archive.org mirrors
+        run: |
+          set -u
+          UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+          : > pdf/STILL_FAILED.txt
+          ok=0; fail=0
+          while IFS=$'\t' read -r folder url name; do
+            [ -f "pdf/$folder/$name" ] && continue
+            mkdir -p "pdf/$folder"
+            host=$(echo "$url" | sed -E 's#https?://([^/]+)/.*#\1#')
+            got=0
+            tries=("$url" "https://web.archive.org/web/2id_/$url" "https://web.archive.org/web/2024id_/$url" "https://web.archive.org/web/2025id_/$url")
+            if echo "$url" | grep -q 'gr.maharashtra.gov.in'; then
+              code=$(basename "$url" .pdf)
+              tries+=("https://archive.org/download/in.gov.maharashtra.gr.$code/$code.pdf")
+            fi
+            for t in "${tries[@]}"; do
+              if curl -sSL --max-time 120 --fail -A "$UA" -e "https://$host/" -o "pdf/$folder/$name" "$t" && head -c 5 "pdf/$folder/$name" | grep -q '%PDF'; then got=1; echo "OK  $t"; break; fi
+              rm -f "pdf/$folder/$name"
+            done
+            if [ $got = 1 ]; then ok=$((ok+1)); else fail=$((fail+1)); echo "$url" >> pdf/STILL_FAILED.txt; fi
+          done < pdf-list.tsv
+          echo "recovered=$ok still_failed=$fail"
+      - name: Commit
+        run: |
+          git config user.name "github-actions"; git config user.email "actions@github.com"
+          git add pdf
+          git commit -m "Recover failed PDFs via mirrors" || echo "nothing"
+          git push
