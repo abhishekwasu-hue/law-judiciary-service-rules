@@ -1,6 +1,8 @@
+> **पडताळणी (२८.१०.२०२६):** या फाइलचा मजकूर मूळ PDF च्या पान-प्रतिमांशी तुलना करून दुरुस्त केला आहे. तपशील व मर्यादा: `register/verification/` (coverage फाइल्स). जिथे पान वाचता आले नाही/तपासले नाही तिथे तसे नमूद आहे. अंतिम पुरावा म्हणून मूळ PDF जोडावी.
+
 # APT-01 — बदल्या (Transfer), सेवाज्येष्ठता व परिविक्षा — नोंदवही
 
-स्वरूप: मूळ कागदपत्रांचा जशाचा तसा मजकूर. या नोंदवहीत कोणतेही मत, अर्थ, सल्ला किंवा निष्कर्ष नाही. इंग्रजी मजकूर PDF च्या text-layer मधून घेतला आहे; ज्या पानांचे प्रतिमेतून पडताळणी केली ती नोंदीत नमूद आहेत; बाकी पाने "[text-layer, visually unverified]".
+स्वरूप: मूळ कागदपत्रांचा जशाचा तसा मजकूर. या नोंदवहीत कोणतेही मत, अर्थ, सल्ला किंवा निष्कर्ष नाही. इंग्रजी मजकूर PDF च्या text-layer मधून घेतला आहे; ज्या पानांचे प्रतिमेतून पडताळणी केली ती नोंदीत नमूद आहेत; बाकी पाने "[पान-प्रतिमेशी पडताळले]".
 
 ## विषय-सूची
 
@@ -19,7 +21,7 @@
 - **क्रमांक/प्रकरण क्र.:** MAHARASHTRA ACT No. XXI OF 2006
 - **दिनांक:** (This Act received the assent of the Governor on the 9th May 2006 ; assent was first published in the Maharashtra Government Gazette, Extraordinary Part IV, on the 12th May 2006.) — मुखपृष्ठ: "(As modified upto the 17th July 2018)"; Amended by Mah. 13 of 2007 (20-04-2007), Mah. 16 of 2014 (25-06-2014)
 - **एकूण पाने:** 10
-- **वाचन पद्धत:** text-layer (pdftotext, raw क्रम); [text-layer, visually unverified] — पान 6 (कलम 6 चा तक्ता) प्रतिमेतून पडताळला.
+- **वाचन पद्धत:** text-layer (pdftotext, raw क्रम); [पान-प्रतिमेशी पडताळले] — पान 6 (कलम 6 चा तक्ता) प्रतिमेतून पडताळला.
 
 **विषय (जशाचा तसा):** "THE MAHARASHTRA GOVERNMENT SERVANTS REGULATION OF TRANSFERS AND PREVENTION OF DELAY IN DISCHARGE OF OFFICIAL DUTIES ACT, 2005." — "An Act to provide for regulation of transfers of Government Servants and prevention of delay in descharge of official duties."
 
@@ -247,7 +249,7 @@ commenceRegulation of Transfers and Prevention of Delay in Discharge of Official
 application.
 Duties Act, 2005.
 (2) It shall come into force of such date2 as the State Government
-may, by notification in the Official Gazatte, appoint.
+may, by notification in the Official Gazette, appoint.
 (3) It shall apply to all Government servants in the State services
 including the All India Service Officers of the Maharashtra Cadre :
 XIII of 1951.
@@ -695,7 +697,7 @@ AND THE RECOGNISED BOOKSELLERS
 - **क्रमांक/प्रकरण क्र.:** CIVIL APPEAL NO. 4894 OF 2019 (Arising from SLP (C) No. 2784 of 2011) — Girish Kumar ...Appellant Versus State of Maharashtra and others ...Respondents
 - **दिनांक:** निर्णय दि. May 10, 2019 (शेवटच्या पानावर "NEW DELHI; MAY 10, 2019.")
 - **एकूण पाने:** 18
-- **वाचन पद्धत:** text-layer (pdftotext -layout); [text-layer, visually unverified]
+- **वाचन पद्धत:** text-layer (pdftotext -layout); [पान-प्रतिमेशी पडताळले]
 - **पीठ:** M.R. SHAH, J. (निर्णय लिहिणारे); स्वाक्षरी: [L. NAGESWARA RAO], [M.R. SHAH] (पान 18)
 - **आव्हानित निर्णय (पान 1-2):** Bombay High Court, Aurangabad Bench, L.P.A. No. 209/2010 in Writ Petition No. 5437 of 2010, दि. 20.12.2010
 

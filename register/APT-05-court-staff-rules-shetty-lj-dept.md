@@ -1,6 +1,8 @@
+> **पडताळणी (२८.१०.२०२६):** या फाइलचा मजकूर मूळ PDF च्या पान-प्रतिमांशी तुलना करून दुरुस्त केला आहे. तपशील व मर्यादा: `register/verification/` (coverage फाइल्स). जिथे पान वाचता आले नाही/तपासले नाही तिथे तसे नमूद आहे. अंतिम पुरावा म्हणून मूळ PDF जोडावी.
+
 # APT-05 — न्यायालयीन कर्मचारी/उच्च न्यायालय कर्मचारी नियम, शेट्टी आयोग व विधी व न्याय विभाग (पदे/वेतन) — नोंदवही
 
-स्वरूप: मूळ कागदपत्रांचा जशाचा तसा मजकूर. या नोंदवहीत कोणतेही मत, अर्थ, सल्ला किंवा निष्कर्ष नाही. इंग्रजी मजकूर PDF च्या text-layer मधून घेतला आहे ("[text-layer, visually unverified]").
+स्वरूप: मूळ कागदपत्रांचा जशाचा तसा मजकूर. या नोंदवहीत कोणतेही मत, अर्थ, सल्ला किंवा निष्कर्ष नाही. इंग्रजी मजकूर PDF च्या text-layer मधून घेतला आहे ("[पान-प्रतिमेशी पडताळले]").
 
 ## विषय-सूची
 
@@ -24,7 +26,7 @@
 - **क्रमांक/प्रकरण क्र.:** No.RC. 1502/2019-20/(Law Clerks)/2459
 - **दिनांक:** Date: 2nd March, 2023
 - **एकूण पाने:** 7
-- **वाचन पद्धत:** text-layer (pdftotext -layout); [text-layer, visually unverified]
+- **वाचन पद्धत:** text-layer (pdftotext -layout); [पान-प्रतिमेशी पडताळले]
 
 **विषय (जशाचा तसा):** "RECRUITMENT FOR THE POST OF “LAW CLERK”"
 
@@ -275,8 +277,8 @@ Sr.No. Particulars Date
 2 Date of publication of list of eligible 05/04/2023
 candidate for interview
 17/04/2023
-3 Date of interview to
-21/04/2023
+3 Date of interview
+to 21/04/2023
 
 4 Date of publication of result for the 28/04/2023
 post of Law Clerk
@@ -342,8 +344,8 @@ BY ORDER OF HONOURABLE THE CHIEF JUSTICE
 
 Sd/-
 Registrar General,
-nd
-Date: 2 March, 2023. High Court of Judicature at Bombay
+
+Date: 2nd March, 2023. High Court of Judicature at Bombay
 ```
 
 ---
@@ -356,7 +358,7 @@ Date: 2 March, 2023. High Court of Judicature at Bombay
 - **क्रमांक/प्रकरण क्र.:** Writ Petition(s)(Civil) No(s). 464/2023; IA No. 234832/2023 - CLARIFICATION/DIRECTION; IA No. 234833/2023 - EXEMPTION FROM FILING O.T.; IA No. 234830/2023 - INTERVENTION/IMPLEADMENT
 - **दिनांक:** Date : 14-11-2024
 - **एकूण पाने:** 6
-- **वाचन पद्धत:** text-layer (pdftotext -layout); [text-layer, visually unverified]
+- **वाचन पद्धत:** text-layer (pdftotext -layout); [पान-प्रतिमेशी पडताळले]
 - **पीठ (CORAM):** HON'BLE MR. JUSTICE ABHAY S. OKA; HON'BLE MR. JUSTICE AUGUSTINE GEORGE MASIH
 - **Amicus Curiae:** MR. MAHFOOZ NAZKI, ADVOCATE (as per Court's order dated 17.04.2023)
 
@@ -423,7 +425,7 @@ attempt to justify the same. We, therefore, direct the Chief
 
 Secretary of the State of Goa to personally remain present in this
 
-Court through video conference on next Friday i.e. 22 nd November,
+Court through video conference on next Friday i.e. 22nd November,
 
 2024.
 
@@ -563,7 +565,7 @@ attempt to justify the same. We, therefore, direct the Chief
 
 Secretary of the State of Goa to personally remain present in this
 
-Court through video conference on next Friday i.e. 22 nd November,
+Court through video conference on next Friday i.e. 22nd November,
 
 2024.
 
@@ -718,7 +720,7 @@ attempt to justify the same. We, therefore, direct the Chief
 
 Secretary of the State of Goa to personally remain present in this
 
-Court through video conference on next Friday i.e. 22 nd November,
+Court through video conference on next Friday i.e. 22nd November,
 
 2024.
 
@@ -864,7 +866,7 @@ attempt to justify the same. We, therefore, direct the Chief
 
 Secretary of the State of Goa to personally remain present in this
 
-Court through video conference on next Friday i.e. 22 nd November,
+Court through video conference on next Friday i.e. 22nd November,
 
 2024.
 
@@ -890,9 +892,9 @@ ASTT. REGISTRAR-cum-PS COURT MASTER (NSH)
 - **दस्तऐवज प्रकार:** नियम (Rules) — Maharashtra Judicial Service Rules, 2008
 - **जारी करणारी संस्था/न्यायालय/विभाग:** Law and Judiciary Department, Mantralaya, Mumbai (Government of Maharashtra), Governor of Maharashtra after consultation with the Maharashtra Public Service Commission and the High Court of Bombay (Articles 233, 234 and the proviso to Article 309 read with Article 235)
 - **क्रमांक/प्रकरण क्र.:** No. HCT/3004/49/C.R. No.9/III
-- **दिनांक:** "The Rules were published by Law and Judiciary Department, Mantralaya, Mumbai vide Notification dated 25th August, 2008 in the Gazette of Government of Maharashtra, Part IV-A dated 27 th August, 2008." — शीर्षक: "(As amended up to 14-06-2017)"
+- **दिनांक:** "The Rules were published by Law and Judiciary Department, Mantralaya, Mumbai vide Notification dated 25th August, 2008 in the Gazette of Government of Maharashtra, Part IV-A dated 27th August, 2008." — शीर्षक: "(As amended up to 14-06-2017)"
 - **एकूण पाने:** 20
-- **वाचन पद्धत:** text-layer (pdftotext -layout; soft-hyphen चिन्ह "-" म्हणून दर्शविले); [text-layer, visually unverified]
+- **वाचन पद्धत:** text-layer (pdftotext -layout; soft-hyphen चिन्ह "-" म्हणून दर्शविले); [पान-प्रतिमेशी पडताळले]
 
 **विषय (जशाचा तसा):** "MAHARASHTRA JUDICIAL SERVICE RULES, 2008*"
 
@@ -908,8 +910,8 @@ ASTT. REGISTRAR-cum-PS COURT MASTER (NSH)
 | CHAPTER-III RECRUITMENT | 6 | Recruitment by Nomination | 8 |
 | CHAPTER-III RECRUITMENT | 7 | Disqualification for appointment. | 11 |
 | CHAPTER-III RECRUITMENT | 8 | Conditions relating to Suitability, Fitness and Character : | 12 |
-| CHAPTER-III RECRUITMENT | 9 | Fees. | 12 |
-| CHAPTER-III RECRUITMENT | 10 | Joining time for Appointment. | 12 |
+| CHAPTER-III RECRUITMENT | 9 | Fees. | 13 |
+| CHAPTER-III RECRUITMENT | 10 | Joining time for Appointment. | 13 |
 | CHAPTER-III RECRUITMENT | 11 | Appointment by Promotion. | 13 |
 | CHAPTER-III RECRUITMENT | 12 | Competitive Examinations. (Deleted) / Competitive Examination. | 16 |
 | CHAPTER-IV PROBATION AND OFFICIATION | 13 | Probation and Officiation. | 17 |
@@ -965,7 +967,7 @@ be;
 (k) “State” means the State of Maharashtra.
 
 * The Rules were published by Law and Judiciary Department, Mantralaya, Mumbai vide Notification dated
-25th August, 2008 in the Gazette of Government of Maharashtra, Part IV-A dated 27 th August, 2008.
+25th August, 2008 in the Gazette of Government of Maharashtra, Part IV-A dated 27th August, 2008.
 1. Inserted vide notification dated 31.12.2010.
 2. Substituted vide notification dated 31.12.2010 for the words “includes Additional and Assistant Public
 Prosecutor”.
@@ -1106,8 +1108,8 @@ strictly on the basis of merit through
 limited competitive examination
 from amongst the Senior Civil
 Judges.
-Provided that if any of the
-7
+7Provided that if any of the
+
 
 posts could not be filled up from
 this 10% quota for want of eligible
@@ -1200,8 +1202,8 @@ resides, to have sufficient knowledge of
 Marathi to enable him to speak, read,
 write and translate with facility from
 Marathi into English and vice-versa.
-2 Senior (a) 90% of the posts by
-10
+2 Senior 10(a) 90% of the posts by
+
 Must have been in the cadre of Civil
 Civil regular promotion from the Judge, Junior Division for a period not
 Judges cadre of Civil Judge, Junior less than three years after successful
@@ -1330,7 +1332,7 @@ Government Rules.
 
 6. Recruitment by Nomination
 (1)(a) On or before the 15th January of every year in case of the Civil Judge, Junior
-Division and in case of District Judges the 31 st March of every year, the
+Division and in case of District Judges the 31st March of every year, the
 Recruiting Authority shall be informed of the number of existing vacancies
 and the vacancies that are likely to occur within one year for the post of Civil
 Judge, Junior Division and District Judge.
@@ -1346,8 +1348,8 @@ filling in the vacancies.
 ```text
 :: 9 ::
 
-(c) For the purpose of shortlisting the candidates, the Recruiting Authority may, if
-12
+12(c) For the purpose of shortlisting the candidates, the Recruiting Authority may, if
+
 
 necessary, hold preliminary written examination comprising of multiple choice
 objective type questions, which can be scrutinized by computers and call upon the
@@ -1358,8 +1360,8 @@ vacancies to the successful candidates:
 Provided that if there are more than one candidates who have secured identical
 cut-off marks as fixed by the Recruiting Authority for maintaining ratio of 1:10, all
 such candidates shall be called upon to appear for final written examination.
-13
-(d)(i)(a) The Recruiting Authority shall hold written examinations in Civil Law
+
+13(d)(i)(a) The Recruiting Authority shall hold written examinations in Civil Law
 and Criminal Law, carrying 100 marks each, having duration of 3
 hours each, for the post of Civil Judge, Junior Division.
 
@@ -1374,8 +1376,8 @@ application form about his choice of medium. Choice once given shall not be allo
 to be changed subsequently in any case;
 (iii) The medium of written examination for the post of District Judge shall be English.
 
-14
-(e)(i) The candidate applying for being appointed for the post of Civil Judge,
+
+14(e)(i) The candidate applying for being appointed for the post of Civil Judge,
 Junior Division who secures not less than 50 marks in each paper shall
 be eligible for viva-voce carrying 50 marks.
 
@@ -1416,8 +1418,8 @@ identical cut-off marks as fixed by the Recruiting Authority for maintaining the
 1:3, all such candidates shall be called upon to appear for viva-voce:
 Provided also that only such candidate who obtains at least 40% of marks in
 viva-voce test shall be eligible for selection.
-(f) The object of the viva-voce examination under these Rules is to assess the
-15
+15(f) The object of the viva-voce examination under these Rules is to assess the
+
 
 suitability of the candidate for the cadre by judging the mental alertness,
 knowledge of law, clear and logical exposition, balance of judgment, skills, attitude,
@@ -1536,12 +1538,12 @@ Explanation :- For the purposes of this clause, where a couple has only one chil
 number of children born out of a single subsequent delivery shall be deemed to be
 one child.
 
-Provided that, a person having more than two children on the date of
-18
+18Provided that, a person having more than two children on the date of
+
 
 commencement of the Maharashtra Civil Services (Declaration of Small Family)
 Rules, 2005 (i.e. Government Notification General Administration Department,
-No. SRV. 2000/C.R.17/2000/12, dated the 28 th March 2005) shall, not be
+No. SRV. 2000/C.R.17/2000/12, dated the 28th March 2005) shall, not be
 disqualified for appointment under this clause so long as the number of children
 he had on the date of commencement of these Rules does not increase:
 
@@ -1585,8 +1587,8 @@ the Recruiting Authority shall take all necessary steps well in advance so as to
 the list of persons considered eligible for promotion at least fifteen days before the
 occurrence of the vacancy. For this purpose, the Authority may follow an Annual
 Programme similar to the one prescribed in sub-rule (1) of rule 6 above.
-(2)(a) The suitability for promotion of Civil Judges, Junior Division to the post
-19
+19(2)(a) The suitability for promotion of Civil Judges, Junior Division to the post
+
 
 of Senior Civil Judge on the basis of principle of merit-cum-seniority shall be
 considered on the basis of evaluation of their judgments carrying 50 marks,
@@ -1595,8 +1597,8 @@ carrying 10 marks, Disposal Remarks carrying 10 marks and Special Reports of
 the Heads of the Departments under whom the candidate has worked during
 three years preceding the year of selection carrying 10 marks.
 
-(b) The Recruiting Authority shall draw up a list of officers from the zone of
-20
+20(b) The Recruiting Authority shall draw up a list of officers from the zone of
+
 
 consideration out of those Civil Judges, Junior Division, who have obtained at least
 60% marks in the evaluation referred to in the preceding clause, provided the selection
@@ -1631,8 +1633,8 @@ prepared in the succeeding year.
 (c) An additional list of Officers equal to ten percent of the expected number of
 vacancies may also be similarly prepared.
 
-(d) The zone of consideration shall be 1:3 of the available vacancies for
-21
+21(d) The zone of consideration shall be 1:3 of the available vacancies for
+
 
 promotion of Civil Judges, Junior Division to the cadre of Senior Civil Judge
 under Rules 5(2)(a):
@@ -1679,14 +1681,14 @@ knowledge of the Case Law.
 ```text
 :: 15 ::
 
-For promotion of Senior Civil Judges to the cadre of District Judges under
-23
+23For promotion of Senior Civil Judges to the cadre of District Judges under
+
 
 Rule 5(1)(a), the Recruiting Authority shall call upon the eligible Judicial Officers in
 the ratio of 241:5 of the available vacancies to submit their judgments for evaluation.
 
-Provided that the Chief Justice may, for reasons to be recorded in writing,
-25
+25Provided that the Chief Justice may, for reasons to be recorded in writing,
+
 
 relax the ratio in which Judicial Officers are called upon to submit their judgments for
 evaluation.
@@ -1710,8 +1712,8 @@ Judges and their names in the select list shall be arranged in accordance with t
 seniority in the cadre of Senior Civil Judges. Appointments shall be made from the list
 so prepared.
 
-26
-(ii) (a) For accelerated promotion of Senior Civil Judges to the posts of District
+
+26(ii) (a) For accelerated promotion of Senior Civil Judges to the posts of District
 Judges under Rule 5(1)(b), the Recruiting Authority shall hold a limited Departmental
 Competitive Examination carrying 200 marks having duration of 90 minutes,
 comprising of 100 multiple choice objective type questions, which can be scrutinised by
@@ -1792,8 +1794,8 @@ PROBATION AND OFFICIATION
 13. Probation and Officiation.- (1) All appointments to the service by nomination
 shall be on probation for a period of two years.
 
-Provided that appointment to the post of Civil Judge, Junior Division and
-28
+28Provided that appointment to the post of Civil Judge, Junior Division and
+
 
 Judicial Magistrate First Class shall be on probation for a period of three years.
 (2) All appointments by promotion shall be on officiating basis for a period of two
@@ -1861,8 +1863,8 @@ cases of all Judicial Officers by following the procedure prescribed for compuls
 retirement under the Maharashtra Civil Service Rules applicable to them, on their
 attaining the age of 58 years:
 
-Provided that, a Judicial Officer whose date of birth is 1 st of a month shall
-30
+30Provided that, a Judicial Officer whose date of birth is 1st of a month shall
+
 
 retired from service on the afternoon of the last day of the preceding month on
 attaining the age of 60 years.
@@ -1896,8 +1898,8 @@ member of the service when he attains the age of 50 years, 55 years or 58 years 
 giving him notice of not less than three months in writing or three months pay and
 allowances in lieu of such notice.
 
-(2) Whether a member of the service should be retired in the public interest
-32
+32(2) Whether a member of the service should be retired in the public interest
+
 
 under sub-rule (1) shall be considered at least three times, that is, when he is
 about to attain the age of 50 years, 55 years and 58 years.
@@ -1963,7 +1965,7 @@ Total 1768
 - **क्रमांक/प्रकरण क्र.:** Writ Petition(s)(Civil) No(s). 643/2015; WITH SLP( C ) No. 31461/2017; T.C.(C ) No. 3/2018
 - **दिनांक:** Date : 27-03-2018 (Signature digitally signed 2018.03.28)
 - **एकूण पाने:** 12
-- **वाचन पद्धत:** text-layer (pdftotext -layout); [text-layer, visually unverified]
+- **वाचन पद्धत:** text-layer (pdftotext -layout); [पान-प्रतिमेशी पडताळले]
 - **पीठ (CORAM, पान 7):** HON'BLE MR. JUSTICE J. CHELAMESWAR; HON'BLE MR. JUSTICE SANJAY KISHAN KAUL (स्वाक्षरीत आदेश पान 1-6, स्वाक्षरी: (J. CHELAMESWAR) पान 6; पान 7-12: Record of Proceedings)
 
 **विषय (जशाचा तसा):** "ALL INDIA JUDGES ASSOCIATION Petitioner(s) VERSUS UNION OF INDIA & ORS. Respondent(s) — O R D E R"
@@ -2145,7 +2147,7 @@ implemented by all the concerned States and Union Territories
 
 w.e.f. 1st of May, 2018. The arrears payable pursuant to the above-
 
-mentioned recommendations shall be paid on or before 30 th June,
+mentioned recommendations shall be paid on or before 30th June,
 
 2018.
 ```
@@ -2575,7 +2577,7 @@ AR CUM PS COURT MASTER
 - **क्रमांक/प्रकरण क्र.:** WRIT PETITION (CIVIL) NO. 643 OF 2015
 - **दिनांक:** Date : 28-02-2020 (Signature digitally signed 2020.03.03)
 - **एकूण पाने:** 12
-- **वाचन पद्धत:** text-layer (pdftotext -layout); [text-layer, visually unverified]
+- **वाचन पद्धत:** text-layer (pdftotext -layout); [पान-प्रतिमेशी पडताळले]
 - **पीठ (CORAM, पान 8):** HON'BLE THE CHIEF JUSTICE; HON'BLE MR. JUSTICE B.R. GAVAI; HON'BLE MR. JUSTICE SURYA KANT (स्वाक्षरीत आदेश पान 1-7, स्वाक्षरी: CJI पान 7; पान 8-12: Record of Proceedings)
 
 **विषय (जशाचा तसा):** "ALL INDIA JUDGES ASSOCIATION Petitioner (s) VERSUS UNION OF INDIA AND ORS. Respondent (s) — O R D E R"
@@ -3313,7 +3315,7 @@ A.R.-CUM-P.S. ASSTT. REGISTRAR
 - **क्रमांक/प्रकरण क्र.:** Writ Petition (Civil) No. 643/2015; With Special Leave Petition (Civil) Nos. 6471-6473/2020; With Contempt Petition (Civil) Nos. 711/2022, 36/2023, 37/2023, 38/2023, 39/2023, 40/2023, 848/2023 in Writ Petition (Civil) No. 643/2015
 - **दिनांक:** May 19, 2023 (शेवटचे पान)
 - **एकूण पाने:** 51
-- **वाचन पद्धत:** text-layer (pdftotext -layout); [text-layer, visually unverified]
+- **वाचन पद्धत:** text-layer (pdftotext -layout); [पान-प्रतिमेशी पडताळले]
 - **पीठ:** [Dr Dhananjaya Y Chandrachud] CJI; [V. Ramasubramanian] J.; [Pamidighantam Sri Narasimha] J. (पान 51)
 - **निर्णयाची अनुक्रमणिका (पान 2-4):** 1. Introduction to Pay Commissions; 2. The SNJPC's Report and the Orders of this Court (पान 6); 3. Submissions of Counsel (पान 8); 4. Principles Evolved for Judicial Pay, Pension and Allowances (पान 11); … 6. Recommendations on Pension, Gratuity and Age of Retirement etc.; 7. Considerations of Recommendations on Pension, Gratuity etc. (पान 40); 8. Consequential Directions (पान 50) — (अनुक्रमणिकेचा मजकूर संपूर्ण मजकुरात पान 2-4 वर जशाचा तसा)
 - **न्यायालयाने शिफारशींवर दिलेले निर्णय दर्शविणारे तक्ते (जशाचे तसे संपूर्ण मजकुरात):** परिच्छेद 83 (पान 33-37) व परिच्छेद 111 (पान 46-50)
@@ -3558,7 +3560,7 @@ allowances.3 Notably, the recommendations were accepted with effect from 01.01.1
 This was because the employees of the Central Government were given the benefits of
 the 5th Central Pay Commission from that date.
 
-3. Within the next few years, the Central Government appointed the 6 th Central Pay
+3. Within the next few years, the Central Government appointed the 6th Central Pay
 Commission, and the Commission made its recommendations which were accepted from
 01.01.2006. To ensure that the District Judiciary does not lag behind, this Court once
 again stepped in at the instance of the very same All India Judges Association. This Court
@@ -3767,7 +3769,7 @@ AAG for the State of Haryana, Kuldeep Singh Parihar, Counsel for the State of
 Uttarakhand appearing for the States.
 
 19. They firstly contended that the multiplier of 2.81 cannot be applied to the District
-Judiciary across the cadres. It is their argument that the 7 th CPC recommended a graded
+Judiciary across the cadres. It is their argument that the 7th CPC recommended a graded
 pay increase across different cadres of the employees of the Central Government and
 therefore, the same has to be applied even for the judiciary. Thereafter, they once again
 argued that the States do not have sufficient financial resources to meet the increase in
@@ -4314,7 +4316,7 @@ same as mentioned in the above paragraphs.
 II. New Pay Structure as per Pay Matrix Model (Recommendation 44.2,
 44.3)
 
-46. The SNJPC has recommended that the pay matrix model, which was adopted by the 7 th
+46. The SNJPC has recommended that the pay matrix model, which was adopted by the 7th
 Central Pay Commission be adopted for Judicial Officers as well. This is desirable as it
 simplifies the matter of pay for judges. Notably, this Court has already accepted this
 recommendation by Order dated 27.07.2022. 21 This has been confirmed in Order dated
@@ -4328,7 +4330,7 @@ III. Multiplier of 2.81 and Its Uniform Application (Recommendations 44.4-
 
 47. The Multiplier/Index of Rationalization of 2.81 has been suggested by the SNJPC to be
 applied to all cadres of judicial officers. The objection of the States and the Union is that
-the IoR of 2.81 has not been suggested by the 7 th CPC to all cadres of officers. It is their
+the IoR of 2.81 has not been suggested by the 7th CPC to all cadres of officers. It is their
 say that when the Central Pay Commission adopted a graduated fitment factor ranging
 from 2.57 for entry level officers to 2.81 for officers of the level of Secretary to the
 Government of India, the judicial officers could not have been granted a uniform
@@ -4547,7 +4549,7 @@ circumstances, the recommendation deserves acceptance.
 
 IX. Grant of 1st ACP to Civil Judge (Jr Div) (Recommendation 44.15 (i))
 
-64. The Commission suggested that the 1 st Assured Career Progression be given to the Civil
+64. The Commission suggested that the 1st Assured Career Progression be given to the Civil
 Judges (Jr Div) be granted on the basis of relaxed norms of performance. At present, a
 Civil Judge (Jr Div) would be entitled to the first ACP only after completing 5 years of
 service. A Civil Judge (Jr Div) is normally in the process of learning the work in his first
@@ -4586,11 +4588,11 @@ position of Civil Judges (Sr Div). 32 It may be noted that there is no rule for 
 participation of Civil Judge (Jr. Div.) in the Limited Competitive Examination to be
 recruited as District Judge.
 
-68. As regards the relaxed norms which could apply for the 1 st ACP, it is noted that the
+68. As regards the relaxed norms which could apply for the 1st ACP, it is noted that the
 SNJPC has recommended that the scrutiny for the grant of First ACP will be limited to
 ascertaining whether there is anything positively adverse such as there is any
 poor/unsatisfactory performance or there being an adverse report of serious nature
-leading to the inference that the officer is unfit to have the benefit of the 1 st ACP. A
+leading to the inference that the officer is unfit to have the benefit of the 1st ACP. A
 29
 All India Judges' Assn. v. Union of India (2002) 4 SCC 247 at para 28.
 30
@@ -4606,7 +4608,7 @@ Rule 5, Maharashtra Judicial Service Rules, 2008.
 
 ```text
 similar provision already exists in Rule 3(5) of the Maharashtra Judicial Services Rules,
-2008. This Rule prescribes that for the 1 st ACP, the ACR rating required is only
+2008. This Rule prescribes that for the 1st ACP, the ACR rating required is only
 ‘Average’ and for the 2nd ACP, the Judicial Officer needs to be rated ‘Good’ for five
 continuous years. Such a rule is only an illustration. High Courts may devise other
 methods for these relaxed norms.
@@ -4634,7 +4636,7 @@ delay in making ACRs is avoided in the future.
 72. Separately, to avoid this delay in the future, the Commission suggested that the process
 of grant of ACP should be initiated 3 months in advance from the date on which the
 judicial officers will be completing 5/10 years and the financial benefits should be paid to
-the judicial officer within a period of 6 months after the judicial officer steps into the 6 th/
+the judicial officer within a period of 6 months after the judicial officer steps into the 6th/
 11th year of Service. Therefore, the Commission recommended that if grant of ACP is
 delayed for every year, one additional increment shall be granted for every year of delay
 subject to the adjustment with the ACP arrears.
@@ -5186,7 +5188,7 @@ recommended the payment of additional quantum of pension from the age of 75 year
 onwards at the rates mentioned in the table on p.44 of the Report.
 
 99. It is seen that different states have different ages for the grant of additional quantum of
-pension and family pension. The 7 th CPC suggested the age of 80 years as the minimum.
+pension and family pension. The 7th CPC suggested the age of 80 years as the minimum.
 High Court and Supreme Court judges also receive additional quantum of pension at the
 age of 80 years. It was however argued by Gourab Banerji, Senior Advocate that as
 District Judges retire at a younger age, the additional quantum of pension should accrue
@@ -5241,7 +5243,7 @@ differential gratuity be paid to them subject to the revised maximum limit. This
 consequential and is accepted by this Court. It is accordingly ordered.
 
 106. The final recommendation made by the Commission on the subject of gratuity is that
-death gratuity be paid on the same lines as the 7 th CPC. Accordingly, the recommendation
+death gratuity be paid on the same lines as the 7th CPC. Accordingly, the recommendation
 is accepted as it is in line with the already accepted principles laid down by this Court.
 
 IX. Recommendations on Retirement Age

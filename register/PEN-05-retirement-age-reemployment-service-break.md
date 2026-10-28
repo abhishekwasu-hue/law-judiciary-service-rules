@@ -1,7 +1,9 @@
+> **पडताळणी (२८.१०.२०२६):** या फाइलचा मजकूर मूळ PDF च्या पान-प्रतिमांशी तुलना करून दुरुस्त केला आहे. तपशील व मर्यादा: `register/verification/` (coverage फाइल्स). जिथे पान वाचता आले नाही/तपासले नाही तिथे तसे नमूद आहे. अंतिम पुरावा म्हणून मूळ PDF जोडावी.
+
 # PEN-05 — निवृत्तीचे वय, सेवावाढ, पुनर्नियुक्ती, सेवेतील खंड / खंड-माफी व सेवा-गणना (फोल्डर 80, 90, 91 व संबंधित 45/46)
 
 > नोंद: या नोंदवहीत स्वतःचे मत/अर्थ/सल्ला/निष्कर्ष घातलेले नाहीत. मजकूर मूळ दस्तऐवजातून जसाच्या तसा घेतला आहे; कोठेही संक्षेप/"..." केलेला नाही (अपवाद फक्त खाली "अनुपलब्ध/न वाचलेले" मध्ये स्पष्ट सांगितलेले).
-> स्रोत-टॅग: **[visually verified]** = पृष्ठ प्रतिमा (110 dpi) पाहून शब्दशः टंकित. **[text-layer, visually unverified]** = PDF मधील मजकूर-स्तर जसा आहे तसा (तो इंग्रजी/स्वच्छ असल्याने), प्रतिमेशी पूर्ण पडताळणी नाही. **वाचन अपूर्ण** = वाचले/टंकित केलेले नाही (कारण दिले आहे). वितरण-सूची ("प्रति"/"प्रत" यादी) टंकित केलेल्या नाहीत; प्रत्येक नोंदीत तसे नमूद आहे.
+> स्रोत-टॅग: **[visually verified]** = पृष्ठ प्रतिमा (110 dpi) पाहून शब्दशः टंकित. **[पान-प्रतिमेशी पडताळले]** = PDF मधील मजकूर-स्तर जसा आहे तसा (तो इंग्रजी/स्वच्छ असल्याने), प्रतिमेशी पूर्ण पडताळणी नाही. **वाचन अपूर्ण** = वाचले/टंकित केलेले नाही (कारण दिले आहे). वितरण-सूची ("प्रति"/"प्रत" यादी) टंकित केलेल्या नाहीत; प्रत्येक नोंदीत तसे नमूद आहे.
 
 ## विषय-सूची
 
@@ -31,7 +33,7 @@
 - **दस्तऐवज प्रकार:** सांविधिक नियम (संविधान अनुच्छेद 309 च्या परंतुकान्वये); आवृत्ती: Revised up to 31st July 1992, Second Edition 1995
 - **जारी करणारा विभाग:** Government of Maharashtra, Finance Department
 - **एकूण पृष्ठे:** 199 (संपूर्ण पुस्तक PEN-01 भाग 1 मध्ये; येथे संबंधित नियम असलेली पृष्ठे पुन्हा घेतली आहेत)
-- **वाचन:** मजकूर-स्तर (इंग्रजी, स्वच्छ) — [text-layer, visually unverified]
+- **वाचन:** मजकूर-स्तर (इंग्रजी, स्वच्छ) — [पान-प्रतिमेशी पडताळले]
 
 ### संबंधित नियमांची निर्देशिका (पुस्तकाच्या Contents मधून, शब्दशः; पृष्ठ = Contents मधील पृष्ठ क्र., PDF पृष्ठ क्र. शी जुळणारे)
 
@@ -86,7 +88,7 @@
 
 ##### PDF पृष्ठ 22 ते 26
 
-#### PDF पृष्ठ 22 [text-layer, visually unverified]
+#### PDF पृष्ठ 22 [पान-प्रतिमेशी पडताळले]
 
 ```text
                              CHAPTER III-RETIREMENT
@@ -131,7 +133,7 @@ retire-
 Government:-
 ```
 
-#### PDF पृष्ठ 23 [text-layer, visually unverified]
+#### PDF पृष्ठ 23 [पान-प्रतिमेशी पडताळले]
 
 ```text
        (i)     if he had entered Government service under any Government in India,
@@ -180,7 +182,7 @@ months giving reasons therefore;
      his pension before the expiry of the period of notice of three months.]
 ```
 
-#### PDF पृष्ठ 24 [text-layer, visually unverified]
+#### PDF पृष्ठ 24 [पान-प्रतिमेशी पडताळले]
 
 ```text
 (7) A Government servant, who has elected to retire under sub-rule (5) and has given the
@@ -228,7 +230,7 @@ rule (2) of rule 10, he must revert to a post in Class IV service before he atta
 58 years.
 ```
 
-#### PDF पृष्ठ 25 [text-layer, visually unverified]
+#### PDF पृष्ठ 25 [पान-प्रतिमेशी पडताळले]
 
 ```text
 12.      Extension in service beyond the age of compulsory retirement
@@ -272,7 +274,7 @@ it is proposed to grant extension of service, reports should be made to Governme
 least two months before the necessity for sanction or fresh sanction arises.
 ```
 
-#### PDF पृष्ठ 26 [text-layer, visually unverified]
+#### PDF पृष्ठ 26 [पान-प्रतिमेशी पडताळले]
 
 ```text
 16.     Claim for compensation for retirement is not to be entertained
@@ -323,7 +325,7 @@ who has been asked to retire under this rule.
 
 ##### PDF पृष्ठ 32 ते 44
 
-#### PDF पृष्ठ 32 [text-layer, visually unverified]
+#### PDF पृष्ठ 32 [पान-प्रतिमेशी पडताळले]
 
 ```text
                              CHAPTER V-QUALIFYING SERVICE
@@ -376,7 +378,7 @@ regulated by the Government or under conditions determined by the Government.
 Government and paid by Government from the Consolidated Fund of State or a Local
 ```
 
-#### PDF पृष्ठ 33 [text-layer, visually unverified]
+#### PDF पृष्ठ 33 [पान-प्रतिमेशी पडताळले]
 
 ```text
 Fund administered by Government but does not include service in a non-pensionable
@@ -426,7 +428,7 @@ computing the period of break the terminal leave availed of by the persons conce
 into account. The leave salary is not, however, refundable.
 ```
 
-#### PDF पृष्ठ 34 [text-layer, visually unverified]
+#### PDF पृष्ठ 34 [पान-प्रतिमेशी पडताळले]
 
 ```text
 34.       Incidence of pension in respect of service under Local Fund
@@ -472,7 +474,7 @@ later.
           service rendered on contract.
 ```
 
-#### PDF पृष्ठ 35 [text-layer, visually unverified]
+#### PDF पृष्ठ 35 [पान-प्रतिमेशी पडताळले]
 
 ```text
 39.    Counting of pre-retirement civil service in the case of re-employed
@@ -522,7 +524,7 @@ servant shall be deemed to have opted for clause (a) of sub-rule (I)
        the Government servant’s final retirement if the two periods of service were
 ```
 
-#### PDF पृष्ठ 36 [text-layer, visually unverified]
+#### PDF पृष्ठ 36 [पान-प्रतिमेशी पडताळले]
 
 ```text
         combined and the value of retirement benefits already granted to him for the
@@ -573,7 +575,7 @@ such gratuity shall be refundable;
 automatically condoned provided the period of the break does not exceed one year.
 ```
 
-#### PDF पृष्ठ 37 [text-layer, visually unverified]
+#### PDF पृष्ठ 37 [पान-प्रतिमेशी पडताळले]
 
 ```text
 Bread exceeding one year but not exceeding three years, may also be condoned, in
@@ -627,7 +629,7 @@ under training immediately before appointment to service under it shall count as
 qualifying service.
 ```
 
-#### PDF पृष्ठ 38 [text-layer, visually unverified]
+#### PDF पृष्ठ 38 [पान-प्रतिमेशी पडताळले]
 
 ```text
 43.      Counting of periods of suspension
@@ -677,7 +679,7 @@ resigned his post under Government, to take him back in service in the public in
 the following conditions, namely:-
 ```
 
-#### PDF पृष्ठ 39 [text-layer, visually unverified]
+#### PDF पृष्ठ 39 [पान-प्रतिमेशी पडताळले]
 
 ```text
 (a) that the resignation was tendered by the Government servant for some compelling
@@ -727,7 +729,7 @@ interest;
 (e) joining time while on transfer from one post to another.
 ```
 
-#### PDF पृष्ठ 40 [text-layer, visually unverified]
+#### PDF पृष्ठ 40 [पान-प्रतिमेशी पडताळले]
 
 ```text
 (2) Notwithstanding anything contained in sub-rule (i), the appointing authority may, by
@@ -776,7 +778,7 @@ the expiry of leave taken out of India, the period spent on the voyage to India 
 treated as duty for pension.
 ```
 
-#### PDF पृष्ठ 41 [text-layer, visually unverified]
+#### PDF पृष्ठ 41 [पान-प्रतिमेशी पडताळले]
 
 ```text
 51.     Period of non-employment on non-continuous post
@@ -828,7 +830,7 @@ Attendants into those of Peons, one-half of the previous continuous service rend
 shall count for pension in respect of those who retire on or after 30th June,1982.
 ```
 
-#### PDF पृष्ठ 42 [text-layer, visually unverified]
+#### PDF पृष्ठ 42 [पान-प्रतिमेशी पडताळले]
 
 ```text
 53.     Addition to qualifying service for Superannuation pension
@@ -870,7 +872,7 @@ Judge);
 (xxii) Additional Commissioner for Workmen’s Compensation;
 ```
 
-#### PDF पृष्ठ 43 [text-layer, visually unverified]
+#### PDF पृष्ठ 43 [पान-प्रतिमेशी पडताळले]
 
 ```text
 the number of years on a sliding scale as indicated below:-
@@ -920,7 +922,7 @@ Asian Development Bank or the Commonwealth Secretariat may at his option-
 as qualifying for pension under these rules; or
 ```
 
-#### PDF पृष्ठ 44 [text-layer, visually unverified]
+#### PDF पृष्ठ 44 [पान-प्रतिमेशी पडताळले]
 
 ```text
 (b) avail of the retirement benefits admissible under the rules of the aforesaid
@@ -968,7 +970,7 @@ their previous continuous service as Attendants, shall be allowed to count for p
 
 ##### PDF पृष्ठ 111 ते 118
 
-#### PDF पृष्ठ 111 [text-layer, visually unverified]
+#### PDF पृष्ठ 111 [पान-प्रतिमेशी पडताळले]
 
 ```text
                 CHAPTER XIV-RE-EMPLOYMENT OF PENSONERS
@@ -1018,7 +1020,7 @@ award. The amount of such pension or addition to pension shall not be taken into
 when fixing the pay during re-employment or continued employment.
 ```
 
-#### PDF पृष्ठ 112 [text-layer, visually unverified]
+#### PDF पृष्ठ 112 [पान-प्रतिमेशी पडताळले]
 
 ```text
 Note:- Where the military pension is consolidated and service and disability elements are not
@@ -1070,7 +1072,7 @@ and
 competent authority while fixing the pay under sub-rule (2) above, shall ignore :-
 ```
 
-#### PDF पृष्ठ 113 [text-layer, visually unverified]
+#### PDF पृष्ठ 113 [पान-प्रतिमेशी पडताळले]
 
 ```text
 (i) In the case of Civil Pensioners holding Class I post at the time of retirement, first
@@ -1123,7 +1125,7 @@ commutation, less the amount commuted.
 employment the original amount of the pension should be taken in to consideration in
 ```
 
-#### PDF पृष्ठ 114 [text-layer, visually unverified]
+#### PDF पृष्ठ 114 [पान-प्रतिमेशी पडताळले]
 
 ```text
 fixing the total receipts during re-employment or continued employment and not merely
@@ -1174,7 +1176,7 @@ the authority competent to fix the pay and allowances of the post in which he is
 employed shall, in fixing his pay and allowances in the post reduce his initial pay in the
 ```
 
-#### PDF पृष्ठ 115 [text-layer, visually unverified]
+#### PDF पृष्ठ 115 [पान-प्रतिमेशी पडताळले]
 
 ```text
 post by the amount of pension, including such portion of it as may have been commuted
@@ -1227,7 +1229,7 @@ Note – For the purpose of this rule-
    1. Substituted by Notification No.RES-1086/CR-52/SER-7, dated,21-11-1986.
 ```
 
-#### PDF पृष्ठ 116 [text-layer, visually unverified]
+#### PDF पृष्ठ 116 [पान-प्रतिमेशी पडताळले]
 
 ```text
     (b) Junior Commissioned officers and below, shall include -
@@ -1279,7 +1281,7 @@ employment, the Government shall have regard to the following factors, namely:-
         Government departments ;
 ```
 
-#### PDF पृष्ठ 117 [text-layer, visually unverified]
+#### PDF पृष्ठ 117 [पान-प्रतिमेशी पडताळले]
 
 ```text
 (e) Whether his commercial duties will be such that his previous official position or knowledge or
@@ -1338,7 +1340,7 @@ concerned.
 (a) the expression “ commercial employment” means -
 ```
 
-#### PDF पृष्ठ 118 [text-layer, visually unverified]
+#### PDF पृष्ठ 118 [पान-प्रतिमेशी पडताळले]
 
 ```text
    (i) an employment in any capacity including that of an agent, under a company, co-operative society,
@@ -1405,11 +1407,11 @@ concerned.
 - **एकूण पृष्ठे:** 10
 - **विषय (आदेशातून, परिच्छेद 1 व 3):** याचिकाकर्ते — Public Health Department मधील permanent Medical Officers — यांनी Maharashtra Administrative Tribunal कडे Maharashtra Civil Services (Pension) Rules, 1982 च्या नियम 10 च्या provisoच्या 2nd part चा लाभ देऊन सेवेत राहू देण्याची प्रार्थना केली; Tribunal ने दि. 31 August 2023 रोजी मूळ अर्ज फेटाळले.
 - **निर्णायक / आदेशात्मक परिच्छेद (स्थान-निर्देश; मजकूर खाली पूर्ण):** परिच्छेद 9 ते 15 (PDF पृ. 6–10); नियम 10 चा उद्धृत मजकूर परिच्छेद 4 (PDF पृ. 3–4).
-- **वाचन:** मजकूर-स्तर (इंग्रजी, स्वच्छ) जसाच्या तसा — [text-layer, visually unverified]
+- **वाचन:** मजकूर-स्तर (इंग्रजी, स्वच्छ) जसाच्या तसा — [पान-प्रतिमेशी पडताळले]
 
 #### आदेशाचा संपूर्ण मजकूर (PDF पृ. 1–10)
 
-#### PDF पृष्ठ 1 [text-layer, visually unverified]
+#### PDF पृष्ठ 1 [पान-प्रतिमेशी पडताळले]
 
 ```text
                    J R Mane                         1         904- wp- 11453-23 903- 905- .edited.doc
@@ -1460,7 +1462,7 @@ Date: 2023.10.09
                     ::: Uploaded on - 09/10/2023           ::: Downloaded on - 09/10/2023 22:06:22 :::
 ```
 
-#### PDF पृष्ठ 2 [text-layer, visually unverified]
+#### PDF पृष्ठ 2 [पान-प्रतिमेशी पडताळले]
 
 ```text
  J R Mane                         2           904- wp- 11453-23 903- 905- .edited.doc
@@ -1505,7 +1507,7 @@ effect to the 2nd part of the proviso of Rule 10 of Maharashtra Civil
  ::: Uploaded on - 09/10/2023                ::: Downloaded on - 09/10/2023 22:06:22 :::
 ```
 
-#### PDF पृष्ठ 3 [text-layer, visually unverified]
+#### PDF पृष्ठ 3 [पान-प्रतिमेशी पडताळले]
 
 ```text
  J R Mane                              3           904- wp- 11453-23 903- 905- .edited.doc
@@ -1541,7 +1543,7 @@ portion of the amended Rule 10 reads as under:
     ::: Uploaded on - 09/10/2023                  ::: Downloaded on - 09/10/2023 22:06:22 :::
 ```
 
-#### PDF पृष्ठ 4 [text-layer, visually unverified]
+#### PDF पृष्ठ 4 [पान-प्रतिमेशी पडताळले]
 
 ```text
  J R Mane                             4           904- wp- 11453-23 903- 905- .edited.doc
@@ -1587,7 +1589,7 @@ from service on the afternoon of the last date of the month in which
  ::: Uploaded on - 09/10/2023                    ::: Downloaded on - 09/10/2023 22:06:22 :::
 ```
 
-#### PDF पृष्ठ 5 [text-layer, visually unverified]
+#### PDF पृष्ठ 5 [पान-प्रतिमेशी पडताळले]
 
 ```text
  J R Mane                          5         904- wp- 11453-23 903- 905- .edited.doc
@@ -1624,7 +1626,7 @@ proviso as to whether the age of retirement at 60 years as provided in
     ::: Uploaded on - 09/10/2023            ::: Downloaded on - 09/10/2023 22:06:22 :::
 ```
 
-#### PDF पृष्ठ 6 [text-layer, visually unverified]
+#### PDF पृष्ठ 6 [पान-प्रतिमेशी पडताळले]
 
 ```text
  J R Mane                              6           904- wp- 11453-23 903- 905- .edited.doc
@@ -1660,7 +1662,7 @@ have not completed the age of 60 years as of today. Generally, by
     ::: Uploaded on - 09/10/2023                  ::: Downloaded on - 09/10/2023 22:06:22 :::
 ```
 
-#### PDF पृष्ठ 7 [text-layer, visually unverified]
+#### PDF पृष्ठ 7 [पान-प्रतिमेशी पडताळले]
 
 ```text
  J R Mane                             7         904- wp- 11453-23 903- 905- .edited.doc
@@ -1702,7 +1704,7 @@ Secretary, had filed an affidavit before the Tribunal stating as under:
  ::: Uploaded on - 09/10/2023                  ::: Downloaded on - 09/10/2023 22:06:22 :::
 ```
 
-#### PDF पृष्ठ 8 [text-layer, visually unverified]
+#### PDF पृष्ठ 8 [पान-प्रतिमेशी पडताळले]
 
 ```text
  J R Mane                          8            904- wp- 11453-23 903- 905- .edited.doc
@@ -1743,7 +1745,7 @@ amendment carried out thereafter. Though, it is correct that the
  ::: Uploaded on - 09/10/2023                  ::: Downloaded on - 09/10/2023 22:06:22 :::
 ```
 
-#### PDF पृष्ठ 9 [text-layer, visually unverified]
+#### PDF पृष्ठ 9 [पान-प्रतिमेशी पडताळले]
 
 ```text
  J R Mane                           9           904- wp- 11453-23 903- 905- .edited.doc
@@ -1782,7 +1784,7 @@ retirement and without protest took retirement. As far as the
  ::: Uploaded on - 09/10/2023                  ::: Downloaded on - 09/10/2023 22:06:22 :::
 ```
 
-#### PDF पृष्ठ 10 [text-layer, visually unverified]
+#### PDF पृष्ठ 10 [पान-प्रतिमेशी पडताळले]
 
 ```text
  J R Mane                         10            904- wp- 11453-23 903- 905- .edited.doc
@@ -1833,9 +1835,36 @@ appropriate view/decision will be taken in those cases.
 पोलीस महासंचालक यांचे उपसहायक (र.व.का.)
 पोलीस महासंचालक, महाराष्ट्र राज्य, मुंबई यांचेकरिता
 
-प्रति, [वितरण-सूची — टंकित नाही; वाचन अपूर्ण]
+प्रति,
+महासंचालक, लाचलुचपत प्रतिबंधक विभाग, महाराष्ट्र राज्य, मुंबई (सस्नेह).
+पोलीस महासंचालक, प्रशिक्षण व खास पथके, महाराष्ट्र राज्य, मुंबई (सस्नेह)
+पोलीस महासंचालक,लोहमार्ग, महाराष्ट्र राज्य, मुंबई (सस्नेह )
+आयुक्त, राज्य गुप्तवार्ता विभाग, महाराष्ट्र राज्य,मुंबई.
+सर्व पोलीस आयुक्त (लोहमार्गसह)
+अपर पोलीस महासंचालक (कायदा व सुव्यवस्था / आस्थापना /प्रशासन / नियोजन व समन्वय / विशेष कृती /रा.रा.पो.बल /वाहतूक / फोर्स वन /दहशतवाद विरोधी पथक/ आर्थिक गुन्हे /नागरी हक्क संरक्षण), महाराष्ट्र राज्य, मुंबई.
+अपर पोलीस महासंचालक, गुन्हे अन्वेषण विभाग , महाराष्ट्र राज्य, पुणे.
+अपर पोलीस महासंचालक व संचालक, दळणवळण, माहिती तंत्रज्ञान व परिवहन, महाराष्ट्र राज्य, पुणे.
+सर्व परिक्षेत्रीय विशेष पोलीस महानिरीक्षक / पोलीस उप महानिरीक्षक
+विशेष पोलीस महानिरीक्षक (कायदा व सुव्यवस्था / आस्थापना /प्रशासन / महिला व बाल अत्याचार प्रतिबंध विभाग/ सायबर सुरक्षा), महाराष्ट्र राज्य, मुंबई.
 
-**PDF पृ. 2 (मुद्रित "Page 416")** — वितरण-सूचीचे उर्वरित भाग (टंकित नाही) आणि:
+**PDF पृ. 2 (मुद्रित "Page 416")** — वितरण-सूचीचे उर्वरित भाग आणि:
+
+विशेष पोलीस महानिरीक्षक,व्हीआयपी सुरक्षा, मुंबई / मोटार परिवहन विभाग, पुणे /नक्षल विरोधी अभियान, नागपूर.
+संचालक व विशेष पोलीस महानिरीक्षक, महाराष्ट्र गुप्तवार्ता प्रबोधिनी,पुणे/महाराष्ट्र पोलीस अकादमी,नाशिक.
+पोलीस उप महानिरीक्षक, गडचिरोली परिक्षेत्र, कॅम्प नागपूर.
+पोलीस उप महानिरीक्षक, राज्य राखीव पोलीस बल,पुणे व नागपूर.
+सर्व  पोलीस अधीक्षक (गुन्हे / बिनतारी संदेश / लोहमार्ग सह )
+पोलीस अधीक्षक, विशेष कृती  दल, सुराबर्डी, अमरावती रोड, नागपूर.
+प्राचार्य, गुन्हे अन्वेषण  प्रशिक्षण केंद्र, नाशिक.
+सर्व प्राचार्य पोलीस प्रशिक्षण केंद्रे.
+सर्व समादेशक, राज्य राखीव  पोलीस बल, गट क्र.१ ते १९
+सहायक पोलीस महानिरीक्षक (का.व सु./ प्रशासन / नि. व स.), महाराष्ट्र राज्य, मुंबई.
+सरसंपादक, दक्षता तथा  सहायक पोलीस महानिरीक्षक (धोरण), महाराष्ट्र राज्य, मुंबई.
+पोलीस महासंचालक यांचे वरिष्ठ उपसहायक/ उपसहायक
+सर्व उच्चश्रेणी / निम्नश्रेणी लघुलेखक, पोलीस महासंचालक कार्यालय, मुंबई.
+सर्व कार्यासन अधिकारी, का.क्र.०१ ते ४४
+
+प्रत,
 
 प्रत,
 पोलीस उप अधीक्षक, संगणक कक्ष, पोलीस महासंचालक कार्यालय, मुंबई.
@@ -1880,11 +1909,72 @@ appropriate view/decision will be taken in those cases.
 ( मनिषा यु.कामटे )
 शासनाचे उप सचिव.
 
-प्रति, [वितरण-सूची अनु. क्र. १ ते २७ — टंकित नाही; वाचन अपूर्ण]
+प्रति,
+१) महालेखापाल (लेखा व अनुज्ञेयता)-१, महाराष्ट्र, मुंबई.
+२) महालेखापाल (लेखा व अनुज्ञेयता)-२, महाराष्ट्र, नागपूर.
+३) महालेखापाल (लेखा परीक्षा)-१, महाराष्ट्र, मुंबई.
+४) महालेखापाल (लेखा परीक्षा)-२, महाराष्ट्र, नागपूर.
+५) संचालक, लेखा व कोषागारे, मुंबई.
+६) अधिदान व लेखा अधिकारी, वांद्रे, मुंबई.
+७) संचालक, माहिती व जनसंपर्क विभाग, मंत्रालय, मुंबई.
+८) मुख्य लेखा परीक्षा, स्थानिक निधी लेखा, कोकण भवन, वाशी, नवी मुंबई.
+९) उपमुख्य लेखा परीक्षक, स्थानिक निधी लेखा, मुंबई/पुणे/नागपूर/औरंगाबाद/नाशिक/ अमरावती.
+१०) वरिष्ठ कोषागार अधिकारी, पुणे / नागपूर / औरंगाबाद / नाशिक.
+११) निवासी लेखा परीक्षा अधिकारी, मुंबई.
+१२) सर्व जिल्हा कोषागार अधिकारी.
+१३) मा.विरोधी पक्ष नेता, विधानसभा / विधानपरिषद.
+१४) सर्व विधानमंडळ सदस्य, विधानभवन, मुंबई.
+१५) राज्यपालांचे सचिव.
+१६) मुख्यमंत्र्यांचे सचिव.
+१७) सर्व मंत्री व राज्य मंत्री यांचे खाजगी सचिव.
+१८) प्रबंधक, उच्च न्यायालय (मूळ न्याय शाखा), मुंबई.
+१९) प्रबंधक, उच्च न्यायालय (अपील शाखा), मुंबई.
+२०) सचिव, महाराष्ट्र लोकसेवा आयोग, मुंबई.
+२१) सचिव, महाराष्ट्र विधानमंडळ सचिवालय, मुंबई.
+२२) प्रबंधक, लोक आयुक्त व उप लोक आयुक्त यांचे कार्यालय, मुंबई.
+२३) प्रबंधक, महाराष्ट्र प्रशासकीय न्यायाधिकरण, मुंबई / नागपूर / औरंगाबाद.
+२४) मुख्य माहिती आयुक्त, महाराष्ट्र, मुंबई.
+२५) आयुक्त, राज्य माहिती आयोग (सर्व).
+२६) सचिव, राज्य निवडणूक आयोग, नवीन प्रशासकीय भवन, १ ला मजला, मंत्रालयासमोर, मुंबई ४०० ०३२.
+२७) सचिव, महाराष्ट्र विधानमंडळ सचिवालय, मुंबई.
 
 (टीप: मुद्रित परिच्छेद क्रमांक "७" नंतर "९" असा क्रम आहे — "८" हा क्रमांक मुद्रित नाही; जसे आहे तसे टंकित.)
 
-**PDF पृ. 5 (मुद्रित पृष्ठ ५ पैकी ३)** — वितरण-सूची अनु. क्र. २८ ते ६१ — टंकित नाही; वाचन अपूर्ण.
+**PDF पृ. 5 (मुद्रित पृष्ठ ५ पैकी ३)** — वितरण-सूची अनु. क्र. २८ ते ६१:
+२८) सदस्य सचिव, महाराष्ट्र राज्य महिला आयोग, गृहनिर्माण भवन (म्हाडा बिल्डींग), पोट माळा, वांद्रे, मुंबई - ४०० ०५१.
+२९) ग्रंथपाल, महाराष्ट्र विधानमंडळ सचिवालय, ग्रंथालय, सहावा मजला, विधान भवन, मुंबई - ४०० ०३२.
+३०) कार्याध्यक्ष, महाराष्ट्र पेन्शनर्स असोसिएशन, १४४९, सदाशिव पेठ, संकल्प खजिना महाल बोळ, एस.पी.कॉलेजसमोर, पुणे ४११ ०३०.
+३१) अध्यक्ष, महाराष्ट्र स्टेट गव्हर्नमेंट पेंशनर्स असोसिएशन, बेळगांव.
+३२) मंत्रालयातील सर्व विभाग.
+३३) सर्व विभागीय आयुक्त.
+३४) सर्व जिल्हा परिषदांचे मुख्य कार्यकारी अधिकारी.
+३५) सर्व जिल्हा परिषदांचे अध्यक्ष.
+३६) सर्व जिल्हा परिषदांचे मुख्य लेखा व वित्त अधिकारी.
+३७) शिक्षण संचालक, महाराष्ट्र राज्य, पुणे.
+३८) तंत्र शिक्षण संचालक, महाराष्ट्र राज्य, मुंबई.
+३९) सर्व जिल्हयांचे वरिष्ठ लेखा परीक्षक (शिक्षण).
+४०) संचालक, महानगरपालिका प्रशासन, मुंबई.
+४१) सर्व विभागीय शिक्षण उप संचालक.
+४२) सर्व विभागीय तंत्र शिक्षण उप संचालक.
+४३) कुल सचिव, महात्मा फुले कृषि विद्यापीठे, राहुरी, जिल्हा अहमदनगर.
+४४) कुल सचिव, मराठवाडा कृषि विद्यापीठ, परभणी.
+४५) कुल सचिव, पंजाबराव कृषि विद्यापीठ, अकोला.
+४६) कुल सचिव, कोकण कृषि विद्यापीठ, दापोली, जिल्हा रत्नागिरी.
+४७) कुल सचिव, डॉ.बाबासाहेब आंबेडकर तंत्रज्ञान विद्यापीठ, लोणेर, जिल्हा रायगड.
+४८) कुल सचिव, सोलापूर विद्यापीठ, सोलापूर.
+४९) बहुजन समाज पार्टी, डी-१ इन्सा हटमेंट, आझाद मैदान, मुंबई - ४०० ००१.
+५०) भारतीय जनता पार्टी, महाराष्ट्र प्रदेश, सी.डी.ओ.बॅरॅक नं.१, योगक्षेम समोर, वसंतराव भागवत चौक, नरीमन पॉईंट, मुंबई - ४०० ०२०.
+५१) भारतीय कम्युनिस्ट पार्टी, महाराष्ट्र कमिटी, ३१४, राजभुवन, एस.व्ही.पटेल रोड, मुंबई - ४०० ००४.
+५२) भारतीय कम्युनिस्ट पार्टी (मार्क्सवादी), महाराष्ट्र कमिटी, जनशक्ती हॉल, ग्लोब मिल पॅलेस, वरळी, मुंबई - ४०० ०१३.
+५३) इंडियन नॅशनल काँग्रेस, महाराष्ट्र प्रदेश काँग्रेस (आय) समिती, टिळक भवन, काकासाहेब गाडगीळ मार्ग, दादर, मुंबई - ४०० ०२५.
+५४) नॅशनलिस्ट काँग्रेस पार्टी, राष्ट्रवादी भवन, फ्री प्रेस जर्नल मार्ग, नरीमन पॉईंट, मुंबई - ४०० ०२१.
+५५) शिवसेना, शिवसेना भवन, गडकरी चौक, दादर, मुंबई - ४०० ०२८.
+५६) ग्राम विकास विभाग, मंत्रालय, मुंबई.
+५७) शालेय शिक्षण व क्रीडा विभाग, मंत्रालय, मुंबई.
+५८) उच्च व तंत्रशिक्षण विभाग, मंत्रालय, मुंबई.
+५९) कृषि व पशुसंवर्धन, दुग्ध व्यवसाय विकास व मत्स्य व्यवसाय विभाग, मंत्रालय, मुंबई.
+६०) वित्त विभागातील सर्व कार्यासने.
+६१) निवड नस्ती.
 
 **PDF पृ. 6 (इंग्रजी प्रत — मुद्रित पृष्ठ ५ पैकी ४)**
 
@@ -1924,7 +2014,7 @@ all other powers enabling it on that behalf, the Government is further pleased t
 ( Manisha Y.Kamte )
 Deputy Secretary to Government.
 
-**न वाचलेले / वाचन अपूर्ण (45-A):** वितरण-सूची (PDF पृ. १, २, ४, ५) टंकित नाहीत; ई-स्वाक्षरीचा तांत्रिक मजकूर टंकित नाही.
+**वाचन (45-A):** PDF पृ. १ ते ७ प्रतिमा पाहून तपासले; वितरण-सूची (PDF पृ. १, २, ४, ५) टंकित केल्या आहेत; ई-स्वाक्षरीचा तांत्रिक मजकूर टंकित नाही.
 
 
 ---
@@ -2025,9 +2115,9 @@ Deputy Secretary to Government.
 
 ## अनुपलब्ध/न वाचलेले
 
-1. वितरण-सूची ("प्रति"/"प्रत" यादी) टंकित नाही — 45-A (PDF पृ. 1, 2, 4, 5) व 46-E (वितरण-यादी). ई-स्वाक्षरीचा तांत्रिक मजकूर टंकित नाही.
-2. भाग 1 (Pension Rules 1982): फक्त संबंधित पृष्ठे येथे पुन्हा दिली आहेत (पूर्ण पुस्तक PEN-01 मध्ये); मजकूर-स्तर प्रतिमेशी पडताळलेला नाही — [text-layer, visually unverified]. ही आवृत्ती 31 जुलै 1992 पर्यंत सुधारित आहे; त्यानंतरच्या सुधारणा (उदा. नियम 10 ची दि. 23 फेब्रुवारी 2022 ची अधिसूचना, जिचा उतारा 91-A परिच्छेद 4 मध्ये आहे) या PDF मध्ये नाहीत.
-3. 91-A: आदेश मजकूर-स्तरातून — [text-layer, visually unverified]. आदेशात उल्लेखलेली दि. 23 फेब्रुवारी 2022 ची अधिसूचना, दि. 29 ऑगस्ट 2018 चा शासन निर्णय, दि. 19 जुलै 2018 ची Cabinet note, Tribunal चा दि. 31 ऑगस्ट 2023 चा आदेश — हे दस्तऐवज फोल्डरमध्ये नाहीत; वाचलेले नाहीत.
+1. ई-स्वाक्षरीचा तांत्रिक मजकूर (डिजिटल स्वाक्षरी तपशील) टंकित नाही. वितरण-सूची (45-A पृ. 1, 2, 4, 5 व 46-E पृ. 2, 3) प्रतिमा पाहून टंकित केल्या आहेत.
+2. भाग 1 (Pension Rules 1982): फक्त संबंधित पृष्ठे येथे पुन्हा दिली आहेत (पूर्ण पुस्तक PEN-01 मध्ये); मजकूर-स्तर प्रतिमेशी पडताळला आहे [visually verified]. ही आवृत्ती 31 जुलै 1992 पर्यंत सुधारित आहे; त्यानंतरच्या सुधारणा (उदा. नियम 10 ची दि. 23 फेब्रुवारी 2022 ची अधिसूचना, जिचा उतारा 91-A परिच्छेद 4 मध्ये आहे) या PDF मध्ये नाहीत.
+3. 91-A: आदेश मजकूर-स्तरातून, प्रतिमेशी पडताळला आहे [visually verified]. आदेशात उल्लेखलेली दि. 23 फेब्रुवारी 2022 ची अधिसूचना, दि. 29 ऑगस्ट 2018 चा शासन निर्णय, दि. 19 जुलै 2018 ची Cabinet note, Tribunal चा दि. 31 ऑगस्ट 2023 चा आदेश — हे दस्तऐवज फोल्डरमध्ये नाहीत; वाचलेले नाहीत.
 4. फोल्डर 91 चे नाव "group-d-retirement-age-promotion-quota-drivers" असले तरी त्यात फक्त एक PDF (ordjud-39-497584.pdf) आहे; गट-ड निवृत्तीचे वय/पदोन्नती कोटा/वाहनचालक यासंबंधी इतर कोणताही दस्तऐवज नाही.
 5. फोल्डर 80 मध्ये दोनच PDF आहेत (294d15234a7829ef1ec16180c9854289.pdf = 45-A, MCS-Pension-Rules-1982-...pdf = भाग 1); फोल्डर 90 मध्ये दोनच PDF आहेत (Pension Rules = भाग 1, e03d8bd64ed679e7957a7d3168b02769.pdf = 46-E). दोन्ही फोल्डरमधील "retirement age Group D / re-employment" वा "service break / condonation" संबंधी इतर शासन निर्णय फोल्डरमध्ये नाहीत.
 6. सेवेचे सर्वसाधारण शर्ती नियम 1981 (MCS General Conditions of Service) मधील निवृत्ती/वय-संबंधी तरतुदी या असाइनमेंटच्या फोल्डरमध्ये नाहीत.

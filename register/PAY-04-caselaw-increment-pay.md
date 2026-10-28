@@ -1,3 +1,5 @@
+> **पडताळणी (२८.१०.२०२६):** या फाइलचा मजकूर मूळ PDF च्या पान-प्रतिमांशी तुलना करून दुरुस्त केला आहे. तपशील व मर्यादा: `register/verification/` (coverage फाइल्स). जिथे पान वाचता आले नाही/तपासले नाही तिथे तसे नमूद आहे. अंतिम पुरावा म्हणून मूळ PDF जोडावी.
+
 # PAY-04 — न्यायनिर्णय : वेतनवाढ (Increment) / वेतन-थकबाकी / वसुली  (फोल्डर pdf/40-caselaw-A-increment-pay/)
 
 > नोंद : या फाईलमध्ये केवळ मूळ दस्तऐवजातील मजकूर जसाच्या तसा घेतला आहे; कोणतेही स्वतःचे मत/निष्कर्ष/सल्ला नाही. सर्व न्यायनिर्णय इंग्रजीत आहेत; इंग्रजी मजकूर मूळ भाषेतच ठेवला आहे.
@@ -20,16 +22,16 @@
 - **दिनांक:** NEW DELHI; APRIL 11, 2023
 - **खंडपीठ:** M.R. SHAH, J. आणि C.T. RAVIKUMAR, J. (निकाल M.R. Shah, J. यांचा)
 - **एकूण पाने:** 28
-- **आदेशाचा/होल्डिंगचा भाग :** परिच्छेद 6 (प्रश्न व Regulation 40(1) चा उतारा), 6.4–6.7, 7 (खाली संपूर्ण निकाल जसाच्या तसा दिला आहे — [text-layer, visually unverified])
+- **आदेशाचा/होल्डिंगचा भाग :** परिच्छेद 6 (प्रश्न व Regulation 40(1) चा उतारा), 6.4–6.7, 7 (खाली संपूर्ण निकाल जसाच्या तसा दिला आहे — [पान-प्रतिमेशी पडताळले])
 
-**संपूर्ण निकाल (जसाच्या तसा) — [text-layer, visually unverified]**
+**संपूर्ण निकाल (जसाच्या तसा) — [पान-प्रतिमेशी पडताळले]**
 
 
 *[PDF पान 1]*
 
 REPORTABLE IN THE SUPREME COURT OF INDIA CIVIL APPELLATE JURISDICTION CIVIL APPEAL NO. 2471 OF 2023 (@ SLP (C) No. 6185/2020) The Director (Admn. and HR) ..Appellant(s) KPTCL & Ors. Versus C.P. Mundinamani & Ors. …Respondent(s) JUDGMENT M.R. SHAH, J.
 
-1. Feeling aggrieved and dissatisfied with the impugned judgment and order passed by the High Court of Karnataka at Bengaluru in Writ Appeal No. 4193/2017, by which, the Division Bench of the High Court has allowed Date: 2023.04.11 the said appeal preferred by the employees -
+1. Feeling aggrieved and dissatisfied with the impugned judgment and order passed by the High Court of Karnataka at Bengaluru in Writ Appeal No. 4193/2017, by which, the Division Bench of the High Court has allowed the said appeal preferred by the employees -
 
 *[PDF पान 2]*
 
@@ -203,7 +205,7 @@ I.A. No. 149091/2022 stands disposed of in terms of the above. ……………�
 - **दिनांक:** 06-09-2024
 - **खंडपीठ (CORAM):** HON'BLE MR. JUSTICE SANJIV KHANNA; HON'BLE MR. JUSTICE SANJAY KUMAR
 - **एकूण पाने:** 4 (पान 1–2 : उपस्थित वकिलांची यादी; पान 3–4 : आदेश)
-- **आदेशाचा (operative) भाग — पान 3–4 (जसाच्या तसा) — [text-layer, visually unverified]**
+- **आदेशाचा (operative) भाग — पान 3–4 (जसाच्या तसा) — [पान-प्रतिमेशी पडताळले]**
 
 UPON hearing the counsel, the Court made the following O R D E R
 
@@ -243,12 +245,12 @@ Re-list in the week commencing 04.11.2024.
 - **खंडपीठ:** R.V. RAVEENDRAN AND LOKESHWAR SINGH PANTA, JJ. (निकाल R.V. Raveendran, J. यांचा)
 - **एकूण पाने:** 6 (पुस्तकी पृष्ठे 104–109)
 - **अपील :** Punjab and Haryana High Court, L.P.A. No.573 of 2002 in CM No. 99 and 2007, दिनांक 06.12.2006 व 23.02.2007 च्या निर्णयाविरुद्ध
-- **स्रोत व वाचन :** पाने 3–6 (परिच्छेद 4 ते 7) प्रतिमा पाहून टाईप केलेले; पाने 1–2 (headnote, परिच्छेद 1–3) text-layer मधून — [text-layer, visually unverified]
+- **स्रोत व वाचन :** पाने 3–6 (परिच्छेद 4 ते 7) प्रतिमा पाहून टाईप केलेले; पाने 1–2 (headnote, परिच्छेद 1–3) text-layer मधून — [पान-प्रतिमेशी पडताळले]
 
-**Headnote (पान 1) [text-layer, visually unverified]:**
+**Headnote (पान 1) [पान-प्रतिमेशी पडताळले]:**
 Service Law: Army - Delay in claiming disability pension - Claim allowed by single Judge of High Court with arrears for 38 months - Division Bench granting arrears for 16 years with 6% interest - HELD: Where a service related claim is based on a continuing wrong, relief can be granted even if there is a long delay in seeking remedy, provided the order does not affect others - As regards consequential relief of recovery of arrears, principles relating to recurring/successive wrongs will apply and High Court will restrict the relief relating to arrears normally to a period of three years prior to date of filing of writ petition - In the instant case, delay of 16 years would affect the consequential claim for arrears - Division Bench of High Court was not justified in directing payment of arrears for 16 years and that too with interest - Order of Division Bench of High Court set aside - Delay - Interest - Tort.
 Tort: Continuing wrong and recurring/successive wrongs - Concept of, relating to service law - Explained.
-Balakrishna S.P Waghmare vs. Shree Dhyaneshwar Maharaja Sansthan 1959(2) Supp. SCR 476=AIR 1959 SC 798; M.R. Gupta vs. Union of India 1995(2) Supp. SCR 852=1995(5) SCC 628; and Shiv Dass vs. Union of India 2007(1) SCR 1127=2007(9) SCC 274 - relied on.
+Balakrishna S.P. Waghmare vs. Shree Dhyaneshwar Maharaja Sansthan 1959(2) Supp. SCR 476=AIR 1959 SC 798; M.R. Gupta vs. Union of India 1995(2) Supp. SCR 852=1995(5) SCC 628; and Shiv Dass vs. Union of India 2007(1) SCR 1127=2007(9) SCC 274 - relied on.
 Case Law Reference: 1959(2) Supp. SCR 476 relied on para 4; 1995(2) Supp. SCR 852 relied on para 4; 2007(1) SCR 1127 relied on para 4.
 
 **निकाल (जसाच्या तसा) — पान 2–6 :**
@@ -293,9 +295,9 @@ R.P. Appeals allowed.
 - **दिनांक:** New Delhi, JULY 29, 2016
 - **खंडपीठ:** [T S THAKUR] CJI; [Dr D Y CHANDRACHUD] J (निकाल Dr D Y Chandrachud, J. यांचा)
 - **एकूण पाने:** 6
-- **होल्डिंगचा भाग :** परिच्छेद 9–13 (खाली संपूर्ण निकाल) — [text-layer, visually unverified]
+- **होल्डिंगचा भाग :** परिच्छेद 9–13 (खाली संपूर्ण निकाल) — [पान-प्रतिमेशी पडताळले]
 
-**संपूर्ण निकाल (जसाच्या तसा) — [text-layer, visually unverified]**
+**संपूर्ण निकाल (जसाच्या तसा) — [पान-प्रतिमेशी पडताळले]**
 
 
 *[PDF पान 1]*

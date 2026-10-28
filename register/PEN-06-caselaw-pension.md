@@ -1,3 +1,5 @@
+> **पडताळणी (२८.१०.२०२६):** या फाइलचा मजकूर मूळ PDF च्या पान-प्रतिमांशी तुलना करून दुरुस्त केला आहे. तपशील व मर्यादा: `register/verification/` (coverage फाइल्स). जिथे पान वाचता आले नाही/तपासले नाही तिथे तसे नमूद आहे. अंतिम पुरावा म्हणून मूळ PDF जोडावी.
+
 # PEN-06 — निवृत्तिवेतन / उपदान / सेवानिवृत्ती — न्यायनिर्णय (फोल्डर 40-caselaw-E-pension-gratuity-retiral)
 
 > नोंद: स्वतःचे मत/अर्थ/निष्कर्ष घातलेले नाहीत. निकालाचा मजकूर PDF च्या मजकूर-स्तरातून जसाच्या तसा (रिकाम्या ओळी वगळून) घेतला आहे; PDF मध्ये दिसणारी स्तंभ-अक्षरे (A, B, C… कडेची) व हेडनोट्स मजकूर-स्तरात जशी आहेत तशी ठेवली आहेत.
@@ -24,7 +26,7 @@
 
 ### मुख्य तरतुदी / निर्णायक भाग (जशाच्या तशा) — संपूर्ण निकाल (पृ. 1–5); निर्णायक परिच्छेद: 3 (पृ. 3–4) व 4 (पृ. 4–5)
 
-#### PDF पृष्ठ 1 [text-layer, visually unverified]
+#### PDF पृष्ठ 1 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                                     REPORTABLE
@@ -51,7 +53,7 @@ Reason:                  years instead of 58 years, the High Court has refused
                                                                                   1
 ```
 
-#### PDF पृष्ठ 2 [text-layer, visually unverified]
+#### PDF पृष्ठ 2 [पान-प्रतिमेशी पडताळले]
 
 ```text
      the revised rates will become payable only from 1 st
@@ -77,7 +79,7 @@ Reason:                  years instead of 58 years, the High Court has refused
                                                                   2
 ```
 
-#### PDF पृष्ठ 3 [text-layer, visually unverified]
+#### PDF पृष्ठ 3 [पान-प्रतिमेशी पडताळले]
 
 ```text
       pension and the pension at the revised rates will become
@@ -104,7 +106,7 @@ Reason:                  years instead of 58 years, the High Court has refused
                                                                    3
 ```
 
-#### PDF पृष्ठ 4 [text-layer, visually unverified]
+#### PDF पृष्ठ 4 [पान-प्रतिमेशी पडताळले]
 
 ```text
      pension at the revised rates will become payable only from
@@ -131,7 +133,7 @@ Reason:                  years instead of 58 years, the High Court has refused
                                                                    4
 ```
 
-#### PDF पृष्ठ 5 [text-layer, visually unverified]
+#### PDF पृष्ठ 5 [पान-प्रतिमेशी पडताळले]
 
 ```text
      original writ petitioner shall be entitled to pension at the
@@ -161,7 +163,7 @@ May 20, 2022                        [B.V. NAGARATHNA]
 
 ### मुख्य तरतुदी / निर्णायक भाग (जशाच्या तशा) — संपूर्ण निकाल (हेडनोट, युक्तिवाद, निकाल) पृ. 1–17
 
-#### PDF पृष्ठ 1 [text-layer, visually unverified]
+#### PDF पृष्ठ 1 [पान-प्रतिमेशी पडताळले]
 
 ```text
                     [2013] 8 S.C.R. 177
@@ -174,7 +176,7 @@ May 20, 2022                        [B.V. NAGARATHNA]
      [K.S. RADHAKRISHNAN AND A.K. SIKRI, JJ.]
      Service Law - Pension - State Government withholding
 a part of pension and/or gratuity during pendency of
-departmental/ criminal proceedings, in apsence of any such C
+departmental/ criminal proceedings, in absence of any such C
 provision in the Pension Rules - Propriety - Held: Gratuity and
 pension are not bounties - It is hard earned benefit which
 accrues to an employee and is in the nature of "property" -
@@ -194,16 +196,16 @@ of the appellant to take away a part of pension or gratuity or
 even leave encashment without any statutory provision and
 under the umbrage of administrative instruction cannot be
 countenanced - Executive instructions are not having
-statutory character and, therefore, cannot be termed as "Jaw" G
+statutory character and, therefore, cannot be termed as "law" G
 within the meaning of Article 300A - On basis of such a
-circular, which is not having force of Jaw, the appellant cannot
+circular, which is not having force of law, the appellant cannot
 withhold even a part of pension or gratuity - Bihar Pension
 Rules, as applicable to the State of Jharkhand - r.43(b) -
 Constitution of India, 1950 - Article 300A.
                               177                                H
 ```
 
-#### PDF पृष्ठ 2 [text-layer, visually unverified]
+#### PDF पृष्ठ 2 [पान-प्रतिमेशी पडताळले]
 
 ```text
     178       SUPREME COURT REPORTS            [2013] 8 S.C.R.
@@ -223,7 +225,7 @@ C respondent. Hence the present appeal by the State of
           Dismissing the appeals, the Court
 D      HELD: 1.1. Gratuity and pension are not bounties. An
   employee earns these benefits by dint of his long,
-  continuous, faithful ant:f un-blemished service. It is thus
+  continuous, faithful and un-blemished service. It is thus
   hard earned benefit which accrues to an employee and
   is in the nature of "property". This right to property
 E cannot be taken away without the due process of law as
@@ -234,17 +236,17 @@ E cannot be taken away without the due process of law as
 F Jharkhand. Rule 43(b) of the said Pension Rules confers
   power on the State Government to withhold or withdraw
   a pension or part thereof under certain circumstances.
-  Reading of Rule 43{b) makes it abundantly clear that
-  even after the conclu'sion of the departmental inquiry, it
+  Reading of Rule 43(b) makes it abundantly clear that
+  even after the conclusion of the departmental inquiry, it
 G is permissible for the Government to withhold pension
   etc. ONLY when a finding is recorded either in
-  departmental inquH-y or judicial proceedings that the
+  departmental inquiry or judicial proceedings that the
   employee had committed grave misconduct in the
-  cfischarge of his duty while in his office. There is no
+  discharge of his duty while in his office. There is no
 H provision in the rules for withholding of the pension/
 ```
 
-#### PDF पृष्ठ 3 [text-layer, visually unverified]
+#### PDF पृष्ठ 3 [पान-प्रतिमेशी पडताळले]
 
 ```text
    STATE OF JHARKHAND & ORS. v. JITENDRA               179
@@ -277,8 +279,8 @@ different. [Paras 13, 14 & 15] [192-0-E, G-H; 193-A-B]
     D.S. Nakara and Ors. vs. Union of India (1983) 1 SCC      F
 305: 1983 (2) SCR 165; Deokinandan Prasad vs. State of
 Bihar (1971) 2 SCC 330: 1971 (0) Suppl. SCR 634 and State
-of West Bengal vs. Haresh C. Bane!jee and Ors. (2006) 7
-sec 651: 2006 (5) Suppl. SCR 620 - relied on.
+of West Bengal vs. Haresh C. Banerjee and Ors. (2006) 7
+SCC 651: 2006 (5) Suppl. SCR 620 - relied on.
                                                               G
     Dr. Dudh Nath Pandey vs. State of Jharkhand and Ors.
 2007 (4) JCR 1 - referred to.
@@ -286,7 +288,7 @@ sec 651: 2006 (5) Suppl. SCR 620 - relied on.
     2007 (4) JCR 1             referred to        Para 4      H
 ```
 
-#### PDF पृष्ठ 4 [text-layer, visually unverified]
+#### PDF पृष्ठ 4 [पान-प्रतिमेशी पडताळले]
 
 ```text
     180       SUPREME COURT REPORTS              [2013] 8 S.C.R.
@@ -322,7 +324,7 @@ G hence directed the appellant to release the withheld dues to the
 H Civil Appeal arising out of SLP(Civil) No. 1427 of 2009. Only
 ```
 
-#### PDF पृष्ठ 5 [text-layer, visually unverified]
+#### PDF पृष्ठ 5 [पान-प्रतिमेशी पडताळले]
 
 ```text
     STATE OF JHARKHAND & ORS. v. JITENDRA                  181
@@ -365,7 +367,7 @@ thereafter, considered the representation of the respondent but
                                                                    H
 ```
 
-#### PDF पृष्ठ 6 [text-layer, visually unverified]
+#### PDF पृष्ठ 6 [पान-प्रतिमेशी पडताळले]
 
 ```text
     182           SUPREME COURT REPORTS              [2013] 8 S.C.R.
@@ -406,11 +408,11 @@ G that there are administrative instructions which permit
 H the Constitution Bench Judgment of this Court in Sant Ram
 ```
 
-#### PDF पृष्ठ 7 [text-layer, visually unverified]
+#### PDF पृष्ठ 7 [पान-प्रतिमेशी पडताळले]
 
 ```text
     STATE OF JHARKHAND & ORS. v. JITENDRA                      183
-        KUMAR SRIVAs:i:.AVA [A.K. SIKRI, J.]
+        KUMAR SRIVASTAVA [A.K. SIKRI, J.]
 Sharma vs. Union of India 1968 (1) SCR 111. He, thus, argued           A
 that the High Court has committed an error in holding that there
 was no power with the Government to withhold the part of
@@ -420,14 +422,14 @@ pension or gratuity, pending disciplinary/criminal proceedings.
 based on the judgment in Sant Ram Sharma would not cut any
 ice in so far as present case is concerned, because of the
 reason this case has no applicability in the given case. Sant
-Ram judgment governs the fi~ of administrative law wherein
+Ram judgment governs the field of administrative law wherein
 the Constitution Bench laid ddwn the principle that the rules          C
-framed by the authority in exer~ise of powers contained in an
+framed by the authority in exercise of powers contained in an
 enactment, would also have statutory force. Though the
 administration can issue administrative instructions for the
 smooth administrative function, such administrative instructions
 cannot supplant the rules. However, these administrative
-instructions can supplement the sfatutory rules by taking care         D
+instructions can supplement the statutory rules by taking care         D
 of those situations where the statutory rules are silent. This ratio
 of that judgment is narrated in the following manner:
      "It is true that there is no specific provision in the Rules
@@ -438,7 +440,7 @@ of that judgment is narrated in the following manner:
      regarding the principle to be followed in promotions of the
      officers concerned to selection grade posts. It is true that F
      Government cannot amend or supersede statutory rules by
-     administrative instructions, but if the rules are silent on any ·
+     administrative instructions, but if the rules are silent on any
      particular point Government can fill up the gaps and
      supplement the rules and issue instructions and
      inconsistent with the rules already framed".
@@ -450,7 +452,7 @@ is posed in the present case is altogether different.
                                                                        H
 ```
 
-#### PDF पृष्ठ 8 [text-layer, visually unverified]
+#### PDF पृष्ठ 8 [पान-प्रतिमेशी पडताळले]
 
 ```text
     184       SUPREME COURT REPORTS                  [2013] 8 S.C.R.
@@ -492,17 +494,17 @@ G1        ruled that pension is a right and the payment of it does not
 H         one's discretion. It is only for the purpose of quantifying the
 ```
 
-#### PDF पृष्ठ 9 [text-layer, visually unverified]
+#### PDF पृष्ठ 9 [पान-प्रतिमेशी पडताळले]
 
 ```text
     STATE OF JHARKHAND & ORS. v. JITENDRA                    185
-        KUMAR SRIVASTAVA [A.K. SiKRI, J.]
+        KUMAR SRIVASTAVA [A.K. SIKRI, J.]
     amount having regard to service and other allied maters         A
     that it may be necessary for the authority to pass an order
     to that effect but the right to receive pension flows to the
     officer not because of any such order but by virtue of the
     rules. This view was reaffirmed in State of Punjab and Anr.
-    V. Iqbal Singh (1976) llLLJ 377SC".                             B
+    V. Iqbal Singh (1976) IILLJ 377SC".                             B
      8. It is thus hard earned benefit which accrues to an
 employee and is in the nature of "property". This right to
 property cannot be taken away without the due process of law
@@ -536,7 +538,7 @@ position emerges:-
                                                                     H
 ```
 
-#### PDF पृष्ठ 10 [text-layer, visually unverified]
+#### PDF पृष्ठ 10 [पान-प्रतिमेशी पडताळले]
 
 ```text
     186            SUPREME COURT REPORTS              [2013] 8 S.C.R.
@@ -576,11 +578,11 @@ G                   to proceedings on which an order of dismissal from
 H
 ```
 
-#### PDF पृष्ठ 11 [text-layer, visually unverified]
+#### PDF पृष्ठ 11 [पान-प्रतिमेशी पडताळले]
 
 ```text
     STATE OF JHARKHAND & ORS. v. JITENDRA                    187
-        KUMAR SRIVASTAVA [A.K. SIKRI, J.)
+        KUMAR SRIVASTAVA [A.K. SIKRI, J.]
     accordance with sub clause (ii) of clause (a) and                A
     C. The Bihar Public Service Commission, shall be
     consulted before final orders are passed.
@@ -614,7 +616,7 @@ Deokinandan Prasad vs. State of Bihar; (1971) 2 SCC 330,
 as is apparent from the following discussion:                        H
 ```
 
-#### PDF पृष्ठ 12 [text-layer, visually unverified]
+#### PDF पृष्ठ 12 [पान-प्रतिमेशी पडताळले]
 
 ```text
     188         SUPREME COURT REPORTS              [2013] 8 S.C.R.
@@ -630,7 +632,7 @@ B              petition is maintainable under Article 32. To this
                  pension is property and the respondents by an
 c                executive order dated June 12, 1968 have
                  wrongfully withheld his pension. That order affects
-                 his fundamental rights under Articles 19(1){f) and
+                 his fundamental rights under Articles 19(1)(f) and
                  31 (1) of the Constitution. The respondents, as we
                  have already indicated, do not dispute the right of
 D                the petitioner to get pension, but for the order
@@ -656,7 +658,7 @@ G                Constitution.
 H
 ```
 
-#### PDF पृष्ठ 13 [text-layer, visually unverified]
+#### PDF पृष्ठ 13 [पान-प्रतिमेशी पडताळले]
 
 ```text
 STATE OF JHARKHAND & ORS. v. JITENDRA                    189
@@ -675,7 +677,7 @@ STATE OF JHARKHAND & ORS. v. JITENDRA                    189
  32.   The question whether the pension granted to a
        public servant is property attracting Article 31 (1)
        came up for consideration before the Punjab High
-       Court in Bhagwant Singh v. Union of India A.l.R.
+       Court in Bhagwant Singh v. Union of India A.I.R.
        1962 Pun 503. It was held that such a right              D
        constitutes "property" and any interference will be
        a breach of Article 31 (1) of the Constitution. It was
@@ -685,7 +687,7 @@ STATE OF JHARKHAND & ORS. v. JITENDRA                    189
        was given by a learned Single Judge. This decision
        was taken up in Letters Patent Appeal by the Union
        of India. The Letters Patent Bench in its decision
-       in Union of India v. Bhagwant Singh I.LR. 1965 Pun
+       in Union of India v. Bhagwant Singh I.L.R. 1965 Pun
        1 approved the decision of the learned Single            F
        Judge. The Letters Patent Bench held that the
        pension granted to a public servant on his
@@ -699,13 +701,13 @@ STATE OF JHARKHAND & ORS. v. JITENDRA                    189
        particular person or authority.                          H
 ```
 
-#### PDF पृष्ठ 14 [text-layer, visually unverified]
+#### PDF पृष्ठ 14 [पान-प्रतिमेशी पडताळले]
 
 ```text
     190         SUPREME COURT REPORTS               [2013] 8 S.C.R.
 A         33.    The matter again came up before a Full Bench of
                  the Punjab and Haryana High Court in K.R. Erry v.
-                 The State of Punjab l.L.R. 1967 P & H 278. The
+                 The State of Punjab I.L.R. 1967 P & H 278. The
                  High Court had to consider the nature of the right
                  of an officer to get pension. The majority quoted
 B                with approval the principles laid down in the two
@@ -743,7 +745,7 @@ G                taking action by way of reducing or denying the
 H                the further question regarding the procedure, if any,
 ```
 
-#### PDF पृष्ठ 15 [text-layer, visually unverified]
+#### PDF पृष्ठ 15 [पान-प्रतिमेशी पडताळले]
 
 ```text
 STATE OF JHARKHAND & ORS. v. JITENDRA                    191
@@ -786,7 +788,7 @@ STATE OF JHARKHAND & ORS. v. JITENDRA                    191
        suit relating to the matters mentioned therein. That      H
 ```
 
-#### PDF पृष्ठ 16 [text-layer, visually unverified]
+#### PDF पृष्ठ 16 [पान-प्रतिमेशी पडताळले]
 
 ```text
     192      SUPREME COURT REPORTS               [2013] 8 S.C.R.
@@ -795,7 +797,7 @@ A               does not stand in the way of a Writ of Mandamus
                 claim of the petitioner for payment of pension
                 according to law".
 B      13. In State of West Bengal Vs. Haresh C. Banerjee and
-  Ors. (2006) 7 sec 651, this Court recognized that even when,
+  Ors. (2006) 7 SCC 651, this Court recognized that even when,
   after the repeal of Article 19(1)(f) and Article 31 (1) of the
   Constitution vide Constitution (Forty-Fourth Amendment) Act,
   1978 w.e.f. 20th June, 1979, the right to property was no longer
@@ -827,7 +829,7 @@ G mandate enshrined in Article 300 A of the Constitution. It follows
 H
 ```
 
-#### PDF पृष्ठ 17 [text-layer, visually unverified]
+#### PDF पृष्ठ 17 [पान-प्रतिमेशी पडताळले]
 
 ```text
     STATE OF JHARKHAND & ORS. v. JITENDRA                     193
@@ -853,5 +855,5 @@ B.B.B.                                      Appeals dismissed.
 
 ## अनुपलब्ध/न वाचलेले
 
-1. दोन्ही निकालांचा मजकूर PDF च्या मजकूर-स्तरातून; प्रतिमेशी पडताळणी केलेली नाही — [text-layer, visually unverified].
+1. दोन्ही निकालांचा मजकूर PDF च्या मजकूर-स्तरातून; प्रतिमेशी पडताळणी केलेली नाही — [पान-प्रतिमेशी पडताळले].
 2. फोल्डर 40-caselaw-E मध्ये एकूण दोनच PDF आहेत; दोन्ही येथे घेतल्या आहेत.

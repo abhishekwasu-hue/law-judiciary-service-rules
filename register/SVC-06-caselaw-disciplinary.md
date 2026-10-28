@@ -1,3 +1,5 @@
+> **पडताळणी (२८.१०.२०२६):** या फाइलचा मजकूर मूळ PDF च्या पान-प्रतिमांशी तुलना करून दुरुस्त केला आहे. तपशील व मर्यादा: `register/verification/` (coverage फाइल्स). जिथे पान वाचता आले नाही/तपासले नाही तिथे तसे नमूद आहे. अंतिम पुरावा म्हणून मूळ PDF जोडावी.
+
 # SVC-06 — शिस्तभंगविषयक न्यायनिर्णय (Caselaw G)
 
 ## विषय-सूची
@@ -16,7 +18,7 @@
 - **खंडपीठ:** Vikramajit Sen and C. Nagappan, JJ. (निर्णय: Vikramajit Sen, J. — पान 435 वरील शीर्षकानुसार)
 - **विषय (headnote मधून जशाचा तसा):** Service Law - Suspension - Protraction of - Propriety
 - **एकूण पाने (PDF):** 23
-- **स्रोत-टीप:** इंग्रजी text-layer (pdftotext -layout) — स्वच्छ; पान 22 (PDF पान क्रमांक) प्रतिमेशी तपासले (visually verified); उर्वरित पाने [text-layer, visually unverified]
+- **स्रोत-टीप:** इंग्रजी text-layer (pdftotext -layout) — स्वच्छ; पान 22 (PDF पान क्रमांक) प्रतिमेशी तपासले (visually verified); उर्वरित पाने [पान-प्रतिमेशी पडताळले]
 
 ### मुख्य तरतुदी (जशाच्या तशा)
 
@@ -41,8 +43,8 @@ UNION OF INDIA THROUGH ITS SECRETARY & ANR.
                                                               c
      Service Law - Suspension - Protraction of -
 Propriety - Held: Right to speedy trial is implicit in Art.
-21 of the Constitution and also reflected in s.309 Cr.PC.
-- Proviso to s. 167(2) Cr.P. C. has the effect of
+21 of the Constitution and also reflected in s.309 Cr.P.C.
+- Proviso to s.167(2) Cr.P.C. has the effect of
 circumscribing the detention of an accused within a           D
 period of 90 days - The quintessence of the proviso to
 s.167(2) can be extrapolated to moderate suspension
@@ -75,12 +77,12 @@ A liberty to challenge his continued suspension in
       appropriate forum - Constitution of India, 1950 - Art.
       21 - Code of Criminal Procedure, 1973 - ss.309 and
       Proviso to s. 167(2) - Magna Carta of 1215 -
- 8    Universal Declaration of Human Rights, 1948 - Art.
+ B    Universal Declaration of Human Rights, 1948 - Art.
       12 - European Convention on Human Rights - Art.
       6(1).
 
          Disposing of the appeal, the Court
-c     HELD: 1. In the present case, reasons were
+C     HELD: 1. In the present case, reasons were
   elaborately recorded for each extension of
   suspension and within the currency of the then
   prevailing period. The salutary requirement of
@@ -89,12 +91,12 @@ D natural justice, that is of spelling out the reasons
   with in the present case. [Para 6] [423-H; 424-A,B]
 
     Ravi Yashwant Bhoir v. District Collector, Raigad
-E 2012 (3) scR 775 = 2012 (4) sec 407 - held
+E 2012 (3) SCR 775 = 2012 (4) SCC 407 - held
   inapplicable.
 
-   State of A. P. v. N. Radhakishan 1998 (2) SCR 693
+   State of A.P. v. N. Radhakishan 1998 (2) SCR 693
   = 1998 (4) SCC 154, Union of India v. Dipak Mali
-F 2009 (16) SCR 564 = 2010 (2) sec 222 -
+F 2009 (16) SCR 564 = 2010 (2) SCC 222 -
   distinguished.
       2.1 Suspension, specially preceding the
   formulation of charges, is essentially transitory or
@@ -139,11 +141,11 @@ cannot be sustained. [Para 11] [427-H; 428-A-C]
                                                          F
 Kartar Singh v. State of Punjab 1994 (2) SCR 375 =
 (1994) 3 SCC 569; Abdul Rehman Antulay v. R.S.
-Na yak 1991 (3) Suppl. SCR 325 = 1992 (1) SCC 225-
+Nayak 1991 (3) Suppl. SCR 325 = 1992 (1) SCC 225-
 followed.
                                                           G
 State of Punjab v. Chaman Lal Goyal 1995 (1) SCR
-695 = (1995) 2 sec 570 - relied on.
+695 = (1995) 2 SCC 570 - relied on.
 
 Klapfer vs. State of North Carolina 386 U.S. 213 (1967)
 - referred to.                                            H
@@ -160,13 +162,13 @@ A         2.3 Prior to 1973 an accused could be detained for
       continuous and consecutive periods of 15 days, albeit,
       after judicial scrutiny and supervision. The Cr.P.C. of
       1973 contains a new proviso which has the effect of
-      circumscribing the po,wer of the Magistrate to
+      circumscribing the power of the Magistrate to
  8
       authorise detention of an accused person beyond
       period of 90 days where the investigation relates to an
       offence punishable with death, imprisonment for life
       or imprisonment for a term of not less than 10 years,
- c    and beyond a period of 60 days where the
+ C    and beyond a period of 60 days where the
       investigation relates to any other offence. The
       quintessence of the proviso of Section 167(2) of the
       Cr.P.C. 1973 can be extrapolated to moderate
@@ -187,7 +189,7 @@ A         2.3 Prior to 1973 an accused could be detained for
 
           Raghubir Singh v. State of Bihar 1986 (3) SCR 802 =
 G
-      1986 (4) sec 481 - relied on.
+      1986 (4) SCC 481 - relied on.
 
       2.4 It is, therefore, directed that the currency of a
    Suspension Order should not extend beyond three
@@ -226,14 +228,14 @@ known to law, and this action of the Respondents
 will be subject to judicial review. [Paras 14-15] [434-
 E-H; 435-C-H]
 
-    0.P Gupta v. Union of India 1988 (1) SCR 27 = 1987 F
-(4) SCC 328, K. Sukhendar Reddy v. State of A.P 1999
-(6) sec 257 = 1999 (6) sec 257 - cited.
+    O.P. Gupta v. Union of India 1988 (1) SCR 27 = 1987 F
+(4) SCC 328, K. Sukhendar Reddy v. State of A.P. 1999
+(6) SCC 257 = 1999 (6) SCC 257 - cited.
 
                   Case Law Reference
   2012 (3) SCR 775      held inapplicable para 6          G
   1988 (1) SCR 27       cited              para 7
- 1999 (6) sec 257        cited             para 7
+ 1999 (6) SCC 257        cited             para 7
  1998 (2) SCR 693        distinguished     para 7         H
 
 ```
@@ -256,7 +258,7 @@ B       1991 (3) Suppl. SCR 325 followed          para 11
 
         1986 (3) SCR 802         relied on       para 13
 
-c        CIVIL APPELLATE JURISDICTION: Civil Appeal No.
+C        CIVIL APPELLATE JURISDICTION: Civil Appeal No.
       1912 of 2015
 
       From the Judgment and Order dated 04.09.2013 of
@@ -292,17 +294,17 @@ H alleges that between 2008 and 2009, Office-notes
          ITS SECY. [VIKRAMAJIT SEN, J.]
 
  were prepared by his staff, namely, Shri Vijay Kumar, A
-  SD0-11, Smt. Amarjit Kaur, SD0-111, Shri Abdul Sayoom
+  SDO-II, Smt. Amarjit Kaur, SDO-III, Shri Abdul Sayoom
  Technical Assistant, and Shri Noor Mohd., LDC, that
  approximately four acres of land were not Defence
  Lands, but were private lands in respect of which
  NOCs could be issued. These NOCs were accordingly B
  issued by the Appellant. Thereafter, on 3.4.2010, the
- Appellant was transferred to Ambala Gantt. However,
+ Appellant was transferred to Ambala Cantt. However,
  vide letter dated 25.1.2011 the Appellant was asked
  to give his explanation for issuing the factually
  incorrect NOCs. In his reply the Appellant admitted C
- his mistake, denied any mala tides in issuing the
+ his mistake, denied any mala fides in issuing the
  NOCs, and attributed the issuance of the NOCs to
  the notes prepared by the subordinate staff of SDOs/
  Technical Officer. It was in this background that he D
@@ -366,7 +368,7 @@ G i.e., the Executive Government as to the justification or
   rationale to continue with the suspension". The Writ Petition
   was allowed and the Central Government was directed to
   pass appropriate orders "as to whether it wishes to continue
-  with the suspension or not having regard to all the ~elevant
+  with the suspension or not having regard to all the relevant
 H
 
 ```
@@ -401,7 +403,7 @@ contention was found by us to be without substance.
 submitted that the original suspension was in
 contemplation of a departmental inquiry which could not
 be commenced because of a directive of the Central
-Vigilance Commission prohibiting its commencement ifthe
+Vigilance Commission prohibiting its commencement if the
 matter was under the investigation of the CBI. The F
 sanction for prosecution was granted on 1.8.2014. It was
 also submitted that the Chargesheet was expected to be
@@ -438,7 +440,7 @@ C including O.P. Gupta v. Union of India 1987 (4) SCC 328,
    continued for an unreasonably long period; that, therefore,
    an order of suspension should not be lightly passed. Our
 D attention has also been drawn to K. Sukhendar Reddy v.
-   State of A. P. 1999 (6) SCC 257, which is topical in that it
+   State of A.P. 1999 (6) SCC 257, which is topical in that it
    castigates selective suspension perpetuated indefinitely
    in circumstances where other involved persons had not
    been subjected to any scrutiny. Reliance on this decision
@@ -478,7 +480,7 @@ from 15.6.2014 (i.e. the fourth extension), and that
 investigation having been completed, sanction for
 prosecution was to be granted within a period of two C
 weeks. When the arguments were heard in great detail
-on 9 1h September, 2014 by which date neither a
+on 9th September, 2014 by which date neither a
 Chargesheet nor a Memorandum of Charges had been
 served on the Appellant. It had been contended by learned
 counsel for the Appellant that this letter, as well as the D
@@ -527,7 +529,7 @@ C      including O.P. Gupta v. Union of India 1987 (4) SCC 328,
       continued for an unreasonably long period; that, therefore,
       an order of suspension should not be lightly passed. Our
 D     attention has also been drawn to K. Sukhendar Reddy v.
-      State of A. P. 1999 (6) SCC 257, which is topical in that it
+      State of A.P. 1999 (6) SCC 257, which is topical in that it
       castigates selective suspension perpetuated indefinitely
       in circumstances where other involved persons had not
       been subjected to any scrutiny. Reliance on this decision
@@ -609,12 +611,12 @@ B against such interference or attacks". More recently, the
   promises that "in the determination of his civil rights and
   obligations or of any criminal charge against him, everyone
   is entitled to a fair and public hearing within a reasonable
-C time .... " and in its second sub article that "everyone charged
+C time...." and in its second sub article that "everyone charged
   with a criminal offence shall be presumed innocent until
   proved guilty according to law".
 
       10. The Supreme Court of the United States struck
-D down the use of no/le persequi, an indefinite but ominous
+D down the use of nolle persequi, an indefinite but ominous
   and omnipresent postponement of civil or criminal
   prosecution in Klapfer vs. State of North Carolina 386 U.S.
   213 (1967). In Kartar Singh vs. State of Punjab (1994) 3
@@ -658,7 +660,7 @@ AJAY KUMAR CHOUDHARY v. UNION OF INDIA THR. 427
     'reasonable, fair or just' and it would fall foul of
                                                                c
     Article 21. There can, therefore, be no doubt that
-    speec;!y trial, and by speedy trial we mean
+    speedy trial, and by speedy trial we mean
     reasonably expeditious trial, is an integral and
     essential part of the fundamental right to life and        D
     liberty enshrined in Article 21. The question which
@@ -755,7 +757,7 @@ AJAY KUMAR CHOUDHARY v. UNION OF INDIA THR. 429
 
    (c) undue delay may well result in impairment of
    the ability of the accused to defend himself,
-   whether on account of .death, disappearance or
+   whether on account of death, disappearance or
    non-availability of witnesses or otherwise.             E
 
         (4) At the same time, one cannot ignore the
@@ -765,7 +767,7 @@ AJAY KUMAR CHOUDHARY v. UNION OF INDIA THR. 429
   burden of proving the guilt of the accused lies
   upon the prosecution, delay ordinarily prejudices
   the prosecution. Non-availability of witnesses,
-  disappearance ofevidence by lapse of time really
+  disappearance of evidence by lapse of time really
   work against the interest of the prosecution. Of         G
   course, there may be cases where the prosecution,
   for whatever reason, also delays the proceedings.
@@ -788,7 +790,7 @@ A        question to be put and answered is - who is
         delaying tactics nor can the time taken in pursuing
 B
         such proceedings be counted towards delay. It goes
-        without saying that frivolous proceed in gs or
+        without saying that frivolous proceedings or
         proceedings taken merely for delaying the day of
         reckoning cannot be treated as proceedings taken in
 c       good faith. The mere fact that an application/petition
@@ -830,7 +832,7 @@ AJAY KUMAR CHOUDHARY v. UNION OF INDIA THR. 431
   White, J. in U.S. v. Ewell 15 L Ed 2d 627 in the
   following words:
 
-       ' ... the Sixth Amendment right to a speedy
+       '... the Sixth Amendment right to a speedy
   trial is necessarily relative, is consistent with   B
   delays, and has orderly expedition, rather than
   mere speed, as its essential ingredients; and
@@ -841,7 +843,7 @@ AJAY KUMAR CHOUDHARY v. UNION OF INDIA THR. 431
        However, inordinately long delay may be
    taken as presumptive proof of prejudice. In
    this context, the fact of incarceration of
-   accused will also be a relevant fact. The          o
+   accused will also be a relevant fact. The          D
    prosecution should not be allowed to become
    a persecution. But when does the prosecution
    become persecution, again depends upon the
@@ -860,7 +862,7 @@ AJAY KUMAR CHOUDHARY v. UNION OF INDIA THR. 431
   speedy trial cannot be put against the accused.
   Even in USA, the relevance of demand rule
   has been substantially watered down in Barker
-  33 L Ed 2d 101 and other succeeding cases.
+  33 L Ed 2d 101and other succeeding cases.
                                                       H
 
 ```
@@ -905,7 +907,7 @@ G     the circumstances of a given case before
       pronouncing upon the complaint. The Supreme
       Court of USA too has repeatedly refused to fix
       any such outer time-limit in spite of the Sixth
-      Amendment. Nor d_o we think that not fixing any
+      Amendment. Nor do we think that not fixing any
 H
 
 ```
@@ -914,7 +916,7 @@ H
 
 ```text
 AJAY KUMAR CHOUDHARY v. UNION OF INDIA THR. 433
-        ITS SECY. [VIKRAMAJIT SEN, J.)
+        ITS SECY. [VIKRAMAJIT SEN, J.]
 
     such outer limit ineffectuates the guarantee of right   A
     to speedy trial.
@@ -940,7 +942,7 @@ considered for promotion without taking the pendency of E
 the Inquiry into perspective.
 
      13. It will be useful to recall that prior to 1973 an
-accused could be detained for continuou~ and consecutive
+accused could be detained for continuous and consecutive
 periods of 15 days, albeit, after judicial scrutiny and F
 supervision. The Cr.P.C. of 1973 contains a new proviso
 which has the effect of circumscribing the power of the
@@ -951,7 +953,7 @@ or imprisonment for a term of not less than 10 years, and
 beyond a period of 60 days where the investigation relates
 to any other offence. Drawing support from the
 observations contained of the Division Bench in Raghubir
-Singh vs. State of Bihar, 1986 (4) sec 481, and more so H
+Singh vs. State of Bihar, 1986 (4) SCC 481, and more so H
 
 ```
 

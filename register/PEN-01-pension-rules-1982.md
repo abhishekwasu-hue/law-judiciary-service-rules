@@ -1,7 +1,9 @@
+> **पडताळणी (२८.१०.२०२६):** या फाइलचा मजकूर मूळ PDF च्या पान-प्रतिमांशी तुलना करून दुरुस्त केला आहे. तपशील व मर्यादा: `register/verification/` (coverage फाइल्स). जिथे पान वाचता आले नाही/तपासले नाही तिथे तसे नमूद आहे. अंतिम पुरावा म्हणून मूळ PDF जोडावी.
+
 # PEN-01 — महाराष्ट्र नागरी सेवा (निवृत्तिवेतन) नियम, १९८२ व अंशराशीकरण नियम, १९८४ (नियमावली नोंदवही)
 
 > नोंद: या नोंदवहीत स्वतःचे मत/अर्थ/सल्ला/निष्कर्ष घातलेले नाहीत. मजकूर मूळ दस्तऐवजातून जसाच्या तसा घेतला आहे. फोल्डर `04`, `80` व `90` मधील पुस्तके खाली नोंदवली आहेत. फोल्डर `80` व `90` मधील `MCS-Pension-Rules-1982-modifed-up-to-31st-july-1992.pdf` ही फाईल बाइट-ते-बाइट एकसारखी (md5 `ff00bfefc2d181ed58e7a62ab5261362`) आहे; म्हणून एकदाच नोंदवली.
-> मजकुराचे स्रोत-टॅग: **[text-layer]** = PDF मधील मजकूर-स्तर; हा इंग्रजी भाग स्वच्छ आहे (नमुना-तपासणी केली). **[text-layer, visually unverified]** = प्रतिमेशी पडताळणी केलेली नाही. स्कॅन केलेल्या फाईल्स (`202503201546689642.pdf`, `20250127268007990.pdf`, `20250127576108455.pdf`) OCR मुळे वेगळ्या फाईलमध्ये (PEN-01B) ठेवल्या आहेत.
+> मजकुराचे स्रोत-टॅग: **[text-layer]** = PDF मधील मजकूर-स्तर; हा इंग्रजी भाग स्वच्छ आहे (नमुना-तपासणी केली). **[पान-प्रतिमेशी पडताळले]** = प्रतिमेशी पडताळणी केलेली नाही. स्कॅन केलेल्या फाईल्स (`202503201546689642.pdf`, `20250127268007990.pdf`, `20250127576108455.pdf`) OCR मुळे वेगळ्या फाईलमध्ये (PEN-01B) ठेवल्या आहेत.
 
 ## विषय-सूची
 
@@ -9605,7 +9607,7 @@ authority.
 - **अधिसूचना क्रमांक/दिनांक (प्रस्तावनेनुसार):** Government Notification, Finance Department, No.MSC. 1084/9/SER-6, dated the 19th July 1984; अंमलबजावणी 15th August 1984 पासून
 - **शीर्षक (शब्दशः):** महाराष्ट्र नागरी सेवा ( निवृत्तिवेतनाचे अंशराशीकरण ) नियम, १९८४ / MAHARASHTRA CIVIL SERVICES (COMMUTATION OF PENSION) RULES, 1984
 - **एकूण पृष्ठे:** 118
-- **मजकूर-स्रोत:** [text-layer] — या PDF चा मराठी मजकूर-स्तर युनिकोडमध्ये स्वच्छ आहे; PDF पृष्ठ 26 (मराठी, छापील पृ. 5) प्रतिमेशी शब्दशः पडताळले (जुळले). इतर मराठी पृष्ठे: [text-layer, visually unverified].
+- **मजकूर-स्रोत:** [text-layer] — या PDF चा मराठी मजकूर-स्तर युनिकोडमध्ये स्वच्छ आहे; PDF पृष्ठ 26 (मराठी, छापील पृ. 5) प्रतिमेशी शब्दशः पडताळले (जुळले). इतर मराठी पृष्ठे: [पान-प्रतिमेशी पडताळले].
 
 ## संपूर्ण नियम-निर्देशिका / अनुक्रमणिका (इंग्रजी Contents पृ. 4–8)
 
@@ -9684,7 +9686,7 @@ authority.
 ## मुख्य तरतुदी (जशाच्या तशा) — संपूर्ण मजकूर, PDF पृष्ठ 1–118
 
 
-#### PDF पृष्ठ 1 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 1 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                    (मराठी / इंग्रजी एकत्रित)
@@ -9711,7 +9713,7 @@ GOVERNMENT OF MAHARASHTRA No. III
                 [किंमत : रुपये २३५.०० ]
 ```
 
-#### PDF पृष्ठ 2 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 2 [पान-प्रतिमेशी पडताळले]
 
 ```text
        महाराष्ट्र नागरी सेवा
@@ -9729,7 +9731,7 @@ GOVERNMENT OF MAHARASHTRA No. III
        (Updated till 31st October, 2021)
 ```
 
-#### PDF पृष्ठ 3 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 3 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                       (2)
@@ -9751,7 +9753,7 @@ given at the end of this publication for reference.
  Mantralaya, Mumbai 400 032.                     Finance Department.
 ```
 
-#### PDF पृष्ठ 4 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 4 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                (2)
@@ -9771,7 +9773,7 @@ given at the end of this publication for reference.
 एच २०७३-१अ
 ```
 
-#### PDF पृष्ठ 5 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 5 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                        (3)
@@ -9823,7 +9825,7 @@ brought to the notice of the Finance Department.
 		                                            Finance Department.
 ```
 
-#### PDF पृष्ठ 6 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 6 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                  (3)
@@ -9864,7 +9866,7 @@ brought to the notice of the Finance Department.
 		वित्त विभाग.
 ```
 
-#### PDF पृष्ठ 7 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 7 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                  (4)
@@ -9910,7 +9912,7 @@ brought to the notice of the Finance Department.
          dated 01.11.2021 with effect from 26.05.1997.
 ```
 
-#### PDF पृष्ठ 8 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 8 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                            (4)
@@ -9953,7 +9955,7 @@ brought to the notice of the Finance Department.
          अंतर्भूत करण्यात आला आहे.
 ```
 
-#### PDF पृष्ठ 9 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 9 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                        (5)
@@ -9996,7 +9998,7 @@ No.
 31     Final assessment of provisional pension           .. ..        21
 ```
 
-#### PDF पृष्ठ 10 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 10 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                    (5)
@@ -10036,7 +10038,7 @@ No.
 एच २०७३-२
 ```
 
-#### PDF पृष्ठ 11 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 11 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                       (6)
@@ -10055,7 +10057,7 @@ No.
 34     Repeal and Saving                     .. ..     23
 ```
 
-#### PDF पृष्ठ 12 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 12 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                              (6)
@@ -10074,7 +10076,7 @@ No.
 एच २०७३-२अ
 ```
 
-#### PDF पृष्ठ 13 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 13 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                (7)
@@ -10121,7 +10123,7 @@ No.
          dated 01.11.2021with effect from 01.04.1985.
 ```
 
-#### PDF पृष्ठ 14 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 14 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                              (7)
@@ -10164,7 +10166,7 @@ No.
             अंतर्भूत करण्यात आला आहे.
 ```
 
-#### PDF पृष्ठ 15 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 15 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                              (8)
@@ -10190,7 +10192,7 @@ No.
     dated 01.11.2021 with effect from 27.02.2009.
 ```
 
-#### PDF पृष्ठ 16 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 16 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                       (8)
@@ -10214,7 +10216,7 @@ No.
     अंतर्भूत करण्यात आला आहे.
 ```
 
-#### PDF पृष्ठ 17 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 17 [पान-प्रतिमेशी पडताळले]
 
 ```text
                     GOVERNMENT OF MAHARASHTRA
@@ -10253,7 +10255,7 @@ recruited on or after 1st November 2005.]
     dated 01.11.2021 and shall always deemed to have been added from 15.08.1984.
 ```
 
-#### PDF पृष्ठ 18 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 18 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                महाराष्ट्र शासन
@@ -10291,7 +10293,7 @@ recruited on or after 1st November 2005.]
 एच २०७३-३
 ```
 
-#### PDF पृष्ठ 19 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 19 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                            2
@@ -10331,7 +10333,7 @@ Civil Services (General Conditions of Services) Rules, 1981.
     dated 01.11.2021.
 ```
 
-#### PDF पृष्ठ 20 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 20 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                       2
@@ -10367,7 +10369,7 @@ Civil Services (General Conditions of Services) Rules, 1981.
 एच २०७३-३अ
 ```
 
-#### PDF पृष्ठ 21 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 21 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                          3
@@ -10407,7 +10409,7 @@ applicant referred to—
     SER-4, dated 01.11.2021.
 ```
 
-#### PDF पृष्ठ 22 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 22 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                        3
@@ -10445,7 +10447,7 @@ applicant referred to—
       आहे.
 ```
 
-#### PDF पृष्ठ 23 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 23 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                               4
@@ -10491,7 +10493,7 @@ after completion of fifteen years of his retirement.
        dated 01.11.2021 with effect from 30.05.1988.
 ```
 
-#### PDF पृष्ठ 24 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 24 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                       4
@@ -10530,7 +10532,7 @@ after completion of fifteen years of his retirement.
       अंतर्भूत करण्यात आला आहे.
 ```
 
-#### PDF पृष्ठ 25 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 25 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                            5
@@ -10580,7 +10582,7 @@ Government Resolution issued by Government in this regard, from time to time.]
     dated 01.11.2021 with effect from 26.05.1997.
 ```
 
-#### PDF पृष्ठ 26 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 26 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                       5
@@ -10627,7 +10629,7 @@ Government Resolution issued by Government in this regard, from time to time.]
 एच २०७३-४
 ```
 
-#### PDF पृष्ठ 27 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 27 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                         6
@@ -10672,7 +10674,7 @@ result of Government decision, the applicant shall be paid the difference betwee
     C.R.451/SER-4, dated 01.11.2021.
 ```
 
-#### PDF पृष्ठ 28 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 28 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                        6
@@ -10713,7 +10715,7 @@ result of Government decision, the applicant shall be paid the difference betwee
 एच २०७३-४अ
 ```
 
-#### PDF पृष्ठ 29 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 29 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                          7
@@ -10759,7 +10761,7 @@ shall not be required to apply afresh:
     C.R.451/SER-4, dated 01.11.2021.
 ```
 
-#### PDF पृष्ठ 30 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 30 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                        7
@@ -10799,7 +10801,7 @@ shall not be required to apply afresh:
 4     शासन अधिसूचना, वित्त विभाग क्रमांक मनासे-२०१९/प्र.क्र.४५१/सेवा-४, दि.०१.११.२०२१ अन्वये सुधारण्यात आला आहे.
 ```
 
-#### PDF पृष्ठ 31 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 31 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                         8
@@ -10837,7 +10839,7 @@ the date of his retirement from service but before the expiry of one year from
 the date of retirement, shall—
 ```
 
-#### PDF पृष्ठ 32 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 32 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                   8
@@ -10872,7 +10874,7 @@ the date of retirement, shall—
 काही भागाचे अंशराशीकरण करण्याची ज्याची इच्छा आहे अशा अर्जदाराने—
 ```
 
-#### PDF पृष्ठ 33 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 33 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                            9
@@ -10921,7 +10923,7 @@ a fraction of pension alongwith 1[pension papers upto] to the date of retirement
     2019/C.R.451/SER-4, dated 01.11.2021.
 ```
 
-#### PDF पृष्ठ 34 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 34 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                       9
@@ -10963,7 +10965,7 @@ a fraction of pension alongwith 1[pension papers upto] to the date of retirement
 एच २०७३-५
 ```
 
-#### PDF पृष्ठ 35 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 35 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                         10
@@ -11003,7 +11005,7 @@ furnished in Form-A shall—
     disbursing authority concerned;
 ```
 
-#### PDF पृष्ठ 36 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 36 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                 10
@@ -11039,7 +11041,7 @@ furnished in Form-A shall—
 एच २०७३-५अ
 ```
 
-#### PDF पृष्ठ 37 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 37 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                         11
@@ -11082,7 +11084,7 @@ has applied for commutation of provisional pension in Form-A in accordance
 with the provisions of rule 9, the Head of Office on receipt of Form-A shall—
 ```
 
-#### PDF पृष्ठ 38 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 38 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                    11
@@ -11117,7 +11119,7 @@ with the provisions of rule 9, the Head of Office on receipt of Form-A shall—
 नमुना “ए” मध्ये अर्ज केलेला असेल तर, नमुना “ए” मिळाल्यानंतर, कार्यालय प्रमुख—
 ```
 
-#### PDF पृष्ठ 39 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 39 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                         12
@@ -11158,7 +11160,7 @@ the same to the applicant under intimation to the Audit Officer.
     residuary pension shall commence.
 ```
 
-#### PDF पृष्ठ 40 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 40 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                    12
@@ -11172,7 +11174,7 @@ the same to the applicant under intimation to the Audit Officer.
      (२) पोटनियम (१) अन्वये नमुना “ए” मिळाल्यानंतर लेखापरीक्षा अधिकारी तात्पुरत्या निवृत्तिवेतनाची
 रक्कम बरोबर आहे हे पडताळून पाहील आणि नियम १५ च्या पोटनियम (१) मधील तरतुदीनुसार पुन्हा
 पडताळणी करील.
-      (३) तात्पुरते निवृत्तिवेतन आणि अंशराशीकृत मू्ल‍ ्य यांच्या रकमेच्या आवश्यक ती पडताळणी
+      (३) तात्पुरते निवृत्तिवेतन आणि अंशराशीकृत मूल्य यांच्या रकमेच्या आवश्यक ती पडताळणी
 केल्यानंतर लेखापरीक्षा अधिकारी—
           (ए) निवृत्तिवेतनाच्या अंशराशीकृत मूल्याचे प्रदान करण्यासाठी कार्यालय प्रमुखाकडे प्राधिकारपत्र
      पाठवील आणि त्यामध्ये अंशराशीकृत मूल्य काढून ते अर्जदाराला संवितरित करावे व तसे केल्याचे
@@ -11195,7 +11197,7 @@ the same to the applicant under intimation to the Audit Officer.
      तारीख देखील त्यात नमूद करील.
 ```
 
-#### PDF पृष्ठ 41 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 41 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                           13
@@ -11236,7 +11238,7 @@ rule 19 shall—
        Form and despatch the same to the applicant;
 ```
 
-#### PDF पृष्ठ 42 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 42 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                     13
@@ -11272,7 +11274,7 @@ rule 19 shall—
 एच २०७३-६
 ```
 
-#### PDF पृष्ठ 43 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 43 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                            14
@@ -11317,7 +11319,7 @@ of rule 20 shall—
     451/SER-4, dated 01.11.2021.
 ```
 
-#### PDF पृष्ठ 44 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 44 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                      14
@@ -11358,7 +11360,7 @@ of rule 20 shall—
 एच २०७३-६अ
 ```
 
-#### PDF पृष्ठ 45 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 45 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                         15
@@ -11401,7 +11403,7 @@ the application for commutation shall be treated as having been withdrawn.
     C.R.451/SER-4, dated 01.11.2021.
 ```
 
-#### PDF पृष्ठ 46 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 46 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                        15
@@ -11438,7 +11440,7 @@ the application for commutation shall be treated as having been withdrawn.
 1     शासन अधिसूचना, वित्त विभाग क्रमांक मनासे-२०१९/प्र.क्र.४५१/सेवा-४, दि.०१.११.२०२१ अन्वये सुधारण्यात आला आहे.
 ```
 
-#### PDF पृष्ठ 47 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 47 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                             16
@@ -11477,7 +11479,7 @@ medical examination.
      SER-4, dated 01.11.2021.
 ```
 
-#### PDF पृष्ठ 48 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 48 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                      16
@@ -11510,7 +11512,7 @@ medical examination.
 कमी नसलेल्या कालावधीनंतर करण्यात आली पाहिजे.
 ```
 
-#### PDF पृष्ठ 49 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 49 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                         17
@@ -11552,7 +11554,7 @@ shall also be returned to the Head of Office.
 Office under sub-rule (6), the applicant becomes eligible to commute a fraction of
 ```
 
-#### PDF पृष्ठ 50 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 50 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                   17
@@ -11589,7 +11591,7 @@ Office under sub-rule (6), the applicant becomes eligible to commute a fraction 
 एच २०७३-७
 ```
 
-#### PDF पृष्ठ 51 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 51 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                           18
@@ -11630,7 +11632,7 @@ expense. He shall indicate in the letter—
      (2) In case an applicant referred to in sub-rule (1)—
 ```
 
-#### PDF पृष्ठ 52 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 52 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                    18
@@ -11665,7 +11667,7 @@ expense. He shall indicate in the letter—
 एच २०७३-७अ
 ```
 
-#### PDF पृष्ठ 53 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 53 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                         19
@@ -11713,7 +11715,7 @@ greater than his actual age, and the applicant received the commuted value with
 reference to the enhanced age.
 ```
 
-#### PDF पृष्ठ 54 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 54 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                   19
@@ -11751,7 +11753,7 @@ reference to the enhanced age.
 नियमांतील कोणतीही बाब लागू होणार नाही.
 ```
 
-#### PDF पृष्ठ 55 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 55 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                         20
@@ -11795,7 +11797,7 @@ modified, is less favourable than the value determined with reference to the
 Table before it was so modified, the Audit Officer, shall—
 ```
 
-#### PDF पृष्ठ 56 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 56 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                  20
@@ -11831,7 +11833,7 @@ Table before it was so modified, the Audit Officer, shall—
 होण्यापूर्वी निर्धारित केलेल्या मूल्यापेक्षा कमी फायद्याचे असेल, त्यावेळी लेखापरीक्षा अधिकारी—
 ```
 
-#### PDF पृष्ठ 57 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 57 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                         21
@@ -11876,7 +11878,7 @@ between the commuted value of 1[ten per cent. of basic pension] per mensem and
     C.R.451/SER-4, dated 01.11.2021.
 ```
 
-#### PDF पृष्ठ 58 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 58 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                        21
@@ -11913,7 +11915,7 @@ between the commuted value of 1[ten per cent. of basic pension] per mensem and
 एच २०७३-८
 ```
 
-#### PDF पृष्ठ 59 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 59 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                         22
@@ -11935,7 +11937,7 @@ provisional pension.
     C.R.451/SER-4, dated 01.11.2021.
 ```
 
-#### PDF पृष्ठ 60 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 60 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                       22
@@ -11954,7 +11956,7 @@ provisional pension.
 एच २०७३-८अ
 ```
 
-#### PDF पृष्ठ 61 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 61 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                         23
@@ -11988,7 +11990,7 @@ are hereby repealed.
       provisions of these rules.
 ```
 
-#### PDF पृष्ठ 62 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 62 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                23
@@ -12015,7 +12017,7 @@ are hereby repealed.
      तरतुदींनुसार केलेली आहे असे मानण्यात येईल.
 ```
 
-#### PDF पृष्ठ 63 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 63 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                        24
@@ -12062,7 +12064,7 @@ Pension) Rules, 1984. The necessary particulars are furnished below :—
             (Pension) Rules, 1982].
 ```
 
-#### PDF पृष्ठ 64 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 64 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                           24
@@ -12098,7 +12100,7 @@ Pension) Rules, 1984. The necessary particulars are furnished below :—
              तात्पुरत्या निवृत्तिवेतनाची रक्कम नमूद करावी. ]
 ```
 
-#### PDF पृष्ठ 65 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 65 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                      25
@@ -12149,7 +12151,7 @@ registered cover.
           C.R.451/SER-4, dated 01.11.2021 with effect from 27.02.2009.
 ```
 
-#### PDF पृष्ठ 66 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 66 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                                25
@@ -12192,7 +12194,7 @@ registered cover.
 एच २०७३-९
 ```
 
-#### PDF पृष्ठ 67 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 67 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                    26
@@ -12237,7 +12239,7 @@ Retirement Benefits—B—Commuted Value of Pensions.”
        01.11.2021.
 ```
 
-#### PDF पृष्ठ 68 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 68 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                         26
@@ -12272,7 +12274,7 @@ Retirement Benefits—B—Commuted Value of Pensions.”
 एच २०७३-९अ
 ```
 
-#### PDF पृष्ठ 69 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 69 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                         27
@@ -12319,7 +12321,7 @@ Pension) Rules, 1984. The necessary particulars are furnished below :—
        SER-4, dated 01.11.2021.
 ```
 
-#### PDF पृष्ठ 70 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 70 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                                27
@@ -12339,8 +12341,8 @@ Pension) Rules, 1984. The necessary particulars are furnished below :—
 
         		             विषय : वैद्यकीय तपासणीशिवाय निवृत्तिवेतनाचे अंशराशीकरण.
 महोदय,
-    महाराष्ट्र नागरी सेवा (निवृत्तिवेतनाचे अंशराशीकरण) नियम, १९८४ मधील तरतुदींनस
-                                                                               ु ार खाली दर्शविण्यात
+    महाराष्ट्र नागरी सेवा (निवृत्तिवेतनाचे अंशराशीकरण) नियम, १९८४ मधील तरतुदींनुसार
+                                                                               खाली दर्शविण्यात
 आल्याप्रमाणे मला माझ्या निवृत्तिवेतनाच्या काही भागाचे अंशराशीकरण करावयाचे आहे. आवश्यक तपशील
 खाली दिला आहे :—
       १.      संपूर्ण नाव
@@ -12358,7 +12360,7 @@ Pension) Rules, 1984. The necessary particulars are furnished below :—
 1       शासन अधिसूचना, वित्त विभाग क्रमांक मनासे-२०१९/प्र.क्र.४५१/सेवा-४, दि.०१.११.२०२१ अन्वये वगळण्यात आला आहे.
 ```
 
-#### PDF पृष्ठ 71 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 71 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                    28
@@ -12407,7 +12409,7 @@ subject to the production of evidence to that effect by the applicant.
       C.R.451/SER-4, dated 01.11.2021 with effect from 27.02.2009.
 ```
 
-#### PDF पृष्ठ 72 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 72 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                                28
@@ -12450,7 +12452,7 @@ subject to the production of evidence to that effect by the applicant.
        सुधारण्यात आला आहे.
 ```
 
-#### PDF पृष्ठ 73 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 73 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                               29
@@ -12489,7 +12491,7 @@ Retirement Benefits—B—Commuted Value of Pensions”.
       dated 01.11.2021.
 ```
 
-#### PDF पृष्ठ 74 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 74 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                           29
@@ -12523,7 +12525,7 @@ Retirement Benefits—B—Commuted Value of Pensions”.
 एच २०७३-१०
 ```
 
-#### PDF पृष्ठ 75 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 75 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                      30
@@ -12567,7 +12569,7 @@ unattested copy is enclosed. The necessary particulars are furnished below :—
            (Pension) Rules, 1982].
 ```
 
-#### PDF पृष्ठ 76 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 76 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                               30
@@ -12602,7 +12604,7 @@ unattested copy is enclosed. The necessary particulars are furnished below :—
 एच २०७३-१०अ
 ```
 
-#### PDF पृष्ठ 77 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 77 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                 31
@@ -12649,7 +12651,7 @@ pension from a disbursing authority other than the authority from which pension 
           C.R.451/SER-4, dated 01.11.2021 with effect from 27.02.2009.
 ```
 
-#### PDF पृष्ठ 78 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 78 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                            31
@@ -12678,7 +12680,7 @@ pension from a disbursing authority other than the authority from which pension 
           . . . . . . . . . . . . . . . . . .
  दिनांक :                                         डाक पत्ता . . . . . . . . . . . . . . . . . . . . .
 		                                                ...........................
-टीप.—जेथून निवृत्तिवेतन घेण्यात येत,े त्या प्राधिकरणामार्फत निवृत्तिवेतनाच्या अंशराशीकृत मूल्याचे प्रदान करण्यात येईल. अशा
+टीप.—जेथून निवृत्तिवेतन घेण्यात येते, त्या प्राधिकरणामार्फत निवृत्तिवेतनाच्या अंशराशीकृत मूल्याचे प्रदान करण्यात येईल. अशा
 प्राधिकरणाव्यतिरिक्त इतर कोणत्याही संवितरण प्राधिकरणामार्फत निवृत्तिवेतनाचे अंशराशीकृत मूल्य घेण्याची मुभा अर्जदाराला
 असणार नाही.
         *ज्या मासिक निवृत्तिवेतनाच्या रकमेचे (कमाल 2[चाळीस टक्के] भागाच्या अधीन राहून), अर्जदार अंशराशीकरण करु
@@ -12690,7 +12692,7 @@ pension from a disbursing authority other than the authority from which pension 
          सुधारण्यात आला आहे.
 ```
 
-#### PDF पृष्ठ 79 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 79 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                    32
@@ -12723,7 +12725,7 @@ returned to this office as early as possible.
  Date  :                                                       Head of Office :
 ```
 
-#### PDF पृष्ठ 80 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 80 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                              32
@@ -12752,7 +12754,7 @@ returned to this office as early as possible.
            दिनांक . . . . . . . . . . . . .				                                           कार्यालय प्रमुख
 ```
 
-#### PDF पृष्ठ 81 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 81 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                33
@@ -12806,7 +12808,7 @@ addition of years to actual age, or has been refused commutation on medical grou
          451/SER-4, dated 01.11.2021.
 ```
 
-#### PDF पृष्ठ 82 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 82 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                                    33
@@ -12856,7 +12858,7 @@ addition of years to actual age, or has been refused commutation on medical grou
 एच २०७३-११
 ```
 
-#### PDF पृष्ठ 83 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 83 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                 34
@@ -12899,7 +12901,7 @@ examined as expeditiously as possible before his/her next birthday which falls
 on……………………………
 ```
 
-#### PDF पृष्ठ 84 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 84 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                              34
@@ -12938,7 +12940,7 @@ on……………………………
 एच २०७३-११अ
 ```
 
-#### PDF पृष्ठ 85 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 85 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                         35
@@ -12986,7 +12988,7 @@ medical authority directs that years will be added to that age, to the consequen
 assumed age.
 ```
 
-#### PDF पृष्ठ 86 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 86 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                                 35
@@ -13026,7 +13028,7 @@ assumed age.
 वर्षांची भर घालण्याचा निदेश दिल्यानंतर गृहीत धरलेल्या वयाशी अनुरुप अशी रक्कम असेल.
 ```
 
-#### PDF पृष्ठ 87 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 87 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                        36
@@ -13049,7 +13051,7 @@ number…………………..dated…………………………..
                                                Head of Office :
 ```
 
-#### PDF पृष्ठ 88 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 88 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                               36
@@ -13070,7 +13072,7 @@ number…………………..dated…………………………..
             					                                                                            कार्यालय प्रमुख
 ```
 
-#### PDF पृष्ठ 89 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 89 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                     37
@@ -13110,7 +13112,7 @@ and must sign the declaration appended thereto in the presence of that authority
        01.11.2021.
 ```
 
-#### PDF पृष्ठ 90 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 90 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                               37
@@ -13143,7 +13145,7 @@ and must sign the declaration appended thereto in the presence of that authority
 एच २०७३-१२
 ```
 
-#### PDF पृष्ठ 91 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 91 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                           38
@@ -13194,7 +13196,7 @@ and must sign the declaration appended thereto in the presence of that authority
         was taken ?
 ```
 
-#### PDF पृष्ठ 92 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 92 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                        38
@@ -13212,7 +13214,7 @@ and must sign the declaration appended thereto in the presence of that authority
       (ए) तुम्हाला पुढीलपैकी कोणताही रोग झाला होता काय?
       देवी, मधून मधून येणारा किंवा इतर कोणताही ताप, पू झाल्यामुळे ग्रंथींची
       वाढ, थुंकीमधून रक्त पडणे, दमा, फुप्फुसाचा दाह, फुप्फुसावरणाचा दाह
-      (प्लुरिसी), हृदय विकार, अचानक मूर्च्छा येण,े संधिवात, आंत्रपुच्छ-
+      (प्लुरिसी), हृदय विकार, अचानक मूर्च्छा येणे, संधिवात, आंत्रपुच्छ-
       दाह, अपस्मार, भ्रमिष्टपणा किंवा मज्जातंतूचे इतर रोग, कान वाहणे किंवा
       कानाचे इतर रोग, गरमी (सिफिलिस) किंवा परमा (गनोरिया), किंवा
       (बी) तुम्हाला अंथरुणाला खिळून राहावे लागले असा इतर कोणताही
@@ -13241,7 +13243,7 @@ and must sign the declaration appended thereto in the presence of that authority
 एच २०७३-१२अ
 ```
 
-#### PDF पृष्ठ 93 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 93 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                        39
@@ -13264,7 +13266,7 @@ Maharashtra Civil Services (Pension) Rules, 1982.
                                             medical authority.
 ```
 
-#### PDF पृष्ठ 94 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 94 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                  39
@@ -13284,7 +13286,7 @@ Maharashtra Civil Services (Pension) Rules, 1982.
      						                                                 वैद्यकीय प्राधिकाऱ्याची सही व पदनाम.
 ```
 
-#### PDF पृष्ठ 95 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 95 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                           40
@@ -13326,7 +13328,7 @@ Maharashtra Civil Services (Pension) Rules, 1982.
 10. Any additional finding
 ```
 
-#### PDF पृष्ठ 96 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 96 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                            40
@@ -13377,7 +13379,7 @@ Maharashtra Civil Services (Pension) Rules, 1982.
 १०. आणखी कोणताही निष्कर्ष
 ```
 
-#### PDF पृष्ठ 97 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 97 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                 41
@@ -13410,7 +13412,7 @@ i.e. the age next birthday, should be taken to be …...……………………
           dated 01.11.2021 with effect from 02.07.2015.
 ```
 
-#### PDF पृष्ठ 98 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 98 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                            41
@@ -13439,7 +13441,7 @@ i.e. the age next birthday, should be taken to be …...……………………
 एच २०७३-१३
 ```
 
-#### PDF पृष्ठ 99 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 99 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                           42
@@ -13475,7 +13477,7 @@ of Pension.
          dated 01.11.2021with effect from 01.04.1985.
 ```
 
-#### PDF पृष्ठ 100 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 100 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                             42
@@ -13508,7 +13510,7 @@ of Pension.
 एच २०७३-१३अ
 ```
 
-#### PDF पृष्ठ 101 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 101 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                             43
@@ -13551,7 +13553,7 @@ of Pension.
     dated 01.11.2021with effect from 27.02.2009.
 ```
 
-#### PDF पृष्ठ 102 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 102 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                           43
@@ -13559,8 +13561,8 @@ of Pension.
                                                     [तक्ता-एक]
                        [ नियम ८ (१); २६ (७); २८ (५) आणि २९ (१) व (२) पहा ]
                         प्रतिवर्षी एक रुपया निवृत्तिवेतनाकरिता अंशराशीकरण मूल्य
-    पुढील जन्मदिनी होणारे   वर्षखरेदीच्या संख्येच्या स्वरुपात पुढील जन्मदिनी होणारे वय वर्षखरेदीच्या संख्येच्या स्वरु
-                                                                                                                   -
+    पुढील जन्मदिनी होणारे   वर्षखरेदीच्या संख्येच्या स्वरुपात पुढील जन्मदिनी होणारे वय वर्षखरेदीच्या संख्येच्या स्वरुख
+
             वय              दर्शविलेले अंशराशीकरण मूल्य                                 पात दर्शविलेले अंशराशीकरण
                                                                                                     मूल्य
             (१)                         (२)                           (१)                          (२)
@@ -13591,7 +13593,7 @@ of Pension.
          अंतर्भूत करण्यात आला आहे.
 ```
 
-#### PDF पृष्ठ 103 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 103 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                         44
@@ -13619,14 +13621,14 @@ of Pension.
 Note.—This Table is based on a rate of interest of 4.75 per cent per annum.
 ```
 
-#### PDF पृष्ठ 104 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 104 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                         44
                                                 तक्ता-एक—चालू
 
   पुढील जन्मदिनी होणारे   वर्षखरेदीच्या संख्येच्या स्वरुपात   पुढील जन्मदिनी होणारे वय    वर्षखरेदीच्या संख्येच्या
-          वय              दर्शविलेले अंशराशीकरण मूल्य                                    स्वरुपात दर्शविलेले अंश-�
+          वय              दर्शविलेले अंशराशीकरण मूल्य                                    स्वरुपात दर्शविलेले अंशप
                                                                                               राशीकरण मूल्य
           (१)                          (२)                             (१)                         (२)
           ६१                          ९.८१                              ७४                        ५.७२
@@ -13646,7 +13648,7 @@ Note.—This Table is based on a rate of interest of 4.75 per cent per annum.
 टीप.—दरसाल दर शेकडा ४.७५ व्याजाच्या दरावर हा तक्ता आधारित आहे.
 ```
 
-#### PDF पृष्ठ 105 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 105 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                              45
@@ -13684,7 +13686,7 @@ birthday    as number of   birthday  as number of           birthday  as number 
     dated 01.11.2021 with effect from 27.02.2009.
 ```
 
-#### PDF पृष्ठ 106 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 106 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                                        45
@@ -13722,7 +13724,7 @@ birthday    as number of   birthday  as number of           birthday  as number 
 एच २०७३-१४
 ```
 
-#### PDF पृष्ठ 107 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 107 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                        46
@@ -13746,7 +13748,7 @@ birthday    as number of   birthday  as number of                 as number of
     				                     Additional Chief Secretary to Government.
 ```
 
-#### PDF पृष्ठ 108 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 108 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                            46
@@ -13768,7 +13770,7 @@ birthday    as number of   birthday  as number of                 as number of
    							                                               शासनाचे अपर मुख्य सचिव
 ```
 
-#### PDF पृष्ठ 109 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 109 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                       47
@@ -13801,7 +13803,7 @@ Civil Surgeon                          जिल्हा शल्यचिक�
 एच २०७३-१५
 ```
 
-#### PDF पृष्ठ 110 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 110 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                      48
@@ -13833,7 +13835,7 @@ Duly                                  यथोचितरीत्या
 Eligibility                           पात्रता
 ```
 
-#### PDF पृष्ठ 111 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 111 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                       49
@@ -13866,7 +13868,7 @@ Medical authority                      वैद्यकीय प्राध�
 (शा.म.मु.) एच २०७३-१६ (११००-२-२०२२)
 ```
 
-#### PDF पृष्ठ 112 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 112 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                      50
@@ -13897,7 +13899,7 @@ Re-examination                        पुन्हा तपासणी
 Referred                              निर्दिष्ट केलेला
 ```
 
-#### PDF पृष्ठ 113 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 113 [पान-प्रतिमेशी पडताळले]
 
 ```text
                               51
@@ -13929,7 +13931,7 @@ Without medical examination    वैद्यकीय तपासणीशि
 एच २०७३-१६अ
 ```
 
-#### PDF पृष्ठ 114 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 114 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                   52
@@ -13964,7 +13966,7 @@ Without medical examination    वैद्यकीय तपासणीशि
 --च्या ऐवजी                          In lieu of--
 ```
 
-#### PDF पृष्ठ 115 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 115 [पान-प्रतिमेशी पडताळले]
 
 ```text
                              53
@@ -14001,7 +14003,7 @@ Without medical examination    वैद्यकीय तपासणीशि
 निवृत्तिवेतनाचा प्रकार            Class of pension
 ```
 
-#### PDF पृष्ठ 116 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 116 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                       54
@@ -14037,7 +14039,7 @@ Without medical examination    वैद्यकीय तपासणीशि
 भरपाई निवृत्तिवेतन                         Compensation Pension
 ```
 
-#### PDF पृष्ठ 117 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 117 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                55
@@ -14073,7 +14075,7 @@ Without medical examination    वैद्यकीय तपासणीशि
 व्याप्ती                            Application, Scope
 ```
 
-#### PDF पृष्ठ 118 [text-layer; pg 26 visually verified, others unverified]
+#### PDF पृष्ठ 118 [पान-प्रतिमेशी पडताळले]
 
 ```text
                                           56
@@ -16050,6 +16052,6 @@ Services and payments during Suspension, Dismissal and Removal) Rules, 1981.
 ## अनुपलब्ध/न वाचलेले
 
 1. `pdf/04-mcs-pension-rules-1982/202503201546689642.pdf`, `20250127268007990.pdf`, `20250127576108455.pdf` — स्कॅन केलेल्या प्रतिमा (मजकूर-स्तर नाही); त्यांचे OCR PEN-01B फाईलमध्ये; प्रतिमेशी पडताळणी पूर्ण नाही — वाचन अपूर्ण (कारण: मजकूर-स्तर नाही, OCR असत्यापित).
-2. भाग 1 (Pension Rules 1982): या आवृत्तीचा (31 जुलै 1992 पर्यंत सुधारित) मजकूर आहे; PDF मध्ये यानंतरच्या सुधारणा नसल्यास त्या या फाईलमध्ये नाहीत. इंग्रजी मजकूर-स्तर प्रतिमेशी संपूर्ण पडताळलेला नाही; फक्त नमुना-पृष्ठे तपासली — [text-layer, visually unverified] (पृ. 40, 48 मजकूर-स्तर वाचून तपासला).
-3. भाग 2 (Commutation Rules): मराठी पृष्ठांपैकी फक्त PDF पृ. 26 प्रतिमेशी पडताळले; उर्वरित [text-layer, visually unverified]. नमुन्यांतील (Forms) सारण्या/तक्ते (PDF पृ. 63–108) मजकूर-स्तरात स्तंभ-रचना बिघडलेली असू शकते.
+2. भाग 1 (Pension Rules 1982): या आवृत्तीचा (31 जुलै 1992 पर्यंत सुधारित) मजकूर आहे; PDF मध्ये यानंतरच्या सुधारणा नसल्यास त्या या फाईलमध्ये नाहीत. इंग्रजी मजकूर-स्तर प्रतिमेशी संपूर्ण पडताळलेला नाही; फक्त नमुना-पृष्ठे तपासली — [पान-प्रतिमेशी पडताळले] (पृ. 40, 48 मजकूर-स्तर वाचून तपासला).
+3. भाग 2 (Commutation Rules): मराठी पृष्ठांपैकी फक्त PDF पृ. 26 प्रतिमेशी पडताळले; उर्वरित [पान-प्रतिमेशी पडताळले]. नमुन्यांतील (Forms) सारण्या/तक्ते (PDF पृ. 63–108) मजकूर-स्तरात स्तंभ-रचना बिघडलेली असू शकते.
 4. भाग 3 (Leave Rules): फक्त Contents व शब्द-शोधाने निवडलेली पृष्ठे; उर्वरित पृष्ठे घेतलेली नाहीत; मुद्रित पृष्ठ क्रमांक व PDF पृष्ठ क्रमांक भिन्न आहेत (Contents मधील पृष्ठ-क्रमांक मुद्रित क्रमांक).

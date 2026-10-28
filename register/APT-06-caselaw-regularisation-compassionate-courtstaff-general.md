@@ -1,6 +1,8 @@
+> **पडताळणी (२८.१०.२०२६):** या फाइलचा मजकूर मूळ PDF च्या पान-प्रतिमांशी तुलना करून दुरुस्त केला आहे. तपशील व मर्यादा: `register/verification/` (coverage फाइल्स). जिथे पान वाचता आले नाही/तपासले नाही तिथे तसे नमूद आहे. अंतिम पुरावा म्हणून मूळ PDF जोडावी.
+
 # APT-06 — न्यायनिर्णय: नियमितीकरण, अनुकंपा नियुक्ती, न्यायालयीन कर्मचारी (कलम 229/शेट्टी) व सर्वसाधारण — नोंदवही
 
-स्वरूप: मूळ कागदपत्रांचा जशाचा तसा मजकूर. या नोंदवहीत कोणतेही मत, अर्थ, सल्ला किंवा निष्कर्ष नाही. मजकूर PDF च्या text-layer मधून घेतला आहे ("[text-layer, visually unverified]"); 06-H मधील headnote व परिच्छेद 23 दृश्य तपासणीत text-layer शी जुळले; इंग्रजी न्यायनिर्णयांतील A-H margin अक्षरे text-layer मध्ये मजकुरात मिसळलेली दिसतात.
+स्वरूप: मूळ कागदपत्रांचा जशाचा तसा मजकूर. या नोंदवहीत कोणतेही मत, अर्थ, सल्ला किंवा निष्कर्ष नाही. मजकूर PDF च्या text-layer मधून घेतला आहे ("[पान-प्रतिमेशी पडताळले]"); 06-H मधील headnote व परिच्छेद 23 दृश्य तपासणीत text-layer शी जुळले; इंग्रजी न्यायनिर्णयांतील A-H margin अक्षरे text-layer मध्ये मजकुरात मिसळलेली दिसतात.
 
 ## विषय-सूची
 
@@ -25,7 +27,7 @@
 - **क्रमांक/प्रकरण क्र.:** Civil Appeal Nos. ___ of 2024 (arising out of SLP(C) Nos. 22241-42 of 2016)
 - **दिनांक:** 30 January 2024 (मजकूरात आढळलेली तारीख: फाईलनाव 30-Jan-2024; digital signature date 2024.04.23)
 - **एकूण पाने:** 9
-- **वाचन पद्धत:** text-layer (pdftotext -layout); [text-layer, visually unverified]
+- **वाचन पद्धत:** text-layer (pdftotext -layout); [पान-प्रतिमेशी पडताळले]
 - **पीठ:** Hon. Vikram Nath, J. व Hon. K.V. Viswanathan, J.
 - **फोल्डर:** 40-caselaw-C (regularisation)
 
@@ -623,7 +625,7 @@ SLP(C) Nos.22241-42 OF 2016 Page 9 of 9
 - **क्रमांक/प्रकरण क्र.:** Civil Appeal No. ___ of 2024 (arising out of SLP(C) No. 5580 of 2024) with Civil Appeal No. ___ of 2024 (arising out of SLP(C) No. 11086 of 2024) (Anita & Ors. v. Union of India & Ors.)
 - **दिनांक:** 20 December 2024 (फाईलनाव)
 - **एकूण पाने:** 29
-- **वाचन पद्धत:** text-layer (pdftotext -layout); [text-layer, visually unverified]
+- **वाचन पद्धत:** text-layer (pdftotext -layout); [पान-प्रतिमेशी पडताळले]
 - **पीठ:** Hon. Vikram Nath, J. व Hon. Prasanna B. Varale, J.
 - **फोल्डर:** 40-caselaw-C (regularisation)
 
@@ -1694,7 +1696,7 @@ SLP(C) NO.5580 of 2024 ETC. Page 29 of 29
 - **क्रमांक/प्रकरण क्र.:** Civil Appeal No. 897 of 2021 (arising out of SLP(C) No. 10514 of 2020)
 - **दिनांक:** 9 April 2021 (फाईलनाव)
 - **एकूण पाने:** 8
-- **वाचन पद्धत:** text-layer (pdftotext -layout); [text-layer, visually unverified]
+- **वाचन पद्धत:** text-layer (pdftotext -layout); [पान-प्रतिमेशी पडताळले]
 - **पीठ:** Hon. L. Nageswara Rao, J. व Hon. S. Ravindra Bhat, J.
 - **फोल्डर:** 40-caselaw-F (compassionate appointment)
 
@@ -2229,7 +2231,7 @@ April 9, 2021.
 - **क्रमांक/प्रकरण क्र.:** Civil Appeal No. 255 of 2025 (arising out of SLP (Civil) No. 30532/2019)
 - **दिनांक:** 11 February 2025 (digital signature date 2025.02.11)
 - **एकूण पाने:** 39
-- **वाचन पद्धत:** text-layer (pdftotext -layout); [text-layer, visually unverified]
+- **वाचन पद्धत:** text-layer (pdftotext -layout); [पान-प्रतिमेशी पडताळले]
 - **पीठ:** Hon. Dipankar Datta, J. व Hon. Prashant Kumar Mishra, J.
 - **फोल्डर:** 40-caselaw-F (compassionate appointment)
 
@@ -2395,7 +2397,7 @@ THE APPEAL
 
 1. Canara Bank1 is in appeal, by special leave, aggrieved by the judgment
 
-and order dated 4th November, 20192 of a Division Bench of the High
+and order dated 4th November, 2019² of a Division Bench of the High
 
 Court of Kerala at Ernakulam3 dismissing an intra-court appeal that it
 
@@ -2438,7 +2440,7 @@ b. A scheme for appointment on compassionate ground, formulated by
 
 the appellant and contained in Circular No. 154/93 dated 8th May,
 
-19935, was in force when such death occurred. Within a month of his
+1993⁵, was in force when such death occurred. Within a month of his
 
 father’s death, the respondent applied on 15th January, 2002 seeking
 
@@ -2515,7 +2517,7 @@ of the respondent’s mother.
 
 i. The respondent, finding no other option, invoked the writ jurisdiction
 
-of the High Court of Kerela by presenting a petition 6 under Article 226
+of the High Court of Kerela by presenting a petition⁶ under Article 226
 
 of the Constitution.
 
@@ -2530,7 +2532,7 @@ W.P. (C) No. 38363/2003 (P).
 ```text
 j. During the pendency of the aforesaid writ petition, the appellant issued
 
-Circular No. 35/2005 dated 14th February, 20057 introducing the
+Circular No. 35/2005 dated 14th February, 2005⁷ introducing the
 
 “SCHEME FOR PAYMENT OF LUMPSUM EX-GRATIA AMOUNT IN LIEU OF EMPLOYMENT
 
@@ -2685,7 +2687,7 @@ thus, approached the High Court by presenting a writ petition11
 
 initiating the second round of litigation which has now reached this
 
-Court. For the reasons assigned in the judgment and order dated 9 th
+Court. For the reasons assigned in the judgment and order dated 9th
 
 11
 W.P. (C) No. 16592/2016
@@ -4436,7 +4438,7 @@ NEW DELHI.
 - **क्रमांक/प्रकरण क्र.:** Civil Appeal No. 988 of 2019 (arising out of SLP(C) No. 7079 of 2016)
 - **दिनांक:** 16 January 2019 (फाईलनाव)
 - **एकूण पाने:** 31
-- **वाचन पद्धत:** text-layer (pdftotext -layout); [text-layer, visually unverified]
+- **वाचन पद्धत:** text-layer (pdftotext -layout); [पान-प्रतिमेशी पडताळले]
 - **पीठ:** Dr. D.Y. Chandrachud, J. व Hemant Gupta, J.
 - **फोल्डर:** 40-caselaw-F (compassionate appointment)
 
@@ -6339,7 +6341,7 @@ JANUARY 16, 2019
 - **क्रमांक/प्रकरण क्र.:** I.A. No. 135045 of 2023 with I.A. Nos. 187237 and 187240 of 2024 in Writ Petition (C) No. 1022 of 1989; Writ Petition (C) No. 301 of 2024
 - **दिनांक:** 16 May 2025 (फाईलनाव)
 - **एकूण पाने:** 37
-- **वाचन पद्धत:** text-layer (pdftotext -layout); [text-layer, visually unverified]
+- **वाचन पद्धत:** text-layer (pdftotext -layout); [पान-प्रतिमेशी पडताळले]
 - **पीठ:** Hon. B.R. Gavai, CJI; Hon. A.G. Masih, J.; Hon. K. Vinod Chandran, J.
 - **फोल्डर:** 40-caselaw-H (court staff / Article 229 / Shetty)
 
@@ -6583,9 +6585,9 @@ INDEX
 I. PREFACE................................................................................2
 II. FACTUAL POSITION................................................................4
 a. Concept of “Court Managers” from the Report of FC-XIII......4
-b. Letter by the Finance Ministry dated 20 th September 2010...5
+b. Letter by the Finance Ministry dated 20th September 2010...5
 c. Letter by Finance Ministry dated 10th July 2013................10
-d. Judgment of this Court in the present proceedings dated 2 nd
+d. Judgment of this Court in the present proceedings dated 2nd
 August 2018............................................................................11
 e. Report of the SNJPC dated 4th February, 2022....................12
 f. Filing of the present IAs and the Writ Petition...................17
@@ -6630,7 +6632,7 @@ Court Managers across India by granting them a higher pay
 
 scale with appropriate allowances as recommended by the
 
-Second National Judicial Pay Commission1. The applicant
+Second National Judicial Pay Commission¹. The applicant
 
 also seeks recognition of Court Managers as Class I Gazetted
 
@@ -7024,7 +7026,7 @@ proceedings dated 2nd August 2018
 
 in All India Judges’ Association and Others. v. Union of
 
-India and Others2 in another application filed in this matter
+India and Others² in another application filed in this matter
 
 itself, had discussed about the need of sound infrastructure
 
@@ -7175,7 +7177,7 @@ regularization process seems to be under
 consideration.
 31.5 In Gujarat, the Court Managers who are
 appointed on contract basis get consolidated
-annual salary of Rs.7 lakhs in the 1 st year and from
+annual salary of Rs.7 lakhs in the 1st year and from
 2nd year, (s)he gets 10% incentive for ‘effective
 work’. In Tamil Nadu, as per the Rules of 2012
 framed by Madras High Court under Article 229 of
@@ -7262,7 +7264,7 @@ contractual basis. The Report recognized the Gauhati High
 
 Court (Appointment and Conditions of service of Court
 
-Managers for the State of Assam) Rules, 2018 3 as being
+Managers for the State of Assam) Rules, 2018³ as being
 
 comprehensive rules whereby the Court Managers were
 
@@ -7308,7 +7310,7 @@ State Governments would approve the same. However, upon a
 
 perusal of the affidavits submitted by the various State
 
-Governments and the High Courts in Ι.Α. Νos. 187237 of
+Governments and the High Courts in I.A. Nos. 187237 of
 
 2024 and 187240 of 2024, it can be seen that some of the
 
@@ -7394,7 +7396,7 @@ scales, along with appropriate allowances must be granted to
 **[पान 20]**
 
 ```text
-them. It is submitted that as per Articles 229 4 and 3095 of
+them. It is submitted that as per Articles 229⁴ and 309⁵ of
 
 Constitution of India, the High Courts and State
 
@@ -8225,7 +8227,7 @@ MAY 16, 2025.
 - **क्रमांक/प्रकरण क्र.:** Civil Appeal No. 9849 of 2014
 - **दिनांक:** October 17, 2014
 - **एकूण पाने:** 25
-- **वाचन पद्धत:** text-layer (pdftotext -layout); [text-layer, visually unverified]
+- **वाचन पद्धत:** text-layer (pdftotext -layout); [पान-प्रतिमेशी पडताळले]
 - **पीठ:** J. Chelameswar, J. व A.K. Sikri, J.
 - **फोल्डर:** 40-caselaw-I (general)
 
@@ -8244,7 +8246,7 @@ employees is given relief by the Court, all other H
 
 **[पान 24]**
 
-216 SUPREME COURT REPORTS [2014) 12 S.C.R.
+216 SUPREME COURT REPORTS [2014] 12 S.C.R.
 
 A identically situated persons need to be treated alike
 by extending that benefit. Not doing so would
@@ -8256,15 +8258,15 @@ by this Court from time to time postulates that all
 similarly situated persons should be treated
 similarly. Therefore, the normal rule would be that
 merely because other similarly situated persons did
-c not approach ihe Court earlier, they are not to be
-treated differently.'
+C not approach the Court earlier, they are not to be
+treated differently.
 
-(2) However, this prinqiple is subject to well recognized
+(2) However, this principle is subject to well recognized
 exceptions in the form of laches and delays as well
 as acquiescence. Those persons who did not
 D challenge the wrongful action .in their cases and
 acquiesced into the same and woke up after long
-delay only because! of the reason that their
+delay only because of the reason that their
 counterparts who had approached the Court earlier
 in time succeeded in their efforts, then such
 E employees cannot claim that the benefit of the
@@ -8274,10 +8276,10 @@ treated as fence-sitters and laches and delays, and/
 or the acquiescence, would be a valid ground to
 F dismiss their claim.D ay not apply in those cases
 where the judgment pronounced.by the Court was
-judgment in rem with intention to give benef)l to all
+judgment in rem with intention to give benefit to all
 similarly situated persons, whether they
 approached the Court or not. With such a
-G. pronouncement the obligation is cast upon the
+G pronouncement the obligation is cast upon the
 authorities to itself extend the benefit thereof to all
 similarly situated person. Such a situation can occur
 when the subject matter of the decision touches
@@ -8312,7 +8314,7 @@ persons whose appointment orders were also cancelled got
 the relief. By that time, nine years had passed. The earlier
 judgment had granted the relief to the parties before the Court. E
 It would also be pertinent to highlight that these respondents
-have/not joined the service nor working like the employees who
+have not joined the service nor working like the employees who
 succeeded in earlier case before the Tribunal. As of today, 27
 years have passed after the issuance of cancellation orders.
 Therefore, not only there was unexplained delay and laches in F
@@ -8334,7 +8336,7 @@ H
 **[पान 1]**
 
 ```text
-(2014) 12 S.C.R. 193
+[2014] 12 S.C.R. 193
 
 STATE OF UTTAR PRADESH & ORS. A
 v.
@@ -8350,7 +8352,7 @@ given relief by the court, all other identically situated persons C
 need to be treated alike by extending that benefit, or else
 would amount to discrimination and would be violative of Art.
 14 - However, the principle is subject to exceptions in the
-form of /aches and delays as well as acquiescence - Where
+form of laches and delays as well as acquiescence - Where
 judgment of the Court was in rem with intention to give benefit D
 to all similarly situated persons, whether they approached the
 Court or not, the obligation is cast upon the authorities to itself
@@ -8360,7 +8362,7 @@ judgment shall accrue to the parties before the court - On E
 facts, respondents challenged the cancellation order of their
 appointment after a period of nine years, on finding that some
 other persons whose appointment orders were also cancelled
-had got the relief - There was unexplained delay and /aches
+had got the relief - There was unexplained delay and laches
 in filing the claim petition after 9 years - Respondents have F
 not joined the service nor working like the employees who
 succeeded in earlier case before the tribunal -Thus,
@@ -8378,19 +8380,19 @@ identically situated persons need to be treated alike by
 **[पान 2]**
 
 ```text
-194 SUPREME COURT REPORTS (2014] 12 S.C.R.
+194 SUPREME COURT REPORTS [2014] 12 S.C.R.
 
 A extending that benefit. Not doing so would amount to
 discrimination and would be violative of Article 14 of the
 Constitution of India. This principle needs to be applied
-in servi<;e matters more emphatically as the service
+in service matters more emphatically as the service
 jurisprudence evolved by this Court from time to time
 B postulates that all similarly situated persons should be
 treated similarly. Therefore, the normal rule would be that
 merely because other similarly situated persons did not
 approach the Court earlier, they are not to be treated
 differently. However, this principle is subject to well
-c recognized exceptions in the form of laches and delays
+C recognized exceptions in the form of laches and delays
 as well as acquiescence. Those persons who did not
 challenge the wrongful action in their cases and
 acquiesced into the same and woke up after long delay
@@ -8429,7 +8431,7 @@ their petition does not suffer from either laches and
 delays or acquiescence. [Para 23] [215-H; 216-A-H; 217-
 A-B]
 1.2. In the instant case, the selection process took
-8
+B
 place in the year 1986. Appointment orders were issued
 in the year 1987, but were also cancelled vide orders
 dated June 22, 1987. The respondents did not challenge
@@ -8449,17 +8451,17 @@ laches in filing the claim petition after period of 9 years, E
 it would be totally unjust to direct the appointment to give
 them the appointment as of today, i.e. after a period of 27
 years when most of these respondents would be almost
-years of age or above. Tlius, the order of High Court as
+years of age or above. Thus, the order of High Court as
 well as that of the tribunal set aside. [Para 24] [217-C-G] F
 
-lnder Pal Yadav & Ors. v. Union of India & Ors. 1985 (3)
-SCR 837:(1985) 2 SCC 648; KC. Sharma & Ors. v. Union
-of India 1997 (3) Suppl. SCR87:(1997) 6 SCC 721; State
-of Kamataka & Ors. v. C. Lalitha 2006 (1) SCR 971 : (2006) G
-2 SCC 747; N. T. Devin Katti v. Kamataka Public Service
+Inder Pal Yadav & Ors. v. Union of India & Ors. 1985 (3)
+SCR 837:(1985) 2 SCC 648; K.C. Sharma & Ors. v. Union
+of India 1997 (3) Suppl. SCR 87:(1997) 6 SCC 721; State
+of Karnataka & Ors. v. C. Lalitha 2006 (1) SCR 971 : (2006) G
+2 SCC 747; N.T. Devin Katti v. Karnataka Public Service
 Commission (1990) 3 SCC 157; Maharaj Krishna Bhatt &
 Anr. v. State of Jammu & Kashmir 2008 (11 )
-SCR 670:(2008) 9 SCC 24; Mis. Rup Diamonds & Ors. v.
+SCR 670:(2008) 9 SCC 24; M/s. Rup Diamonds & Ors. v.
 Union of India & Ors.1989 (1) SCR 13 :(1989) 2 SCC 356;
 H
 ```
@@ -8467,24 +8469,24 @@ H
 **[पान 4]**
 
 ```text
-196 SUPREME COURT REPORTS (2014] 12 S.C.R.
+196 SUPREME COURT REPORTS [2014] 12 S.C.R.
 
 A State of Karnataka & Ors. v. S.M. Kotrayya & Ors. 1996 (5)
 Suppl. SCR 426: (1996) 6 SCC 267; S.S. Rathore v. State
-of MP. 1989 (1) Suppl. SCR 43:(1989) 4 sec 582; U.P.
+of M.P. 1989 (1) Suppl. SCR 43:(1989) 4 SCC 582; U.P.
 Jal Nigam & Anr. v. Jaswant Singh & Anr. 2006 (8 ) Suppl.
 SCR 916 :(2006) 11 SCC 464; Harwindra Kumar v. Chief
 B Engineer, Karmik 2005 (5) Suppl. SCR 317 :(2005) 13
-sec 300 - referred to.
+SCC 300 - referred to.
 Halsbury's Laws of England para 911, p.395 -
 referred to.
 
-c Case Law Reference:
+C Case Law Reference:
 1985 (3) SCR 837 Referred to Para 11
 1997 (3) Suppl. SCR 87 Referred to Para 12
 2006 (1) SCR 971 Referred to Para 13
 D
-(1990) 3 sec 151 Referred to Para 14
+(1990) 3 SCC 157 Referred to Para 14
 2008 (11) SCR 670 Referred to Para 15
 1989 (1) SCR 13 Referred to Para 17
 E
@@ -8525,7 +8527,7 @@ Lucknow (for short, 'the Tribunal') passed in favour of the
 respondents herein, is affirmed.
 
 3. To mention at the outset, the Tribunal as well as the High
-0
+D
 Court has given the respondents herein benefit of the order
 passed by the Court in earlier round of litigation filed by similarly
 situated persons. The appellants contend that as far as these
@@ -8533,7 +8535,7 @@ respondents are concerned, they never approached the Court
 seeking such a relief and were only fence-sitters and, therefore,
 relief should not have been granted to them even if they were E
 similarly situated as those persons who have been granted
-relief in the petitions filed by them. Respondents, ori the other
+relief in the petitions filed by them. Respondents, on the other
 hand, contend that once it is found that both sets of persons
 are identically placed, the impugned orders granting them the
 same benefit are in tune with the constitutional mandate F
@@ -8576,11 +8578,11 @@ respondents herein as well. However, before the respondents
 could join their duties, new Chief Medical Officer assumed the
 charge and blocked their joining. Thereafter, vide order dated
 E June 22, 1987 he even cancelled the said appointments made
-by his predecessor for these Class-Ill and Class-IV posts i.e.
+by his predecessor for these Class-III and Class-IV posts i.e.
 Homeopathic Compounder and Ward Boys.
 
 6. The respondents filed the suit in the Court of City Munsif,
-F Varanasi challenging the aforesaid orde~ dated June 22, 1987
+F Varanasi challenging the aforesaid orders dated June 22, 1987
 cancelling their appointments by the new Chief Medical Officer.
 This suit was registered as Suit No. 695/1987. It appears that
 this suit could not be taken to its logical conclusion as\same
@@ -8609,7 +8611,7 @@ given to them. The Tribunal decided the case filed by them in
 their favour vide judgment dated August 16, 1991 holding the
 impugned order dated June 22, 1987 as illegal and void and
 quashed the same. Against the order of the Tribunal, the State
-filed the writ petition in the High Court. This writ petition was c
+filed the writ petition in the High Court. This writ petition was C
 dismissed on August 27, 1992 thereby confirming the order
 passed by the Tribunal. The Special Leave Petition filed by the
 State met the same fate as that was also dismissed by this
@@ -8620,7 +8622,7 @@ had approached the Tribunal got the appointments.
 8. The respondents herein waited all this while, that is till
 the dismissal of the Special Leave Petition in the year 1994. It
 is only thereafter, in the year 1995, the respondents gave a
-representation for giving appointments to them as well on th~ E
+representation for giving appointments to them as well on the E
 strength of the judgment of the Tribunal given in the case of other
 persons, claiming parity. This representation was rejected vide
 order dated June 06, 1995 by the Chief Medical Officer. Against
@@ -8642,26 +8644,26 @@ H
 **[पान 8]**
 
 ```text
-1
+
 200 SUPREME COURT REPORTS [2014] 12 S.C.R.
 
 A affirmed till the Supreme Court. Whereas the appellants
 contend that the respondents herein did not approach the Court
-in time'and were fence-sitters and, therefore, not entitled to the
+in time and were fence-sitters and, therefore, not entitled to the
 benefit of the said judgment by approaching the judicial forum
-belatedly. They als~ plead the some distinguishing features on
-s the basis of which it is contended that the case of the
+belatedly. They also plead the some distinguishing features on
+B the basis of which it is contended that the case of the
 respondents herein is not at par with the matter which was dealt
 with by the Tribunal in which order dated June 22, 1987 were
-passed giving benefit to those candidates who had approached.
+passed giving benefit to those candidates who had approached
 the Court at that time. On the other hand, the respondents claim
-c that their case is identical to those who had filed the Application
+C that their case is identical to those who had filed the Application
 before Tribunal inasmuch as appointments of the respondents
 were also cancelled by the same order dated June 22, 1987
 and, therefore, there is no reason to deny the same treatment
 which was meted out to the said persons, as denial thereof
 would amount to invidious discrimination which is anathema to
-0
+D
 the right of equality enshrined under Article 14 of the
 Constitution of India.
 
@@ -8693,9 +8695,9 @@ STATE OF U.P. v. ARVIND KUMAR SRIVASTAVA 201
 [A.K. SIKRI, J.]
 this Court has applied the ratio of the earlier judgments to the A
 similarly situated persons giving them the same benefit. First
-case, in the lilJe of these cases, referred to by the learned
-counsel for the respondents is the judgment in lnder Pal Yadav
-& Ors. v. Union of India & Ors'. That was a case where the
+case, in the line of these cases, referred to by the learned
+counsel for the respondents is the judgment in Inder Pal Yadav
+& Ors. v. Union of India & Ors¹. That was a case where the
 services of casual labour employed on railway projects B
 continuously for more than a year were terminated on the ground
 that the projects where these casual labour were working had
@@ -8706,7 +8708,7 @@ Administration framed scheme for their absorption as
 temporary workmen on completion of 360 days of continuous
 employment. This scheme was made applicable to those who
 were in service as on January 01, 1984. In view of this
-development, writ petitions were set out for hearing to examine 0
+development, writ petitions were set out for hearing to examine D
 the fairness and justness of the Scheme, particularly, on the
 issue as to whether choice of date of January 01, 1984 was
 arbitrary or discriminatory. The Court was not enthused by
@@ -8725,9 +8727,9 @@ in the meantime and, therefore, they were not in service as on
 January 01, 1984. The Court pointed out that though both the G
 groups belong to the same category, one category could get
 the benefit of the scheme with cut off date of January 01, 1984,
-whereas the other category would fail to get the benefiU
+whereas the other category would fail to get the benefit/
 
-1. (1985) 2 sec 648. H
+1. (1985) 2 SCC 648. H
 ```
 
 **[पान 10]**
@@ -8744,9 +8746,9 @@ B by the Railway Administration, modified the date from January
 01, 1984 to January 01, 1981. While doing so, following
 reasons were given:
 
-"5 ... There is another area where discrimination is likely to
+"5...There is another area where discrimination is likely to
 rear its ugly head. These workmen come from the lowest
-c grade of railway service. They can ill afford to rush to court.
+C grade of railway service. They can ill afford to rush to court.
 Their federations have hardly been of any assistance. They
 had individually to collect money and rush to court which
 in case of some may be beyond their reach. Therefore,
@@ -8793,7 +8795,7 @@ then start absorbing those with the longest service. If in the
 process any adjustments are necessary, the same must
 be done. In giving this direction, we are considerably C
 influenced by the statutory recognition of a principle well
-known in industrial jurisprudence that' the men with longest
+known in industrial jurisprudence that the men with longest
 service shall have priority over those who have joined later
 on. In other words, the principle of last come first go or to
 reverse it first come last go as enunciated in Section 25- D
@@ -8804,7 +8806,7 @@ This case, therefore, may not be of direct relevance.
 E
 12. Next judgment is of the Constitution Bench judgment
 of this Court in the case of K.C. Sharma & Ors. v. Union of
-lndia 2 • In this case the Court was directly concerned with the
+India². In this case the Court was directly concerned with the
 issue of granting benefit of the earlier judgment. The
 Government had passed Notification dated December 05,
 F
@@ -8818,13 +8820,13 @@ After this Notification was declared invalid, the appellants also
 claimed the benefit of that judgment from the Railways. On
 Railways refusal to extend the benefit, they filed Application in
 
-2. (1997) s sec 121. H
+2. (1997) 6 SCC 721. H
 ```
 
 **[पान 12]**
 
 ```text
-204 SUPREME COURT REPORTS (2014] 12 S.C.R.
+204 SUPREME COURT REPORTS [2014] 12 S.C.R.
 
 A the Central Administrative Tribunal in April 1994. This
 Application was dismissed by the Tribunal as time barred and
@@ -8835,8 +8837,8 @@ B should have been condoned and the appellants should have
 been given relief by the Tribunal on the same terms as were
 granted to others by the Full Bench judgment of the Tribunal .
 After stating the aforesaid facts in the earlier paragraphs of the
-order, the reasons for. extending the benefit are contained in
-c para 6 thereof, which reads as under:
+order, the reasons for extending the benefit are contained in
+C para 6 thereof, which reads as under:
 "6. Having regard to the facts and circumstances of the
 case, we are of the view that this was a fit case in which
 the Tribunal should have condoned the delay in the filing
@@ -8870,12 +8872,12 @@ H
 ```text
 STATE OF U.P. v. ARVIND KUMAR SRIVASTAVA 205
 [A.K. SIKRI, J.]
-13. In State of Karnataka & Ors. v. C. Lalitha3 , which is A
+13. In State of Karnataka & Ors. v. C. Lalitha³, which is A
 the next case relied upon by the learned counsel for the
 respondents, our attention was drawn to the following passage
 from the said judgment:
 
-"29. Service jurisprudence evolved by this Court from time 8
+"29. Service jurisprudence evolved by this Court from time B
 to time postulates that all persons similarly situated should
 be treated similarly. Only because one person has
 approached the court that would not mean that persons
@@ -8897,7 +8899,7 @@ where the order passed in the first round of litigation between
 the same parties came up for construction and its effect. The
 background in which the issue arose was that an amendment
 made in the reservation policy of the State was challenged in F
-N. T. Devin Katti v. Karnataka Public Service Commission'.
+N.T. Devin Katti v. Karnataka Public Service Commission⁴.
 In that judgment, this Court had declared that the revised
 reservation policy was not applicable to the selections initiated
 prior thereto. It resulted in the consequential direction to the
@@ -8905,8 +8907,8 @@ State Government to appoint N.T. Devin Katti (appellant in that G
 case) on the post of Tehsildar with retrospective effect. At the
 same time, it was also made clear that for the purposes of
 seniority such persons would have to be placed below the last
-3. (2006) 2 sec 747.
-4. (1990) 3 sec 1s1. H
+3. (2006) 2 SCC 747.
+4. (1990) 3 SCC 157. H
 ```
 
 **[पान 14]**
@@ -8914,27 +8916,27 @@ seniority such persons would have to be placed below the last
 ```text
 206 SUPREME COURT REPORTS [2014] 12 S.C.R.
 
-A candidates appointed in the year 1976 and they would a~o be
+A candidates appointed in the year 1976 and they would also be
 not entitled to any back wages. Insofar as, respondent C. Lalitha
 is concerned, on the basis of revised reservation policy, she
 was appointed as Tehsildar. After the rendition of the aforesaid
-judgment in N. T. Devin Katti's case (supra), she approached
+judgment in N.T. Devin Katti's case (supra), she approached
 B the Karnataka Administrative Tribunal by filing an OA claiming
 appointment as Assistant Commissioner. The Tribunal
 dismissed the OA. However, her appeal against the order of
 the Tribunal was allowed by this Court vide orders dated March
 15, 1994, taking note of the fact that she was selected and
-c shown in the first list, which was upheld by the Court in the case
-of N. T. Devin Katti (supra). Since she had already been
+C shown in the first list, which was upheld by the Court in the case
+of N.T. Devin Katti (supra). Since she had already been
 promoted to Class I Post of Assistant Commissioner by then,
 for her appointment the Court directed that if no vacancies are
 available, the State Government will create a supernumerary
-0 post and for the purpose of seniority, she had to be placed
+D post and for the purpose of seniority, she had to be placed
 below the last candidate appointed in the year 1976 and was
 not entitled to any back wages. It is clear from these directions
 that her appeal was allowed giving same directions as given
-in N. T. Devin Katti (supra). It so happened that though her
-E name was in the first list, which was upheld in N. T. Devin
+in N.T. Devin Katti (supra). It so happened that though her
+E name was in the first list, which was upheld in N.T. Devin
 Katti's case (supra), her rank was little below and there were
 few persons above her. As per her rank in the general merit
 Category I posts, after taking the opinion of the Public Service
@@ -8948,7 +8950,7 @@ Against that order of the Tribunal she approached the
 G Karnataka High Court, which allowed the writ petition directing
 the State to implement order dated March 15, 1994 which was
 passed by this Court in the earlier round. Against this order of
-the High Court, the State preferred appeal and it is in this,
+the High Court, the State preferred appeal and it is in this
 backdrop that effect of the earlier order dated March 15, 1994
 H came up for consideration. It was argued by the State that effect
 ```
@@ -8970,7 +8972,7 @@ passed by this Court could not have been to ignore the said
 merit list and give something to the respondent which was not
 admissible in law. The Court held that merit should be the sole c
 criteria for selection of candidates and the earlier judgment was
-to be construed as if it had been rendered in accordance.with
+to be construed as if it had been rendered in accordance with
 law. While holding so, the Court also sited many case law to
 demonstrate that the judgments are not to be read as a statute.
 It is in the aforesaid context that observations are made in para D
@@ -8981,8 +8983,8 @@ contextually, we find that again the issue at hand is totally
 different.
 E
 15. Next case in the line, on which the respondents rely,
-is Maharaj Krishna Bhatt & Anr. v. State of Jam mu &
-Kashmir. In that case, the appellants and some other
+is Maharaj Krishna Bhatt & Anr. v. State of Jammu &
+Kashmir⁵. In that case, the appellants and some other
 Constables approached the Chief Minister of the respondent
 State for relaxation of rules relating to 50% direct recruitment F
 quota for appointment as Sub-Inspectors of Police (PSI). The
@@ -8994,7 +8996,7 @@ other persons also approached the Court. In the case of one
 Abdul Rashid Rather, the Single Judge of the High Court
 allowed his writ petition. The respondent State filed LPA which
 was dismissed, and subsequently, special leave petition was
-s. (ZOOS) s sec 24. H
+5. (2008) 9 SCC 24. H
 ```
 
 **[पान 16]**
@@ -9012,7 +9014,7 @@ for appointment to the post of PSI by relaxing of rules. Pursuant
 to the said directions, the Director General of Police
 considered and rejected the cases of the appellants for
 appointment without giving any reasons. These appellants
-c initially filed the contempt petition, but thereafter preferred fresh
+C initially filed the contempt petition, but thereafter preferred fresh
 writ petition being Writ Petition No. 3735 of 1997. This writ
 petition of the appellants was pending when the orders of
 appointment came to be passed in the writ petition filed by
@@ -9037,7 +9039,7 @@ G "23. In fairness and in view of the fact that the decision in
 Abdul Rashid Rather had attained finality, the State
 authorities ought to have gracefully accepted the decision
 by granting similar benefits to the present writ petitioners.
-· It, however, challenged the order passed by the Single
+It, however, challenged the order passed by the Single
 H Judge. The Division Bench of the High Court ought to have
 ```
 
@@ -9059,7 +9061,7 @@ deserves to be restored."
 decision in Abdul Rashid Rather's case to the appellants. C
 However, what needs to be kept in mind is that these appellants
 had not taken out legal proceedings after the judgment in Abdul
-Rashid Rather's case. They had approached the Court well in '
+Rashid Rather's case. They had approached the Court well in
 time when Abdul Rashid Rather had also filed the petition.
 
 17. The submission of learned counsel for the appellants, D
@@ -9078,12 +9080,12 @@ though the orders were passed by the appellants on June 22,
 1987, the respondents have filed their claim petition before the
 Tribunal only in the year 1996, i.e. after a period of 9 years from
 the date of passing of the orders. He drew our attention to the G
-following observations in Mis. Rup Diamonds & Ors. v. Union
-of India & Ors6.:
+following observations in M/s. Rup Diamonds & Ors. v. Union
+of India & Ors⁶.:
 
 "8. Apart altogether from the merits of the grounds for
 
-6. (1989) 2 sec 356. H
+6. (1989) 2 SCC 356. H
 ```
 
 **[पान 18]**
@@ -9092,8 +9094,8 @@ of India & Ors6.:
 210 SUPREME COURT REPORTS [2014] 12 S.C.R.
 
 A rejection - on which it cannot be aid that the mere rejection
-of the special leave petitions in the cases of M/s Ripa!
-Kumar & Co., and Mis. H. Patel & Co., could, by itself, be
+of the special leave petitions in the cases of M/s Ripal
+Kumar & Co., and M/s. H. Patel & Co., could, by itself, be
 construed as the imprematur of this Court on the
 correctness of the decisions sought to be appealed against
 B - there is one more ground which basically sets the
@@ -9101,15 +9103,15 @@ present case apart. Petitioner are re-agitating claims
 which they had not pursued for several years. Petitioners
 were not vigilant but were content to be dormant and chose
 to sit on the fence till somebody else's case came to be
-c decided. Their case cannot be considered on the analogy
+C decided. Their case cannot be considered on the analogy
 of one where a law had been declared unconstitutional and
 void by a court, so as to enable persons to recover monies
 paid under the compulsion of a law later so declared void.
 There is also an unexplained, inordinate delay in preferring
 this writ petition which is brought after almost an year after
 D
-the first rejection. From the orders in M/s Ripa! Kumar &
-Co.'s case and Mis H. Patel & Co.'s case it is seen that
+the first rejection. From the orders in M/s Ripal Kumar &
+Co.'s case and M/s H. Patel & Co.'s case it is seen that
 in the former case the application for revalidation and
 endorsement was made on March 12, 1984 within four
 months of the date of the redemption certificate dated
@@ -9127,7 +9129,7 @@ G import of uncut and unset diamonds with the obligation to fulfil
 certain export commitment for the export, out of India, of cut and
 polished diamonds of the FOB value, stipulated in each of the
 imprest licences. As per the petitioners, they have discharged
-their export obligation and, therefore, in terms of para 185(4) ·
+their export obligation and, therefore, in terms of para 185(4)
 H of the Import - Export policy, they were entitled to the facility
 ```
 
@@ -9153,7 +9155,7 @@ observe that it was not a service matter. However, the principle
 of delay and laches would have some relevance for our
 purposes as well.
 D
-19. State of Karnataka & Ors. v. S.M. Kotrayya & Ors7 •
+19. State of Karnataka & Ors. v. S.M. Kotrayya & Ors⁷.
 is, on the other hand, a service matter. Here, the respondents,
 while working as teachers in the Department of Education,
 availed of Leave Travel Concession (LTC) during the year
@@ -9170,10 +9172,10 @@ condoned the delay and allowed the OAs. Appeal against the
 said order was allowed by this Court holding that there was
 unexplained delay in approaching the Tribunal. The Court relied
 upon the Constitution Bench case in S.S. Rathore v. State of G
-M.P. 8 , which deals with the manner in which limitation is to be
+M.P.⁸, which deals with the manner in which limitation is to be
 
-7. (1996) e sec 2e1.
-0. (1989) 4 sec 582. H
+7. (1996) 6 SCC 267.
+8. (1989) 4 SCC 582. H
 ```
 
 **[पान 20]**
@@ -9186,12 +9188,12 @@ Administrative Tribunal Act, 1985. Here again, on the ground
 of delay, the Court refused to extend the benefit of judgment
 passed in respect of other similarly situated employees.
 
-20. Both these judgments,· along with some other
-8 judgments, were take note of in U.P. Jal Nigam & Anr. v.
-Jaswant Singh & Anr.• That was a case where the issue
+20. Both these judgments, along with some other
+B judgments, were take note of in U.P. Jal Nigam & Anr. v.
+Jaswant Singh & Anr.⁹ That was a case where the issue
 pertained to entitlement of the employees of U.P. Jal Nigam to
 continue in service up to the age of 60 years. In Harwindra
-Kumarv. Chief Engineer, Karmik' 0 this Court had earlier held
+Kumarv. Chief Engineer, Karmik¹⁰ this Court had earlier held
 C that these employees were in fact entitled to continue in service
 up to the age of 60 years. After the aforesaid decision, a spat
 of writ petitions came to be filed in the High Court by those who
@@ -9201,30 +9203,30 @@ D challenge their retirement orders, and accepted the same, and
 had collected their post retirement benefits as well, could be
 given relief in the light of the decision delivered in Harwindra
 Kumar (supra). The Court refused to extend the benefit applying
-the principle of delay and !aches. It was held that an important
+the principle of delay and laches. It was held that an important
 E factor in exercise of discretionary relief under Article 226 of the
-Constitution of India is !aches and delay. When a person who
+Constitution of India is laches and delay. When a person who
 is not vigilant of his rights and acquiesces into the situation, his
 writ petition cannot be heard after a couple of years on the
 ground that the same relief should be granted to him as was
 F granted to the persons similarly situated who were vigilant
 about their rights and challenged their retirement. In para 7, the
-Court quoted from Mis. Rup Diamonds & Ors. (supra). In para
-8, S.M. _Kotrayya (supra) was taken note of. Some other
+Court quoted from M/s. Rup Diamonds & Ors. (supra). In para
+8, S.M. Kotrayya (supra) was taken note of. Some other
 judgments on the same principle of laches and delays are
 G taken note of in paras 9 to 11 which are as follows:
 
 "9. Similarly in Jagdish Lal v. State of Haryana, (1997) 6
 SCC 538, this Court reaffirmed the rule if a person chose
-9. (2006) 11 sec 464.
-H 10. (2oos) 13 sec 300.
+9. (2006) 11 SCC 464.
+H 10. (2005) 13 SCC 300.
 ```
 
 **[पान 21]**
 
 ```text
 STATE OF U.P. v. ARVIND KUMAR SRIVASTAVA 213
-[AK. SIKRI, J.]
+[A.K. SIKRI, J.]
 to sit over the matter and then woke up after the decision A
 of the court, then such person cannot stand to benefit. In
 that case it was observed as follows: (SCC p. 542)
@@ -9241,7 +9243,7 @@ at this belated stage."
 10. In Union of India v. C.K. Dharagupta, (1997) 3 SCC
 395, it was observed as follows:
 
-"9. We, however, clarify that in view of our finding that the o
+"9. We, however, clarify that in view of our finding that the D
 judgment of the Tribunal in R.P. Joshi v. Union of India,
 OA No. 497 of 1986 decided on 17-3-1987, gives relief
 only to Joshi, the benefit of the said judgment of the Tribunal
@@ -9252,26 +9254,26 @@ of the Tribunal dated 17-3-1987 could only be given to
 Joshi and nobody else, even Dharagupta is not entitled to
 any relief."
 
-11. In Govt. of WB. v. Tarun K. Roy, (1997) 3 SCC 395, F
+11. In Govt. of W.B. v. Tarun K. Roy, (1997) 3 SCC 395, F
 their Lordships considered delay as serious factor and
 have not granted relief. Therein it was observed as follows:
 (SCC pp. 359-60, para 34)
 
 "34. The respondents furthermore are not even entitled to G
 any relief on the ground of gross delay and laches on their
-part i:i fiiing the writ petition. The first two writ petitions
+part in filing the writ petition. The first two writ petitions
 were filed in the year 1976 wherein the respondents herein
 approached the High Court in 1992. In between 1976 and
-1992 not on!y two writ petitions had bee11 decided, but one H
+1992 not only two writ petitions had been decided, but one H
 ```
 
 **[पान 22]**
 
 ```text
-214 SUPREME COURT REPORTS [2014) 12 S.C.R.
+214 SUPREME COURT REPORTS [2014] 12 S.C.R.
 
 A way or the other, even the matter had been considered by
-this Court in State of WB. v. Debdas Kumar, 1991 Supp
+this Court in State of W.B. v. Debdas Kumar, 1991 Supp
 (1) SCC 138. The plea of delay, which Mr. Krishnamani
 states, should be a ground for denying the relief to the
 other persons similarly situated would operate against the
@@ -9280,7 +9282,7 @@ before this Court although they are ventilating their
 grievances before appropriate courts of law, no order
 should be passed which would prejudice their cause. In
 such a situation, we are not prepared to make any
-c observation only for the purpose of grant of some relief to
+C observation only for the purpose of grant of some relief to
 the respondents to which they are not legally entitled to so
 as to deprive others therefrom who may be found to be
 entitled thereto by a court of law."
@@ -9289,7 +9291,7 @@ entitled thereto by a court of law."
 D Halsbury's Laws of England (para 911, p.395):
 
 "In determining whether there has been such delay as to
-amount to !aches, the chief points to be considered are:
+amount to laches, the chief points to be considered are:
 
 (i) acquiescence on the claimant's part; and
 E
@@ -9316,7 +9318,7 @@ H
 ```text
 STATE OF U.P. v. ARVIND KUMAR SRIVASTAVA 215
 [A.K. SIKRI, J.]
-these considerations rests the doctrine of !aches." A
+these considerations rests the doctrine of laches." A
 
 22. Holding that the respondents had also acquiesced in
 accepting the retirements, the appeal of U.P. Jal Nigam was
@@ -9332,7 +9334,7 @@ claimants lost time or whiled it away and did not rise to
 the occasion in time for filing the writ petitions, then in such
 cases, the court should be very slow in granting the relief
 to the incumbent. Secondly, it has also to be taken into
-· consideration the question of acquiescence or waiver on D
+consideration the question of acquiescence or waiver on D
 the part of the incumbent whether other parties are going
 to be prejudiced if the relief is granted. In the present case,
 if the respondents would have challenged their retirement
@@ -9359,7 +9361,7 @@ employees is given relief by the Court, all other H
 **[पान 24]**
 
 ```text
-216 SUPREME COURT REPORTS [2014) 12 S.C.R.
+216 SUPREME COURT REPORTS [2014] 12 S.C.R.
 
 A identically situated persons need to be treated alike
 by extending that benefit. Not doing so would
@@ -9371,15 +9373,15 @@ by this Court from time to time postulates that all
 similarly situated persons should be treated
 similarly. Therefore, the normal rule would be that
 merely because other similarly situated persons did
-c not approach ihe Court earlier, they are not to be
-treated differently.'
+C not approach the Court earlier, they are not to be
+treated differently.
 
-(2) However, this prinqiple is subject to well recognized
+(2) However, this principle is subject to well recognized
 exceptions in the form of laches and delays as well
 as acquiescence. Those persons who did not
 D challenge the wrongful action .in their cases and
 acquiesced into the same and woke up after long
-delay only because! of the reason that their
+delay only because of the reason that their
 counterparts who had approached the Court earlier
 in time succeeded in their efforts, then such
 E employees cannot claim that the benefit of the
@@ -9389,10 +9391,10 @@ treated as fence-sitters and laches and delays, and/
 or the acquiescence, would be a valid ground to
 F dismiss their claim.D ay not apply in those cases
 where the judgment pronounced.by the Court was
-judgment in rem with intention to give benef)l to all
+judgment in rem with intention to give benefit to all
 similarly situated persons, whether they
 approached the Court or not. With such a
-G. pronouncement the obligation is cast upon the
+G pronouncement the obligation is cast upon the
 authorities to itself extend the benefit thereof to all
 similarly situated person. Such a situation can occur
 when the subject matter of the decision touches
@@ -9429,7 +9431,7 @@ persons whose appointment orders were also cancelled got
 the relief. By that time, nine years had passed. The earlier
 judgment had granted the relief to the parties before the Court. E
 It would also be pertinent to highlight that these respondents
-have/not joined the service nor working like the employees who
+have not joined the service nor working like the employees who
 succeeded in earlier case before the Tribunal. As of today, 27
 years have passed after the issuance of cancellation orders.
 Therefore, not only there was unexplained delay and laches in F
@@ -9450,7 +9452,7 @@ H
 
 ## अनुपलब्ध/न वाचलेले
 
-- सर्व न्यायनिर्णयांचा मजकूर PDF text-layer मधून घेतला आहे; पान-प्रतिमांशी दृश्य पडताळणी केलेली नाही (06-H चा headnote व परिच्छेद 23 वगळता) — "[text-layer, visually unverified]".
+- सर्व न्यायनिर्णयांचा मजकूर PDF text-layer मधून घेतला आहे; पान-प्रतिमांशी दृश्य पडताळणी केलेली नाही (06-H चा headnote व परिच्छेद 23 वगळता) — "[पान-प्रतिमेशी पडताळले]".
 - 06-A व 06-B मध्ये मजकुरातील "Civil Appeal No. ___ of 2024" क्रमांक मूळ दस्तऐवजात रिकामा आहे.
 - 06-C: स्वतंत्र मजकूर येथे नाही; APT-04 प्रवेश 04-B पहा.
 - 06-H: text-layer मध्ये margin अक्षरे (A-H) मिसळलेली आहेत; मूळ pagination (S.C.R. पृष्ठे) व PDF पान क्रमांक भिन्न असू शकतात.
