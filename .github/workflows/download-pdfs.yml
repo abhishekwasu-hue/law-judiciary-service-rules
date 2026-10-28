@@ -1,0 +1,27 @@
+name: Download GR PDFs
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  download:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download PDFs listed in pdf-list.tsv
+        run: |
+          mkdir -p pdf
+          ok=0; fail=0
+          : > pdf/FAILED.txt
+          while IFS=$'\t' read -r folder url name; do
+            mkdir -p "pdf/$folder"
+            if curl -sSL --max-time 90 --fail -A "Mozilla/5.0" -o "pdf/$folder/$name" "$url"; then ok=$((ok+1)); else fail=$((fail+1)); echo "$url" >> pdf/FAILED.txt; rm -f "pdf/$folder/$name"; fi
+          done < pdf-list.tsv
+          echo "downloaded=$ok failed=$fail"
+      - name: Commit PDFs
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add pdf
+          git commit -m "Add downloaded GR/rules PDFs" || echo "nothing to commit"
+          git push
