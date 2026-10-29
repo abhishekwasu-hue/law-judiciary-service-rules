@@ -1,0 +1,24 @@
+name: Download extra PDFs
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  extra:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download PDFs listed in pdf-list-extra.tsv
+        run: |
+          UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+          : > pdf/FAILED-extra.txt
+          while IFS=$'\t' read -r folder url name; do
+            mkdir -p "pdf/$folder"
+            if curl -sSL --max-time 120 --fail -A "$UA" -o "pdf/$folder/$name" "$url" && head -c 5 "pdf/$folder/$name" | grep -q '%PDF'; then echo "OK $url"; else echo "$url" >> pdf/FAILED-extra.txt; rm -f "pdf/$folder/$name"; fi
+          done < pdf-list-extra.tsv
+      - name: Commit
+        run: |
+          git config user.name "github-actions"; git config user.email "actions@github.com"
+          git add pdf
+          git commit -m "Add extra rule PDFs" || echo nothing
+          for i in 1 2 3 4; do git pull --rebase origin main && git push && break || sleep 8; done
