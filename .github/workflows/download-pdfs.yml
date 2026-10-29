@@ -22,6 +22,12 @@ jobs:
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
-          git add pdf
-          git commit -m "Add downloaded GR/rules PDFs" || echo "nothing to commit"
-          git push
+          git pull --rebase origin main || true
+          git ls-files --others --modified --exclude-standard pdf > /tmp/new.txt || true
+          split -l 60 /tmp/new.txt /tmp/batch_
+          for b in /tmp/batch_*; do
+            [ -e "$b" ] || continue
+            xargs -d '\n' git add -- < "$b"
+            git commit -m "Add downloaded GR/rules PDFs (batch)" || continue
+            for i in 1 2 3; do git pull --rebase origin main && git push && break || sleep 5; done
+          done
