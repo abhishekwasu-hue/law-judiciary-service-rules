@@ -1,0 +1,4 @@
+FAIL https://gr.maharashtra.gov.in/Site/Upload/Government%20Resolutions/Marathi/201112261037421242001.pdf
+FAIL https://www.maharashtra.gov.in/Site/Upload/Government%20Resolutions/Marathi/201112261037421242001.pdf
+FAIL https://web.archive.org/web/2id_/https://gr.maharashtra.gov.in/Site/Upload/Government%20Resolutions/Marathi/201112261037421242001.pdf
+FAIL https://archive.org/download/in.gov.maharashtra.gr.201112261037421242001/201112261037421242001.pdf
