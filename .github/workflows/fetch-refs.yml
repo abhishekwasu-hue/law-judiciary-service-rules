@@ -10,22 +10,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Round 3
+      - name: Round 4
         run: |
-          mkdir -p raw && cd raw
+          mkdir -p r4 && cd r4
           UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36"
-          printf 'openssl_conf = o\n[o]\nssl_conf = s\n[s]\nsystem_default = d\n[d]\nOptions = UnsafeLegacyRenegotiation\n' > /tmp/ssl.cnf
-          g(){ n=$1; u=$2; OPENSSL_CONF=/tmp/ssl.cnf curl -sSL -m 60 -A "$UA" -o "$n" -w "$n %{http_code} %{size_download} %{content_type} $u\n" "$u" >>../log3.txt 2>&1 || true; }
-          : > ../log3.txt
-          g a-peri-api.bin https://api.sci.gov.in/jonew/judis/43769.pdf
-          g a-scba-api.bin https://api.sci.gov.in/jonew/judis/13280.pdf
-          g a-bhc34.bin https://bombayhighcourt.gov.in/bhc/libweb/bhcrule/bhcasrules/BHCASRules34.pdf
-          g a-act1.bin https://www.indiacode.nic.in/bitstream/123456789/1514/1/a1971-70.pdf
-          g a-act2.bin https://legislative.gov.in/sites/default/files/A1971-70.pdf
-          g a-act3.bin https://www.indiacode.nic.in/handle/123456789/1514
-          g a-ik-act.bin https://indiankanoon.org/doc/1301049/
-          g a-gr1982.bin "https://gad.maharashtra.gov.in/sites/default/files/1982.06.21.pdf"
-          g a-gad1997.bin "https://gad.maharashtra.gov.in/sites/default/files/1997.11.18.pdf"
-          for f in *.bin; do echo "== $f: $(file -b $f | head -c 100)" >> ../log3.txt; done
+          : > ../log4.txt
+          g(){ curl -sSL -m 40 -A "$UA" -o "$1" -w "$1 %{http_code} %{size_download} %{content_type} $2\n" "$2" >>../log4.txt 2>&1 || true; }
+          g s1.html "https://indiankanoon.org/search/?formInput=%22contempt%20of%20courts%20act%2C%201971%22%20doctypes%3Alaws"
+          g s2.html "https://indiankanoon.org/search/?formInput=contempt+of+courts+act+1971+section+12"
+          g act-lawmin.pdf "https://lawmin.gov.in/sites/default/files/legislative/The_Contempt_of_Courts_Act_1971.pdf"
+          g act-ic.pdf "https://www.indiacode.nic.in/bitstream/123456789/1514/1/197170.pdf"
+          g act-ic2.pdf "https://indiacode.nic.in/bitstream/123456789/1514/1/A1971-70.pdf"
+          g act-egaz.pdf "https://egazette.gov.in"
+          grep -o 'href="/doc/[0-9]*/"[^>]*>[^<]*' s1.html s2.html | head -30 >> ../log4.txt
           cd ..; git config user.name gha; git config user.email gha@example.com
-          git add -A raw log3.txt; git commit -m "round3" || true; git pull --rebase origin claude/fetch-refs || true; git push
+          git add -A r4 log4.txt; git commit -m r4 || true; git pull --rebase origin claude/fetch-refs || true; git push
