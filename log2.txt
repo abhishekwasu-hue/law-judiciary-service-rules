@@ -1,0 +1,24 @@
+01-Maheshwar-Peri-CrlA549-2016.pdf 200 172258 https://api.sci.gov.in/jonew/judis/43769.pdf
+curl: (6) Could not resolve host: main.sci.gov.in
+01-Maheshwar-Peri-CrlA549-2016.pdf 000 0 https://main.sci.gov.in/jonew/judis/43769.pdf
+01-Maheshwar-Peri-CrlA549-2016.pdf 404 113581 https://www.sci.gov.in/jonew/judis/43769.pdf
+01-Maheshwar-Peri-CrlA549-2016.pdf 200 170770 https://sci.gov.in/jonew/judis/43769.pdf
+FAILED 01-Maheshwar-Peri-CrlA549-2016.pdf
+02-SC-Bar-Assn-v-UoI-1998.pdf 200 126501 https://api.sci.gov.in/jonew/judis/13280.pdf
+curl: (6) Could not resolve host: main.sci.gov.in
+02-SC-Bar-Assn-v-UoI-1998.pdf 000 0 https://main.sci.gov.in/jonew/judis/13280.pdf
+02-SC-Bar-Assn-v-UoI-1998.pdf 404 113581 https://www.sci.gov.in/jonew/judis/13280.pdf
+FAILED 02-SC-Bar-Assn-v-UoI-1998.pdf
+curl: (35) TLS connect error: error:0A000152:SSL routines::unsafe legacy renegotiation disabled
+08-BHC-Contempt-Rules-Ch34.pdf 000 0 https://bombayhighcourt.gov.in/bhc/libweb/bhcrule/bhcasrules/BHCASRules34.pdf
+curl: (28) Connection timed out after 90002 milliseconds
+08-BHC-Contempt-Rules-Ch34.pdf 000 0 https://bombayhighcourt.nic.in/libweb/bhcrule/bhcasrules/BHCASRules34.pdf
+curl: (35) TLS connect error: error:0A000152:SSL routines::unsafe legacy renegotiation disabled
+08-BHC-Contempt-Rules-Ch34.pdf 000 0 https://www.bombayhighcourt.gov.in/bhc/libweb/bhcrule/bhcasrules/BHCASRules34.pdf
+FAILED 08-BHC-Contempt-Rules-Ch34.pdf
+09-GAD-Circular-18-11-1997.pdf 404 97433 https://gad.maharashtra.gov.in/sites/default/files/1997.11.18.pdf
+curl: (6) Could not resolve host: www.gad.maharashtra.gov.in
+09-GAD-Circular-18-11-1997.pdf 000 0 https://www.gad.maharashtra.gov.in/sites/default/files/1997.11.18.pdf
+FAILED 09-GAD-Circular-18-11-1997.pdf
+10-MCS-Seniority-Rules-1982.pdf 404 97433 https://gad.maharashtra.gov.in/sites/default/files/1982.06.21.pdf
+FAILED 10-MCS-Seniority-Rules-1982.pdf
