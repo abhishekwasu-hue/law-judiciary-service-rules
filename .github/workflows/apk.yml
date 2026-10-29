@@ -1,0 +1,30 @@
+name: apk
+on:
+  push:
+    branches: [claude/apk-build]
+    paths: ['.github/workflows/apk.yml','apk/www/**']
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: 20}
+      - uses: actions/setup-java@v4
+        with: {distribution: temurin, java-version: 17}
+      - name: Build debug APK
+        working-directory: apk
+        run: |
+          npm init -y >/dev/null
+          npm i @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6 @capacitor/filesystem@6 @capacitor/share@6 >/dev/null
+          npx cap init "नस्ती डॅशबोर्ड" app.nastidash --web-dir www
+          npx cap add android
+          npx cap sync android
+          cd android && chmod +x gradlew && ./gradlew assembleDebug --no-daemon 2>&1 | tail -25
+          cd .. && mkdir -p ../apk-out && cp android/app/build/outputs/apk/debug/app-debug.apk ../apk-out/Nasti-Dashboard.apk && ls -la ../apk-out
+      - name: Commit APK
+        run: |
+          git config user.name gha; git config user.email gha@example.com
+          git add apk-out; git commit -m "apk" || true; git pull --rebase origin claude/apk-build || true; git push
