@@ -1,0 +1,31 @@
+name: Fetch case documents (GR 26.12.2011 etc.)
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Try official URL, mirrors and archive for each document
+        run: |
+          UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+          mkdir -p case-docs; : > case-docs/RESULT.txt
+          code=201112261037421242001
+          urls=(
+            "https://gr.maharashtra.gov.in/Site/Upload/Government%20Resolutions/Marathi/$code.pdf"
+            "https://www.maharashtra.gov.in/Site/Upload/Government%20Resolutions/Marathi/$code.pdf"
+            "https://web.archive.org/web/2id_/https://gr.maharashtra.gov.in/Site/Upload/Government%20Resolutions/Marathi/$code.pdf"
+            "https://archive.org/download/in.gov.maharashtra.gr.$code/$code.pdf"
+          )
+          for u in "${urls[@]}"; do
+            if curl -sSL --max-time 120 --fail -A "$UA" -e "https://gr.maharashtra.gov.in/" -o "case-docs/GR-26-12-2011-$code.pdf" "$u" && head -c5 "case-docs/GR-26-12-2011-$code.pdf" | grep -q '%PDF'; then echo "OK $u" >> case-docs/RESULT.txt; break; fi
+            rm -f "case-docs/GR-26-12-2011-$code.pdf"; echo "FAIL $u" >> case-docs/RESULT.txt
+          done
+          cat case-docs/RESULT.txt
+      - name: Commit
+        run: |
+          git config user.name github-actions; git config user.email actions@github.com
+          git add case-docs; git commit -m "Fetch GR 26.12.2011 attempt" || echo nothing
+          git pull --rebase; git push
