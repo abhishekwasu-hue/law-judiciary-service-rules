@@ -18,9 +18,11 @@ jobs:
         working-directory: apk
         run: |
           npm init -y >/dev/null
-          npm i @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6 @capacitor/filesystem@6 @capacitor/share@6 >/dev/null
+          npm i @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6 @capacitor/filesystem@6 @capacitor/share@6 @capacitor/local-notifications@6 >/dev/null
           npx cap init "नस्ती डॅशबोर्ड" app.nastidash --web-dir www
           npx cap add android
+          npx cap sync android
+          (npm i -D @capacitor/assets >/dev/null && npx capacitor-assets generate --android --iconBackgroundColor '#12355b' --iconBackgroundColorDark '#12355b' && echo ICONS_OK) || echo ICONS_FAILED
           npx cap sync android
           cd android && chmod +x gradlew && ./gradlew assembleDebug --no-daemon 2>&1 | tail -25
           cd .. && mkdir -p ../apk-out && cp android/app/build/outputs/apk/debug/app-debug.apk ../apk-out/Nasti-Dashboard.apk && ls -la ../apk-out
