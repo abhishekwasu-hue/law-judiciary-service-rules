@@ -10,18 +10,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Round 4
+      - name: Round 5
         run: |
-          mkdir -p r4 && cd r4
-          UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36"
-          : > ../log4.txt
-          g(){ curl -sSL -m 40 -A "$UA" -o "$1" -w "$1 %{http_code} %{size_download} %{content_type} $2\n" "$2" >>../log4.txt 2>&1 || true; }
-          g s1.html "https://indiankanoon.org/search/?formInput=%22contempt%20of%20courts%20act%2C%201971%22%20doctypes%3Alaws"
-          g s2.html "https://indiankanoon.org/search/?formInput=contempt+of+courts+act+1971+section+12"
-          g act-lawmin.pdf "https://lawmin.gov.in/sites/default/files/legislative/The_Contempt_of_Courts_Act_1971.pdf"
-          g act-ic.pdf "https://www.indiacode.nic.in/bitstream/123456789/1514/1/197170.pdf"
-          g act-ic2.pdf "https://indiacode.nic.in/bitstream/123456789/1514/1/A1971-70.pdf"
-          g act-egaz.pdf "https://egazette.gov.in"
-          grep -o 'href="/doc/[0-9]*/"[^>]*>[^<]*' s1.html s2.html | head -30 >> ../log4.txt
+          mkdir -p r5 && cd r5
+          : > ../log5.txt
+          for p in "1396751 Contempt-of-Courts-Act-1971-Entire-Act" ; do set -- $p
+            google-chrome --headless=new --no-sandbox --disable-gpu --virtual-time-budget=15000 --print-to-pdf="$2.pdf" --no-pdf-header-footer "https://indiankanoon.org/doc/$1/" >>../log5.txt 2>&1 || true
+          done
+          ls -la >> ../log5.txt
           cd ..; git config user.name gha; git config user.email gha@example.com
-          git add -A r4 log4.txt; git commit -m r4 || true; git pull --rebase origin claude/fetch-refs || true; git push
+          git add -A r5 log5.txt; git commit -m r5 || true; git pull --rebase origin claude/fetch-refs || true; git push
