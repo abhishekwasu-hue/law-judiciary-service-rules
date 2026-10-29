@@ -1,0 +1,36 @@
+name: fetch-refs
+on:
+  push:
+    branches: [claude/fetch-refs]
+    paths: ['.github/workflows/fetch-refs.yml']
+permissions:
+  contents: write
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download
+        run: |
+          mkdir -p contempt-refs && cd contempt-refs
+          UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36"
+          dl(){ curl -sSL -m 120 -A "$UA" -o "$1" -w "$1 %{http_code} %{size_download}\n" "$2" || true; }
+          dl 01-Maheshwar-Peri-CrlA549-2016.pdf https://api.sci.gov.in/jonew/judis/43769.pdf
+          dl 02-SC-Bar-Assn-v-UoI-1998.pdf https://api.sci.gov.in/jonew/judis/13280.pdf
+          dl 03-Dr-UN-Bora-2021.pdf https://api.sci.gov.in/supremecourt/2009/32454/32454_2009_6_1501_30900_Judgement_26-Oct-2021.pdf
+          dl 04-Chaduranga-Kanthraj-Urs-2024.pdf https://api.sci.gov.in/supremecourt/1997/6958/6958_1997_9_1501_57763_Judgement_10-Dec-2024.pdf
+          dl 05-HSBC-PI-Holdings-CPC624-2020.pdf https://api.sci.gov.in/supremecourt/2020/20907/20907_2020_11_1520_36266_Judgement_11-Jul-2022.pdf
+          dl 06-Heera-Traders-2022.pdf https://api.sci.gov.in/supremecourt/2021/20760/20760_2021_10_1501_33625_Judgement_22-Feb-2022.pdf
+          dl 07-Balwantbhai-Bhandari-2023.pdf https://api.sci.gov.in/supremecourt/2022/22917/22917_2022_1_1501_46749_Judgement_06-Sep-2023.pdf
+          dl 08-BHC-Contempt-Rules-Ch34.pdf https://bombayhighcourt.gov.in/bhc/libweb/bhcrule/bhcasrules/BHCASRules34.pdf
+          dl 09-GAD-Circular-18-11-1997.pdf https://gad.maharashtra.gov.in/sites/default/files/1997.11.18.pdf
+          dl 10-MCS-Seniority-Rules-1982.pdf https://gad.maharashtra.gov.in/sites/default/files/1982.06.21.pdf
+          dl 11-Seniority-Rules-2021.pdf "https://gr.maharashtra.gov.in/Site/Upload/Government%20Resolutions/English/202107091546108207.pdf"
+          dl 12-Contempt-of-Courts-Act-1971.pdf https://www.indiacode.nic.in/bitstream/123456789/1514/1/a1971-70.pdf
+          dl 13-Contempt-of-Courts-Act-1971-legislative.pdf https://legislative.gov.in/sites/default/files/A1971-70.pdf
+          for f in *.pdf; do head -c4 "$f" | grep -q '%PDF' || { echo "NOT PDF: $f"; rm -f "$f"; }; done
+          ls -la | tee ../contempt-refs-log.txt
+      - name: Commit
+        run: |
+          git config user.name gha; git config user.email gha@example.com
+          git add contempt-refs contempt-refs-log.txt; git commit -m "fetched refs" || true; git push
