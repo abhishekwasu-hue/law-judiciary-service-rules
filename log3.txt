@@ -1,0 +1,18 @@
+a-peri-api.bin 200 172258 application/pdf https://api.sci.gov.in/jonew/judis/43769.pdf
+a-scba-api.bin 200 126501 application/pdf https://api.sci.gov.in/jonew/judis/13280.pdf
+a-bhc34.bin 200 532550 application/pdf https://bombayhighcourt.gov.in/bhc/libweb/bhcrule/bhcasrules/BHCASRules34.pdf
+curl: (28) Operation timed out after 60001 milliseconds with 0 bytes received
+a-act1.bin 000 0  https://www.indiacode.nic.in/bitstream/123456789/1514/1/a1971-70.pdf
+a-act2.bin 404 4660 text/html; charset=utf-8 https://legislative.gov.in/sites/default/files/A1971-70.pdf
+curl: (28) Operation timed out after 60002 milliseconds with 0 bytes received
+a-act3.bin 000 0  https://www.indiacode.nic.in/handle/123456789/1514
+a-ik-act.bin 200 35376 text/html; charset=utf-8 https://indiankanoon.org/doc/1301049/
+curl: (6) Could not resolve host: gad.maharashtra.gov.in
+a-gr1982.bin 000 0  https://gad.maharashtra.gov.in/sites/default/files/1982.06.21.pdf
+curl: (6) Could not resolve host: gad.maharashtra.gov.in
+a-gad1997.bin 000 0  https://gad.maharashtra.gov.in/sites/default/files/1997.11.18.pdf
+== a-act2.bin: HTML document, ASCII text, with very long lines (3252)
+== a-bhc34.bin: PDF document, version 1.7, 10 page(s)
+== a-ik-act.bin: HTML document, Unicode text, UTF-8 text, with very long lines (1704)
+== a-peri-api.bin: data
+== a-scba-api.bin: data
