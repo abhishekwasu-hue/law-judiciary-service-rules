@@ -1,0 +1,44 @@
+s1.html 200 49125 text/html; charset=utf-8 https://indiankanoon.org/search/?formInput=%22contempt%20of%20courts%20act%2C%201971%22%20doctypes%3Alaws
+s2.html 200 66890 text/html; charset=utf-8 https://indiankanoon.org/search/?formInput=contempt+of+courts+act+1971+section+12
+act-lawmin.pdf 404 4660 text/html; charset=utf-8 https://lawmin.gov.in/sites/default/files/legislative/The_Contempt_of_Courts_Act_1971.pdf
+curl: (28) Operation timed out after 40001 milliseconds with 0 bytes received
+act-ic.pdf 000 0  https://www.indiacode.nic.in/bitstream/123456789/1514/1/197170.pdf
+curl: (28) Operation timed out after 40053 milliseconds with 0 bytes received
+act-ic2.pdf 302 0  https://indiacode.nic.in/bitstream/123456789/1514/1/A1971-70.pdf
+curl: (60) SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)
+More details here: https://curl.se/docs/sslcerts.html
+
+curl failed to verify the legitimacy of the server and therefore could not
+establish a secure connection to it. To learn more about this situation and
+how to fix it, please visit the webpage mentioned above.
+act-egaz.pdf 000 0  https://egazette.gov.in
+s1.html:href="/doc/974692/">Section 11 in The 
+s1.html:href="/doc/1396751/">Entire Act
+s1.html:href="/doc/269047/">Section 12 in The 
+s1.html:href="/doc/1396751/">Entire Act
+s1.html:href="/doc/583891/">Section 10 in The 
+s1.html:href="/doc/1396751/">Entire Act
+s1.html:href="/doc/1436/">Section 20 in The 
+s1.html:href="/doc/1396751/">Entire Act
+s1.html:href="/doc/1923500/">Section 15 in The 
+s1.html:href="/doc/1396751/">Entire Act
+s1.html:href="/doc/1737746/">Section 2 in The 
+s1.html:href="/doc/1396751/">Entire Act
+s1.html:href="/doc/1686702/">Section 19 in The 
+s1.html:href="/doc/1396751/">Entire Act
+s1.html:href="/doc/576566/">Section 14 in The 
+s1.html:href="/doc/1396751/">Entire Act
+s1.html:href="/doc/1121027/">Section 3 in The 
+s1.html:href="/doc/1396751/">Entire Act
+s1.html:href="/doc/1478730/">Section 13 in The 
+s1.html:href="/doc/1396751/">Entire Act
+s2.html:href="/doc/269047/">
+s2.html:href="/doc/1396751/">Entire Act
+s2.html:href="/doc/17045069/">Full Document
+s2.html:href="/doc/146857974/">Full Document
+s2.html:href="/doc/727569/">Full Document
+s2.html:href="/doc/193567322/">Full Document
+s2.html:href="/doc/139253767/">Full Document
+s2.html:href="/doc/158114646/">Full Document
+s2.html:href="/doc/69024097/">Full Document
+s2.html:href="/doc/82894323/">Full Document
