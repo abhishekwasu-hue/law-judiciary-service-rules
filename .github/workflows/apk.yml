@@ -18,7 +18,7 @@ jobs:
         working-directory: apk
         run: |
           npm init -y >/dev/null
-          npm i @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6 @capacitor/filesystem@6 @capacitor/share@6 @capacitor/local-notifications@6 >/dev/null
+          npm i @capacitor/core@6 @capacitor/cli@6 @capacitor/android@6 @capacitor/filesystem@6 @capacitor/share@6 @capacitor/local-notifications@6 @capacitor/app@6 @capacitor-community/speech-recognition@6 >/dev/null
           npx cap init "नस्ती डॅशबोर्ड" app.nastidash --web-dir www
           npx cap add android
           npx cap sync android
