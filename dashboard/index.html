@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="mr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>प्रस्ताव डॅशबोर्ड</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#1f3a5f">
+<style>
+:root{--bg:#f4f6f9;--card:#fff;--ink:#1b2430;--mute:#5c6b7d;--line:#d9e0e8;--pri:#1f3a5f;--ok:#1a7f45;--run:#b26a00;--bad:#b3261e}
+@media(prefers-color-scheme:dark){:root{--bg:#10151c;--card:#19212b;--ink:#e8edf3;--mute:#95a3b5;--line:#2a3544;--pri:#6ea0e0;--ok:#4cc27f;--run:#f0a93b;--bad:#ff7b72}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 "Noto Sans Devanagari","Mangal",system-ui,sans-serif}
+header{background:var(--pri);color:#fff;padding:12px 16px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:5}
+header h1{font-size:18px;margin:0;flex:1}
+header button{background:transparent;border:1px solid #fff8;color:#fff;border-radius:8px;padding:6px 10px}
+nav{display:flex;gap:4px;padding:8px 16px 0;max-width:1000px;margin:auto}
+nav button{flex:1;padding:10px 6px;border:0;border-bottom:3px solid transparent;background:none;color:var(--mute);font:inherit;font-weight:600}
+nav button.on{color:var(--pri);border-color:var(--pri)}
+main{max-width:1000px;margin:auto;padding:12px 16px 80px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
+label{display:block;font-size:14px;color:var(--mute);margin:10px 0 4px}
+input,select{width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--bg);color:var(--ink);font:inherit}
+.row{display:grid;grid-template-columns:1fr;gap:10px}
+@media(min-width:700px){.row{grid-template-columns:1fr 1fr 1fr}.cases{display:grid;grid-template-columns:1fr 1fr;gap:12px}}
+.btn{display:inline-block;background:var(--pri);color:#fff;border:0;border-radius:8px;padding:10px 16px;font:inherit;font-weight:600;margin-top:12px;text-decoration:none;cursor:pointer}
+.btn.sec{background:transparent;color:var(--pri);border:1px solid var(--pri);margin:6px 6px 0 0;padding:7px 12px;font-weight:500}
+.badge{display:inline-block;padding:2px 10px;border-radius:99px;font-size:13px;font-weight:600;border:1px solid currentColor}
+.done{color:var(--ok)}.running,.queued{color:var(--run)}.failed{color:var(--bad)}
+.drop{border:2px dashed var(--line);border-radius:12px;padding:22px;text-align:center;color:var(--mute)}
+.msg{margin-top:10px;font-size:14px;color:var(--mute);white-space:pre-wrap}
+.hit{border-top:1px solid var(--line);padding:8px 0;font-size:14px}.hit b{color:var(--pri)}
+small{color:var(--mute)}
+</style>
+</head>
+<body>
+<header><h1>प्रस्ताव डॅशबोर्ड</h1><button id="cfgBtn">⚙ सेटिंग</button></header>
+<nav><button data-t="up" class="on">अपलोड</button><button data-t="cases">प्रकरणे</button><button data-t="find">नोंदवही शोध</button></nav>
+<main>
+<section id="cfg" class="card" hidden>
+ <b>GitHub जोडणी</b>
+ <div class="row">
+  <div><label>रेपो (owner/name)</label><input id="repo" value="abhishekwasu-hue/law-judiciary-service-rules"></div>
+  <div><label>Branch</label><input id="branch" value="main"></div>
+  <div><label>GitHub Token (फक्त या ब्राउझरमध्ये साठवला जातो)</label><input id="token" type="password" placeholder="github_pat_..."></div>
+ </div>
+ <button class="btn" id="saveCfg">जतन करा</button>
+ <div class="msg">Token: Fine-grained, फक्त या रेपोसाठी — Contents: Read &amp; write, Actions: Read &amp; write, Metadata: Read.</div>
+</section>
+
+<section id="up">
+ <div class="card">
+  <div class="row">
+   <div><label>C R क्रमांक</label><input id="crno" inputmode="numeric" placeholder="128"></div>
+   <div><label>वर्ष</label><input id="cryr" inputmode="numeric" value="2026"></div>
+   <div><label>निर्देशपत्र / फाइल क्रमांक (ऐच्छिक)</label><input id="fileno" inputmode="numeric" placeholder="1056"></div>
+  </div>
+  <label>प्रस्ताव PDF</label>
+  <div class="drop"><input id="pdf" type="file" accept="application/pdf"></div>
+  <button class="btn" id="send">अपलोड करा व काम सुरू करा</button>
+  <div class="msg" id="upmsg"></div>
+ </div>
+ <small>प्रत्येक प्रस्ताव स्वतंत्र प्रकरण म्हणून प्रक्रिया होतो; प्रस्ताव एकमेकांत मिसळत नाहीत.</small>
+</section>
+
+<section id="cases" hidden><div id="caselist" class="cases"></div></section>
+
+<section id="find" hidden>
+ <div class="card"><label>शोध (मराठी / English)</label>
+ <input id="q" placeholder="उदा. निवृत्तीचे वय, ACP, HRA">
+ <button class="btn" id="go">शोधा</button><div id="hits"></div></div>
+</section>
+</main>
+<script>
+const $=s=>document.querySelector(s);
+const ls={g:k=>{try{return localStorage.getItem(k)}catch(e){return null}},s:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}}};
+let C={repo:ls.g('repo')||$('#repo').value,branch:ls.g('branch')||'main',token:ls.g('token')||''};
+$('#repo').value=C.repo;$('#branch').value=C.branch;$('#token').value=C.token;
+if(!C.token)$('#cfg').hidden=false;
+$('#cfgBtn').onclick=()=>$('#cfg').hidden=!$('#cfg').hidden;
+$('#saveCfg').onclick=()=>{C={repo:$('#repo').value.trim(),branch:$('#branch').value.trim()||'main',token:$('#token').value.trim()};for(const k in C)ls.s(k,C[k]);$('#cfg').hidden=true;load()};
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x===b));['up','cases','find'].forEach(t=>$('#'+t).hidden=t!==b.dataset.t);if(b.dataset.t==='cases')load()});
+
+async function gh(path,opt={}){
+  const r=await fetch('https://api.github.com/repos/'+C.repo+path,{...opt,headers:{Authorization:'Bearer '+C.token,Accept:'application/vnd.github+json',...(opt.headers||{})}});
+  return r;
+}
+const b64=buf=>{let s='',a=new Uint8Array(buf);for(let i=0;i<a.length;i+=0x8000)s+=String.fromCharCode.apply(null,a.subarray(i,i+0x8000));return btoa(s)};
+async function put(path,b64c,msg){
+  let sha;const ex=await gh('/contents/'+path+'?ref='+C.branch);if(ex.ok)sha=(await ex.json()).sha;
+  const r=await gh('/contents/'+path,{method:'PUT',body:JSON.stringify({message:msg,content:b64c,branch:C.branch,sha})});
+  if(!r.ok)throw new Error(path+': '+r.status+' '+(await r.text()).slice(0,200));
+}
+$('#send').onclick=async()=>{
+  const m=$('#upmsg');const no=$('#crno').value.trim(),yr=$('#cryr').value.trim(),f=$('#pdf').files[0];
+  if(!C.token){m.textContent='आधी सेटिंगमध्ये Token टाका.';return}
+  if(!/^\d+$/.test(no)||!/^\d{4}$/.test(yr)||!f){m.textContent='C R क्रमांक, वर्ष व PDF द्या.';return}
+  const P='CR'+no+'_'+yr;
+  try{
+    m.textContent='अपलोड होत आहे…';
+    const meta={cr:no,year:yr,file_no:$('#fileno').value.trim(),name:f.name};
+    await put('inbox/'+P+'.json',btoa(unescape(encodeURIComponent(JSON.stringify(meta)))),'meta '+P);
+    await put('cases/'+P+'/status.json',btoa(JSON.stringify({state:'queued',queued:new Date().toISOString()})),'queued '+P);
+    await put('inbox/'+P+'.pdf',b64(await f.arrayBuffer()),'proposal '+P);
+    m.textContent='अपलोड झाले ('+P+'). काम सुरू झाले; "प्रकरणे" मध्ये स्थिती पहा.';
+  }catch(e){m.textContent='चूक: '+e.message}
+};
+
+const FILES=['Study.docx','Note_and_Letter.docx','Proposal_with_GRs.pdf'];
+const LBL={queued:'रांगेत',running:'चालू',done:'पूर्ण',failed:'अयशस्वी'};
+async function load(){
+  const box=$('#caselist');if(!C.token){box.innerHTML='<div class="card">सेटिंगमध्ये Token टाका.</div>';return}
+  const r=await gh('/contents/cases?ref='+C.branch);
+  if(!r.ok){box.innerHTML='<div class="card">अद्याप प्रकरणे नाहीत.</div>';return}
+  const dirs=(await r.json()).filter(x=>x.type==='dir').map(x=>x.name).sort().reverse();
+  if(!dirs.length){box.innerHTML='<div class="card">अद्याप प्रकरणे नाहीत.</div>';return}
+  let html='',again=false;
+  for(const p of dirs){
+    let st={state:'queued'};
+    const s=await gh('/contents/cases/'+p+'/status.json?ref='+C.branch,{headers:{Accept:'application/vnd.github.raw+json'}});
+    if(s.ok)try{st=await s.json()}catch(e){}
+    if(st.state==='running'||st.state==='queued')again=true;
+    const t=p.replace(/^CR(\d+)_(\d+)$/,'C R $1/$2');
+    html+=`<div class="card"><b>${t}</b> <span class="badge ${st.state}">${LBL[st.state]||st.state}</span>
+      ${st.summary?`<div>${esc(st.summary)}</div>`:''}
+      ${(st.doubts&&st.doubts.length)?`<small>शंका: ${st.doubts.length} · उपलब्ध नाही: ${(st.not_found||[]).length}</small><br>`:''}
+      ${st.state==='done'?FILES.map(f=>`<button class="btn sec" data-p="${p}" data-f="${f}">⬇ ${f.replace(/\.(docx|pdf)$/,'')}</button>`).join(''):''}</div>`;
+  }
+  box.innerHTML=html;
+  box.querySelectorAll('button[data-p]').forEach(b=>b.onclick=()=>dl(b.dataset.p,b.dataset.f));
+  clearTimeout(load.t);if(again&&!$('#cases').hidden)load.t=setTimeout(load,20000);
+}
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+async function dl(p,f){
+  const name=p+'_'+f;
+  const r=await gh('/contents/cases/'+p+'/'+name+'?ref='+C.branch,{headers:{Accept:'application/vnd.github.raw+json'}});
+  if(!r.ok){alert('फाइल मिळाली नाही: '+name);return}
+  const a=document.createElement('a');a.href=URL.createObjectURL(await r.blob());a.download=name;a.click();
+}
+$('#go').onclick=async()=>{
+  const q=$('#q').value.trim(),h=$('#hits');if(!q||!C.token)return;h.textContent='शोधत आहे…';
+  const r=await fetch('https://api.github.com/search/code?q='+encodeURIComponent(q+' repo:'+C.repo+' path:register')+'&per_page=15',{headers:{Authorization:'Bearer '+C.token,Accept:'application/vnd.github.text-match+json'}});
+  if(!r.ok){h.textContent='शोध अयशस्वी: '+r.status;return}
+  const j=await r.json();
+  h.innerHTML=j.items.length?j.items.map(i=>`<div class="hit"><b>${esc(i.path)}</b>${(i.text_matches||[]).slice(0,2).map(m=>`<div>${esc(m.fragment)}</div>`).join('')}<a href="${i.html_url}" target="_blank" rel="noopener">उघडा</a></div>`).join(''):'काही सापडले नाही.';
+};
+if(C.token)load();
+</script>
+</body>
+</html>
