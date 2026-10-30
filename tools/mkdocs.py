@@ -133,10 +133,18 @@ def build_letter(spec, out):
     add(body, sect, P[7], d, "प्रति,")
     for line in L["to"]: add(body, sect, P[8], d, "\t" + line)
     add(body, sect, P[10], d, "")
-    add(body, sect, P[11], d, "विषय :- " + L["subject"])
+    # विषय व संदर्भ: bold + centre (Abhi's standing rule)
+    from docx.enum.text import WD_ALIGN_PARAGRAPH as WA
+    def ctr(p):
+        p.alignment = WA.CENTER
+        pf = p.paragraph_format; pf.left_indent = Cm(0); pf.right_indent = Cm(0); pf.first_line_indent = Cm(0)
+        for r in p.runs: r.bold = True; setfont(r)
+        return p
+    ctr(add(body, sect, P[11], d, "विषय :- " + L["subject"].strip(), bold=True))
     refs = L["refs"]
-    add(body, sect, P[13], d, "संदर्भ :- " + refs[0])
-    for r in refs[1:]: add(body, sect, P[13], d, "         " + r)
+    if refs:
+        ctr(add(body, sect, P[13], d, "संदर्भ :- " + refs[0].strip(), bold=True))
+        for r in refs[1:]: ctr(add(body, sect, P[13], d, r.strip(), bold=True))
     add(body, sect, P[15], d, "")
     add(body, sect, P[16], d, "महोदय,")
     add(body, sect, P[17], d, "\t" + L["intro"])
