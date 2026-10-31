@@ -3,6 +3,7 @@
 Requests: tools/gr-request.txt, one per line:
   code <sanketank>                                   e.g.  code 201909111829520805
   search <date_from> <date_to> <words...>            e.g.  search 2019-09-11 2019-09-11 ठोक भरपाई
+  dept <date_from> <date_to> <department words>      e.g.  dept 2022-04-19 2022-04-19 Law Judiciary   (all GRs of that dept on those dates, max 15)
     (searches title/description in the archive.org mirror of gr.maharashtra.gov.in; downloads at most 5 matches)
 Output: pdf/gr/<code>.pdf  +  pdf/gr/INDEX.tsv (code, date, department, title, request).
 Processed lines are moved to the '# done' section so they are not fetched again."""
@@ -58,6 +59,17 @@ for req in todo:
             for d in docs:
                 code = d["identifier"].split(".")[-1]
                 log.append(f"{req}  ->  {code} {str(d.get('title',''))[:80]}  ->  {save(code, req, d)}")
+        elif p[0] == "dept":
+            # dept <date_from> <date_to> <department words>  -> all GRs of that department in the date range (max 15)
+            d1, d2, words = p[1], p[2], " AND ".join(f"subject:({w})" for w in p[3:])
+            q = f'collection:maharashtragr AND date:[{d1} TO {d2}] AND {words}'
+            u = "https://archive.org/advancedsearch.php?" + urllib.parse.urlencode({"q": q, "fl[]": ["identifier", "title", "date", "subject", "description"], "rows": 15, "output": "json"}, doseq=True)
+            docs = json.loads(get(u))["response"]["docs"]
+            if not docs: log.append(f"{req}  ->  no match")
+            for d in docs:
+                code = d["identifier"].split(".")[-1]
+                d["title"] = str(d.get("description") or d.get("title", ""))[:200]
+                log.append(f"{req}  ->  {code} {d['title'][:90]}  ->  {save(code, req, d)}")
         else: log.append(f"{req}  ->  unknown request type")
     except Exception as e: log.append(f"{req}  ->  error {e}")
 open("tools/gr-request.txt", "w", encoding="utf-8").write("\n".join(head + ["# done"] + [f"{x}" for x in log] + [x for x in done if x.strip()]) + "\n")
