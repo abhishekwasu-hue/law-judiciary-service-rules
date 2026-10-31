@@ -7,13 +7,13 @@ spec.json:
 {
  "note": {
    "first": "text of para 1 (starts after a tab; ends with ... सादर.)",
-   "paras": ["para text without number (numbering 2., 3., ... added automatically)", ...],
+   "paras": [{"table": [["अ.क्र.","..."],["1","..."]], "bold_last": false} or "para text without number (numbering 2., 3., ... added automatically)", ...],
    "sub": {"<para index in paras, 0-based>": ["(१) ...", "(२) ..."]},   # optional lettered/numbered sub-points after that para
    "closing": "मान्यतेस्तव सादर.",
    "signers": ["का.अ. (श्री. वसू)", "अ.स. (        )", ...]
  },
  "related": [ {"heading": "<GR/नियम/पूर्वोदाहरण शीर्षक>", "text": ["<जसाच्या तसा उतारा परिच्छेद>", "..."], "source": "<क्रमांक, दिनांक, पृ., परि.>"} ],   # शेवटी 'संबंधित माहिती'
- "letter": {
+ "letter": {   # optional — omit when no letter is needed (note only)
    "ref_no": "संकिर्ण-2026/प्र.क्र.116/का.6", "date": "__.__.2026",
    "to": ["प्रबंधक (वित्त व अर्थसंकल्प),", "उच्च न्यायालय (अपील शाखा),", "मुंबई."],
    "subject": "....", "refs": ["१) ...", "२) ..."],
@@ -80,6 +80,39 @@ def add(body, sect, proto, doc, text, bold=None, left=None, first=None):
     if first is not None: p.paragraph_format.first_line_indent = first
     return p
 
+
+def add_table(d, sect, rows, bold_last=False):
+    """rows: list of lists (first row = header, bold). Bordered grid, DVOT-SurekhMR."""
+    from docx.oxml import OxmlElement
+    ncol = max(len(r) for r in rows)
+    t = d.add_table(rows=len(rows), cols=ncol)
+    tblPr = t._tbl.tblPr
+    b = OxmlElement("w:tblBorders")
+    for e in ("top", "left", "bottom", "right", "insideH", "insideV"):
+        x = OxmlElement(f"w:{e}"); x.set(qn("w:val"), "single"); x.set(qn("w:sz"), "4"); x.set(qn("w:color"), "000000"); b.append(x)
+    tblPr.append(b)
+    from docx.shared import Cm, Pt
+    # column widths: serial column narrow, rest proportional to longest text (min 2 cm), total 16 cm
+    lens = [max(len(str(r[j])) if j < len(r) else 0 for r in rows) for j in range(ncol)]
+    first = 1.5 if ncol > 2 else 0
+    rest = 16.0 - first
+    wts = [max(l, 10) ** 0.5 for l in (lens[1:] if first else lens)]
+    ws = ([first] if first else []) + [max(2.4, rest * w / sum(wts)) for w in wts]
+    k = 16.0 / sum(ws); ws = [w * k for w in ws]
+    t.autofit = False
+    for j in range(ncol): t.columns[j].width = Cm(ws[j])
+    for i, r in enumerate(rows):
+        for j in range(ncol):
+            c = t.cell(i, j); c.text = ""; c.width = Cm(ws[j])
+            para = c.paragraphs[0]
+            pf = para.paragraph_format; pf.space_before = Pt(0); pf.space_after = Pt(0); pf.line_spacing = 1.0
+            pf.left_indent = Cm(0); pf.first_line_indent = Cm(0)
+            run = para.add_run(str(r[j]) if j < len(r) else "")
+            setfont(run); run.font.size = Pt(11)
+            if i == 0 or (bold_last and i == len(rows) - 1): run.bold = True
+    sect.addprevious(t._tbl)
+    return t
+
 def build_note(spec, out):
     from docx.shared import Cm
     d = docx.Document(NOTE_T); body, P, sect = fresh(d); fix_styles(d)
@@ -92,6 +125,8 @@ def build_note(spec, out):
     k = 2
     subs = n.get("sub", {})
     for i, t in enumerate(n["paras"]):
+        if isinstance(t, dict):
+            add_table(d, sect, t["table"], t.get("bold_last", False)); continue
         add(body, sect, numbered, d, f"{k}.\t{t}"); k += 1
         for s in subs.get(str(i), []):
             add(body, sect, numbered, d, f"\t{s}", left=Cm(1.0), first=Cm(-0.0))
@@ -120,7 +155,10 @@ def build_letter(spec, out):
     d = docx.Document(LET_T); body, P, sect = fresh(d); fix_styles(d)
     L = spec["letter"]
     # 0..4 letterhead (0 holds the two logo drawings) ; 5 ref/date ; 6 blank
-    for i in range(0, 4): body_el = copy.deepcopy(P[i]); sect.addprevious(body_el)
+    from docx.text.paragraph import Paragraph as _P
+    for i in range(0, 4):
+        body_el = copy.deepcopy(P[i]); sect.addprevious(body_el)
+        for r in _P(body_el, d).runs: setfont(r)
     em = copy.deepcopy(P[4]); sect.addprevious(em)
     from docx.text.paragraph import Paragraph
     pe = Paragraph(em, d);
@@ -149,6 +187,8 @@ def build_letter(spec, out):
     add(body, sect, P[16], d, "महोदय,")
     add(body, sect, P[17], d, "\t" + L["intro"])
     for pt in L["points"]:
+        if isinstance(pt, dict):
+            add_table(d, sect, pt["table"], pt.get("bold_last", False)); continue
         add(body, sect, P[17], d, pt, left=Cm(1.0), first=Cm(-1.0))
     if L.get("closing"): add(body, sect, P[17], d, "\t" + L["closing"])
     add(body, sect, P[18], d, "\t\t\t\t\t\t\t      \t     आपला,")
@@ -162,5 +202,5 @@ def build_letter(spec, out):
 if __name__ == "__main__":
     spec = json.load(open(sys.argv[1], encoding="utf-8")); od, pre = sys.argv[2], sys.argv[3]
     build_note(spec, os.path.join(od, f"{pre}_Note.docx"))
-    build_letter(spec, os.path.join(od, f"{pre}_Letter.docx"))
+    if spec.get("letter"): build_letter(spec, os.path.join(od, f"{pre}_Letter.docx"))
     print("ok", pre)
