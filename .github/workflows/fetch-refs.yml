@@ -10,12 +10,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Round 6 (HTE compassionate)
+      - name: Round 6b (HTE compassionate)
         run: |
           mkdir -p r6 && cd r6
           : > ../log6.txt
           UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36"
-          dl(){ curl -sSL -A "$UA" --max-time 120 -o "$1" "$2" >>../log6.txt 2>&1; echo "$1 $(stat -c%s "$1" 2>/dev/null) $(file -b "$1" | cut -c1-40)" >> ../log6.txt; }
+          dl(){ curl -sSL -A "$UA" --max-time 120 -o "$1" "$2" >>../log6.txt 2>&1 || echo "FAIL $1" >> ../log6.txt; echo "$1 $(stat -c%s "$1" 2>/dev/null) $(file -b "$1" | cut -c1-40)" >> ../log6.txt; }
           dl GAD-GR-2025-07-17-anukampa.pdf "https://gr.maharashtra.gov.in/Site/Upload/Government%20Resolutions/Marathi/202507171651403607.pdf"
           dl HC-FB-Sunita-Gaikwad-WP9284-2022.pdf "https://www.bombayhighcourt.nic.in/generatenewauth.php?bhcpar=cGF0aD0uL3dyaXRlcmVhZGRhdGEvZGF0YS9hdXJqdWRnZW1lbnRzLzIwMjMvJmZuYW1lPTIwMDEwMDA5Mjg0MjAyMl8zLnBkZiZzbWZsYWc9TiZyanVkZGF0ZT0mdXBsb2FkZHQ9MDEvMDgvMjAyMyZzcGFzc3BocmFzZT0wNTA3MjUxNTU5MDkmbmNpdGF0aW9uPTIwMjM6QkhDLUFVRzoxNjA5Ny1EQiZzbWNpdGF0aW9uPSZkaWdjZXJ0ZmxnPU4maW50ZXJmYWNlPU8%3D"
           dl SC-Madhuri-Vidhate-2022.pdf "https://api.sci.gov.in/supremecourt/2020/4008/4008_2020_7_1501_38707_Judgement_30-Sep-2022.pdf"
