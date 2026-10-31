@@ -1,0 +1,5 @@
+GAD-GR-2017-09-21.pdf 3355460 PDF document, version 1.6 (zip deflate e
+total 3288
+drwxr-xr-x  2 runner runner    4096 Oct 31 11:16 .
+drwxr-xr-x 19 runner runner    4096 Oct 31 11:16 ..
+-rw-r--r--  1 runner runner 3355460 Oct 31 11:16 GAD-GR-2017-09-21.pdf
