@@ -1,0 +1,19 @@
+name: Find GR (archive.org mirror)
+on:
+  push:
+    paths: ['tools/find-gr.txt']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  find:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 tools/find_gr.py
+      - run: |
+          git config user.name github-actions; git config user.email actions@github.com
+          git add working-notes/gr-search pdf/_found || true
+          git commit -m "GR search results" || exit 0
+          for i in 1 2 3; do git pull --rebase origin main && git push && break || sleep 5; done

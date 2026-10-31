@@ -1,0 +1,3 @@
+# date_from date_to department regex  (one search per line; edit and push to run)
+2019-09-01 2019-09-30 finance चवक|1013/प्र.क्र.17|ठोक भरपाई|lump
+2013-07-01 2013-07-31 finance चवक|1013/प्र.क्र.17|ठोक भरपाई|lump
