@@ -1,0 +1,16 @@
+HTE-GR-2026-02-11.pdf 581929 PDF document, version 1.6 (zip deflate e
+bhandara.html 130381 HTML document, Unicode text, UTF-8 text,
+LINK https://cdn.s3waas.gov.in/s3a8baa56554f96369ab93e4f3bb068c22/uploads/2025/07/2025070351.pdf
+curl: (28) Operation timed out after 150002 milliseconds with 1259402 out of 2335180 bytes received
+bhandara_1.pdf 2335180 PDF document, version 1.7, 20 page(s)
+curl: (28) Failed to connect to www.bombayhighcourt.nic.in port 443 after 40000 ms: Timeout was reached
+curl: (28) Failed to connect to www.bombayhighcourt.nic.in port 443 after 40002 ms: Timeout was reached
+curl: (28) Failed to connect to www.bombayhighcourt.nic.in port 443 after 40001 ms: Timeout was reached
+FAIL HC-FB.pdf
+HC-FB.pdf  cannot open `HC-FB.pdf' (No such file or
+total 2992
+drwxr-xr-x  2 runner runner    4096 Oct 31 10:44 .
+drwxr-xr-x 18 runner runner    4096 Oct 31 10:44 ..
+-rw-r--r--  1 runner runner  581929 Oct 31 10:44 HTE-GR-2026-02-11.pdf
+-rw-r--r--  1 runner runner  130381 Oct 31 10:44 bhandara.html
+-rw-r--r--  1 runner runner 2335180 Oct 31 10:48 bhandara_1.pdf
