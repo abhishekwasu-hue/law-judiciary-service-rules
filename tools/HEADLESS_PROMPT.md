@@ -12,4 +12,5 @@ Rules for this run:
 5. Outputs, written into OUTDIR (ASCII names): <PREFIX>_Study.docx, <PREFIX>_Note_and_Letter.docx, <PREFIX>_Proposal_with_GRs.pdf (+ the .map.json from pkg3.py).
 6. Verify before finishing: fonts DVOT-SurekhMR on every run, "आपला,", "प्रत : निवड नस्ती", no internal file ids, page stamps and bookmarks in the PDF, every "(पॅकेज PDF पृ. N)" matches the map.
 7. Keep scratch work in /tmp, not in the repo. Write OUTDIR/status.json at the end: {"state":"done","summary":"<one Marathi line: what the proposal is>","doubts":["..."],"not_found":["..."]}
-8. Reply in Marathi, in as few words as possible.
+8. A needed GR not in pdf/ or pdf/gr/: run `python3 tools/gr_request.py` after adding a `code`/`search` line to tools/gr-request.txt (INSTRUCTIONS §4.14); commit pdf/gr. Only if still not found write "उपलब्ध नाही — मागवावे".
+9. Reply in Marathi, in as few words as possible.
