@@ -34,18 +34,13 @@ small{color:var(--mute)}
 </style>
 </head>
 <body>
-<header><h1>प्रस्ताव डॅशबोर्ड</h1><button id="cfgBtn">⚙ सेटिंग</button></header>
+<header><h1>प्रस्ताव डॅशबोर्ड</h1><button id="cfgBtn">🔑 पासवर्ड</button></header>
 <nav><button data-t="up" class="on">अपलोड</button><button data-t="cases">प्रकरणे</button><button data-t="find">नोंदवही शोध</button></nav>
 <main>
 <section id="cfg" class="card" hidden>
- <b>GitHub जोडणी</b>
- <div class="row">
-  <div><label>रेपो (owner/name)</label><input id="repo" value="abhishekwasu-hue/law-judiciary-service-rules"></div>
-  <div><label>Branch</label><input id="branch" value="main"></div>
-  <div><label>GitHub Token (फक्त या ब्राउझरमध्ये साठवला जातो)</label><input id="token" type="password" placeholder="github_pat_..."></div>
- </div>
+ <b>लॉगिन</b>
+ <label>पासवर्ड</label><input id="token" type="password" autocomplete="current-password">
  <button class="btn" id="saveCfg">जतन करा</button>
- <div class="msg">Token: Fine-grained, फक्त या रेपोसाठी — Contents: Read &amp; write, Actions: Read &amp; write, Metadata: Read.</div>
 </section>
 
 <section id="up">
@@ -74,77 +69,58 @@ small{color:var(--mute)}
 <script>
 const $=s=>document.querySelector(s);
 const ls={g:k=>{try{return localStorage.getItem(k)}catch(e){return null}},s:(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}}};
-let C={repo:ls.g('repo')||$('#repo').value,branch:ls.g('branch')||'main',token:ls.g('token')||''};
-$('#repo').value=C.repo;$('#branch').value=C.branch;$('#token').value=C.token;
-if(!C.token)$('#cfg').hidden=false;
+let PW=ls.g('pw')||'';$('#token').value=PW;if(!PW)$('#cfg').hidden=false;
 $('#cfgBtn').onclick=()=>$('#cfg').hidden=!$('#cfg').hidden;
-$('#saveCfg').onclick=()=>{C={repo:$('#repo').value.trim(),branch:$('#branch').value.trim()||'main',token:$('#token').value.trim()};for(const k in C)ls.s(k,C[k]);$('#cfg').hidden=true;load()};
+$('#saveCfg').onclick=()=>{PW=$('#token').value;ls.s('pw',PW);$('#cfg').hidden=true;load()};
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x===b));['up','cases','find'].forEach(t=>$('#'+t).hidden=t!==b.dataset.t);if(b.dataset.t==='cases')load()});
-
-async function gh(path,opt={}){
-  const r=await fetch('https://api.github.com/repos/'+C.repo+path,{...opt,headers:{Authorization:'Bearer '+C.token,Accept:'application/vnd.github+json',...(opt.headers||{})}});
-  return r;
-}
+const api=(u,o={})=>fetch(u,{...o,headers:{'x-pass':PW,...(o.headers||{})}});
 const b64=buf=>{let s='',a=new Uint8Array(buf);for(let i=0;i<a.length;i+=0x8000)s+=String.fromCharCode.apply(null,a.subarray(i,i+0x8000));return btoa(s)};
-async function put(path,b64c,msg){
-  let sha;const ex=await gh('/contents/'+path+'?ref='+C.branch);if(ex.ok)sha=(await ex.json()).sha;
-  const r=await gh('/contents/'+path,{method:'PUT',body:JSON.stringify({message:msg,content:b64c,branch:C.branch,sha})});
-  if(!r.ok)throw new Error(path+': '+r.status+' '+(await r.text()).slice(0,200));
-}
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 $('#send').onclick=async()=>{
-  const m=$('#upmsg');const no=$('#crno').value.trim(),yr=$('#cryr').value.trim(),f=$('#pdf').files[0];
-  if(!C.token){m.textContent='आधी सेटिंगमध्ये Token टाका.';return}
+  const m=$('#upmsg'),no=$('#crno').value.trim(),yr=$('#cryr').value.trim(),f=$('#pdf').files[0];
+  if(!PW){m.textContent='आधी पासवर्ड टाका.';return}
   if(!/^\d+$/.test(no)||!/^\d{4}$/.test(yr)||!f){m.textContent='C R क्रमांक, वर्ष व PDF द्या.';return}
-  const P='CR'+no+'_'+yr;
   try{
     m.textContent='अपलोड होत आहे…';
-    const meta={cr:no,year:yr,file_no:$('#fileno').value.trim(),name:f.name};
-    await put('inbox/'+P+'.json',btoa(unescape(encodeURIComponent(JSON.stringify(meta)))),'meta '+P);
-    await put('cases/'+P+'/status.json',btoa(JSON.stringify({state:'queued',queued:new Date().toISOString()})),'queued '+P);
-    await put('inbox/'+P+'.pdf',b64(await f.arrayBuffer()),'proposal '+P);
-    m.textContent='अपलोड झाले ('+P+'). काम सुरू झाले; "प्रकरणे" मध्ये स्थिती पहा.';
+    const r=await api('/api/upload',{method:'POST',body:JSON.stringify({cr:no,year:yr,file_no:$('#fileno').value.trim(),name:f.name,pdf:b64(await f.arrayBuffer())})});
+    const j=await r.json();if(!r.ok)throw new Error(j.error||r.status);
+    m.textContent='अपलोड झाले ('+j.prefix+'). काम सुरू झाले; "प्रकरणे" मध्ये स्थिती पहा.';
   }catch(e){m.textContent='चूक: '+e.message}
 };
-
 const FILES=['Study.docx','Note_and_Letter.docx','Proposal_with_GRs.pdf'];
 const LBL={queued:'रांगेत',running:'चालू',done:'पूर्ण',failed:'अयशस्वी'};
 async function load(){
-  const box=$('#caselist');if(!C.token){box.innerHTML='<div class="card">सेटिंगमध्ये Token टाका.</div>';return}
-  const r=await gh('/contents/cases?ref='+C.branch);
-  if(!r.ok){box.innerHTML='<div class="card">अद्याप प्रकरणे नाहीत.</div>';return}
-  const dirs=(await r.json()).filter(x=>x.type==='dir').map(x=>x.name).sort().reverse();
-  if(!dirs.length){box.innerHTML='<div class="card">अद्याप प्रकरणे नाहीत.</div>';return}
+  const box=$('#caselist');if(!PW){box.innerHTML='<div class="card">पासवर्ड टाका.</div>';return}
+  const r=await api('/api/cases');
+  if(r.status===401){box.innerHTML='<div class="card">पासवर्ड चुकीचा.</div>';return}
+  const list=r.ok?await r.json():[];
+  if(!list.length){box.innerHTML='<div class="card">अद्याप प्रकरणे नाहीत.</div>';return}
   let html='',again=false;
-  for(const p of dirs){
-    let st={state:'queued'};
-    const s=await gh('/contents/cases/'+p+'/status.json?ref='+C.branch,{headers:{Accept:'application/vnd.github.raw+json'}});
-    if(s.ok)try{st=await s.json()}catch(e){}
+  for(const st of list){
     if(st.state==='running'||st.state==='queued')again=true;
-    const t=p.replace(/^CR(\d+)_(\d+)$/,'C R $1/$2');
+    const t=st.p.replace(/^CR(\d+)_(\d+)$/,'C R $1/$2');
     html+=`<div class="card"><b>${t}</b> <span class="badge ${st.state}">${LBL[st.state]||st.state}</span>
       ${st.summary?`<div>${esc(st.summary)}</div>`:''}
       ${(st.doubts&&st.doubts.length)?`<small>शंका: ${st.doubts.length} · उपलब्ध नाही: ${(st.not_found||[]).length}</small><br>`:''}
-      ${st.state==='done'?FILES.map(f=>`<button class="btn sec" data-p="${p}" data-f="${f}">⬇ ${f.replace(/\.(docx|pdf)$/,'')}</button>`).join(''):''}</div>`;
+      ${st.state==='done'?FILES.map(f=>`<button class="btn sec" data-p="${st.p}" data-f="${f}">⬇ ${f.replace(/\.(docx|pdf)$/,'')}</button>`).join(''):''}</div>`;
   }
   box.innerHTML=html;
   box.querySelectorAll('button[data-p]').forEach(b=>b.onclick=()=>dl(b.dataset.p,b.dataset.f));
   clearTimeout(load.t);if(again&&!$('#cases').hidden)load.t=setTimeout(load,20000);
 }
-const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 async function dl(p,f){
-  const name=p+'_'+f;
-  const r=await gh('/contents/cases/'+p+'/'+name+'?ref='+C.branch,{headers:{Accept:'application/vnd.github.raw+json'}});
-  if(!r.ok){alert('फाइल मिळाली नाही: '+name);return}
-  const a=document.createElement('a');a.href=URL.createObjectURL(await r.blob());a.download=name;a.click();
+  const r=await api('/api/file?p='+p+'&f='+f);
+  if(!r.ok){alert('फाइल मिळाली नाही');return}
+  const a=document.createElement('a');a.href=URL.createObjectURL(await r.blob());a.download=p+'_'+f;a.click();
 }
 $('#go').onclick=async()=>{
-  const q=$('#q').value.trim(),h=$('#hits');if(!q||!C.token)return;h.textContent='शोधत आहे…';
-  const r=await fetch('https://api.github.com/search/code?q='+encodeURIComponent(q+' repo:'+C.repo+' path:register')+'&per_page=15',{headers:{Authorization:'Bearer '+C.token,Accept:'application/vnd.github.text-match+json'}});
+  const q=$('#q').value.trim(),h=$('#hits');if(!q||!PW)return;h.textContent='शोधत आहे…';
+  const r=await api('/api/search?q='+encodeURIComponent(q));
   if(!r.ok){h.textContent='शोध अयशस्वी: '+r.status;return}
   const j=await r.json();
-  h.innerHTML=j.items.length?j.items.map(i=>`<div class="hit"><b>${esc(i.path)}</b>${(i.text_matches||[]).slice(0,2).map(m=>`<div>${esc(m.fragment)}</div>`).join('')}<a href="${i.html_url}" target="_blank" rel="noopener">उघडा</a></div>`).join(''):'काही सापडले नाही.';
+  h.innerHTML=j.length?j.map(i=>`<div class="hit"><b>${esc(i.path)}</b>${i.frags.map(m=>`<div>${esc(m)}</div>`).join('')}</div>`).join(''):'काही सापडले नाही.';
 };
-if(C.token)load();
+if(PW)load();
 </script>
 </body>
 </html>
