@@ -1,0 +1,12 @@
+GAD-GR-2025-07-17-anukampa.pdf 799510 PDF document, version 1.6 (zip deflate e
+curl: (28) Connection timed out after 120002 milliseconds
+FAIL HC-FB-Sunita-Gaikwad-WP9284-2022.pdf
+HC-FB-Sunita-Gaikwad-WP9284-2022.pdf  cannot open `HC-FB-Sunita-Gaikwad-WP9284
+SC-Madhuri-Vidhate-2022.pdf 79123 PDF document, version 1.4, 9 page(s)
+HC-Vidya-Ahire-WP9685-2023-livelaw.pdf 66385 PDF document, version 1.3, 4 page(s)
+total 940
+drwxr-xr-x  2 runner runner   4096 Oct 31 05:39 .
+drwxr-xr-x 17 runner runner   4096 Oct 31 05:37 ..
+-rw-r--r--  1 runner runner 799510 Oct 31 05:37 GAD-GR-2025-07-17-anukampa.pdf
+-rw-r--r--  1 runner runner  66385 Oct 31 05:39 HC-Vidya-Ahire-WP9685-2023-livelaw.pdf
+-rw-r--r--  1 runner runner  79123 Oct 31 05:39 SC-Madhuri-Vidhate-2022.pdf
