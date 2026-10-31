@@ -2,13 +2,14 @@
 #   code <सांकेतांक>                                उदा. code 201909111812520805
 #   dept <दिनांकापासून> <दिनांकापर्यंत> <विभाग शब्द>   उदा. dept 2022-04-19 2022-04-19 Law Judiciary
 #   search <दिनांकापासून> <दिनांकापर्यंत> <शब्द>      उदा. search 2019-09-11 2019-09-11 ठोक भरपाई
-dept 2026-08-05 2026-08-05 Law Judiciary
-dept 2014-03-12 2014-03-12 Law Judiciary
-dept 2018-03-31 2018-03-31 Law Judiciary
-dept 2021-05-14 2021-05-14 Law Judiciary
-dept 2022-04-19 2022-04-19 Law Judiciary
-dept 2022-12-02 2022-12-02 Law Judiciary
-code 202301111807499612
 # done
+dept 2026-08-05 2026-08-05 Law Judiciary  ->  no match
+dept 2014-03-12 2014-03-12 Law Judiciary  ->  no match
+dept 2018-03-31 2018-03-31 Law Judiciary  ->  201803311828253712 Maharashtra Government Resolution : Title : Redesigning of Existing Court Complexes under   ->  exists
+dept 2018-03-31 2018-03-31 Law Judiciary  ->  201803311819256212 Maharashtra Government Resolution : Title : Redesigning of Existing Court Complexes under   ->  exists
+dept 2021-05-14 2021-05-14 Law Judiciary  ->  no match
+dept 2022-04-19 2022-04-19 Law Judiciary  ->  202204191549468012 Maharashtra Government Resolution : Title : Upgradation of Pay Scales of the staff members  ->  exists
+dept 2022-12-02 2022-12-02 Law Judiciary  ->  no match
+code 202301111807499612  ->  saved
 code 201909111812520805  ->  saved (वित्त वि. दि.11.09.2019, सह/उप सचिव ठोक भरपाई)
 code 201307101257022705  ->  saved (वित्त वि. दि.10.07.2013, सह/उप सचिव ठोक भरपाई)
