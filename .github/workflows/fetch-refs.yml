@@ -7,10 +7,10 @@ permissions:
   contents: write
 jobs:
   fetch:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - name: Round 6b (HTE compassionate)
+      - name: Round 6c (HTE compassionate)
         run: |
           mkdir -p r6 && cd r6
           : > ../log6.txt
