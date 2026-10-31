@@ -10,16 +10,17 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - name: Round 6c (HTE compassionate)
+      - name: Round 7
         run: |
-          mkdir -p r6 && cd r6
-          : > ../log6.txt
+          set +e
+          mkdir -p r7 && cd r7
+          : > ../log7.txt
           UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36"
-          dl(){ curl -sSL -A "$UA" --max-time 120 -o "$1" "$2" >>../log6.txt 2>&1 || echo "FAIL $1" >> ../log6.txt; echo "$1 $(stat -c%s "$1" 2>/dev/null) $(file -b "$1" | cut -c1-40)" >> ../log6.txt; }
-          dl GAD-GR-2025-07-17-anukampa.pdf "https://gr.maharashtra.gov.in/Site/Upload/Government%20Resolutions/Marathi/202507171651403607.pdf"
-          dl HC-FB-Sunita-Gaikwad-WP9284-2022.pdf "https://www.bombayhighcourt.nic.in/generatenewauth.php?bhcpar=cGF0aD0uL3dyaXRlcmVhZGRhdGEvZGF0YS9hdXJqdWRnZW1lbnRzLzIwMjMvJmZuYW1lPTIwMDEwMDA5Mjg0MjAyMl8zLnBkZiZzbWZsYWc9TiZyanVkZGF0ZT0mdXBsb2FkZHQ9MDEvMDgvMjAyMyZzcGFzc3BocmFzZT0wNTA3MjUxNTU5MDkmbmNpdGF0aW9uPTIwMjM6QkhDLUFVRzoxNjA5Ny1EQiZzbWNpdGF0aW9uPSZkaWdjZXJ0ZmxnPU4maW50ZXJmYWNlPU8%3D"
-          dl SC-Madhuri-Vidhate-2022.pdf "https://api.sci.gov.in/supremecourt/2020/4008/4008_2020_7_1501_38707_Judgement_30-Sep-2022.pdf"
-          dl HC-Vidya-Ahire-WP9685-2023-livelaw.pdf "https://livelaw.in/pdf_upload/family-of-employee-having-more-than-two-children-ineligible-for-compassionate-appointment-548200.pdf"
-          ls -la >> ../log6.txt
+          dl(){ curl -sSL -A "$UA" --connect-timeout 40 --max-time 150 --retry 2 -o "$1" "$2" >>../log7.txt 2>&1 || echo "FAIL $1" >> ../log7.txt; echo "$1 $(stat -c%s "$1" 2>/dev/null) $(file -b "$1" 2>/dev/null | cut -c1-40)" >> ../log7.txt; }
+          dl HTE-GR-2026-02-11.pdf "https://gr.maharashtra.gov.in/Site/Upload/Government%20Resolutions/Marathi/202602111926429308.pdf"
+          dl bhandara.html "https://bhandara.gov.in/mr/notice/%E0%A4%85%E0%A4%A8%E0%A5%81%E0%A4%95%E0%A4%82%E0%A4%AA%E0%A4%BE-%E0%A4%A8%E0%A4%BF%E0%A4%AF%E0%A5%81%E0%A4%95%E0%A5%8D%E0%A4%A4%E0%A5%80-%E0%A4%B6%E0%A4%BE-%E0%A4%A8%E0%A4%BF%E0%A4%B0%E0%A5%8D/"
+          i=0; for u in $(grep -oE 'https?://[^"'"'"' ]+\.pdf' bhandara.html | sort -u | head -6); do i=$((i+1)); echo "LINK $u" >> ../log7.txt; dl bhandara_$i.pdf "$u"; done
+          dl HC-FB.pdf "https://www.bombayhighcourt.nic.in/generatenewauth.php?bhcpar=cGF0aD0uL3dyaXRlcmVhZGRhdGEvZGF0YS9hdXJqdWRnZW1lbnRzLzIwMjMvJmZuYW1lPTIwMDEwMDA5Mjg0MjAyMl8zLnBkZiZzbWZsYWc9TiZyanVkZGF0ZT0mdXBsb2FkZHQ9MDEvMDgvMjAyMyZzcGFzc3BocmFzZT0wNTA3MjUxNTU5MDkmbmNpdGF0aW9uPTIwMjM6QkhDLUFVRzoxNjA5Ny1EQiZzbWNpdGF0aW9uPSZkaWdjZXJ0ZmxnPU4maW50ZXJmYWNlPU8%3D"
+          ls -la >> ../log7.txt
           cd ..; git config user.name gha; git config user.email gha@example.com
-          git add -A r6 log6.txt; git commit -m r6 || true; git pull --rebase origin claude/fetch-refs || true; git push
+          git add -A r7 log7.txt; git commit -m r7; git pull --rebase origin claude/fetch-refs; git push
