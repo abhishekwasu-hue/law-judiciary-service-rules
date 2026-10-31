@@ -1,0 +1,3 @@
+# <save-as-name> <url>  (push to run .github/workflows/fetch-urls.yml; files go to pdf/_found/)
+fin_gr_20190911_thok-bharpai_201909111829520805.pdf https://gr.maharashtra.gov.in/Site/Upload/Government%20Resolutions/Marathi/201909111829520805.pdf
+fin_gr_20190911_thok-bharpai_201909111829520805_archive.pdf https://archive.org/download/in.gov.maharashtra.gr.201909111829520805/201909111829520805.pdf

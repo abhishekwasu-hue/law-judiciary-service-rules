@@ -1,0 +1,22 @@
+name: Fetch listed URLs
+on:
+  push:
+    paths: ['tools/fetch-urls.txt']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          mkdir -p pdf/_found
+          grep -v '^#' tools/fetch-urls.txt | while read -r name url; do
+            [ -n "$url" ] || continue
+            curl -sSL --max-time 120 --fail -A "Mozilla/5.0" -o "pdf/_found/$name" "$url" && echo "ok $name" || { echo "fail $url"; rm -f "pdf/_found/$name"; }
+          done
+          git config user.name github-actions; git config user.email actions@github.com
+          git add pdf/_found || true
+          git commit -m "Fetched GR PDFs" || exit 0
+          for i in 1 2 3; do git pull --rebase origin main && git push && break || sleep 5; done
