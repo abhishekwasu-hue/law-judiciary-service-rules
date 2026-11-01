@@ -20,7 +20,8 @@ Commands:
                       runs' duration_ms. An error result of the MAIN run (max turns, API key, credit, ...) -> fail with
                       a Marathi reason + next step; exit 1. A part-1 error alone is only a warning (the main run then
                       writes part 1 itself; verify/finish still check the Study). Adds "मॉडेल: " lines to
-                      runs.warnings (status.json model_log entries, per-model cost from modelUsage) and, when the
+                      runs.warnings (status.json model_log entries, review.corrections as "मॉडेल: Opus पडताळणी — …",
+                      per-model cost from modelUsage) and, when the
                       total cost is over BUDGET_USD, "खर्च-मर्यादा ओलांडली — दर्जा राखण्यासाठी (…)" (soft budget).
   verify <outdir> [<workdir>]
                       runs tools/verify_outputs.py <outdir> <PREFIX> "<package pdf>" <proposal pages>
@@ -28,12 +29,18 @@ Commands:
                       `package_pdf`, else from the file names; proposal pages = page count of the fetched proposal,
                       else status.json `proposal_pages`; original name from <workdir>/case.json, so a real file name
                       such as CR66_Proposal_with_GRs.pdf is accepted). Not ALL OK -> fail with the FAIL lines.
+                      status.json `review.approved` must be true (final reviewer, MODEL_REVIEW), else fail.
+  extracts <outdir> <spec.json> <study.json> [<ocr dir>]
+                      tools/extract_check.py on the delivered `related` + Study part 3 vs the package PDF; non-fatal:
+                      "मॉडेल: उतारा-तपासणी — …" warning lines for mismatched / unverifiable extracts.
   config <cfg.json>   (local) the non-secret run settings from the Worker's /api/engine/config JSON as KEY=VALUE
                       lines for $GITHUB_ENV: MODEL (main tier, every quality-critical task; default claude-opus-5-5),
                       MODEL_LIGHT (mechanical tier + orchestrating session; default claude-haiku-5-5), MODEL_STRONG
-                      (optional one-way escalation tier; default off), EFFORT (default medium), BUDGET_USD (SOFT,
+                      (optional one-way escalation tier; default off), MODEL_REVIEW (final reviewer/approver;
+                      default claude-opus-5-5), EFFORT (default medium), BUDGET_USD (SOFT,
                       default 0.75 — never stops or degrades the run). Invalid values -> defaults.
-  agents <out.json>   (local) Claude Code --agents JSON: drafter (MODEL) [+ drafter_strong (MODEL_STRONG)].
+  agents <out.json>   (local) Claude Code --agents JSON: drafter (MODEL), study_writer + related_writer
+                      (MODEL_LIGHT), reviewer (MODEL_REVIEW) [+ drafter_strong (MODEL_STRONG)].
   part1check <facts.json> <study_part1.json>
                       (local) cheap-tier Study part 1 vs the main tier's facts: every number/date (and Devanagari
                       name/post) of a page must occur in that page's part-1 text. PART1 OK / MISMATCH lines, exit 1.
@@ -315,7 +322,7 @@ def claude_fields(results, wall=None):
     return fields
 
 
-DEFAULTS = {"model": "claude-opus-5-5", "model_light": "claude-haiku-5-5", "model_strong": "",
+DEFAULTS = {"model": "claude-opus-5-5", "model_light": "claude-haiku-5-5", "model_review": "claude-opus-5-5", "model_strong": "",
             "effort": "medium", "budget_usd": 0.75}
 EFFORTS = ("low", "medium", "high", "xhigh", "max")
 OFF = ("none", "off", "no", "-", "0", "false")
@@ -323,10 +330,12 @@ MODEL_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:@\[\]/-]{1,99}")
 
 
 def engine_config(cfg):
-    """Non-secret run settings from the Worker config dict (keys model, model_light, model_strong, effort,
-    budget_usd); every missing/invalid value -> DEFAULTS. Tiers: MODEL = main tier (every quality-critical task;
-    default = the Opus-class model that produced the approved outputs), MODEL_LIGHT = mechanical tier (orchestrator,
-    tools, builds, lint/verify fixes, Study part 1 draft), MODEL_STRONG = optional one-way escalation tier above MODEL
+    """Non-secret run settings from the Worker config dict (keys model, model_light, model_review, model_strong,
+    effort, budget_usd); every missing/invalid value -> DEFAULTS. Tiers (Abhi, 01.11.2026): MODEL = drafter (facts from
+    the page images, letter-or-not, note body + letter, GR choice for the note, Study part 0; Abhi sets it to Sonnet),
+    MODEL_LIGHT = cheap tier (orchestrator, tools, builds, lint/verify fixes, Study parts 1-7 except 0, note `related`),
+    MODEL_REVIEW = final reviewer/approver (Opus-class; checks and minimally corrects note + letter + part 0; the run
+    is not "done" without its approval), MODEL_STRONG = optional one-way escalation tier above MODEL
     (empty / "none" = off). BUDGET_USD is SOFT: the run is never stopped or degraded for it; going over it only adds
     the warning "खर्च-मर्यादा ओलांडली — दर्जा राखण्यासाठी"."""
     cfg = cfg if isinstance(cfg, dict) else {}
@@ -349,7 +358,8 @@ def engine_config(cfg):
     main = model("model")
     if strong == main:
         strong = ""
-    return {"MODEL": main, "MODEL_LIGHT": model("model_light"), "MODEL_STRONG": strong, "EFFORT": eff,
+    return {"MODEL": main, "MODEL_LIGHT": model("model_light"), "MODEL_REVIEW": model("model_review"),
+            "MODEL_STRONG": strong, "EFFORT": eff,
             "BUDGET_USD": f"{bud:.2f}"}
 
 
@@ -362,10 +372,25 @@ def cmd_config(path):
         print(f"{k}={v}")
 
 
+VERBATIM = (" Extracts are copied character for character from the cited page (look at the page image where the "
+            "text layer is garbled); never paraphrase, shorten or fill gaps; mark omissions with \"…\". Do not decide "
+            "which GR applies and do not change the note body or the letter.")
+REVIEW = (" You are the final approver. LOOK at the proposal page images (WORKDIR/pages/p-NN.png; OCR p-NN.ocr.txt as "
+          "a cross-check) for every number, date, name and amount used in the note, the letter and Study part 0. Check "
+          "rule compliance (INSTRUCTIONS §4 incl. §4.18; the lint_spec rules), that the letter-or-not decision follows "
+          "PROPOSAL_SOP Step 3 / INSTRUCTIONS §4.15, and the official language. Correct /tmp/work/spec.json (note + "
+          "letter; not `related`) and /tmp/work/study_part0.json directly with MINIMAL edits (never restyle approved "
+          "wording). Write /tmp/work/review.json = {\"approved\": true|false, \"changes\": N, \"corrections\": "
+          "[\"<Marathi: what changed>\"], \"reason\": \"<Marathi, only when not approved>\"}. approved=false only "
+          "when the case cannot be made correct by small edits.")
+
+
 def agents_json(conf, brief="tools/ENGINE_BRIEF.md"):
     """Claude Code --agents definitions (pinned CLI: description, prompt, model per agent). The orchestrating session
-    runs on MODEL_LIGHT; quality-critical work goes to `drafter` (MODEL); `drafter_strong` (MODEL_STRONG) exists
-    only when configured. Prompts are fixed text (stable prefix for prompt caching)."""
+    runs on MODEL_LIGHT; `drafter` (MODEL) = facts, letter-or-not, note body + letter, Study part 0; `study_writer`
+    and `related_writer` (MODEL_LIGHT) = Study parts 2-4, 7 (5-6 copied) and the note's `related` extracts, checked by
+    tools/extract_check.py (mismatches go back to drafter); `reviewer` (MODEL_REVIEW) = final check + approval;
+    `drafter_strong` (MODEL_STRONG) only when configured. Prompts are fixed text (stable prefix for prompt caching)."""
     base = ("You are a subagent of the Law & Judiciary engine run (one case). The binding rules are " + brief +
             " (read it once, fully) and the tool docstrings in /tmp/work/TOOL_DOCS.md; INSTRUCTIONS.md wins on any doubt"
             " (grep the exact item). Nothing of your own; verbatim quotes with source; unreadable = \"अस्पष्ट\". "
@@ -373,23 +398,42 @@ def agents_json(conf, brief="tools/ENGINE_BRIEF.md"):
             "(files written, open doubts, anything you could not read). Batch independent tool calls in one message; "
             "never read a file twice; limit command output. No git, no questions, never print environment values.")
     out = {"drafter": {
-        "description": "Main tier. Quality-critical work: read facts/numbers/dates/names/handwriting/stamps from the "
-                       "proposal page images; letter-or-not decision; GR selection and verbatim quotes; note and "
-                       "letter spec; Study parts 0, 2, 3, 4, 7; Study part 1 pages that failed the part-1 check; "
-                       "content fixes that lint/verify still reports after 2 mechanical attempts.",
+        "description": "Drafter. Read facts/numbers/dates/names/handwriting/stamps from the proposal page images; "
+                       "letter-or-not decision; GR selection for the note body and the enclosures; note body and "
+                       "letter spec; Study part 0; extracts and Study part 1 pages that failed their check; content "
+                       "fixes that lint/verify still reports after 2 mechanical attempts.",
         "prompt": base, "model": conf["MODEL"]}}
     if conf.get("MODEL_STRONG"):
         out["drafter_strong"] = {
             "description": "Escalation tier (one-way up, only per the escalation rules): a page or a content problem "
                            "the main tier reported as still unclear / still failing.",
             "prompt": base, "model": conf["MODEL_STRONG"]}
+    light = conf.get("MODEL_LIGHT") or DEFAULTS["model_light"]
+    out["study_writer"] = {
+        "description": "Cheap tier. Study parts 2, 3, 4, 7 from facts.json, the drafter's spec and the package pages; "
+                       "parts 5-6 = exact copies of the spec's note and letter text (never redrafted). Part 3 extracts "
+                       "verbatim from the package GR pages with source and \"(पॅकेज PDF पृ. N)\"; checked by "
+                       "tools/extract_check.py.",
+        "prompt": base + VERBATIM, "model": light}
+    out["related_writer"] = {
+        "description": "Cheap tier. The note's \"संबंधित माहिती (संदर्भासाठी)\" (spec `related`): verbatim GR/rule/"
+                       "precedent extracts with source, each ending \"(पॅकेज PDF पृ. N)\" or \"(पॅकेज PDF मध्ये नाही)\"; "
+                       "checked by tools/extract_check.py.",
+        "prompt": base + VERBATIM, "model": light}
+    out["reviewer"] = {
+        "description": "Final review and approval (Opus-class). Checks every number/date/name of the note, letter and "
+                       "Study part 0 against the page images, the rules (INSTRUCTIONS §4 incl. §4.18, the brief), the "
+                       "letter-or-not decision and the language; corrects spec/part-0 text with minimal edits and "
+                       "writes /tmp/work/review.json {approved, changes, corrections[]}.",
+        "prompt": base + REVIEW, "model": conf.get("MODEL_REVIEW") or DEFAULTS["model_review"]}
     return out
 
 
 def cmd_agents(args):
-    """agents <out.json> — writes agents_json(engine_config(env)) (env MODEL, MODEL_LIGHT, MODEL_STRONG)."""
-    conf = {k: os.environ.get(k, "") for k in ("MODEL", "MODEL_LIGHT", "MODEL_STRONG")}
+    """agents <out.json> — writes agents_json(env MODEL, MODEL_LIGHT, MODEL_REVIEW, MODEL_STRONG)."""
+    conf = {k: os.environ.get(k, "") for k in ("MODEL", "MODEL_LIGHT", "MODEL_REVIEW", "MODEL_STRONG")}
     conf["MODEL"] = conf["MODEL"] or DEFAULTS["model"]
+    conf["MODEL_REVIEW"] = conf["MODEL_REVIEW"] or DEFAULTS["model_review"]
     json.dump(agents_json(conf), open(args[0], "w", encoding="utf-8"), ensure_ascii=False, indent=1)
 
 
@@ -455,10 +499,12 @@ def model_lines(results, status_path=None, budget=None):
     """'मॉडेल: ' run lines (runs.warnings — no schema change; contract with the UI): each routing/escalation entry of
     status.json `model_log` [{task, from, to, reason}] (kept also when the run failed), one per-model cost line from
     the results' modelUsage, and the soft-budget warning when the total cost is over BUDGET_USD."""
-    lines, log = [], []
+    lines, log, review = [], [], {}
     if status_path and os.path.exists(status_path):
         try:
-            log = json.load(open(status_path, encoding="utf-8")).get("model_log") or []
+            st = json.load(open(status_path, encoding="utf-8"))
+            log = st.get("model_log") or []
+            review = st.get("review") if isinstance(st.get("review"), dict) else {}
         except Exception:
             log = []
     for e in log if isinstance(log, list) else []:
@@ -467,6 +513,11 @@ def model_lines(results, status_path=None, budget=None):
         if t and to:
             lines.append(f"मॉडेल: {t} → {short_model(to)}" + (f" (पूर्वी {short_model(fr)})" if fr else "")
                          + (f" ({why})" if why else ""))
+    fam = (short_model(os.environ.get("MODEL_REVIEW") or DEFAULTS["model_review"]).split() or ["Opus"])[0]
+    corr = review.get("corrections") if isinstance(review.get("corrections"), list) else []
+    for c in corr:
+        if str(c or "").strip():
+            lines.append(f"मॉडेल: {fam} पडताळणी — {str(c).strip()}")
     cost = {}
     for r in results:
         mu = r.get("modelUsage") if isinstance(r.get("modelUsage"), dict) else {}
@@ -543,6 +594,10 @@ def cmd_verify(args):
         return cmd_fail(f"status.json वाचता आले नाही: {e}")
     if st.get("state") != "done":
         return  # `finish` records the engine's own failure reason
+    rv = st.get("review") if isinstance(st.get("review"), dict) else {}
+    if rv.get("approved") is not True:
+        why = str(rv.get("reason") or "").strip() or "review नोंद नाही"
+        return cmd_fail(f"अंतिम पडताळणी (reviewer) मान्यता नाही — {why} — पुन्हा तयार करा."[:500])
     prefix = str(st.get("prefix") or "").strip()
     if not prefix:
         sf = glob.glob(os.path.join(out, "*_Study.docx"))
@@ -590,6 +645,49 @@ def cmd_verify(args):
     cmd_fail(f"पडताळणी (verify_outputs) अयशस्वी — {detail}"[:500])
 
 
+def cmd_extracts(args):
+    """extracts <outdir> <spec.json> <study.json> [<ocr dir>] — final verbatim guard (tools/extract_check.py) on the
+    delivered `related` + Study part 3 against the package PDF; non-fatal: mismatched / unverifiable extracts become
+    "मॉडेल: उतारा-तपासणी — …" warning lines (the run already sent mismatches back to the drafter)."""
+    out, spec, study = args[:3]
+    try:
+        st = json.load(open(os.path.join(out, "status.json"), encoding="utf-8"))
+    except Exception:
+        st = {}
+    if st.get("state") != "done":
+        return
+    pkg = os.path.join(out, os.path.basename(str(st.get("package_pdf") or "")))
+    if not st.get("package_pdf") or not os.path.exists(pkg):
+        pp = package_pdfs(out)
+        pkg = pp[0] if len(pp) == 1 else ""
+    if not pkg:
+        return add_warnings(["मॉडेल: उतारा-तपासणी — पॅकेज PDF सापडली नाही, तपासणी झाली नाही"])
+    cmd = [sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "extract_check.py"), pkg]
+    cmd += ["--spec", spec] if os.path.exists(spec) else []
+    cmd += ["--study", study] if os.path.exists(study) else []
+    if len(cmd) == 2:
+        return add_warnings(["मॉडेल: उतारा-तपासणी — spec/study सापडले नाहीत, तपासणी झाली नाही"])
+    cmd += ["--ocr-dir", args[3]] if len(args) > 3 and os.path.isdir(args[3]) else []
+    rj = os.path.join(out, ".extracts.json")
+    r = subprocess.run(cmd + ["--json", rj], capture_output=True, text=True, encoding="utf-8", errors="replace")
+    print(r.stdout, end="")
+    try:
+        recs = json.load(open(rj, encoding="utf-8"))
+    except Exception:
+        return add_warnings([f"मॉडेल: उतारा-तपासणी — साधन चालले नाही (exit {r.returncode})"])
+    finally:
+        if os.path.exists(rj): os.remove(rj)
+    bad = [x for x in recs if x.get("status") == "mismatch"]
+    unv = [x for x in recs if x.get("status") == "unverifiable"]
+    lines = []
+    if bad:
+        lines.append(f"मॉडेल: उतारा-तपासणी — {len(bad)} उतारे मूळ PDF शी जुळले नाहीत ("
+                     + "; ".join(sorted({str(x.get('where')) for x in bad}))[:180] + ")")
+    if unv:
+        lines.append(f"मॉडेल: उतारा-तपासणी — {len(unv)} उतारे पडताळता आले नाहीत (स्कॅन/विस्कळीत मजकूर-स्तर)")
+    add_warnings(lines)
+
+
 def cmd_warn(text):
     text = (text or "").strip()[:300]
     cur = (rest("GET", f"runs?id=eq.{RUN}&select=warnings") or [{}])[0]
@@ -619,7 +717,8 @@ def main(a):
         return cmd_agents(a[1:])
     if len(a) == 3 and a[0] == "part1check":
         return cmd_part1check(a[1:])
-    if len(a) < 2 or a[0] not in ("fetch", "step", "log_url", "finish", "fail", "claude_result", "verify", "warn"):
+    if len(a) < 2 or a[0] not in ("fetch", "step", "log_url", "finish", "fail", "claude_result", "verify", "warn",
+                                  "extracts"):
         print(__doc__); sys.exit(2)
     init()
     c, arg = a[0], " ".join(a[1:])
@@ -633,6 +732,7 @@ def main(a):
         elif c == "claude_result": cmd_claude_result(a[1:])
         elif c == "verify": cmd_verify(a[1:])
         elif c == "warn": cmd_warn(arg)
+        elif c == "extracts": cmd_extracts(a[1:])
     except SystemExit:
         raise
     except Exception as e:

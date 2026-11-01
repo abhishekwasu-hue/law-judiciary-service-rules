@@ -218,6 +218,18 @@ open(fake, "w", encoding="utf-8").write(
     "else:\n"
     "    print('ALL OK | pages 9 | toc 3')\n")
 st["prefix"] = "CR130_2026"; st["package_pdf"] = PROP; st["proposal_pages"] = 5
+# final reviewer (MODEL_REVIEW) approval is required before verify_outputs runs
+for rv, label in ((None, "no review"), ({"approved": False, "changes": 0, "reason": "पत्राचा निर्णय चुकीचा"}, "approved false")):
+    st.pop("review", None)
+    if rv: st["review"] = rv
+    json.dump(st, open(os.path.join(out, "status.json"), "w", encoding="utf-8"), ensure_ascii=False)
+    run_row.update(state="running", step="तपासणी चालू")
+    if os.path.exists(argf): os.remove(argf)
+    r = run("verify", out, work, VERIFY_SCRIPT=fake)
+    check(r.returncode == 1 and run_row["state"] == "failed" and run_row["step"].startswith("अंतिम पडताळणी (reviewer) मान्यता नाही")
+          and not os.path.exists(argf) and (not rv or "पत्राचा निर्णय चुकीचा" in run_row["step"]),
+          f"verify: {label} -> failed with a Marathi reason, verify_outputs not run ({run_row['step']})")
+st["review"] = {"approved": True, "changes": 2, "corrections": ["नोंद परि.3 दिनांक 05.08.2026 केला", "पत्रातील पदनाम"]}
 json.dump(st, open(os.path.join(out, "status.json"), "w", encoding="utf-8"), ensure_ascii=False)
 run_row.update(state="running", step="तपासणी चालू")
 r = run("verify", out, work, VERIFY_SCRIPT=fake)
@@ -233,7 +245,8 @@ MN = "CR66_Proposal_with_GRs.pdf"
 json.dump({**cj0, "proposal_original_name": "11ae057d-" + MN, "inputs": []}, open(os.path.join(tmp, "cm.json"), "w", encoding="utf-8"))
 os.makedirs(work_m); os.replace(os.path.join(tmp, "cm.json"), os.path.join(work_m, "case.json"))
 open(os.path.join(out_m, MN), "wb").write(b"x")
-json.dump({"state": "done", "prefix": "CR66_2026", "package_pdf": MN, "proposal_pages": 4}, open(os.path.join(out_m, "status.json"), "w", encoding="utf-8"))
+json.dump({"state": "done", "prefix": "CR66_2026", "package_pdf": MN, "proposal_pages": 4, "review": {"approved": True, "changes": 0}},
+          open(os.path.join(out_m, "status.json"), "w", encoding="utf-8"))
 r = run("verify", out_m, work_m, VERIFY_SCRIPT=fake)
 a = json.load(open(argf, encoding="utf-8"))
 check(r.returncode == 0 and a[4:] == ["--original-name", MN] and os.path.basename(a[2]) == MN,
@@ -283,8 +296,14 @@ sys.path.insert(0, os.path.join(ROOT, "tools"))
 import engine_supabase as es
 
 c = es.engine_config({})
-check(c == {"MODEL": "claude-opus-5-5", "MODEL_LIGHT": "claude-haiku-5-5", "MODEL_STRONG": "", "EFFORT": "medium",
-            "BUDGET_USD": "0.75"}, f"config: defaults (main Opus-class, light Haiku, no strong tier, soft budget 0.75) {c}")
+check(c == {"MODEL": "claude-opus-5-5", "MODEL_LIGHT": "claude-haiku-5-5", "MODEL_REVIEW": "claude-opus-5-5", "MODEL_STRONG": "",
+            "EFFORT": "medium", "BUDGET_USD": "0.75"},
+      f"config: defaults (drafter, light Haiku, reviewer Opus, no strong tier, soft budget 0.75) {c}")
+c = es.engine_config({"model": "claude-sonnet-5-5", "model_review": "claude-opus-5-5"})
+check(c["MODEL"] == "claude-sonnet-5-5" and c["MODEL_REVIEW"] == "claude-opus-5-5" and c["MODEL_LIGHT"] == "claude-haiku-5-5",
+      f"config: drafter Sonnet + reviewer Opus (Abhi 01.11.2026) {c}")
+check(es.engine_config({"model_review": "$(id)"})["MODEL_REVIEW"] == "claude-opus-5-5" and
+      es.engine_config({"model_review": ""})["MODEL_REVIEW"] == "claude-opus-5-5", "config: invalid/empty model_review -> Opus default")
 c = es.engine_config({"model": " claude-sonnet-5-5 ", "model_light": "claude-haiku-5-5", "model_strong": "claude-fable-5-1",
                       "effort": "HIGH", "budget_usd": "1.5"})
 check(c["MODEL"] == "claude-sonnet-5-5" and c["MODEL_STRONG"] == "claude-fable-5-1" and c["EFFORT"] == "high"
@@ -303,21 +322,29 @@ json.dump({"anthropic_api_key": "sk-secret", "model": "claude-opus-5-5", "model_
           open(cfgf, "w", encoding="utf-8"))
 r = subprocess.run([sys.executable, TOOL, "config", cfgf], capture_output=True, text=True, encoding="utf-8",
                    env={k: v for k, v in os.environ.items() if not k.startswith("SUPABASE")})
-check(r.returncode == 0 and r.stdout.splitlines() == ["MODEL=claude-opus-5-5", "MODEL_LIGHT=claude-haiku-5-5", "MODEL_STRONG=",
+check(r.returncode == 0 and r.stdout.splitlines() == ["MODEL=claude-opus-5-5", "MODEL_LIGHT=claude-haiku-5-5", "MODEL_REVIEW=claude-opus-5-5", "MODEL_STRONG=",
       "EFFORT=medium", "BUDGET_USD=0.90"] and "sk-secret" not in r.stdout, f"config CLI: KEY=VALUE lines, no secret, no Supabase env ({r.stdout!r} {r.stderr[:200]})")
 r = subprocess.run([sys.executable, TOOL, "config", os.path.join(tmp, "absent.json")], capture_output=True, text=True, encoding="utf-8")
 check(r.returncode == 0 and "MODEL=claude-opus-5-5" in r.stdout, "config CLI: unreadable file -> defaults")
 
-ag = es.agents_json({"MODEL": "claude-opus-5-5", "MODEL_LIGHT": "claude-haiku-5-5", "MODEL_STRONG": ""})
-check(set(ag) == {"drafter"} and ag["drafter"]["model"] == "claude-opus-5-5" and ag["drafter"]["description"] and ag["drafter"]["prompt"],
-      "agents: drafter on the main tier only (no strong tier configured)")
+ag = es.agents_json({"MODEL": "claude-sonnet-5-5", "MODEL_LIGHT": "claude-haiku-5-5", "MODEL_REVIEW": "claude-opus-5-5", "MODEL_STRONG": ""})
+check(set(ag) == {"drafter", "study_writer", "related_writer", "reviewer"} and ag["drafter"]["model"] == "claude-sonnet-5-5"
+      and ag["drafter"]["description"] and ag["drafter"]["prompt"], "agents: drafter on MODEL, no strong tier when not configured")
+check(ag["study_writer"]["model"] == ag["related_writer"]["model"] == "claude-haiku-5-5"
+      and all("extract_check" in ag[k]["description"] and "character for character" in ag[k]["prompt"] for k in ("study_writer", "related_writer"))
+      and "copies" in ag["study_writer"]["description"], "agents: study_writer + related_writer on the cheap tier, verbatim rule, parts 5-6 copied")
+check(ag["reviewer"]["model"] == "claude-opus-5-5" and "review.json" in ag["reviewer"]["prompt"] and "MINIMAL" in ag["reviewer"]["prompt"]
+      and "§4.18" in ag["reviewer"]["prompt"], "agents: reviewer on MODEL_REVIEW, minimal edits, review.json")
+check(es.agents_json({"MODEL": "claude-opus-5-5"})["reviewer"]["model"] == "claude-opus-5-5"
+      and es.agents_json({"MODEL": "claude-opus-5-5"})["related_writer"]["model"] == "claude-haiku-5-5", "agents: reviewer/light defaults")
 ag = es.agents_json({"MODEL": "claude-opus-5-5", "MODEL_STRONG": "claude-fable-5-1"})
 check(ag["drafter_strong"]["model"] == "claude-fable-5-1" and "ENGINE_BRIEF" in ag["drafter_strong"]["prompt"], "agents: drafter_strong when configured")
 agf = os.path.join(tmp, "agents.json")
 r = subprocess.run([sys.executable, TOOL, "agents", agf], capture_output=True, text=True, encoding="utf-8",
                    env=dict(os.environ, MODEL="claude-sonnet-5-5", MODEL_LIGHT="claude-haiku-5-5", MODEL_STRONG="claude-opus-5-5"))
 aj = json.load(open(agf, encoding="utf-8"))
-check(r.returncode == 0 and aj["drafter"]["model"] == "claude-sonnet-5-5" and aj["drafter_strong"]["model"] == "claude-opus-5-5",
+check(r.returncode == 0 and aj["drafter"]["model"] == "claude-sonnet-5-5" and aj["drafter_strong"]["model"] == "claude-opus-5-5"
+      and aj["reviewer"]["model"] == "claude-opus-5-5" and aj["study_writer"]["model"] == "claude-haiku-5-5",
       f"agents CLI: file written from env ({r.stderr[:200]})")
 
 facts = {"pages": 2, "facts": [
@@ -357,6 +384,10 @@ check(ls[0] == "मॉडेल: पान 3 → Fable 5.1 (पूर्वी O
       and ls[2] == "मॉडेल: खर्च — Opus 5.5 $0.80, Haiku 5.5 $0.10" and ls[3].startswith("खर्च-मर्यादा ओलांडली — दर्जा राखण्यासाठी")
       and len(ls) == 4, f"model_lines: escalations, per-model cost, soft-budget warning {ls}")
 check(not any(l.startswith("खर्च-मर्यादा") for l in es.model_lines(res, None, 2.0)), "model_lines: under budget -> no budget warning")
+stv = os.path.join(tmp, "status_rv.json")
+json.dump({"state": "done", "model_log": [], "review": {"approved": True, "changes": 1, "corrections": ["पत्रातील दिनांक 05.08.2026 केला", ""]}},
+          open(stv, "w", encoding="utf-8"), ensure_ascii=False)
+check(es.model_lines([], stv) == ["मॉडेल: Opus पडताळणी — पत्रातील दिनांक 05.08.2026 केला"], f"model_lines: reviewer corrections {es.model_lines([], stv)}")
 
 # claude_result end to end: lines land in runs.warnings; over budget does NOT fail the run
 run_row.update(state="running", step="तपासणी चालू", warnings=[])
@@ -370,6 +401,36 @@ check([w for w in run_row["warnings"] if w.startswith("मॉडेल: ")] == l
       f"claude_result: मॉडेल lines + soft-budget warning stored {run_row['warnings']}")
 r = claude({"type": "result", "subtype": "error_max_budget_usd", "is_error": True, "num_turns": 12, "total_cost_usd": 0.8})
 check(r.returncode == 1 and run_row["step"].startswith("खर्च-मर्यादा ओलांडली"), f"claude_result budget stop: Marathi reason ({run_row['step']})")
+
+# --- extracts: final verbatim guard -> non-fatal "मॉडेल: उतारा-तपासणी" warning lines
+FONTF = next((f for f in ("/usr/share/fonts/truetype/freefont/FreeSerif.ttf", "/usr/share/fonts/opentype/freefont/FreeSerif.otf",
+                          "C:/Windows/Fonts/mangal.ttf", "C:/Windows/Fonts/Nirmala.ttf") if os.path.exists(f)), None)
+try:
+    import pymupdf
+except ImportError:
+    pymupdf = None
+if pymupdf and FONTF:
+    LINE = "शासन सेवेत नियुक्त होणाऱ्या कर्मचाऱ्यांसाठी नवीन योजना लागू करण्यात येईल."
+    ox = os.path.join(tmp, "out_x"); os.makedirs(ox)
+    d = pymupdf.open(); d.new_page(); pg = d.new_page(); pg.insert_text((40, 100), LINE, fontsize=9, fontname="dv", fontfile=FONTF)
+    d.save(os.path.join(ox, PROP)); d.close()
+    json.dump({"state": "done", "package_pdf": PROP}, open(os.path.join(ox, "status.json"), "w", encoding="utf-8"))
+    spx = os.path.join(tmp, "spec_x.json")
+    json.dump({"related": [{"heading": "GR", "text": ["“" + LINE.replace("नवीन", "जुनी") + "”"], "source": "(पॅकेज PDF पृ. 2)"}]},
+              open(spx, "w", encoding="utf-8"), ensure_ascii=False)
+    run_row.update(state="done", warnings=[])
+    r = run("extracts", ox, spx, os.path.join(tmp, "absent_study.json"))
+    check(r.returncode == 0 and run_row["state"] == "done" and len(run_row["warnings"]) == 1
+          and run_row["warnings"][0].startswith("मॉडेल: उतारा-तपासणी — 1 उतारे मूळ PDF शी जुळले नाहीत"),
+          f"extracts: mismatch -> warning only, case stays done ({run_row['warnings']} {r.stderr[:200]})")
+    json.dump({"related": [{"heading": "GR", "text": ["“" + LINE + "”"], "source": "(पॅकेज PDF पृ. 2)"}]},
+              open(spx, "w", encoding="utf-8"), ensure_ascii=False)
+    run_row.update(warnings=[])
+    r = run("extracts", ox, spx, os.path.join(tmp, "absent_study.json"))
+    check(r.returncode == 0 and run_row["warnings"] == [] and not os.path.exists(os.path.join(ox, ".extracts.json")),
+          f"extracts: all match -> no warning, no scratch file left ({run_row['warnings']})")
+else:
+    print("skip  extracts (pymupdf or Devanagari font missing)")
 
 srv.shutdown()
 print("ALL TESTS PASSED")

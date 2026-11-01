@@ -67,7 +67,7 @@ jobs:
           fi
           {
             echo "ANTHROPIC_API_KEY=$A"; echo "SUPABASE_URL=$U"; echo "SUPABASE_SERVICE_KEY=$S"
-            grep -E '^(MODEL|MODEL_LIGHT|MODEL_STRONG|EFFORT|BUDGET_USD)=[][A-Za-z0-9._:@/-]*$' /tmp/engine_conf.env || true
+            grep -E '^(MODEL|MODEL_LIGHT|MODEL_REVIEW|MODEL_STRONG|EFFORT|BUDGET_USD)=[][A-Za-z0-9._:@/-]*$' /tmp/engine_conf.env || true
           } >> "$GITHUB_ENV"
           rm -f /tmp/engine_conf.env
       - name: Record log URL
@@ -137,10 +137,12 @@ jobs:
       # waits for /tmp/work/study_part1.done (max 40 min) and inserts it, else writes part 1 itself. The step waits for the
       # background run (stopped once the main run has ended — its part is no longer used) before recording the result.
       # cost/turns = sum of both runs; duration = wall clock of this step (the runs overlap).
-      # Model tiers (docs/QUALITY_AUDIT.md §6): the orchestrating session runs on MODEL_LIGHT (mechanical work: tools,
-      # builds, lint/verify fixes); every quality-critical task (facts from page images, letter decision, GR selection +
-      # verbatim quotes, note/letter, Study part 0) goes to the `drafter` subagent on MODEL (--agents, pinned CLI:
-      # per-agent `model`); `drafter_strong` on MODEL_STRONG only when configured (one-way escalation). Study part 1 =
+      # Model tiers (Abhi 01.11.2026; table in tools/ENGINE_PROMPT.md): the orchestrating session runs on MODEL_LIGHT
+      # (mechanical work); `drafter` on MODEL (facts from page images, letter decision, GR choice for the note, note +
+      # letter, Study part 0); `study_writer` / `related_writer` on MODEL_LIGHT (Study parts 2-4, 7, 5-6 copied; note
+      # `related`) — extracts machine-checked by tools/extract_check.py, mismatches back to `drafter`; `reviewer` on
+      # MODEL_REVIEW (Opus-class) = final check + approval (status.json review.approved, required by the verify step);
+      # `drafter_strong` on MODEL_STRONG only when configured (--agents, pinned CLI: per-agent `model`). Study part 1 =
       # helper run on MODEL_LIGHT, kept only if part1check matches the drafter's facts. Budget is SOFT: no CLI cap;
       # claude_result adds "खर्च-मर्यादा ओलांडली — दर्जा राखण्यासाठी" when the total is over BUDGET_USD.
       - name: Process the proposal (Claude Code headless)
@@ -152,13 +154,13 @@ jobs:
           rm -f /tmp/work/study_part1.* /tmp/work/part1*
           mv CLAUDE.md /tmp/CLAUDE.md.repo
           T0=$(date +%s)
-          : "${MODEL:=claude-opus-5-5}" "${MODEL_LIGHT:=claude-haiku-5-5}" "${MODEL_STRONG:=}" "${EFFORT:=medium}"
-          export MODEL MODEL_LIGHT MODEL_STRONG
+          : "${MODEL:=claude-opus-5-5}" "${MODEL_LIGHT:=claude-haiku-5-5}" "${MODEL_REVIEW:=claude-opus-5-5}" "${MODEL_STRONG:=}" "${EFFORT:=medium}"
+          export MODEL MODEL_LIGHT MODEL_REVIEW MODEL_STRONG
           python3 tools/engine_supabase.py agents /tmp/work/agents.json
           python3 - <<'PY'
           import ast, io
           out = io.open("/tmp/work/TOOL_DOCS.md", "w", encoding="utf-8")
-          for t in ("mkdocs", "build_note_letter", "build_study", "pkg3", "highlight", "lint_spec", "verify_outputs", "oldcases_text"):
+          for t in ("mkdocs", "build_note_letter", "build_study", "pkg3", "highlight", "lint_spec", "verify_outputs", "extract_check", "oldcases_text"):
               d = ast.get_docstring(ast.parse(io.open(f"tools/{t}.py", encoding="utf-8").read())) or ""
               out.write("### tools/" + t + ".py" + chr(10) + d + chr(10) + chr(10))
           PY
@@ -209,6 +211,7 @@ jobs:
           PRECEDENT=/tmp/precedent
           MODEL=$MODEL
           MODEL_LIGHT=$MODEL_LIGHT
+          MODEL_REVIEW=$MODEL_REVIEW
           MODEL_STRONG=$MODEL_STRONG
           BUDGET_USD=${BUDGET_USD:-0.75}"
           ARGS=(-p "$PROMPT" --dangerously-skip-permissions --max-turns 400 --output-format json
@@ -229,8 +232,12 @@ jobs:
           mv /tmp/CLAUDE.md.repo CLAUDE.md
           echo "claude exit $rc"; tail -n 20 /tmp/claude.err || true
           python3 tools/engine_supabase.py claude_result /tmp/claude.json /tmp/claude.err "$rc" "${P1_ARGS[@]}" --wall "$((T1 - T0))"             --status /tmp/out/status.json
+      # needs status.json review.approved (final reviewer) before verify_outputs runs
       - name: Verify outputs (verify_outputs.py must print ALL OK)
         run: python3 tools/engine_supabase.py verify /tmp/out /tmp/case
+      # verbatim guard for the cheap-tier extracts (related + Study part 3) on the delivered files: warning lines only
+      - name: Check extracts (extract_check.py, non-fatal)
+        run: python3 tools/engine_supabase.py extracts /tmp/out /tmp/work/spec.json /tmp/work/study.json /tmp/work/pkgpages || true
       - name: Upload outputs and finish
         run: python3 tools/engine_supabase.py finish /tmp/out
       - name: Record failure
