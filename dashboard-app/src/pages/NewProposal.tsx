@@ -49,7 +49,7 @@ export default function NewProposal() {
   const [created, setCreated] = useState<Case | null>(null);
   const [runErr, setRunErr] = useState('');
   const runs = useRuns(created?.id ?? null);
-  const run: Run | undefined = runs?.[0];
+  const run: Run | undefined = created ? runs?.[0] : undefined; // ignore the previous case after reset
   const statusRef = useRef<HTMLDivElement>(null);
   const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF(s => ({ ...s, [k]: e.target.value }));
 
@@ -118,9 +118,26 @@ export default function NewProposal() {
   }
 
   const locked = !!created;
+  // start a fresh proposal: clears this page only; the earlier case stays in प्रकरणे (Abhi, 01.11.2026)
+  function reset() {
+    setProposal(null);
+    setExtras([]);
+    setF({ cr_no: '', cr_year: '', file_no: '', subject: '', category: '', priority: 'सामान्य', instructions: '' });
+    setUps([]);
+    setCreated(null);
+    setRunErr('');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
   return (
     <div className="space-y-5">
-      <h1 className="text-2xl font-bold">नवीन प्रस्ताव</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-bold">नवीन प्रस्ताव</h1>
+        {(proposal || created || ups.length > 0) && (
+          <button type="button" className="btn-ghost" onClick={reset} disabled={busy} title="हे पान रिकामे करा; आधीचे प्रकरण प्रकरणे मध्ये राहील">
+            ↺ रीसेट — नवीन प्रस्ताव
+          </button>
+        )}
+      </div>
       {(ups.length > 0 || created) && (
         <div ref={statusRef} className="scroll-mt-4">
           <Section title={created ? `स्थिती — ${crLabel(created)}` : 'स्थिती'} right={created ? <Link className="btn-ghost" to={`/cases/${created.id}`}>प्रकरण उघडा →</Link> : undefined}>
