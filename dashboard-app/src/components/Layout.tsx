@@ -1,0 +1,140 @@
+import { useEffect, useState } from 'react';
+import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { useAuth } from '../lib/auth';
+import CommandPalette from './CommandPalette';
+
+export function Brand() {
+  return (
+    <div className="flex items-center gap-3">
+      <img src="/icon.svg" alt="" className="h-10 w-10" />
+      <div className="leading-tight">
+        <div className="font-head text-xl font-bold text-navy-800 dark:text-white">प्रस्ताव कक्ष</div>
+        <div className="text-sm text-slate-500 dark:text-slate-400">विधि व न्याय विभाग • कार्यासन-6</div>
+      </div>
+    </div>
+  );
+}
+
+const NAV = [
+  { to: '/', label: 'मुख्य पृष्ठ', icon: '🏠', end: true },
+  { to: '/new', label: 'नवीन प्रस्ताव', icon: '➕' },
+  { to: '/cases', label: 'प्रकरणे', icon: '🗂️' },
+  { to: '/gr', label: 'GR ग्रंथालय', icon: '📚' },
+  { to: '/search', label: 'नोंदवही शोध', icon: '🔎' },
+];
+
+export function ThemeToggle() {
+  const [dark, setDark] = useState(() => document.documentElement.classList.contains('dark'));
+  useEffect(() => {
+    document.documentElement.classList.toggle('dark', dark);
+    try {
+      localStorage.setItem('theme', dark ? 'dark' : 'light');
+    } catch {
+      /* storage unavailable */
+    }
+  }, [dark]);
+  return (
+    <button className="btn-ghost min-w-tap px-2" onClick={() => setDark(d => !d)} aria-label={dark ? 'हलका मोड' : 'गडद मोड'} title={dark ? 'हलका मोड' : 'गडद मोड'}>
+      {dark ? '☀️' : '🌙'}
+    </button>
+  );
+}
+
+const isTyping = (t: EventTarget | null) => {
+  const el = t as HTMLElement | null;
+  return !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable);
+};
+
+export default function Layout() {
+  const { me, signOut } = useAuth();
+  const nav = useNavigate();
+  const [palette, setPalette] = useState(false);
+
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setPalette(p => !p);
+        return;
+      }
+      if (e.ctrlKey || e.metaKey || e.altKey || isTyping(e.target)) return;
+      if (e.key === 'n') {
+        e.preventDefault();
+        nav('/new');
+      } else if (e.key === '/') {
+        e.preventDefault();
+        nav('/cases?focus=1');
+      }
+    };
+    window.addEventListener('keydown', k);
+    return () => window.removeEventListener('keydown', k);
+  }, [nav]);
+
+  const items = me?.role === 'owner' ? [...NAV, { to: '/settings', label: 'सेटिंग्ज', icon: '⚙️' }] : NAV;
+  const linkCls = ({ isActive }: { isActive: boolean }) =>
+    `flex min-h-tap items-center gap-3 rounded-lg px-3 py-2 font-semibold ${
+      isActive ? 'bg-navy-700 text-white dark:bg-navy-600' : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-navy-800'
+    }`;
+
+  return (
+    <div className="min-h-screen md:flex">
+      <aside className="no-print sticky top-0 hidden h-screen w-60 shrink-0 flex-col gap-4 border-r border-slate-200 bg-white p-4 dark:border-navy-800 dark:bg-navy-900 md:flex">
+        <Brand />
+        <nav className="flex flex-col gap-1" aria-label="मुख्य">
+          {items.map(i => (
+            <NavLink key={i.to} to={i.to} end={i.end} className={linkCls}>
+              <span aria-hidden="true">{i.icon}</span>
+              {i.label}
+            </NavLink>
+          ))}
+        </nav>
+        <div className="mt-auto space-y-2 text-sm">
+          <button className="btn-ghost w-full justify-between" onClick={() => setPalette(true)}>
+            आदेश शोधा <kbd className="rounded border px-1 text-xs">Ctrl K</kbd>
+          </button>
+          <div className="break-all text-slate-500 dark:text-slate-400">{me?.email}</div>
+          <div className="flex gap-2">
+            <ThemeToggle />
+            <button className="btn-ghost flex-1" onClick={() => void signOut()}>बाहेर पडा</button>
+          </div>
+        </div>
+      </aside>
+
+      <div className="min-w-0 flex-1">
+        <header className="no-print sticky top-0 z-30 flex items-center justify-between gap-2 border-b border-slate-200 bg-white/95 px-4 py-2 backdrop-blur dark:border-navy-800 dark:bg-navy-900/95 md:hidden">
+          <div className="flex items-center gap-2">
+            <img src="/icon.svg" alt="" className="h-8 w-8" />
+            <span className="font-head text-lg font-bold">प्रस्ताव कक्ष</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <button className="btn-ghost min-w-tap px-2" onClick={() => setPalette(true)} aria-label="आदेश शोधा">⌘</button>
+            <ThemeToggle />
+            {me?.role === 'owner' && (
+              <NavLink to="/settings" className="btn-ghost min-w-tap px-2" aria-label="सेटिंग्ज">⚙️</NavLink>
+            )}
+            <button className="btn-ghost min-w-tap px-2" onClick={() => void signOut()} aria-label="बाहेर पडा">⎋</button>
+          </div>
+        </header>
+        <main className="mx-auto w-full max-w-7xl px-4 pb-28 pt-4 md:pb-10 md:pt-6">
+          <Outlet />
+        </main>
+        <nav className="no-print fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)] dark:border-navy-800 dark:bg-navy-900 md:hidden" aria-label="मुख्य">
+          {NAV.map(i => (
+            <NavLink
+              key={i.to}
+              to={i.to}
+              end={i.end}
+              className={({ isActive }) =>
+                `flex min-h-[56px] flex-col items-center justify-center text-xs font-semibold ${isActive ? 'text-navy-700 dark:text-saffron-400' : 'text-slate-500 dark:text-slate-400'}`
+              }
+            >
+              <span className="text-lg" aria-hidden="true">{i.icon}</span>
+              {i.label.split(' ')[0]}
+            </NavLink>
+          ))}
+        </nav>
+      </div>
+      <CommandPalette open={palette} onClose={() => setPalette(false)} />
+    </div>
+  );
+}
