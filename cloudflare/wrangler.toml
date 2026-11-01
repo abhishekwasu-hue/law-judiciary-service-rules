@@ -12,4 +12,4 @@ run_worker_first = ["/api/*"]
 
 [[kv_namespaces]]
 binding = "SETTINGS"
-id = "PASTE_KV_NAMESPACE_ID"
+id = "a366dfbd5d92462e900b583fed5e8eed"
