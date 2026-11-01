@@ -1,6 +1,6 @@
 # QUALITY_AUDIT.md — productivity + output-quality audit (01.11.2026)
 
-Read-only audits. Pack 1 + Pack 2 FIXED 01.11.2026 (tests: tests/test_tools.py 10, tests/test_verify_outputs.py 17, tests/engine_supabase_test.py, cloudflare/test/worker.test.mjs 3; migration 0004). Pack 3 open. Abhi chooses what to fix (OWNER_RULES A.5/A.6). Severity H/M/L, effort S/M/L.
+Read-only audits. Pack 1 + Pack 2 FIXED 01.11.2026 (tests: tests/test_tools.py 10, tests/test_verify_outputs.py 17, tests/engine_supabase_test.py, cloudflare/test/worker.test.mjs 3; migration 0004). Pack 3 partly decided (Abhi, 01.11.2026 — see Pack 3 line below). §5 items 1, 2, 3, 5 and §6 tiers built 01.11.2026 (App B live). Abhi chooses what to fix (OWNER_RULES A.5/A.6). Severity H/M/L, effort S/M/L.
 
 ## 1. Procedure, rules and quality gates
 | Sev | Where | Problem | Fix | Eff |
@@ -51,6 +51,7 @@ Tests: only engine_supabase has one. Smallest useful per tool listed in the agen
 - **Pack 1 — output quality (all S, ~1 session):** pkg3 stamp + page-spec + no box; letter margins; verify_outputs hardened (ids, refs, stamps, map.json, fonts, Study, file name, signer chain, banned words); workflow runs verify itself; PROPOSAL_PROMPT + rule-text alignment; engine builds old-case corpus; regression tests for these tools.
 - **Pack 2 — reliability / cost (mostly S):** stuck-run fix; `fetch-depth: 1`; cost/turns stored per run; Marathi failure reason (no GitHub log needed); one-time token; drop runs_ins/files_ins; push-loop fix; newest-proposal pick; gr_request retries; engine reads only INSTRUCTIONS/SOP/WORKFLOW; install caching.
 - **Pack 3 — needs Abhi's decision:** which pdf/ folders the engine needs (sparse checkout); confidential zips in history (keep vs rewrite); delete superseded files and App A (desk page, TEST-1); approve-before-save rule for samples/specs (CR128 provisional); keep Supabase key out of the Claude step (M).
+  Status 01.11.2026 (Abhi): confidential old-case zips STAY in the repo and its git history (not removed; repo private); old dashboard/ folder STAYS (not removed). Still open: pdf/ folders for sparse checkout, approve-before-save for samples/specs, App A keep/retire.
 
 ## 3. App B operations and repo hygiene
 | Sev | Where | Problem | Fix | Eff |
@@ -69,7 +70,7 @@ Tests: only engine_supabase has one. Smallest useful per tool listed in the agen
 | L | worker.js:190 | Size check on content-length only; orphan object if case missing | Check case exists first | S |
 | L | ENGINE_PROMPT:16-17 | Engine loads CLAUDE.md → OWNER_RULES (trading/Ayurveda), HANDOVER to-dos | Read only INSTRUCTIONS/SOP/WORKFLOW | S |
 | L | dashboard/, HEADLESS_PROMPT.md, run_headless.sh, bulk-download workflows | Superseded files | Archive/delete after Abhi confirms; decide if App A stays | S |
-Stale HANDOVER: item 4 says B "not deployed" (it is live); item 5 done; App A items (TEST-1, two pages) — still relevant?; CR128 pending.
+HANDOVER refreshed 01.11.2026 (B live; App A keep/retire and CR128 kept in Pending).
 Flow per proposal: upload → auto-run → download. Leaves the app only on failure (GitHub log) or stuck run.
 
 ## 5. Run time (independent audit 01.11.2026 — estimates, no live timings yet)
@@ -85,7 +86,7 @@ Estimate for 15 pages / 3 GRs: setup 4–7 min + model 40–100 min ≈ 50–110
 | 7 | Partial checkout of pdf/ | 1–2 | med | M |
 | 8 | Faster model for part 1 only | 5–10 | med | S |
 | 9 | Docstrings only, not whole tool files | 1–2 | none | S |
-Keep LibreOffice (preview check). Lower max-turns does not speed a successful run. Priority suggested: 1, 3, 2, 5, 4, 6. UI ETA default set to 70 min until real medians exist.
+Keep LibreOffice (preview check). Lower max-turns does not speed a successful run. Priority suggested: 1, 3, 2, 5, 4, 6. Status 01.11.2026: items 1 (prep_pages.py), 2 (tools/ENGINE_BRIEF.md), 3 (parallel part 1), 5 (lint before build) built; first live runs ~10 min; UI ETA = median of real runs (default 15 min).
 
 ## 6. Cost per run — model tiers (01.11.2026; quality first)
 Prices (claude-api skill, models table cached 2026-10-06, $/MTok): Opus 5.5 in 4 / out 20, cache read 0.20, 5-min write 5;

@@ -1,6 +1,8 @@
 # APP_B_DESIGN.md — "प्रस्ताव कक्ष" full-stack app (build prompt B) — design + decisions log
 
-Prompt: `docs/APP_B_FULLSTACK_PROMPT.md`. Branch: `app-b/proposal-desk-fullstack`. One stored file for all B research/decisions (OWNER_RULES A.11).
+Prompt: `docs/APP_B_FULLSTACK_PROMPT.md`. Built on `app-b/proposal-desk-fullstack`, merged to `main` (cf0315d); all later work on main.
+**Status 01.11.2026: LIVE** https://prastav-kaksha.abhi-desk.workers.dev — Supabase project `vxkktnymewcvcqysilgx`, Tokyo
+(ap-northeast-1; Mumbai not offered at creation); migrations 0001–0004 applied by Abhi in the SQL editor. One stored file for all B research/decisions (OWNER_RULES A.11).
 
 ## Audit of the existing draft (01.11.2026)
 - `cloudflare/worker.js` + `dashboard/index.html`: password header auth, files stored IN the repo (`inbox/`, `cases/`) through the GitHub contents API. → replace storage with Supabase; keep the idea "browser talks only to workers.dev".
@@ -14,22 +16,42 @@ Prompt: `docs/APP_B_FULLSTACK_PROMPT.md`. Branch: `app-b/proposal-desk-fullstack
 
 ## Decisions (provisional defaults — Abhi may change; logged per OWNER_RULES A.9)
 D1. **Settings store = Cloudflare KV namespace `SETTINGS`** bound to the Worker. Keys: `supabase_url`, `supabase_anon_key`,
-    `supabase_service_key`, `github_repo`, `github_token`, `anthropic_api_key`, `model`, `owner_email`. Entered on the
+    `supabase_service_key`, `github_repo`, `github_branch`, `github_token`, `anthropic_api_key`, `model`, `model_light`,
+    `budget_usd`, `owner_email` (cloudflare/worker.js SECRET_KEYS + PLAIN_KEYS). Entered on the
     Settings screen (owner only). The Worker never returns a secret to the browser — only "set / not set" and the last 4 characters.
 D2. **First-run setup without hard-coding.** While KV has no `owner_email`, the app shows "प्रारंभिक सेटअप". The Worker creates a
     random `setup_code` in KV on first request; Abhi reads it in the Cloudflare dashboard (Workers → KV → SETTINGS) and types it
     into the setup form with the Supabase values and his email. After that, setup is locked; Settings needs the owner login.
 D3. **Login = Supabase Auth email OTP.** The Worker verifies each call's JWT with `GET <supabase_url>/auth/v1/user`. Roles in table
     `members` (owner / staff / senior read-only); the owner invites colleagues.
-D4. **Engine keys reach GitHub Actions at run time, not as repo secrets.** On a run the Worker creates a one-time run token
-    (KV, 3 h TTL) and sends `repository_dispatch` `{case_id, run_id, token}`. The workflow calls `GET /api/engine/config` with the
-    token, masks the values (`::add-mask::`) and gets: Anthropic key, model, Supabase URL + service key. Changing a key in Settings
-    takes effect on the next run. Only the GitHub token (to dispatch) is used by the Worker itself.
+D4. **Engine keys reach GitHub Actions at run time, not as repo secrets.** On a run the Worker creates a run token
+    (KV, 4 h TTL > 180 min job timeout) and sends `repository_dispatch` `{case_id, run_id, token, worker}`. The workflow calls
+    `GET /api/engine/config` with the token, masks the values (`::add-mask::`) and gets: Anthropic key, model, model_light,
+    budget_usd, Supabase URL + service key. The token is **single use for the config** (marked used on the first read; a 412
+    "config incomplete" leaves it unused). After that it is good only for `POST /api/engine/fail` (marks THIS run failed with a
+    reason; returns nothing secret) until it expires — used when the workflow has no Supabase env. Stuck runs (queued/running
+    > 3.5 h) are failed by `POST /api/runs/sweep`, called by the app on load. Changing a key in Settings takes effect on the
+    next run. Only the GitHub token (to dispatch) is used by the Worker itself.
 D5. **Engine = GitHub Actions (prompt option a)**, Claude Code headless with the repo's CLAUDE.md, one proposal per run.
 D6. **Data = Supabase** Postgres (tables per prompt §4, RLS on all), Storage private buckets `proposals`, `outputs`, `gr-library`,
     signed URLs 10 min issued by the Worker, Realtime on `cases` and `runs`.
 D7. **Front end** = React + Vite + TypeScript + Tailwind, Recharts, pdf.js, docx-preview — exact versions pinned in package.json;
     built to `dashboard-app/dist`, served by the same Worker (static assets) → one workers.dev URL.
+
+D8. (01.11.2026) **Supabase Storage keys are ASCII** (`file<ext>`, unique per upload) — live 400 InvalidKey on a Devanagari
+    name; the original name is kept in `case_files` and used for downloads (§4.16). Engine output keys ASCII too.
+D9. (01.11.2026) **Duplicate C R** at upload → Worker 409 `{error:"duplicate_cr", existing_id}`; the app shows a notice with a
+    link to the existing case. The engine keeps filling other fields and records the duplicate.
+D10. (01.11.2026) **Model tiers** (docs/QUALITY_AUDIT.md §6; Abhi: quality must not drop): orchestrating session on
+    `model_light` (default claude-haiku-5-5; mechanical work, machine-checked); `drafter` subagent on `model` (default
+    claude-opus-5-5) for all quality-critical work (facts from page images, letter decision, GR selection + verbatim quotes,
+    note/letter, Study 0, 2, 3, 4, 7); optional `drafter_strong` (MODEL_STRONG, workflow env, off by default — not a Settings
+    key) for one-way escalation. Study part 1 on the cheap tier is kept only if part1check matches the drafter's facts.
+D11. (01.11.2026) **Budget is SOFT** — `budget_usd` (engine default 0.75; Worker accepts > 0 and ≤ 20; Abhi set 1.5): going
+    over adds the warning "खर्च-मर्यादा ओलांडली — दर्जा राखण्यासाठी", never stops or degrades a run. Cost, turns and per-model
+    use stored per run (migration 0004).
+D12. (01.11.2026) **Engine speed/quality steps:** page pre-step (tools/prep_pages.py), compact rules tools/ENGINE_BRIEF.md,
+    lint before build, verify re-run in the workflow; §4.18 language rule in samples + lint.
 
 ## Open questions for Abhi (work continues on the defaults)
 Q1. D1/D2 (keys in Cloudflare KV via Settings; setup code read once from the Cloudflare dashboard) — OK?
@@ -44,3 +66,6 @@ Q3. Second AI provider as fallback — default: none.
 6. Deploy kit — `docs/APP_B_SETUP_MR.md` (Marathi), `scripts/deploy.ps1`, `supabase/config.toml`, daily DB backup `supabase/migrations/20261101000002_backup.sql` (pg_cron, last 30, tested in PGlite; Storage files not backed up) — DONE.
 4. Front end `dashboard-app/` (React 18.3.1, Vite 5.4.11, TS 5.6.3, Tailwind 3.4.15, supabase-js 2.46.1, recharts 2.13.3, pdfjs-dist 4.8.69, docx-preview 0.3.3) — DONE, `npm run build` passes: setup, OTP login, Settings (keys masked), new proposal (per-file progress, Realtime run steps = engine's Marathi step texts), case list/Kanban/CSV, case detail 6 tabs, Home KPIs + charts, GR library, register search. Not run against a live Worker/Supabase. Limits: swipe actions not built (stage select instead), export CSV, signature-chain settings = note only.
 5. Charts / Kanban / rest of prompt §6 — DONE inside step 4.
+7. Live deploy — DONE 01.11.2026 (Abhi's accounts; URL and Supabase project above). First live runs ~10 min, $2.28–3.32
+   (all on Opus, before D10/D11). Expected with tiers $1.0–1.8 — not yet measured. Later UX: auto-reload after deploys,
+   Marathi errors, duplicate C R notice, live ETA from real run times.
