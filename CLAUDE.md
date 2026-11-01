@@ -3,4 +3,5 @@
 
 # Law & Judiciary proposal work — binding in every session of this repo (do not wait to be told)
 @INSTRUCTIONS.md
+@PROPOSAL_SOP.md
 @PROPOSAL_WORKFLOW.md
