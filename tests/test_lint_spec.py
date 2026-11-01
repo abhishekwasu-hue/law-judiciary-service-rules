@@ -99,6 +99,96 @@ class LintSpec(unittest.TestCase):
         self.bad(self.s122, lambda s: s["note"]["paras"].__setitem__(0, s["note"]["paras"][0] + " कै.मिलिंद"),
                  "'कै.' नंतर एक जागा", "note.paras[0]")
 
+    # ---- §4.19 Marathi forms (01.11.2026, मराठी भाषा विभाग GR दि. 10.11.2022) ----
+    def add0(self, txt):
+        return lambda s: s["note"]["paras"].__setitem__(0, s["note"]["paras"][0] + txt)
+
+    def test_colon_dash(self):
+        self.bad(self.s122, self.add0(" तपशील खालीलप्रमाणे आहे.:-"), "'.:-' ऐवजी ':-'", "note.paras[0]")
+
+    def test_karun_spelling(self):
+        self.bad(self.s122, self.add0(" अर्ज सादर करुन"), "'करुन' ऐवजी 'करून'", "note.paras[0]")
+        self.bad(self.s122, lambda s: s["letter"].__setitem__("intro", s["letter"]["intro"].replace("करून", "करुन")),
+                 "'करुन' ऐवजी 'करून'", "letter.intro")
+
+    def test_prarup_spelling(self):
+        def f(s):
+            i = max(i for i, x in enumerate(s["note"]["paras"]) if isinstance(x, str))
+            s["note"]["paras"][i] = s["note"]["paras"][i].replace("प्रारूप", "प्रारुप")
+        probs = self.bad(self.s122, f, "'प्रारुप' ऐवजी 'प्रारूप'")
+        self.assertTrue(any("last para" in p for p in probs), probs)
+
+    def test_abbrev_space_date(self):
+        self.bad(self.s122, self.add0(" दि.17.09.2026 रोजी"), "संक्षेपचिन्हानंतर एक जागा", "note.paras[0]")
+
+    def test_abbrev_space_kra(self):
+        self.bad(self.s122, self.add0(" पत्र क्र.108 अन्वये"), "संक्षेपचिन्हानंतर एक जागा", "note.paras[0]")
+        self.bad(self.s122, self.add0(" (प्र.क्र. 21/2024)"), "संक्षेपचिन्हानंतर एक जागा", "note.paras[0]")
+        self.bad(self.s122, lambda s: s["letter"]["refs"].__setitem__(0, s["letter"]["refs"][0] + " दि.01.01.2026"),
+                 "संक्षेपचिन्हानंतर एक जागा", "letter.refs[0]")
+
+    def test_missing_info_para_form(self):
+        def f(s):
+            i = next(i for i, x in enumerate(s["note"]["paras"]) if isinstance(x, str) and x.startswith(L.MISSING_HEAD))
+            s["note"]["paras"][i] = s["note"]["paras"][i].replace(L.MISSING_HEAD + ":-", L.MISSING_HEAD + " -")
+        self.bad(self.s122, f, "missing-info para")
+
+    def test_419_exclusions_ok(self):
+        s = copy.deepcopy(self.s122)
+        s["note"]["paras"][0] += (" पत्र क्र.संकिर्ण-2026/226/प्र.क्र.131/का.6, क्र.वेतन-1311/प्र.क्र.17/सेवा-3 (पृ.6/प.वि.):-"
+                                  " (पृ.6/प.वि.:-) दर 1.5 टक्के, सांकेतांक 202211101530029233 (पॅकेज PDF पृ. 3).")
+        self.assertFalse([p for p in L.lint_spec(s) if "§4.19" in p])
+        self.assertEqual(s["note"]["signers"], L.SIGNERS)
+
+    def test_419_quoted_text_is_exempt(self):
+        s = copy.deepcopy(self.s122)
+        s["note"]["paras"][0] += " नियमात “दि.17.09.2026 रोजी पत्र क्र.108 चे प्रारुप तपासणी करुन खालीलप्रमाणे.:-” असे आहे."
+        s["related"][0]["text"].append("जसाच्या तसा उतारा: दि.01.01.2020 पासून सादर करुन.:-")
+        self.assertFalse([p for p in L.lint_spec(s) if "§4.19" in p])
+
+    def test_fix_lang(self):
+        t = "दि.17.09.2026 च्या पत्र क्र.108 नुसार (प्र.क्र. 21/2024) प्रारुप तयार करुन, खालीलप्रमाणे आहे.:- “दि.01.01.2020 करुन.:-” क्र.बी-4/36/2010 (पृ.6/प.वि.).:-"
+        self.assertEqual(L.fix_lang(t), "दि. 17.09.2026 च्या पत्र क्र. 108 नुसार (प्र. क्र. 21/2024) प्रारूप तयार करून, खालीलप्रमाणे आहे:- "
+                                        "“दि.01.01.2020 करुन.:-” क्र.बी-4/36/2010 (पृ.6/प.वि.):-")
+        self.assertEqual(L.lang_hits(L.fix_lang(t)), [])
+
+    # ---- §4.20 letter table = data only (02.11.2026) ----
+    def test_doc_in_letter_table(self):
+        s131 = load(next(p for p in SPECS if os.path.basename(p).startswith("CR131_")))
+        for word in ("आदेशाची प्रत", "छायांकित प्रती", "कार्यालय प्रमुखांचे प्रमाणपत्र", "कार्यभार हस्तांतरण अहवाल"):
+            with self.subTest(word=word):
+                self.bad(s131, lambda s: s["letter"]["points"][0]["table"][1].__setitem__(1, "दिनांक व " + word),
+                         "कागदपत्रे तक्त्यात नको", "letter.points[0].table[1][1]")
+
+    def test_doc_list_after_table_ok(self):
+        s131 = load(next(p for p in SPECS if os.path.basename(p).startswith("CR131_")))
+        pts = s131["letter"]["points"]
+        self.assertIsInstance(pts[0], dict)
+        self.assertEqual(pts[1].strip(), L.DOC_INTRO)
+        self.assertTrue(all(isinstance(x, str) and L.DOC_RE.search(x) for x in pts[2:]))
+        s = copy.deepcopy(s131)
+        s["letter"]["points"][0]["table"][1][1] = "प्रत्यक्ष स्वीकारल्याचा दिनांक (प्रतिनियुक्ती आदेशात “आदेशाची प्रत” नमूद)"
+        self.assertFalse([p for p in L.lint_spec(s) if "§4.20" in p])
+
+    def test_mixed_points_render_in_order(self):
+        import docx
+        s131 = next(p for p in SPECS if os.path.basename(p).startswith("CR131_"))
+        out = tempfile.mkdtemp(prefix="cr131_")
+        try:
+            r = run([os.path.join(TOOLS, "build_note_letter.py"), s131, out, "T131"])
+            self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+            d = docx.Document(os.path.join(out, "T131_Note_and_Letter.docx"))
+            body = [el for el in d.element.body if el.tag.endswith("}p") or el.tag.endswith("}tbl")]
+            text = lambda el: "".join(t.text or "" for t in el.iter("{http://schemas.openxmlformats.org/wordprocessingml/2006/main}t"))
+            i = next(k for k, el in enumerate(body) if text(el).strip() == L.DOC_INTRO)
+            prev = next(el for el in reversed(body[:i]) if el.tag.endswith("}tbl") or text(el).strip())
+            self.assertTrue(prev.tag.endswith("}tbl"), "document list must follow the letter table")
+            self.assertIn("पद प्रथम रिक्त झाल्याचा दिनांक", text(prev))
+            items = [text(el).strip() for el in body[i + 1:i + 6]]
+            self.assertTrue(items[0].startswith("1)") and items[4].startswith("5)"), items)
+        finally:
+            shutil.rmtree(out, ignore_errors=True)
+
     # ---- must fail: spec ----
     def test_banned_word(self):
         self.bad(self.s122, lambda s: s["note"]["paras"].__setitem__(0, s["note"]["paras"][0] + " असे दिसून येते."),

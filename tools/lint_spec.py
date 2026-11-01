@@ -15,12 +15,18 @@ Rules (spec.json)
     digits, blank "पृ.      /प.वि."); "“…”" quotes are skipped in related; page range 1..N only with --pages N
   - note.first ends with "सादर."
   - last note para (note.closing if not blank, else the last text item of note.paras) is one of the two SOP forms:
-    "सबब, … पत्राचे प्रारुप पृ.  /प.वि. वर मान्यतेस्तव सादर. मान्य झाल्यास पत्र निर्गमित करण्यात येईल." or
+    "सबब, … पत्राचे प्रारूप पृ.  /प.वि. वर मान्यतेस्तव सादर. मान्य झाल्यास पत्र निर्गमित करण्यात येईल." or
     "सबब, … वित्त विभागाच्या मान्यतेस्तव सादर करण्यात येत आहे."
   - note.signers == INSTRUCTIONS §4.6 chain (+ "अ.मु.स. (वित्त)" last); "अ.मु.स. (वित्त)" present <=> last para has
     "वित्त विभागाच्या मान्यतेस्तव"
+  - §4.19 (text outside quotes; note body, letter, related heading/source — not the verbatim related text): no '.:-'
+    (use ':-'), 'करून' not 'करुन', 'प्रारूप' not 'प्रारुप', one space after 'दि.' / 'क्र.' / 'प्र. क्र.' in running text
+    (file/letter nos. and other tokens with '/' or '-' left exactly); missing-info para starts
+    "प्रस्तावासोबत खालील माहिती उपलब्ध नाही:-"
   - letter (when present): ref_no संकिर्ण-<year>/<file no>/प्र.क्र.<n>/का.6; to, subject, refs present; intro starts
     "उपरोक्त विषयाबाबत संदर्भाधीन", contains "आपणांस कळविण्यात येते की," and ends with ":-" when there are points
+  - §4.20: no document (प्रत / प्रमाणपत्र / अहवाल) in a data row of a letter.points table (outside quotes); documents go
+    after the table as a numbered list introduced by DOC_INTRO
 Rules (study.json): parts with headings भाग 0 … भाग 7 (--allow-missing-part1: भाग 1 may be absent); no internal ids;
   पृ. references as above ("“…”" skipped).
 The constants and check functions below are the ONE definition shared with tools/verify_outputs.py."""
@@ -47,11 +53,17 @@ QUOTE_RE = re.compile(r"“[^”]*”")
 PART_RE = re.compile(r"\s*भाग\s*([0-9०-९])(?![0-9०-९])")
 LH_EMAIL = "lnjd.desk6-mh@mah.gov.in"
 # last-para forms (PROPOSAL_SOP Step 4), tolerant of the wording between the fixed parts
-LAST_LETTER_RE = re.compile(r"^सबब\s*,.*पत्राचे\s+प्रारुप\s+पृ\.[^/]{0,40}/\s*प\.वि\.\s*वर\s+मान्यतेस्तव\s+सादर\s*\.\s*"
+LAST_LETTER_RE = re.compile(r"^सबब\s*,.*पत्राचे\s+प्रारूप\s+पृ\.[^/]{0,40}/\s*प\.वि\.\s*वर\s+मान्यतेस्तव\s+सादर\s*\.\s*"
                             r"मान्य\s+झाल्यास\s+पत्र\s+निर्गमित\s+करण्यात\s+येईल\s*\.$", re.S)
 LAST_FIN_RE = re.compile(r"^सबब\s*,.*वित्त\s+विभागाच्या\s+मान्यतेस्तव\s+सादर\s+करण्यात\s+येत\s+आहे\s*\.$", re.S)
 INTRO_START = "उपरोक्त विषयाबाबत संदर्भाधीन"
 INTRO_HAS = "आपणांस कळविण्यात येते की,"
+MISSING_HEAD = "प्रस्तावासोबत खालील माहिती उपलब्ध नाही"  # missing-information para (PROPOSAL_SOP Step 4)
+MISSING_FORM = MISSING_HEAD + ":- (1)…; (2)…"
+# INSTRUCTIONS §4.20 (02.11.2026): letter table only for data to fill in; documents after the table as a numbered list
+DOC_RE = re.compile(r"प्रत(?![्िृ])|प्रमाणपत्र|अहवाल")   # प्रत / प्रती(सह) — not प्रत्यक्ष, प्रतिनियुक्ती
+DOC_INTRO = "तसेच, खालील कागदपत्रे उपलब्ध करून देण्यात यावीत, ही विनंती:-"
+DOC_MSG = "कागदपत्रे तक्त्यात नको — तक्त्यानंतर यादीत (§4.20)"
 
 
 def num(s):
@@ -118,6 +130,62 @@ def style_hits(text, letter=False):
     out = [msg for rx, msg in STYLE_RULES if rx.search(t)]
     if letter:
         out += [msg for rx, msg in LETTER_STYLE_RULES if rx.search(t)]
+    return out
+
+
+# INSTRUCTIONS §4.19 (01.11.2026) — मराठी भाषा विभाग GR कपासू-2020/प्र.क्र.56/भाषा-2, दि. 10.11.2022 (परिशिष्ट तीन,
+# अ.क्र. 23: संक्षेपचिन्हानंतर जागा). Applied to text outside “…” quotes only; one definition for lint, verify and the
+# sample normaliser (fix_lang).
+SPELL_419 = {"करुन": "करून", "प्रारुप": "प्रारूप"}
+COLON_DASH_RE = re.compile(r"(?<!प\.वि)(?<!क्र)(?<!दि)\.:-")   # ".:-" -> ":-" (abbreviation dots such as प.वि. kept)
+ABBR_PREFIXES = ("प्र.क्र.", "क्र.", "दि.")                         # running-text abbreviations that take a space
+CODE_RE = re.compile(r"/|[0-9A-Za-zऀ-ॿ_]-[0-9A-Za-zऀ-ॿ_]")      # file/letter nos., codes: left exactly
+OPEN_CH = "(“‘[\"'"
+ABBR_NEXT = re.compile(r"[0-9०-९A-Za-zऀ-ॿ_(]")
+
+
+def _abbr_fix_token(tok):
+    """Spaced form of one whitespace token, or None when it needs no change (§4.19 abbreviation rule)."""
+    core = tok.lstrip(OPEN_CH); lead = tok[:len(tok) - len(core)]
+    pre = next((p for p in ABBR_PREFIXES if core.startswith(p)), None)
+    if pre is None or CODE_RE.search(core):
+        return None
+    rest = core[len(pre):]
+    spaced = "प्र. क्र." if pre == "प्र.क्र." else pre
+    if rest and ABBR_NEXT.match(rest):
+        return lead + spaced + " " + rest
+    return lead + spaced + rest if spaced != pre else None
+
+
+def abbr_hits(text):
+    """Tokens in running text with no space after 'दि.' / 'क्र.' / 'प्र.क्र.' (quotes, codes with '/' or '-' skipped)."""
+    return [mt.group(0) for mt in re.finditer(r"\S+", unquoted(text)) if _abbr_fix_token(mt.group(0)) is not None]
+
+
+def _fix_plain(t):
+    for a, b in SPELL_419.items():
+        t = t.replace(a, b)
+    t = COLON_DASH_RE.sub(":-", t)
+    return re.sub(r"\S+", lambda mt: _abbr_fix_token(mt.group(0)) or mt.group(0), t)
+
+
+def fix_lang(text):
+    """text with the §4.19 forms applied outside “…” / "…" quotes (quoted extracts unchanged)."""
+    out, pos = [], 0
+    for mt in QUOTE_RE.finditer(text):
+        out += [_fix_plain(text[pos:mt.start()]), mt.group(0)]; pos = mt.end()
+    out.append(_fix_plain(text[pos:]))
+    return "".join(out)
+
+
+def lang_hits(text):
+    """§4.19 problems in text (outside quotes)."""
+    t = unquoted(text); out = []
+    for a, b in SPELL_419.items():
+        if a in t: out.append(f"शुद्धलेखन — '{a}' ऐवजी '{b}' (§4.19)")
+    if COLON_DASH_RE.search(t): out.append("विरामचिन्ह — '.:-' ऐवजी ':-' (§4.19)")
+    hits = abbr_hits(text)
+    if hits: out.append(f"संक्षेपचिन्हानंतर एक जागा — 'दि. 17.09.2026', 'क्र. 108', 'प्र. क्र.' (§4.19): {hits[:3]}")
     return out
 
 
@@ -190,6 +258,12 @@ def lint_spec(spec, pages=None):
         P += [f"{path}: {m}" for m in style_hits(t)]
     for path, t in letter:
         P += [f"{path}: {m}" for m in style_hits(t, letter=True)]
+    rel_own = [(pth, t) for pth, t in related if not re.search(r"\.text(\[|$)", pth)]  # extracts (.text) are verbatim
+    for path, t in body + letter + rel_own:
+        P += [f"{path}: {m}" for m in lang_hits(t)]
+    for path, t in body:
+        if ns(unquoted(t)).startswith(MISSING_HEAD) and not ns(t).startswith(MISSING_HEAD + ":-"):
+            P.append(f"{path}: missing-info para — form '{MISSING_FORM}' (§4.19)")
     for path, t in body + letter:
         P += [f"{path}: पृ. reference — {x.split(': ', 1)[1]}" for x in ref_problems(t, pages, path)]
     for path, t in related:
@@ -212,7 +286,7 @@ def lint_spec(spec, pages=None):
         lpath, last = (f"note.paras[{idx[-1]}]", paras[idx[-1]]) if idx else ("note.paras", "")
     lastn = ns(last)
     if not (LAST_LETTER_RE.match(lastn) or LAST_FIN_RE.match(lastn)):
-        P.append(f"{lpath}: last para — not one of the SOP forms ('सबब, … पत्राचे प्रारुप पृ.  /प.वि. वर मान्यतेस्तव सादर. "
+        P.append(f"{lpath}: last para — not one of the SOP forms ('सबब, … पत्राचे प्रारूप पृ.  /प.वि. वर मान्यतेस्तव सादर. "
                  f"मान्य झाल्यास पत्र निर्गमित करण्यात येईल.' / 'सबब, … वित्त विभागाच्या मान्यतेस्तव सादर करण्यात येत आहे.')")
 
     # signers + Finance
@@ -250,6 +324,13 @@ def lint_spec(spec, pages=None):
                 P.append(f"letter.intro: पत्राची भाषा — माहिती मागताना '…, {REQUEST}.' अशी विनंतीपूर्वक मांडणी हवी (§4.18)")
             if L.get("points") and not it.endswith(":-"):
                 P.append("letter.intro: intro wording — must end with ':-' before the points")
+        pts = L.get("points") if isinstance(L.get("points"), list) else []
+        for i, pt in enumerate(pts):
+            if isinstance(pt, dict) and isinstance(pt.get("table"), list):
+                for r, row in enumerate(pt["table"][1:], 1):
+                    for c, cell in enumerate(row if isinstance(row, list) else []):
+                        if isinstance(cell, str) and DOC_RE.search(unquoted(cell)):
+                            P.append(f"letter.points[{i}].table[{r}][{c}]: {DOC_MSG} — '{DOC_INTRO}'")
     return P
 
 

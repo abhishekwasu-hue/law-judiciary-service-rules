@@ -9,7 +9,7 @@ import unittest
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BRIEF = os.path.join(ROOT, "tools", "ENGINE_BRIEF.md")
 LINT = os.path.join(ROOT, "tools", "lint_spec.py")
-MAX_BYTES = 13 * 1024  # 01.11.2026: +§4.18 language rule
+MAX_BYTES = 14 * 1024  # 01.11.2026: +§4.18 language rule, +§4.19 Marathi forms
 
 
 def lint_constant(name):
@@ -33,7 +33,7 @@ class EngineBriefTest(unittest.TestCase):
         self.assertLessEqual(len(self.raw), MAX_BYTES, f"brief is {len(self.raw)} bytes")
 
     def test_every_section4_item_tagged(self):
-        missing = [n for n in range(1, 19) if f"[I4.{n}]" not in self.text]
+        missing = [n for n in range(1, 21) if f"[I4.{n}]" not in self.text]
         self.assertEqual(missing, [], f"missing tags: {missing}")
 
     def test_source_tags_present(self):

@@ -43,7 +43,7 @@ From INSTRUCTIONS.md [I§.n], PROPOSAL_SOP.md [SOP step], tools/PROPOSAL_PROMPT.
 ## 3. Note (टिप्पणी) [SOP4]
 - [I4.3] Desk sample format (note of C R 66-2025, letter with letterhead logo); ready-made; only the proposal's
   facts and the precedents' language; no extra information.
-- Para 1: "<authority> यांच्या पृ.__/प.वि. वरील दि.__ रोजीच्या पत्रास अनुसरुन सादर." (or "…पत्रासोबत प्राप्त …
+- Para 1: "<authority> यांच्या पृ.__/प.वि. वरील दि. __ रोजीच्या पत्रास अनुसरुन सादर." (or "…पत्रासोबत प्राप्त …
   पत्रास अनुसरुन सादर."). Short numbered paras. Facts/posts/periods/amounts in TABLES:
   `{"table": [[...],[...]], "bold_last": true}` in note.paras. GR text verbatim in “ ” + "(पृ.N/प.वि.)". Earlier
   record of the same matter = a fact with its reference.
@@ -52,9 +52,9 @@ From INSTRUCTIONS.md [I§.n], PROPOSAL_SOP.md [SOP step], tools/PROPOSAL_PROMPT.
 - Banned (closed list, = tools/lint_spec.py BANNED): "दिसून येते", "असे दिसते", "पडताळणी केली असता",
   "माझ्या मते", "मला वाटते", "असे वाटते", "ठरवावे", "कदाचित", "बहुधा"; also no commentary, theory,
   arithmetic explanation or advice.
-- Missing info para: "प्रस्तावासोबत खालील माहिती उपलब्ध नाही.:- (1)…; (2)…".
+- Missing info para: "प्रस्तावासोबत खालील माहिती उपलब्ध नाही:- (1)…; (2)…".
 - Last para, exactly one of:
-  (a) "सबब, उपरोक्त माहिती तक्त्याच्या स्वरूपात … कळविण्याबाबतच्या पत्राचे प्रारुप पृ.      /प.वि. वर मान्यतेस्तव
+  (a) "सबब, उपरोक्त माहिती तक्त्याच्या स्वरूपात … कळविण्याबाबतच्या पत्राचे प्रारूप पृ.      /प.वि. वर मान्यतेस्तव
   सादर. मान्य झाल्यास पत्र निर्गमित करण्यात येईल."
   (b) "सबब, … प्रस्ताव वित्त विभागाच्या मान्यतेस्तव सादर करण्यात येत आहे."
 - [I4.6] note.signers in order, all LEFT, normal page (no mirror): का. अ. (श्रीम. कऱ्हाडे) / अ.स. (श्री. वडनेरकर)
@@ -64,13 +64,17 @@ From INSTRUCTIONS.md [I§.n], PROPOSAL_SOP.md [SOP step], tools/PROPOSAL_PROMPT.
   source; each ends with exactly "(पॅकेज PDF पृ. N)" ("(पॅकेज PDF पृ. N-M)" / "(पॅकेज PDF पृ. N,M)"), or
   "(पॅकेज PDF मध्ये नाही)" when not in the package [I4.11]. No repo paths, internal ids or old-case names.
 
-- [I4.18] Language: short sentences, one point each, clear subject ("<authority> यांनी … सादर केला आहे."); "श्रीमती" not "सौ."; one space after "श्री."/"श्रीमती"; name as in the proposal (Marathi initials e.g. "ह. ना. आपटे" if the proposal has them, else as written); missing-information list as a table; letter: no "तात्काळ", request "…उपलब्ध करुन देण्यात यावी, ही विनंती." Quotes stay verbatim. Model: samples/specs/CR131_2026_special-pay_info-letter.json.
+- [I4.18] Language: short sentences, one point each, clear subject ("<authority> यांनी … सादर केला आहे."); "श्रीमती" not "सौ."; one space after "श्री."/"श्रीमती"; name as in the proposal (Marathi initials e.g. "ह. ना. आपटे" if the proposal has them, else as written); missing-information list as a table; letter: no "तात्काळ", request "…उपलब्ध करून देण्यात यावी, ही विनंती." Quotes stay verbatim. Model: samples/specs/CR131_2026_special-pay_info-letter.json.
+
+- [I4.19] Marathi forms (GR कपासू-2020/प्र.क्र.56/भाषा-2, दि. 10.11.2022), outside quotes: "दि. 17.09.2026", "क्र. 108", running "प्र. क्र."; ":-" not ".:-"; "करून", "प्रारूप". Exempt: quotes/extracts, पृ.N/प.वि., file nos. and tokens with '/' or '-', signers, dates, GR codes.
 
 ## 4. Letter [SOP4][I4.5][I4.10]
-- ref_no "संकिर्ण-2026/<file no>/प्र.क्र.<n>/का.6"; date "__.__.2026"; to; subject; refs ("आपले पत्र क्र.…, दि.…").
+- ref_no "संकिर्ण-2026/<file no>/प्र.क्र.<n>/का.6"; date "__.__.2026"; to; subject; refs ("आपले पत्र क्र. …, दि. …").
 - intro: "उपरोक्त विषयाबाबत संदर्भाधीन पत्रास अनुसरुन आपणांस कळविण्यात येते की, सदर प्रकरणी पुढील कार्यवाहीसाठी
-  खालील माहिती … उपलब्ध करुन देण्यात यावी.:-"; points = empty table or a few short points (essential only,
+  खालील माहिती … उपलब्ध करून देण्यात यावी, ही विनंती:-"; points = empty table or a few short points (essential only,
   official language of earlier files, tables where needed [I4.15]).
+- [I4.20] Letter table = data to fill in only (dates, figures, periods, yes/no, numbers). Documents (प्रत /
+  प्रमाणपत्र / अहवाल) after the table: point "	तसेच, खालील कागदपत्रे उपलब्ध करून देण्यात यावीत, ही विनंती:-", then "1)	…" items; split mixed rows. Model: CR131.
 - The tool adds, never hand-write: विषय and संदर्भ bold + centre [I4.10]; "आपला," (never "आपली"), then
   "( राजेश वडनेरकर )" / "अवर सचिव ,महाराष्ट्र शासन", then "प्रत : निवड नस्ती"; letterhead
   "दूरध्वनी क्र. :- ०२२-२२793230   Email ID :- lnjd.desk6-mh@mah.gov.in" [I4.5].

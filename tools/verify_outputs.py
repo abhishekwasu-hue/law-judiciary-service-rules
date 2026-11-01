@@ -18,6 +18,8 @@ Checks
   - "अ.मु.स. (वित्त)" present  <=>  last numbered para contains "वित्त विभागाच्या मान्यतेस्तव"
  Note body and letter: no "पॅकेज PDF" (allowed only in "संबंधित माहिती" and the Study); no BANNED word
  Note body and letter (§4.18, text outside “…” quotes only): no 'सौ.'; 'श्री.' followed by a space; letter: no 'तात्काळ'
+ Note body and letter (§4.19, outside quotes, lint_spec.lang_hits): no '.:-', no 'करुन' / 'प्रारुप', a space after
+  'दि.' / 'क्र.' / 'प्र. क्र.' in running text (file nos. / codes with '/' or '-' skipped); missing-info para 'नाही:-'
  Note_and_Letter (whole file): no repo paths (register/, service-rules/, precedent-library/, pdf/, repo, रेपो)
  Letter (when present: a "प्रति," or "क्रमांक :-" paragraph):
   - starts on a new page / new section (page break or section break before the letterhead)
@@ -51,8 +53,8 @@ THEME_ATTRS = ("asciiTheme", "hAnsiTheme", "cstheme", "eastAsiaTheme")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 # shared rule definitions — ONE copy, in tools/lint_spec.py (pre-build lint uses the same rules)
 from lint_spec import (AMS, BANNED, FIN, ID_RE, LH_EMAIL, RELATED, REF_NO, REPO_RE, REQUEST,  # noqa: E402,F401
-                       SIGNERS, banned_hits, finance_problems, heading_problems, id_hits, ns, num, part_no,
-                       ref_problems, repo_hits, signer_problems, style_hits, unquoted)
+                       MISSING_FORM, MISSING_HEAD, SIGNERS, banned_hits, finance_problems, heading_problems, id_hits,
+                       lang_hits, ns, num, part_no, ref_problems, repo_hits, signer_problems, style_hits, unquoted)
 INTRO_HEAD = "उपरोक्त विषयाबाबत"  # letter intro paragraph (lint_spec.INTRO_START begins with it)
 UPLOAD_PREFIX = re.compile(r"^[0-9a-fA-F]{8}-")
 
@@ -212,6 +214,13 @@ def main(argv):
               [f"{where}: {x}" for where, t, isl in (("note", note_txt, False), ("letter", letter_txt, True))
                for x in style_hits(t, letter=isl)])
 
+        # §4.19 (मराठी भाषा विभाग GR दि. 10.11.2022): same helpers as the pre-build lint, text outside quotes
+        lg = [f"{where}: {x}" for where, t in (("note", note_txt), ("letter", letter_txt)) for x in lang_hits(t)]
+        lg += [f"note: missing-info para — form '{MISSING_FORM}'" for b in bl[:note_end] if b["kind"] == "p"
+               and re.sub(r"^[0-9०-९]+\.\s*", "", ns(unquoted(b["text"]))).startswith(MISSING_HEAD)
+               and not re.sub(r"^[0-9०-९]+\.\s*", "", ns(b["text"])).startswith(MISSING_HEAD + ":-")]
+        check("official Marathi §4.19 (note body, letter)", lg)
+
         # signer chain + Finance
         ne = [b for b in bl[:note_end] if b["kind"] == "p" and ns(b["text"])]
         ntexts = [ns(b["text"]) for b in ne]
@@ -261,7 +270,7 @@ def main(argv):
             intro = next((t for t in lt if t.startswith(INTRO_HEAD)), None)
             rq = []
             if intro is None: rq.append("intro paragraph 'उपरोक्त विषयाबाबत …' missing")
-            elif REQUEST not in unquoted(intro): rq.append(f"intro lacks '{REQUEST}' — '…उपलब्ध करुन देण्यात यावी, {REQUEST}.'")
+            elif REQUEST not in unquoted(intro): rq.append(f"intro lacks '{REQUEST}' — '…उपलब्ध करून देण्यात यावी, {REQUEST}.'")
             check("letter intro request wording §4.18", rq)
             en = []
             if "आपला," not in lt: en.append("'आपला,' line missing")

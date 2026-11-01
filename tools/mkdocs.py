@@ -9,7 +9,7 @@ spec.json:
    "first": "text of para 1 (starts after a tab; ends with ... सादर.)",
    "paras": [{"table": [["अ.क्र.","..."],["1","..."]], "bold_last": false} or "para text without number (numbering 2., 3., ... added automatically)", ...],
    "sub": {"<para index in paras, 0-based>": ["(१) ...", "(२) ..."]},   # optional lettered/numbered sub-points after that para
-   "closing": "सबब, उपरोक्त माहिती तक्त्याच्या स्वरूपात कळविण्याबाबतच्या पत्राचे प्रारुप पृ.      /प.वि. वर मान्यतेस्तव सादर. मान्य झाल्यास पत्र निर्गमित करण्यात येईल.",
+   "closing": "सबब, उपरोक्त माहिती तक्त्याच्या स्वरूपात कळविण्याबाबतच्या पत्राचे प्रारूप पृ.      /प.वि. वर मान्यतेस्तव सादर. मान्य झाल्यास पत्र निर्गमित करण्यात येईल.",
               # or (no letter): "सबब, ... प्रस्ताव वित्त विभागाच्या मान्यतेस्तव सादर करण्यात येत आहे."  (PROPOSAL_SOP Step 4)
    "signers": ["का. अ. (श्रीम. कऱ्हाडे)", "अ.स. (श्री. वडनेरकर)", "उ.वि.स. नि. उ.स. (श्री. बोंद्रे)", "प्र.स. व वि.प. (श्री. खटी)"]
               # add "अ.मु.स. (वित्त)" only when the file goes to Finance (INSTRUCTIONS §4.6)

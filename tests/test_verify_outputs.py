@@ -293,5 +293,29 @@ class VerifyOutputs(unittest.TestCase):
         self.assertIn("ALL OK", out)
 
 
+    # ---- §4.19 Marathi forms (01.11.2026) ----
+    def test_419_colon_dash_in_letter(self):
+        d = self.case("colon419")
+        build_note(self.intro_with("ही विनंती:-", "ही विनंती.:-"), d)
+        self.must_fail(d, "official Marathi §4.19")
+
+    def test_419_karun_in_letter(self):
+        d = self.case("karun419")
+        build_note(self.intro_with("करून", "करुन"), d)
+        self.must_fail(d, "letter: शुद्धलेखन")
+
+    def test_419_unspaced_date_in_note(self):
+        d = self.case("date419")
+        build_note(self.spec_with(lambda s: s["note"].__setitem__("first", s["note"]["first"].replace("दि. 17.09.2026", "दि.17.09.2026"))), d)
+        self.must_fail(d, "note: संक्षेपचिन्हानंतर एक जागा")
+
+    def test_419_quoted_ok(self):
+        d = self.case("quoted419")
+        s = self.spec_with(lambda s: s["note"]["paras"].__setitem__(0, s["note"]["paras"][0] + " “दि.17.09.2026 रोजी सादर करुन.:-”"))
+        build_note(s, d)
+        rc, out = self.run_verify(d)
+        self.assertEqual(rc, 0, out)
+        self.assertIn("ALL OK", out)
+
 if __name__ == "__main__":
     unittest.main()

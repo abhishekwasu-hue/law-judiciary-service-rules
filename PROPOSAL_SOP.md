@@ -60,25 +60,27 @@ Trigger: Abhi says "प्रस्ताव कक्षातील नवी�
 
 ## Step 4 — Write the note (टिप्पणी) — spec.json
 Copy the structure of the nearest sample in `samples/specs/` and fill your facts. Rules:
-- **Language (INSTRUCTIONS §4.18, 01.11.2026):** short sentences, one point each, clear subject (who did what); "श्रीमती" (not "सौ."), one space after "श्री."/"श्रीमती"; the person's name as found in the proposal — the Marathi-initials form (e.g. "ह. ना. आपटे") if the proposal has it, otherwise exactly as written there; missing-information list as a table; letter: no "तात्काळ", request form "…उपलब्ध करुन देण्यात यावी, ही विनंती." Quotes stay verbatim. lint_spec.py checks this.
-- **Para 1:** "<authority> यांच्या पृ.__/प.वि. वरील दि.__ रोजीच्या पत्रास अनुसरुन सादर." (or "…पत्रासोबत प्राप्त … पत्रास अनुसरुन सादर.")
+- **Language (INSTRUCTIONS §4.18, 01.11.2026):** short sentences, one point each, clear subject (who did what); "श्रीमती" (not "सौ."), one space after "श्री."/"श्रीमती"; the person's name as found in the proposal — the Marathi-initials form (e.g. "ह. ना. आपटे") if the proposal has it, otherwise exactly as written there; missing-information list as a table; letter: no "तात्काळ", request form "…उपलब्ध करून देण्यात यावी, ही विनंती." Quotes stay verbatim. lint_spec.py checks this.
+- **Marathi forms (INSTRUCTIONS §4.19, 01.11.2026; Marathi Language Dept GR कपासू-2020/प्र.क्र.56/भाषा-2, दि. 10.11.2022):** outside “…” quotes — a space after an abbreviation dot in running text ("दि. 17.09.2026", "क्र. 108", "प्र. क्र. 21/2024"); ":-" never ".:-"; "करून" not "करुन", "प्रारूप" not "प्रारुप". Left exactly: quotes and related extracts, "पृ.N/प.वि." / "पॅकेज PDF पृ. N", file/letter nos. and any token with '/' or '-' ("संकिर्ण-2026/226/प्र.क्र.131/का.6"), the signer chain, date digits, decimals, GR codes. lint_spec.py and verify_outputs.py check this.
+- **Para 1:** "<authority> यांच्या पृ.__/प.वि. वरील दि. __ रोजीच्या पत्रास अनुसरुन सादर." (or "…पत्रासोबत प्राप्त … पत्रास अनुसरुन सादर.")
 - **Body:** short numbered paras.
   - Facts, posts, periods and amounts go in TABLES: a `{"table": [[...],[...]], "bold_last": true}` item in `note.paras`.
   - GR/rule text verbatim in “ ” with "(पृ.N/प.वि.)".
   - Earlier record of the same matter = stated as a fact with its reference.
 - **Page references:** only "पृ.N/प.वि.", where N = page in the returned PDF (proposal pages 1..n, then the attached GR pages). Never "पॅकेज PDF" in the note body or the letter.
 - **Banned words:** no commentary or theory, no arithmetic explanations, no advice. Closed list (checked by `tools/verify_outputs.py` in the note body and the letter; keep both lists identical — 01.11.2026 सुसंगती): "दिसून येते", "असे दिसते", "पडताळणी केली असता", "माझ्या मते", "मला वाटते", "असे वाटते", "ठरवावे", "कदाचित", "बहुधा".
-- **Missing information para:** "प्रस्तावासोबत खालील माहिती उपलब्ध नाही.:- (1)…; (2)…".
+- **Missing information para:** "प्रस्तावासोबत खालील माहिती उपलब्ध नाही:- (1)…; (2)…".
 - **Last para, one of:**
-  - "सबब, उपरोक्त माहिती तक्त्याच्या स्वरूपात … कळविण्याबाबतच्या पत्राचे प्रारुप पृ.      /प.वि. वर मान्यतेस्तव सादर. मान्य झाल्यास पत्र निर्गमित करण्यात येईल."
+  - "सबब, उपरोक्त माहिती तक्त्याच्या स्वरूपात … कळविण्याबाबतच्या पत्राचे प्रारूप पृ.      /प.वि. वर मान्यतेस्तव सादर. मान्य झाल्यास पत्र निर्गमित करण्यात येईल."
   - "सबब, … प्रस्ताव वित्त विभागाच्या मान्यतेस्तव सादर करण्यात येत आहे."
 - **Signers** (`note.signers`, in order): का. अ. (श्रीम. कऱ्हाडे) / अ.स. (श्री. वडनेरकर) / उ.वि.स. नि. उ.स. (श्री. बोंद्रे) / प्र.स. व वि.प. (श्री. खटी). Add "अ.मु.स. (वित्त)" only when the file goes to Finance.
 - **`related`** ("संबंधित माहिती (संदर्भासाठी)"): verbatim extracts. Each source ends with exactly "(पॅकेज PDF पृ. N)" (several pages: "(पॅकेज PDF पृ. N-M)" / "(पॅकेज PDF पृ. N,M)"), or "(पॅकेज PDF मध्ये नाही)" when the page is not in the package (01.11.2026 सुसंगती). No repo paths (register/, service-rules/, pdf/ …) and no internal ids in `related`.
 - **Letter (`letter`):**
   - `ref_no`: "संकिर्ण-2026/<file no>/प्र.क्र.<n>/का.6"; `date`: "__.__.2026".
-  - `to`; `subject`; `refs` ("आपले पत्र क्र.…, दि.…").
-  - `intro`: "उपरोक्त विषयाबाबत संदर्भाधीन पत्रास अनुसरुन आपणांस कळविण्यात येते की, सदर प्रकरणी पुढील कार्यवाहीसाठी खालील माहिती … उपलब्ध करुन देण्यात यावी.:-"
+  - `to`; `subject`; `refs` ("आपले पत्र क्र. …, दि. …").
+  - `intro`: "उपरोक्त विषयाबाबत संदर्भाधीन पत्रास अनुसरुन आपणांस कळविण्यात येते की, सदर प्रकरणी पुढील कार्यवाहीसाठी खालील माहिती … उपलब्ध करून देण्यात यावी, ही विनंती:-"
   - `points`: an empty table or a few short points.
+  - **Table = data only (INSTRUCTIONS §4.20, 02.11.2026):** the table asks only for data to fill in (dates, figures, periods, yes/no, numbers). Documents (copy of an order, report, certificate — "प्रत", "प्रमाणपत्र", "अहवाल") go after the table: a point "	तसेच, खालील कागदपत्रे उपलब्ध करून देण्यात यावीत, ही विनंती:-" then numbered points "1)	… आदेशाची प्रत;". A row mixing both is split (data in the table, the document in the list). Model: CR131 sample. lint_spec.py checks this.
   - The tool adds the subject/reference block (bold, centred), "आपला," + signature and "प्रत : निवड नस्ती".
 - **Build:** `python3 tools/build_note_letter.py spec.json <outdir> <PREFIX>`. This writes `<PREFIX>_Note_and_Letter.docx` + a PDF preview. LOOK at the preview pages.
 
