@@ -12,11 +12,38 @@ repo root. CLAUDE.md is NOT loaded in this run (the workflow moves it aside): re
   the record and prepare the NEXT note on the basis of the proposal + the reply (PROPOSAL_SOP Step 3: letter only if
   essential information is still missing; otherwise the note goes onward for approval).
 - `instructions` (if not empty) = the user's correction for this re-run. Follow it exactly, within the binding rules.
+- `WORKDIR/pages/` = the proposal already split by the workflow (tools/prep_pages.py): `p-NN.png` (110 dpi page images,
+  SOP Step 1.1 — use these instead of running pdftoppm), `p-NN.txt` (text layer), `p-NN.ocr.txt` (tesseract OCR, lang in
+  `pages.json` `ocr_lang`), `pages.json`. Reply PDFs: `WORKDIR/pages_reply_<n>/` (same layout; `pages.json` `pdf` = file).
+  You still LOOK at every page image yourself (SOP Step 1). Text layer / OCR are a cross-check only: every number,
+  date, name and amount is read from the IMAGE; where they differ, the image wins; unreadable on the image = "अस्पष्ट".
+  If a directory is missing or incomplete, render the pages yourself (`python3 tools/prep_pages.py <pdf> <dir>`).
+
+## Study part 1 — written by a parallel run
+A second Claude run (tools/ENGINE_PART1_PROMPT.md) started together with you writes Study part 1 ("भाग 1 — प्रस्तावाचे
+मराठी रूपांतर", page-wise, PROPOSAL_PROMPT rules) into `/tmp/work/study_part1.json` and then creates
+`/tmp/work/study_part1.done` (or `/tmp/work/study_part1.failed` with a reason).
+- Do NOT write part 1 yourself while that run is working. Do all other work first (Steps 1–5, Study parts 0 and 2–7).
+  You still read every page image for your own facts list (SOP Step 1.3) — only the part-1 TEXT is delegated.
+- When you build the Study (build_study.py): wait for the marker with ONE Bash call, e.g.
+  `for i in $(seq 240); do [ -e /tmp/work/study_part1.done ] || [ -e /tmp/work/study_part1.failed ] && break; sleep 10; done; ls /tmp/work`
+  (max 40 min; use a Bash timeout of 600000 ms and repeat the call up to 4 times — never longer in total).
+- `.done` → load `/tmp/work/study_part1.json` and insert it UNCHANGED as `parts[1]` (after part 0, before part 2). Check it
+  against the page images like your own text (Step 7 second read); correct a wrong number/date in it, nothing else.
+- `.failed`, or neither marker after the wait, or the JSON is invalid → write part 1 yourself (PROPOSAL_PROMPT rules) and
+  note it in part 7.
+- A draft Study built before part 1 is in may use `--allow-missing-part1` (or env `STUDY_ALLOW_MISSING_PART1=1`) — only
+  for that intermediate build. The FINAL Study always contains part 1, built without that flag.
+
+## Lint before building
+Before every build run `python3 tools/lint_spec.py spec.json --study study.json --pages <package pages>` (docstring in
+tools/lint_spec.py; same checks as verify_outputs.py) and fix every line it prints until "LINT OK".
+build_note_letter.py and build_study.py lint again themselves and exit 1 on a rule problem.
 
 ## Binding
 Read first, in this order, and follow exactly: INSTRUCTIONS.md, PROPOSAL_SOP.md, PROPOSAL_WORKFLOW.md, then
 tools/PROPOSAL_PROMPT.md, the docstrings of tools/mkdocs.py, tools/build_note_letter.py, tools/build_study.py,
-tools/pkg3.py, tools/highlight.py, tools/verify_outputs.py, tools/oldcases_text.py, and register/00-INDEX.md.
+tools/pkg3.py, tools/highlight.py, tools/lint_spec.py, tools/verify_outputs.py, tools/oldcases_text.py, and register/00-INDEX.md.
 Do NOT read HANDOVER.md (session to-dos, out of scope here) or OWNER_RULES.md (its only part that applies here is
 section A: study everything fully first, never guess, nothing of your own — already binding through INSTRUCTIONS §1).
 Do PROPOSAL_SOP.md Steps 1–7 exactly as written. **Skip SOP Step 0b (प्रस्ताव कक्ष intake — this app replaces it) and
@@ -49,9 +76,11 @@ INSTRUCTIONS.md wins on any conflict.
    - `OUTDIR/<PREFIX>_Study.docx` (part 0 briefing + parts 1–7),
    - `OUTDIR/<PREFIX>_Note_and_Letter.docx`,
    - the package PDF under the ORIGINAL proposal file name = `proposal_original_name` exactly (INSTRUCTIONS §4.16;
-     strip only a random upload prefix like `11ae057d-`). NEVER `<PREFIX>_Proposal_with_GRs.pdf`.
+     strip only a random upload prefix like `11ae057d-`). Never invent a new name such as `<PREFIX>_Proposal_with_GRs.pdf`
+     — but when the original name itself looks machine-made (e.g. the uploaded file really is `CR66_Proposal_with_GRs.pdf`
+     or `..._0001.pdf`), keep it exactly as uploaded; never "correct" it.
    Exactly one .pdf in OUTDIR besides `*_Note_and_Letter.pdf` / `*_Study.pdf` previews.
-6. Verify (SOP Step 7): `python3 tools/verify_outputs.py OUTDIR <PREFIX> "OUTDIR/<original name>" <proposal pages>`
+6. Verify (SOP Step 7): `python3 tools/verify_outputs.py OUTDIR <PREFIX> "OUTDIR/<original name>" <proposal pages> --original-name "<proposal_original_name>"`
    must print ALL OK; fix and re-run until it does. Then the second read of every number and date against the page images.
    After you finish, the workflow runs the same command itself (PREFIX, package and proposal pages from status.json) and
    FAILS the case unless it prints ALL OK — so never write status.json "done" without ALL OK.

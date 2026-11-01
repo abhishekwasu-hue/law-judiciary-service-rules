@@ -10,15 +10,22 @@ Commands:
   log_url <url>       runs.log_url = url (Actions run page).
   finish <outdir>     <outdir>/status.json + exactly one *_Study.docx, one *_Note_and_Letter.docx and one package .pdf
                       (named as the ORIGINAL proposal file, INSTRUCTIONS §4.16; LibreOffice previews *_Study.pdf /
-                      *_Note_and_Letter.pdf are ignored) -> bucket outputs/<case>/<kind>/v<n>/<name>, case_files rows,
+                      *_Note_and_Letter.pdf are ignored) -> bucket outputs/<case>/<kind>/v<n>/file<ext> (ASCII key:
+                      Storage refuses non-ASCII keys; the real name only in case_files.original_name), case_files rows,
                       runs done + summary fields, cases.stage "मसुदा तयार", activity run_done. Incomplete -> fail.
-  claude_result <claude.json> [<stderr file>] [<exit code>]
-                      Claude Code `--output-format json` result -> runs.cost_usd, num_turns, duration_s. An error result
-                      (max turns, API key, credit, ...) -> fail with a Marathi reason + next step; exit 1.
+  claude_result <claude.json> [<stderr file>] [<exit code>] [--part1 <part1.json>] [--wall <seconds>]
+                      Claude Code `--output-format json` result(s) -> runs.cost_usd and num_turns = SUM of the main run
+                      and the parallel Study-part-1 run (--part1, if its JSON exists); duration_s = --wall (wall clock
+                      of the whole step: the two runs overlap, so a sum would overstate it), else the longer of the two
+                      runs' duration_ms. An error result of the MAIN run (max turns, API key, credit, ...) -> fail with
+                      a Marathi reason + next step; exit 1. A part-1 error alone is only a warning (the main run then
+                      writes part 1 itself; verify/finish still check the Study).
   verify <outdir> [<workdir>]
-                      runs tools/verify_outputs.py <outdir> <PREFIX> "<package pdf>" <proposal pages> (PREFIX/package
-                      from status.json `prefix` / `package_pdf`, else from the file names; proposal pages = page count
-                      of the fetched proposal, else status.json `proposal_pages`). Not ALL OK -> fail with the FAIL lines.
+                      runs tools/verify_outputs.py <outdir> <PREFIX> "<package pdf>" <proposal pages>
+                      --original-name "<newest proposal's original name>" (PREFIX/package from status.json `prefix` /
+                      `package_pdf`, else from the file names; proposal pages = page count of the fetched proposal,
+                      else status.json `proposal_pages`; original name from <workdir>/case.json, so a real file name
+                      such as CR66_Proposal_with_GRs.pdf is accepted). Not ALL OK -> fail with the FAIL lines.
   warn "<text>"       runs.warnings += text (non-fatal, e.g. new GRs not pushed); activity run_warning.
   fail "<reason>"     runs: state failed, step reason, finished_at; activity run_failed; exit 1.
                       (If the run is already failed, the earlier, more specific reason is kept.)"""
@@ -143,6 +150,12 @@ def cmd_fetch(work):
     print(f"fetched {len(got)} file(s) -> {work}/in")
 
 
+def storage_name(n):
+    """Supabase Storage refuses non-ASCII object keys (400 InvalidKey): objects are stored as file<ext>."""
+    ext = os.path.splitext(n)[1].lower()
+    return "file" + (ext if re.fullmatch(r"\.[a-z0-9]{1,8}", ext) else "")
+
+
 def strip_upload_prefix(n):
     return re.sub(r"^[0-9a-f]{8}-", "", n)
 
@@ -177,7 +190,7 @@ def cmd_finish(out):
         name = os.path.basename(p)
         prev = rest("GET", f"case_files?case_id=eq.{CASE}&kind=eq.{kind}&select=version&order=version.desc&limit=1") or []
         ver = prev[0]["version"] + 1 if prev else 1
-        path = f"{CASE}/{kind}/v{ver}/{name}"
+        path = f"{CASE}/{kind}/v{ver}/{storage_name(name)}"  # ASCII object key; real name in original_name
         ctype = MIME.get(os.path.splitext(name)[1].lower()) or mimetypes.guess_type(name)[0] or "application/octet-stream"
         http("POST", f"{BASE}/storage/v1/object/outputs/{enc(path)}", open(p, "rb").read(),
              {"Content-Type": ctype, "x-upsert": "true"})
@@ -266,24 +279,54 @@ def read_claude_json(path):
     return res if isinstance(res, dict) else None
 
 
+def claude_fields(results, wall=None):
+    """runs fields from one or more Claude results: cost_usd and num_turns summed; duration_s = wall clock if known,
+    else the longest run (the runs are parallel)."""
+    costs = [r.get("total_cost_usd", r.get("cost_usd")) for r in results]
+    costs = [float(c) for c in costs if isinstance(c, (int, float)) and not isinstance(c, bool)]
+    turns = [r["num_turns"] for r in results if isinstance(r.get("num_turns"), int) and not isinstance(r.get("num_turns"), bool)]
+    durs = [r["duration_ms"] / 1000 for r in results if isinstance(r.get("duration_ms"), (int, float))]
+    fields = {}
+    if costs: fields["cost_usd"] = round(sum(costs), 4)
+    if turns: fields["num_turns"] = sum(turns)
+    if wall is not None: fields["duration_s"] = round(wall, 1)
+    elif durs: fields["duration_s"] = round(max(durs), 1)
+    return fields
+
+
 def cmd_claude_result(args):
+    args = list(args)
+    part1 = wall = None
+    for flag in ("--part1", "--wall"):
+        if flag in args:
+            k = args.index(flag); v = args[k + 1] if k + 1 < len(args) else ""; del args[k:k + 2]
+            if flag == "--part1": part1 = v
+            else:
+                try: wall = float(v)
+                except ValueError: wall = None
     res = read_claude_json(args[0]) if args else None
+    p1 = read_claude_json(part1) if part1 else None
     err = ""
     if len(args) > 1 and os.path.exists(args[1]):
         err = open(args[1], encoding="utf-8", errors="replace").read()[-4000:]
     rc = args[2] if len(args) > 2 else "0"
+    results = [r for r in (res, p1) if r]
+    fields = claude_fields(results, wall)
+    if fields:
+        try:
+            patch_run(fields)
+        except Exception as e:
+            print("engine_supabase: cost not stored:", e, file=sys.stderr)
     if res:
-        cost = res.get("total_cost_usd", res.get("cost_usd"))
-        fields = {}
-        if isinstance(cost, (int, float)): fields["cost_usd"] = round(float(cost), 4)
-        if isinstance(res.get("num_turns"), int): fields["num_turns"] = res["num_turns"]
-        if isinstance(res.get("duration_ms"), (int, float)): fields["duration_s"] = round(res["duration_ms"] / 1000, 1)
-        if fields:
-            try:
-                patch_run(fields)
-            except Exception as e:
-                print("engine_supabase: cost not stored:", e, file=sys.stderr)
-        print("claude:", res.get("subtype"), "| turns", res.get("num_turns"), "| cost", cost)
+        print("claude:", res.get("subtype"), "| turns", res.get("num_turns"), "| cost", res.get("total_cost_usd", res.get("cost_usd")))
+    if p1:
+        print("part1 :", p1.get("subtype"), "| turns", p1.get("num_turns"), "| cost", p1.get("total_cost_usd", p1.get("cost_usd")))
+    if part1 and (p1 is None or p1.get("is_error") or p1.get("subtype") not in (None, "success")):
+        try:
+            cmd_warn("भाग 1 (समांतर रूपांतर) स्वतंत्रपणे पूर्ण झाला नाही — मुख्य अभ्यासाने लिहिला ("
+                     + str((p1 or {}).get("subtype") or "निकाल नाही") + ").")
+        except Exception as e:
+            print("engine_supabase: part1 warning not stored:", e, file=sys.stderr)
     failed = res is None or bool(res.get("is_error")) or res.get("subtype") not in (None, "success") or str(rc) not in ("", "0")
     if failed:
         cmd_fail(claude_reason(res, err, rc))
@@ -307,9 +350,14 @@ def cmd_verify(args):
         pp = package_pdfs(out)
         pkg = pp[0] if len(pp) == 1 else ""
     pages = None
+    orig = ""
     if work:
         try:
             cj = json.load(open(os.path.join(work, "case.json"), encoding="utf-8"))
+            orig = safe_name(str(cj.get("proposal_original_name") or ""))
+            if orig == "file": orig = ""
+            if orig and pkg and os.path.basename(pkg) == strip_upload_prefix(orig):
+                orig = os.path.basename(pkg)  # the package keeps the name with only the upload prefix stripped
             src = next(os.path.join(work, f["local_path"]) for f in cj["inputs"] if f["kind"] == "proposal")
             import pymupdf  # on the runner (tools/requirements-engine.txt)
             with pymupdf.open(src) as d:
@@ -322,7 +370,8 @@ def cmd_verify(args):
     if missing:
         return cmd_fail("पडताळणी करता आली नाही — माहिती नाही: " + ", ".join(missing))
     script = os.environ.get("VERIFY_SCRIPT") or os.path.join(os.path.dirname(os.path.abspath(__file__)), "verify_outputs.py")
-    r = subprocess.run([sys.executable, script, out, prefix, pkg, str(pages)], capture_output=True, text=True,
+    cmd = [sys.executable, script, out, prefix, pkg, str(pages)] + (["--original-name", orig] if orig else [])
+    r = subprocess.run(cmd, capture_output=True, text=True,
                        encoding="utf-8", errors="replace")
     lines = (r.stdout or "").splitlines()
     print(r.stdout, end="")

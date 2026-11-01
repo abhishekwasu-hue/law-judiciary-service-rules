@@ -89,6 +89,23 @@ jobs:
           npm install -g "@anthropic-ai/claude-code@$CLAUDE_CODE_VERSION"
       - name: Fetch case files from Supabase
         run: python3 tools/engine_supabase.py fetch /tmp/case
+      # Page PNGs (110 dpi) + text layer + tesseract OCR before Claude (QUALITY_AUDIT §5 item 1). Non-fatal: without them
+      # Claude renders the pages itself. The model still looks at every image; text/OCR are only a cross-check.
+      - name: Prepare page images (prep_pages.py)
+        run: |
+          set -uo pipefail
+          P=$(python3 -c 'import json; c = json.load(open("/tmp/case/case.json", encoding="utf-8")); print(next(f["local_path"] for f in c["inputs"] if f["kind"] == "proposal"))') || P=""
+          if [ -z "$P" ] || ! python3 tools/prep_pages.py "/tmp/case/$P" /tmp/case/pages; then
+            rm -rf /tmp/case/pages
+            python3 tools/engine_supabase.py warn "प्रस्तावाची पान-प्रतिमा आधी तयार झाली नाही (prep_pages) — इंजिन स्वतः तयार करेल" || true
+          fi
+          n=0
+          for f in /tmp/case/in/reply/*.pdf; do
+            [ -f "$f" ] || continue
+            n=$((n + 1))
+            python3 tools/prep_pages.py "$f" "/tmp/case/pages_reply_$n" || rm -rf "/tmp/case/pages_reply_$n"
+          done
+          exit 0
       # SOP Step 0.4 + INSTRUCTIONS §7.1 for the engine: old-case text corpus and the precedent library (non-fatal).
       - name: Prepare precedent sources
         run: |
@@ -111,24 +128,76 @@ jobs:
       # CLAUDE.md is moved aside for this step only: it would auto-load OWNER_RULES (trading/apps/diet) and HANDOVER
       # (session to-dos, SOP Step 0b/8 commit work) into every turn. ENGINE_PROMPT names exactly what to read instead;
       # running from the repo root keeps every tool's relative path (tools/, pdf/, सन*.zip) working. Restored before commit.
+      # Study part 1 (page-wise Marathi rendering, the largest single output) runs in PARALLEL (QUALITY_AUDIT §5 item 3):
+      # a second headless run (tools/ENGINE_PART1_PROMPT.md) is started in the background first, with a minimal env
+      # (env -i: only HOME/PATH/locale + the Anthropic key; no Supabase key, it needs only the page files). The main run
+      # waits for /tmp/work/study_part1.done (max 40 min) and inserts it, else writes part 1 itself. The step waits for the
+      # background run (stopped once the main run has ended — its part is no longer used) before recording the result.
+      # cost/turns = sum of both runs; duration = wall clock of this step (the runs overlap).
       - name: Process the proposal (Claude Code headless)
         run: |
           set -uo pipefail
-          mkdir -p /tmp/out
+          mkdir -p /tmp/out /tmp/work
+          rm -f /tmp/work/study_part1.* /tmp/work/part1*
           mv CLAUDE.md /tmp/CLAUDE.md.repo
+          T0=$(date +%s)
+          MARGS=()
+          if [ -n "${MODEL:-}" ]; then MARGS=(--model "$MODEL"); fi
+          P1_PID=""
+          if [ -s /tmp/case/pages/pages.json ]; then
+            P1_PROMPT="$(cat tools/ENGINE_PART1_PROMPT.md)
+
+          PAGES=/tmp/case/pages
+          WORKDIR=/tmp/case
+          OUT=/tmp/work"
+            (
+              rc1=0
+              env -i HOME="$HOME" PATH="$PATH" LANG=C.UTF-8 LC_ALL=C.UTF-8 TMPDIR=/tmp CI=true                   ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY"                   timeout -k 60 100m claude -p "$P1_PROMPT" --dangerously-skip-permissions --max-turns 120                   --output-format json "${MARGS[@]}" > /tmp/work/part1_result.json 2> /tmp/work/part1.err &
+              echo $! > /tmp/work/part1.pid
+              wait $! || rc1=$?
+              if [ -e /tmp/work/study_part1.done ] && ! python3 - <<'PY'
+          import json, sys
+          p = json.load(open("/tmp/work/study_part1.json", encoding="utf-8"))
+          ok = isinstance(p, dict) and str(p.get("heading", "")).startswith("भाग 1") and isinstance(p.get("blocks"), list) and p["blocks"]
+          ok = ok and all(isinstance(b, dict) and len(b) == 1 and next(iter(b)) in ("subheading", "para", "bullets", "table") for b in p["blocks"])
+          sys.exit(0 if ok else 1)
+          PY
+              then
+                rm -f /tmp/work/study_part1.done
+                echo "study_part1.json invalid (checked by the workflow)" > /tmp/work/study_part1.failed
+              fi
+              if [ ! -e /tmp/work/study_part1.done ] && [ ! -e /tmp/work/study_part1.failed ]; then
+                echo "part-1 run ended (exit $rc1) without a marker" > /tmp/work/study_part1.failed
+              fi
+              echo "part1 exit $rc1"
+            ) &
+            P1_PID=$!
+          else
+            echo "no page files: part 1 is written by the main run" > /tmp/work/study_part1.failed
+          fi
           PROMPT="$(cat tools/ENGINE_PROMPT.md)
 
           WORKDIR=/tmp/case
           OUTDIR=/tmp/out
           OLDCASES=/tmp/old
           PRECEDENT=/tmp/precedent"
-          ARGS=(-p "$PROMPT" --dangerously-skip-permissions --max-turns 400 --output-format json)
-          if [ -n "${MODEL:-}" ]; then ARGS+=(--model "$MODEL"); fi
+          ARGS=(-p "$PROMPT" --dangerously-skip-permissions --max-turns 400 --output-format json "${MARGS[@]}")
           rc=0
           timeout -k 60 150m claude "${ARGS[@]}" > /tmp/claude.json 2> /tmp/claude.err || rc=$?
+          P1_ARGS=()
+          if [ -n "$P1_PID" ]; then
+            if kill -0 "$P1_PID" 2>/dev/null; then
+              echo "main run ended; stopping the part-1 run"
+              [ -s /tmp/work/part1.pid ] && kill -TERM "$(cat /tmp/work/part1.pid)" 2>/dev/null
+            fi
+            wait "$P1_PID" || true
+            P1_ARGS=(--part1 /tmp/work/part1_result.json)
+            tail -n 5 /tmp/work/part1.err || true
+          fi
+          T1=$(date +%s)
           mv /tmp/CLAUDE.md.repo CLAUDE.md
           echo "claude exit $rc"; tail -n 20 /tmp/claude.err || true
-          python3 tools/engine_supabase.py claude_result /tmp/claude.json /tmp/claude.err "$rc"
+          python3 tools/engine_supabase.py claude_result /tmp/claude.json /tmp/claude.err "$rc" "${P1_ARGS[@]}" --wall "$((T1 - T0))"
       - name: Verify outputs (verify_outputs.py must print ALL OK)
         run: python3 tools/engine_supabase.py verify /tmp/out /tmp/case
       - name: Upload outputs and finish

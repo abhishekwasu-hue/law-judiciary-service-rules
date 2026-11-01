@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""verify_outputs.py <outdir> <PREFIX> "<package pdf>" <proposal pages>
+"""verify_outputs.py <outdir> <PREFIX> "<package pdf>" <proposal pages> [--original-name NAME]
 Quality gate for one proposal's three outputs (PROPOSAL_SOP.md Step 7; rules INSTRUCTIONS.md §4).
 Prints one line per check ("OK: ..." / "FAIL: ...") and "ALL OK" only when every check passes; exit code 1 otherwise.
+Rule constants / regexes / shared checks: tools/lint_spec.py (same rules as the pre-build lint).
 Windows: `py tools/verify_outputs.py ...`; runner: `python3 tools/verify_outputs.py ...`.
 
 Checks
@@ -24,7 +25,8 @@ Checks
   - "आपला," present, signature "आपली," absent ("आपली पत्रे" in संदर्भ is allowed); lines "( राजेश वडनेरकर )", "अवर सचिव ,महाराष्ट्र शासन", "प्रत : निवड नस्ती"
  Study: headings भाग 0 … भाग 7
  Package PDF:
-  - file name is the original proposal name (not *_Proposal_with_GRs.pdf)
+  - file name is the original proposal name (not *_Proposal_with_GRs.pdf); with --original-name NAME: the file name must
+    equal NAME minus a random upload prefix like "11ae057d-" (the *_Proposal_with_GRs.pdf ban is then skipped, §4.16)
   - every page carries exactly "पृ. i / N" in the bottom 40 pt strip; bookmarks present
   - <pdf>.map.json: proposal pages == <proposal pages>; total pages == proposal + enclosure pages (no separator pages);
     no mark with status "TEXT NOT FOUND" / "page not included" or hits == 0 (works with or without per-mark "hits")
@@ -44,21 +46,12 @@ from docx.text.paragraph import Paragraph
 FONT = "DVOT-SurekhMR"
 FONT_ATTRS = ("ascii", "hAnsi", "cs", "eastAsia")
 THEME_ATTRS = ("asciiTheme", "hAnsiTheme", "cstheme", "eastAsiaTheme")
-SIGNERS = ["का. अ. (श्रीम. कऱ्हाडे)", "अ.स. (श्री. वडनेरकर)", "उ.वि.स. नि. उ.स. (श्री. बोंद्रे)", "प्र.स. व वि.प. (श्री. खटी)"]
-AMS = "अ.मु.स. (वित्त)"
-FIN = "वित्त विभागाच्या मान्यतेस्तव"
-# closed list (PROPOSAL_SOP.md Step 4 "Banned words") — keep both lists identical
-BANNED = ["दिसून येते", "असे दिसते", "पडताळणी केली असता", "माझ्या मते", "मला वाटते", "असे वाटते", "ठरवावे", "कदाचित", "बहुधा"]
-RELATED = "संबंधित माहिती (संदर्भासाठी)"
-ID_RE = re.compile(r"z\d_\d{4}")
-REPO_RE = re.compile(r"(register/|service-rules/|precedent-library/|(?<![A-Za-z])pdf/|(?<![A-Za-z])repo(?![A-Za-z])|रेपो)", re.I)
-D = r"[0-9०-९]+"
-NUMLIST = rf"{D}(?:\s*(?:-|–|ते|,)\s*{D})*"
-REF_LOOSE = re.compile(r"पृ\.([^/\n]{0,40}?)/\s*प\.वि\.")
-REF_PKG = re.compile(rf"पॅकेज PDF\s*पृ\.\s*({NUMLIST})")
-REF_NO = re.compile(r"संकिर्ण-[0-9]{4}/[0-9]+/प्र\.क्र\.[0-9]+/का\.6")
-QUOTE_RE = re.compile(r"“[^”]*”")
-LH_EMAIL = "lnjd.desk6-mh@mah.gov.in"
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+# shared rule definitions — ONE copy, in tools/lint_spec.py (pre-build lint uses the same rules)
+from lint_spec import (AMS, BANNED, FIN, ID_RE, LH_EMAIL, RELATED, REF_NO, REPO_RE, SIGNERS,  # noqa: E402,F401
+                       banned_hits, finance_problems, heading_problems, id_hits, ns, num, part_no, ref_problems,
+                       repo_hits, signer_problems)
+UPLOAD_PREFIX = re.compile(r"^[0-9a-fA-F]{8}-")
 
 results = []
 
@@ -73,12 +66,8 @@ def check(name, problems):
         print(f"OK: {name}")
 
 
-def num(s):
-    return int(s.translate(str.maketrans("०१२३४५६७८९", "0123456789")))
 
 
-def ns(s):
-    return re.sub(r"\s+", " ", s).strip()
 
 
 def el_text(el):
@@ -122,29 +111,6 @@ def font_problems(d, label):
     return [f"{label}: {bad} text runs without {FONT} on all four rFonts attributes"] if bad else []
 
 
-def ref_problems(text, npages, label, skip_quotes=False):
-    if skip_quotes:
-        text = QUOTE_RE.sub(" ", text)
-    probs = []
-    lists = []
-    for mt in REF_LOOSE.finditer(text):
-        inner = mt.group(1).strip()
-        if not re.search(r"[0-9०-९]", inner):
-            continue  # blank placeholder "पृ.      /प.वि." or table header "पृ./प.वि."
-        if not re.fullmatch(NUMLIST, inner):
-            probs.append(f"{label}: unparsed reference '{mt.group(0)}'"); continue
-        lists.append((mt.group(0), inner))
-    for mt in REF_PKG.finditer(text):
-        lists.append((mt.group(0), mt.group(1)))
-    for whole, inner in lists:
-        for part in re.split(r"\s*,\s*", inner):
-            ends = [num(x) for x in re.split(r"\s*(?:-|–|ते)\s*", part) if x.strip()]
-            if len(ends) == 2 and ends[0] > ends[1]:
-                probs.append(f"{label}: reversed range '{whole}'")
-            for n in ends:
-                if not 1 <= n <= npages:
-                    probs.append(f"{label}: '{whole}' — page {n} outside package (1-{npages})")
-    return probs
 
 
 def p_centred(p):
@@ -167,6 +133,12 @@ def p_bold(p):
 
 
 def main(argv):
+    argv = list(argv); orig = None
+    if "--original-name" in argv:
+        i = argv.index("--original-name")
+        if i + 1 >= len(argv):
+            print(__doc__); return 2
+        orig = argv[i + 1]; del argv[i:i + 2]
     if len(argv) != 5:
         print(__doc__); return 2
     out, pre, pkg, npp = argv[1], argv[2], argv[3], int(argv[4])
@@ -184,14 +156,14 @@ def main(argv):
     if S is not None:
         sb = blocks_of(S); st = "\n".join(b["text"] for b in sb)
         check("Study fonts", font_problems(S, "Study"))
-        check("Study internal ids", [f"internal id {x}" for x in sorted(set(ID_RE.findall(st)))])
+        check("Study internal ids", [f"internal id {x}" for x in id_hits(st)])
         check("Study पृ. references", ref_problems(st, N, "Study", skip_quotes=True))
         have = set()
         for b in sb:
-            mt = re.match(r"\s*भाग\s*([0-9०-९])(?![0-9०-९])", b["text"])
-            if b["kind"] == "p" and mt:
-                have.add(num(mt.group(1)))
-        check("Study headings भाग 0-7", [f"heading भाग {i} missing" for i in range(8) if i not in have])
+            k = part_no(b["text"])
+            if b["kind"] == "p" and k is not None:
+                have.add(k)
+        check("Study headings भाग 0-7", heading_problems(have))
 
     # ---------------- Note and Letter ----------------
     fn = os.path.join(out, f"{pre}_Note_and_Letter.docx")
@@ -221,8 +193,8 @@ def main(argv):
         alltxt = txt(0, n)
 
         check("Note_and_Letter fonts", font_problems(NL, "Note_and_Letter"))
-        check("Note_and_Letter internal ids", [f"internal id {x}" for x in sorted(set(ID_RE.findall(alltxt)))])
-        check("Note_and_Letter repo paths", [f"repo path/word '{x}'" for x in sorted(set(mt.group(0) for mt in REPO_RE.finditer(alltxt)))])
+        check("Note_and_Letter internal ids", [f"internal id {x}" for x in id_hits(alltxt)])
+        check("Note_and_Letter repo paths", [f"repo path/word '{x}'" for x in repo_hits(alltxt)])
         check("Note_and_Letter पृ. references",
               ref_problems(note_txt, N, "note") + ref_problems(rel_txt, N, "संबंधित माहिती", skip_quotes=True)
               + ref_problems(letter_txt, N, "letter"))
@@ -231,7 +203,7 @@ def main(argv):
         if "पॅकेज PDF" in letter_txt: pk.append("letter uses 'पॅकेज PDF'")
         check("'पॅकेज PDF' only in संबंधित माहिती", pk)
         check("banned words (note body, letter)",
-              [f"{where}: '{w}'" for where, t in (("note", note_txt), ("letter", letter_txt)) for w in BANNED if w in t])
+              [f"{where}: '{w}'" for where, t in (("note", note_txt), ("letter", letter_txt)) for w in banned_hits(t)])
 
         # signer chain + Finance
         ne = [b for b in bl[:note_end] if b["kind"] == "p" and ns(b["text"])]
@@ -242,17 +214,13 @@ def main(argv):
             k += 1
         sig_start = len(ntexts) - k
         tail = ntexts[sig_start:]
-        exp = SIGNERS + ([AMS] if has_ams else [])
-        sp = [] if tail == exp else [f"signer block {tail} != {exp}"]
+        sp = signer_problems(tail, has_ams)
         stray = [t for t in ntexts[:sig_start] if t in SIGNERS + [AMS]]
         if stray: sp.append(f"signer lines outside the signer block: {stray}")
         check("note signer chain (§4.6)", sp)
         numbered = [t for t in ntexts[:sig_start] if re.match(r"[0-9०-९]+\.", t)]
         last = numbered[-1] if numbered else (ntexts[sig_start - 1] if sig_start else "")
-        fin = FIN in last
-        check("अ.मु.स. (वित्त) <=> Finance last para",
-              [] if fin == has_ams else [f"'{AMS}' {'present' if has_ams else 'absent'} but last para "
-                                         f"{'contains' if fin else 'lacks'} '{FIN}'"])
+        check("अ.मु.स. (वित्त) <=> Finance last para", finance_problems(last, has_ams))
 
         # letter
         if not has_letter:
@@ -293,8 +261,13 @@ def main(argv):
 
     # ---------------- Package PDF ----------------
     if P is not None:
-        check("package file name = original proposal name",
-              [f"'{os.path.basename(pkg)}' is a generated name"] if re.search(r"_Proposal_with_GRs\.pdf$", pkg, re.I) else [])
+        if orig is not None:  # §4.16: the original name is kept even if it looks machine-made
+            want = UPLOAD_PREFIX.sub("", os.path.basename(orig))
+            check("package file name = original proposal name",
+                  [] if os.path.basename(pkg) == want else [f"'{os.path.basename(pkg)}' != original name '{want}'"])
+        else:
+            check("package file name = original proposal name",
+                  [f"'{os.path.basename(pkg)}' is a generated name"] if re.search(r"_Proposal_with_GRs\.pdf$", pkg, re.I) else [])
         stp = []
         for i, pg in enumerate(P, 1):
             r = pg.rect

@@ -203,7 +203,7 @@ class TestBuildStudy(TmpCase):
         sj = os.path.join(self.tmp, "study.json"); out = os.path.join(self.tmp, "X_Study.docx")
         with open(sj, "w", encoding="utf-8-sig") as f:
             json.dump(spec, f, ensure_ascii=False)
-        r = run([os.path.join(TOOLS, "build_study.py"), sj, out])
+        r = run([os.path.join(TOOLS, "build_study.py"), sj, out, "--no-lint"])  # fonts only; parts 2-7 absent
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         d = docx.Document(out)
         self.assertEqual(bad_font_runs(d), 0)

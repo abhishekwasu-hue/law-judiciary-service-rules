@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""build_note_letter.py <spec.json> <outdir> <PREFIX>
+"""build_note_letter.py <spec.json> <outdir> <PREFIX> [--no-lint]
+First runs the pre-build lint (tools/lint_spec.py) on spec.json and stops with exit 1 (problems printed) if it finds any;
+--no-lint or env LINT_SKIP=1 skips it (test fixtures that build deliberately bad files).
 spec.json -> <outdir>/<PREFIX>_Note_and_Letter.docx (note; if spec has "letter": the letter follows in its OWN section on a
 new page, keeping LETTER_TEMPLATE's page setup — margins etc. — while the note keeps NOTE_TEMPLATE's).
 Uses tools/mkdocs.py (Section templates, tables supported) + docxcompose.
@@ -84,7 +86,29 @@ def main(spec, outdir, pre):
     return 0 if ok else 1
 
 
+def lint(spec):
+    """pre-build lint (same rules as verify_outputs.py); True when clean."""
+    sys.path.insert(0, HERE)
+    import lint_spec
+    try:
+        probs = lint_spec.lint_spec(lint_spec.load(spec))
+    except Exception as e:
+        probs = [f"{spec}: JSON — {e}"]
+    for p in probs:
+        print(p)
+    if probs:
+        print("LINT FAILED — fix spec.json (tools/lint_spec.py); nothing built", file=sys.stderr)
+    return not probs
+
+
 if __name__ == "__main__":
-    if len(sys.argv) != 4:
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+    args = [a for a in sys.argv[1:] if a != "--no-lint"]
+    if len(args) != 3:
         sys.exit(__doc__)
-    sys.exit(main(*sys.argv[1:4]))
+    if "--no-lint" not in sys.argv and os.environ.get("LINT_SKIP") != "1" and not lint(args[0]):
+        sys.exit(1)
+    sys.exit(main(*args))

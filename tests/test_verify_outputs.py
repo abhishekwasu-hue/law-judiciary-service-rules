@@ -25,7 +25,8 @@ NENC = 4          # enclosure pages -> package 20 pages (CR122 cites up to प�
 FONTS = ["/usr/share/fonts/truetype/freefont/FreeSerif.ttf", "/usr/share/fonts/opentype/freefont/FreeSerif.otf",
          "C:/Windows/Fonts/mangal.ttf", "C:/Windows/Fonts/Nirmala.ttf"]
 FONTFILE = next((f for f in FONTS if os.path.exists(f)), None)
-ENV = dict(os.environ, PYTHONIOENCODING="utf-8")
+# LINT_SKIP: the must-FAIL fixtures are built from deliberately bad specs, which the pre-build lint would refuse
+ENV = dict(os.environ, PYTHONIOENCODING="utf-8", LINT_SKIP="1")
 
 
 def py(*args):
@@ -126,8 +127,8 @@ class VerifyOutputs(unittest.TestCase):
         shutil.copytree(self.good, d)
         return d
 
-    def run_verify(self, d, pkg=PKGNAME, npp=NPP):
-        r = py(os.path.join(TOOLS, "verify_outputs.py"), d, PRE, os.path.join(d, pkg), str(npp))
+    def run_verify(self, d, pkg=PKGNAME, npp=NPP, extra=()):
+        r = py(os.path.join(TOOLS, "verify_outputs.py"), d, PRE, os.path.join(d, pkg), str(npp), *extra)
         return r.returncode, r.stdout + r.stderr
 
     def must_fail(self, d, needle, **kw):
@@ -211,6 +212,24 @@ class VerifyOutputs(unittest.TestCase):
         os.rename(os.path.join(d, PKGNAME), os.path.join(d, bad))
         os.rename(os.path.join(d, PKGNAME + ".map.json"), os.path.join(d, bad + ".map.json"))
         self.must_fail(d, "package file name", pkg=bad)
+
+    def rename_pkg(self, d, new):
+        os.rename(os.path.join(d, PKGNAME), os.path.join(d, new))
+        os.rename(os.path.join(d, PKGNAME + ".map.json"), os.path.join(d, new + ".map.json"))
+
+    def test_original_name_machine_like_ok(self):
+        # §4.16: the uploaded proposal itself was named CR66_Proposal_with_GRs.pdf -> keep it, no FAIL
+        d = self.case("orig_ok")
+        self.rename_pkg(d, "CR66_Proposal_with_GRs.pdf")
+        rc, out = self.run_verify(d, pkg="CR66_Proposal_with_GRs.pdf",
+                                  extra=("--original-name", "11ae057d-CR66_Proposal_with_GRs.pdf"))
+        self.assertEqual(rc, 0, out)
+        self.assertIn("ALL OK", out)
+
+    def test_original_name_mismatch(self):
+        d = self.case("orig_bad")
+        self.rename_pkg(d, "renamed.pdf")
+        self.must_fail(d, "package file name", pkg="renamed.pdf", extra=("--original-name", "CR66_Proposal_with_GRs.pdf"))
 
     def test_mark_not_found(self):
         d = self.case("mark")

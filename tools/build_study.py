@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""build_study.py <study.json> <out.docx>   — builds <PREFIX>_Study.docx (A4, 2 cm margins, DVOT-SurekhMR everywhere).
+"""build_study.py <study.json> <out.docx> [--allow-missing-part1] [--no-lint]   — builds <PREFIX>_Study.docx (A4, 2 cm margins, DVOT-SurekhMR everywhere).
 study.json = {"title": "C R 130/2026 — अभ्यास-फाइल", "parts": [
    {"heading": "भाग 0 — वरिष्ठांसाठी ब्रीफिंग", "blocks": [
        {"bullets": ["प्रस्ताव : ...", "मागणी : ..."]},
@@ -9,15 +9,36 @@ study.json = {"title": "C R 130/2026 — अभ्यास-फाइल", "part
        {"image": "chart.png", "width_cm": 14}          # optional chart (briefing only)
    ]},
    {"heading": "भाग 1 — प्रस्तावाचे मराठी रूपांतर", "blocks": [...]}, ... ]}
-Each part starts on a new page. Order and content of parts: INSTRUCTIONS.md §4.8, §4.17 and tools/PROPOSAL_PROMPT.md."""
-import sys, json
+Each part starts on a new page. Order and content of parts: INSTRUCTIONS.md §4.8, §4.17 and tools/PROPOSAL_PROMPT.md.
+First runs the pre-build lint (tools/lint_spec.py: headings भाग 0 … भाग 7, internal ids, पृ. references) and stops with
+exit 1 (problems printed) if it finds any. --allow-missing-part1 or env STUDY_ALLOW_MISSING_PART1=1: भाग 1 may be absent
+(produced in parallel, merged later). --no-lint or env LINT_SKIP=1 skips the lint."""
+import sys, json, os
 from docx import Document
 from docx.shared import Pt, Cm
 from docx.enum.text import WD_BREAK
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
 F = "DVOT-SurekhMR"
-spec = json.load(open(sys.argv[1], encoding="utf-8-sig")); out = sys.argv[2]
+try:
+    sys.stdout.reconfigure(encoding="utf-8")
+except Exception:
+    pass
+FLAGS = ("--allow-missing-part1", "--no-lint")
+ARGS = [a for a in sys.argv[1:] if a not in FLAGS]
+if len(ARGS) != 2:
+    sys.exit(__doc__)
+spec = json.load(open(ARGS[0], encoding="utf-8-sig")); out = ARGS[1]
+if "--no-lint" not in sys.argv and os.environ.get("LINT_SKIP") != "1":
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from lint_spec import lint_study
+    allow1 = "--allow-missing-part1" in sys.argv or os.environ.get("STUDY_ALLOW_MISSING_PART1") == "1"
+    probs = lint_study(spec, allow_missing_part1=allow1)
+    for pr in probs:
+        print(pr)
+    if probs:
+        print("LINT FAILED — fix study.json (tools/lint_spec.py); nothing built", file=sys.stderr)
+        sys.exit(1)
 d = Document(); s = d.sections[0]; s.page_width, s.page_height = Cm(21), Cm(29.7)
 for a in ("left_margin", "right_margin", "top_margin", "bottom_margin"): setattr(s, a, Cm(2))
 def rf(el):

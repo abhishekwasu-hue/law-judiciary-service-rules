@@ -15,13 +15,13 @@ DB = {
     "runs": [{"id": 11, "case_id": 7, "state": "queued", "instructions": "पत्रात फक्त अत्यावश्यक माहिती", "step": None}],
     "case_files": [
         {"id": 1, "case_id": 7, "kind": "proposal", "storage_path": f"proposals/7/proposal/v1/{PROP}", "original_name": PROP, "version": 1, "created_at": "1"},
-        {"id": 2, "case_id": 7, "kind": "proposal", "storage_path": f"proposals/7/proposal/v2/{PROP}", "original_name": PROP, "version": 2, "created_at": "2"},
+        {"id": 2, "case_id": 7, "kind": "proposal", "storage_path": "proposals/7/proposal/v2/file.pdf", "original_name": PROP, "version": 2, "created_at": "2"},
         {"id": 3, "case_id": 7, "kind": "reply", "storage_path": "proposals/7/reply/v1/उत्तर.pdf", "original_name": "उत्तर.pdf", "version": 1, "created_at": "3"},
         {"id": 4, "case_id": 7, "kind": "study", "storage_path": "outputs/7/study/v1/CR130_2026_Study.docx", "original_name": "CR130_2026_Study.docx", "version": 1, "created_at": "4"},
     ],
     "activity": [],
 }
-STORE = {f"proposals/7/proposal/v1/{PROP}": b"%PDF old", f"proposals/7/proposal/v2/{PROP}": b"%PDF new",
+STORE = {f"proposals/7/proposal/v1/{PROP}": b"%PDF old", "proposals/7/proposal/v2/file.pdf": b"%PDF new",
          "proposals/7/reply/v1/उत्तर.pdf": b"%PDF reply"}
 LOG = []
 
@@ -91,7 +91,7 @@ run_row = DB["runs"][0]
 # --- fetch
 r = run("fetch", work); check(r.returncode == 0, f"fetch exit 0 ({r.stderr.strip()[:200]})")
 p = os.path.join(work, "in", "proposal", PROP)
-check(open(p, "rb").read() == b"%PDF new", "fetch: newest proposal version, original name")
+check(open(p, "rb").read() == b"%PDF new", "fetch: newest proposal version (ASCII storage key file.pdf) saved under its original name")
 check(os.path.exists(os.path.join(work, "in", "reply", "उत्तर.pdf")), "fetch: reply downloaded")
 check(not os.path.exists(os.path.join(work, "in", "study")), "fetch: outputs not downloaded")
 cj = json.load(open(os.path.join(work, "case.json"), encoding="utf-8"))
@@ -115,14 +115,19 @@ json.dump(st, open(os.path.join(out, "status.json"), "w", encoding="utf-8"), ens
 LOG.clear()
 r = run("finish", out); check(r.returncode == 0, f"finish exit 0 ({r.stderr.strip()[:300]})")
 ups = [l["path"] for l in LOG if l["m"] == "POST" and l["path"].startswith("/storage/v1/object/")]
-check(sorted(ups) == sorted([f"/storage/v1/object/outputs/7/study/v2/CR130_2026_Study.docx",
-                             "/storage/v1/object/outputs/7/note_letter/v1/CR130_2026_Note_and_Letter.docx",
-                             f"/storage/v1/object/outputs/7/package_pdf/v1/{PROP}"]), "finish: 3 uploads to outputs, original names, versions")
-check(STORE[f"outputs/7/package_pdf/v1/{PROP}"] == b"x" + PROP.encode(), "finish: package PDF content uploaded")
-pdfh = [l for l in LOG if l["path"].endswith(PROP) and l["m"] == "POST"][0]["h"]
+check(sorted(ups) == sorted(["/storage/v1/object/outputs/7/study/v2/file.docx",
+                             "/storage/v1/object/outputs/7/note_letter/v1/file.docx",
+                             "/storage/v1/object/outputs/7/package_pdf/v1/file.pdf"]), f"finish: 3 uploads to outputs, ASCII keys file<ext>, versions ({ups})")
+check(all(u.isascii() for u in ups), "finish: storage object keys are ASCII (Devanagari proposal name)")
+check(STORE["outputs/7/package_pdf/v1/file.pdf"] == b"x" + PROP.encode(), "finish: package PDF content uploaded")
+pdfh = [l for l in LOG if l["path"].endswith("package_pdf/v1/file.pdf") and l["m"] == "POST"][0]["h"]
 check(pdfh.get("Content-Type") == "application/pdf" and pdfh.get("x-upsert") == "true", "finish: content-type + upsert")
 new = [f for f in DB["case_files"] if f["id"] >= 100]
 check({(f["kind"], f["version"], f["storage_path"].split("/")[0]) for f in new} == {("study", 2, "outputs"), ("note_letter", 1, "outputs"), ("package_pdf", 1, "outputs")}, "finish: case_files rows")
+check({f["kind"]: (f["storage_path"], f["original_name"]) for f in new} == {
+    "study": ("outputs/7/study/v2/file.docx", "CR130_2026_Study.docx"),
+    "note_letter": ("outputs/7/note_letter/v1/file.docx", "CR130_2026_Note_and_Letter.docx"),
+    "package_pdf": ("outputs/7/package_pdf/v1/file.pdf", PROP)}, "finish: case_files storage_path ASCII, original_name = real (Devanagari) name")
 check(run_row["state"] == "done" and run_row["step"] == "तयार" and run_row["summary"] == st["summary"] and run_row["letter_needed"] is True
       and run_row["essential_points"] == st["essential_points"] and run_row["grs_attached"] == st["grs_attached"]
       and run_row["grs_missing"] == st["grs_missing"] and run_row["finished_at"], "finish: runs PATCH done + summary fields")
@@ -173,6 +178,36 @@ check(r.returncode == 1 and "वेळ संपली" in run_row["step"], "cla
 r = claude(None, err="something odd", rc="137", raw="not json")
 check(r.returncode == 1 and "exit 137" in run_row["step"], f"claude_result unknown error: exit code in reason ({run_row['step']})")
 
+# --- claude_result with the parallel Study-part-1 run: cost/turns summed, duration = wall clock (--wall)
+p1f = os.path.join(tmp, "part1.json")
+open(p1f, "w", encoding="utf-8").write(json.dumps({"type": "result", "subtype": "success", "is_error": False, "num_turns": 30,
+                                                   "duration_ms": 400000, "total_cost_usd": 1.25}))
+run_row.update(state="running", step="तपासणी चालू", warnings=[])
+jf, ef = os.path.join(tmp, "claude.json"), os.path.join(tmp, "claude.err")
+open(jf, "w", encoding="utf-8").write(json.dumps({"type": "result", "subtype": "success", "is_error": False, "num_turns": 79,
+                                                  "duration_ms": 600000, "total_cost_usd": 3.32}))
+open(ef, "w", encoding="utf-8").write("")
+r = run("claude_result", jf, ef, "0", "--part1", p1f, "--wall", "655.4")
+check(r.returncode == 0 and run_row["state"] == "running", f"claude_result main+part1: exit 0 ({r.stderr[:200]})")
+check(run_row["cost_usd"] == 4.57 and run_row["num_turns"] == 109 and run_row["duration_s"] == 655.4,
+      f"claude_result main+part1: cost/turns summed, duration = wall ({run_row['cost_usd']}, {run_row['num_turns']}, {run_row['duration_s']})")
+check(run_row["warnings"] == [], "claude_result part1 success: no warning")
+r = run("claude_result", jf, ef, "0", "--part1", p1f)
+check(run_row["duration_s"] == 600.0 and run_row["num_turns"] == 109, "claude_result without --wall: duration = longer run")
+r = run("claude_result", jf, ef, "0", "--part1", os.path.join(tmp, "absent.json"), "--wall", "700")
+check(r.returncode == 0 and run_row["state"] == "running" and run_row["cost_usd"] == 3.32 and run_row["num_turns"] == 79
+      and run_row["duration_s"] == 700.0, "claude_result part1 JSON absent: main only, not failed")
+check(len(run_row["warnings"]) == 1 and "भाग 1" in run_row["warnings"][0], "claude_result part1 absent: warning recorded")
+open(p1f, "w", encoding="utf-8").write(json.dumps({"type": "result", "subtype": "error_max_turns", "is_error": True, "num_turns": 120, "total_cost_usd": 2.0}))
+r = run("claude_result", jf, ef, "0", "--part1", p1f, "--wall", "800")
+check(r.returncode == 0 and run_row["state"] == "running" and run_row["num_turns"] == 199 and run_row["cost_usd"] == 5.32,
+      "claude_result part1 error alone: case not failed, its cost/turns still counted")
+check(len(run_row["warnings"]) == 2 and "error_max_turns" in run_row["warnings"][1], "claude_result part1 error: warning with subtype")
+open(jf, "w", encoding="utf-8").write(json.dumps({"type": "result", "subtype": "error_max_turns", "is_error": True, "num_turns": 400, "total_cost_usd": 9.0}))
+r = run("claude_result", jf, ef, "0", "--part1", p1f, "--wall", "900")
+check(r.returncode == 1 and run_row["state"] == "failed" and "max turns" in run_row["step"] and run_row["num_turns"] == 520,
+      "claude_result main error with part1: failed with the main run's reason, sums stored")
+
 # --- verify: runs verify_outputs with PREFIX / package / proposal pages; FAIL lines become the reason
 fake = os.path.join(tmp, "fake_verify.py"); argf = os.path.join(tmp, "verify_args.json")
 open(fake, "w", encoding="utf-8").write(
@@ -190,6 +225,21 @@ a = json.load(open(argf, encoding="utf-8"))
 check(r.returncode == 0 and run_row["state"] == "running", f"verify ALL OK: exit 0 ({r.stderr[:200]})")
 check(a[1] == "CR130_2026" and os.path.basename(a[2]) == PROP and a[0] == out, "verify: outdir, PREFIX, package PDF passed")
 check(a[3] == "5", f"verify: proposal pages from status.json when the PDF cannot be read ({a[3]})")
+check(a[4:] == ["--original-name", PROP], f"verify: --original-name = the newest proposal's original name ({a[4:]})")
+# a real proposal file name that looks machine-made (live case: CR66_Proposal_with_GRs.pdf) is passed as is
+cj0 = json.load(open(os.path.join(work, "case.json"), encoding="utf-8"))
+work_m = os.path.join(tmp, "case_m"); out_m = os.path.join(tmp, "out_m"); os.makedirs(out_m)
+MN = "CR66_Proposal_with_GRs.pdf"
+json.dump({**cj0, "proposal_original_name": "11ae057d-" + MN, "inputs": []}, open(os.path.join(tmp, "cm.json"), "w", encoding="utf-8"))
+os.makedirs(work_m); os.replace(os.path.join(tmp, "cm.json"), os.path.join(work_m, "case.json"))
+open(os.path.join(out_m, MN), "wb").write(b"x")
+json.dump({"state": "done", "prefix": "CR66_2026", "package_pdf": MN, "proposal_pages": 4}, open(os.path.join(out_m, "status.json"), "w", encoding="utf-8"))
+r = run("verify", out_m, work_m, VERIFY_SCRIPT=fake)
+a = json.load(open(argf, encoding="utf-8"))
+check(r.returncode == 0 and a[4:] == ["--original-name", MN] and os.path.basename(a[2]) == MN,
+      f"verify: upload prefix stripped, machine-looking original name passed ({a[4:]})")
+r = run("verify", out_m, VERIFY_SCRIPT=fake)
+check(len(json.load(open(argf, encoding="utf-8"))) == 4, "verify without workdir: no --original-name")
 try:
     import pymupdf
     d = pymupdf.open()
