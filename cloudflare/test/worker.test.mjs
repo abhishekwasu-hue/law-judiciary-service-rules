@@ -86,9 +86,9 @@ test('setup → settings masking → auth → run dispatch → engine config', a
   // model_light + budget_usd: plain settings, round-trip, budget validated (positive, <= 20)
   for (const v of ['0', '-1', '20.5', 'abc']) assert.equal((await put({ budget_usd: v, model_light: 'x' })).status, 400, `budget ${v} refused`);
   assert.equal(env.SETTINGS.m.has('model_light'), false, 'nothing saved on a refused PUT');
-  assert.equal((await put({ model_light: 'claude-haiku-4-5', budget_usd: '0.75' })).status, 200);
+  assert.equal((await put({ model_light: 'claude-haiku-4-5', model_review: 'claude-opus-5-5', budget_usd: '0.75' })).status, 200);
   s = await body(await call('/api/settings', { headers: owner }));
-  assert.equal(s.model_light, 'claude-haiku-4-5'); assert.equal(s.budget_usd, '0.75');
+  assert.equal(s.model_light, 'claude-haiku-4-5'); assert.equal(s.model_review, 'claude-opus-5-5'); assert.equal(s.budget_usd, '0.75');
   assert.equal((await put({ budget_usd: '20' })).status, 200);
   assert.equal((await put({ budget_usd: '1.5' })).status, 200);
 
@@ -105,7 +105,7 @@ test('setup → settings masking → auth → run dispatch → engine config', a
   assert.equal((await call(`/api/engine/config?run_id=56`, { headers: { authorization: `Bearer ${payload.token}` } })).status, 403, 'token bound to its run');
   const ec = await body(await cfg(payload.token));
   assert.equal(ec.anthropic_api_key, 'sk-ant-secret-wxyz'); assert.equal(ec.supabase_service_key, 'service-secret-1234');
-  assert.equal(ec.model, 'claude-opus-5-5'); assert.equal(ec.model_light, 'claude-haiku-4-5'); assert.equal(ec.budget_usd, '1.5');
+  assert.equal(ec.model, 'claude-opus-5-5'); assert.equal(ec.model_light, 'claude-haiku-4-5'); assert.equal(ec.model_review, 'claude-opus-5-5'); assert.equal(ec.budget_usd, '1.5');
   assert.equal((await cfg(payload.token)).status, 403, 'config token is single use');
 
   // engine fail with the (used) run token: only its own run, only while queued/running

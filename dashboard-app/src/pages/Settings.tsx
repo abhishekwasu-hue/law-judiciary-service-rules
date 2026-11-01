@@ -13,8 +13,9 @@ const PLAIN: { k: string; label: string; hint?: string; num?: boolean; ai?: bool
   { k: 'supabase_anon_key', label: 'Supabase anon key', hint: 'त्याच ठिकाणची सार्वजनिक की (anon)' },
   { k: 'github_repo', label: 'GitHub repo', hint: 'नियम व साधने असलेला रेपो — उदा. owner/repo' },
   { k: 'github_branch', label: 'GitHub branch', hint: 'सहसा main' },
-  { k: 'model', label: 'मुख्य मॉडेल (model)', hint: 'नोंद, पत्र व GR साठी; रिकामे = डीफॉल्ट', ai: true, ph: 'उदा. claude-opus-… (दर्जा राखण्यासाठी)' },
-  { k: 'model_light', label: 'स्वस्त मॉडेल (model_light)', hint: 'पाने वाचणे, भाग 1 व यांत्रिक कामासाठी; रिकामे = डीफॉल्ट', ai: true, ph: 'उदा. claude-haiku-…' },
+  { k: 'model', label: 'मुख्य मॉडेल (model)', hint: 'मसुदा (तथ्ये, नोंद, पत्र, GR) — उदा. claude-sonnet-…', ai: true, ph: 'उदा. claude-sonnet-…' },
+  { k: 'model_review', label: 'अंतिम पडताळणी मॉडेल (model_review)', hint: 'नोंद, पत्र व ब्रीफिंगची अंतिम तपासणी व मंजुरी — सर्वात सक्षम मॉडेल ठेवा; रिकामे = डीफॉल्ट', ai: true, ph: 'उदा. claude-opus-…' },
+  { k: 'model_light', label: 'स्वस्त मॉडेल (model_light)', hint: 'Study भाग 1–7, संबंधित माहिती व यांत्रिक काम — स्वस्त मॉडेल; रिकामे = डीफॉल्ट', ai: true, ph: 'उदा. claude-haiku-…' },
   { k: 'budget_usd', label: 'कमाल खर्च ($) (budget_usd)', hint: 'प्रत्येक प्रस्तावासाठी अपेक्षित कमाल खर्च ($). ओलांडल्यास फक्त सूचना येते — काम थांबत नाही, दर्जा घटत नाही. रिकामे = 0.75', num: true, ai: true, ph: 'उदा. 1.5' },
 ];
 const SECRET: { k: string; label: string; hint: string }[] = [
@@ -116,7 +117,7 @@ export default function Settings() {
             </div>
             <fieldset className="space-y-3 rounded-lg border border-slate-200 p-4 dark:border-navy-800">
               <legend className="px-1 text-lg font-bold">AI मॉडेल व खर्च</legend>
-              <p className="text-sm text-slate-600 dark:text-slate-300">स्वस्त मॉडेल — पाने वाचणे, भाग 1, यांत्रिक काम; मुख्य मॉडेल — नोंद/पत्र/GR; गरज पडल्यासच अधिक सक्षम मॉडेल आपोआप</p>
+              <p className="text-sm text-slate-600 dark:text-slate-300">स्वस्त मॉडेल — Study भाग 1–7, संबंधित माहिती, यांत्रिक काम; मुख्य मॉडेल — मसुदा; पडताळणी मॉडेल — अंतिम तपासणी व मंजुरी</p>
               <div className="grid gap-4 md:grid-cols-3">
                 {PLAIN.filter(p => p.ai).map(plainField)}
               </div>

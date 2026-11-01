@@ -3,7 +3,7 @@
 // every key/URL lives in KV namespace SETTINGS, entered on the app's Settings screen (owner only).
 
 const SECRET_KEYS = ['supabase_service_key', 'github_token', 'anthropic_api_key'];
-const PLAIN_KEYS = ['supabase_url', 'supabase_anon_key', 'github_repo', 'github_branch', 'model', 'model_light', 'budget_usd', 'owner_email'];
+const PLAIN_KEYS = ['supabase_url', 'supabase_anon_key', 'github_repo', 'github_branch', 'model', 'model_light', 'model_review', 'budget_usd', 'owner_email'];
 const ALL_KEYS = [...SECRET_KEYS, ...PLAIN_KEYS];
 const FILE_KINDS = ['proposal', 'extra_doc', 'reply'];
 const MAX_UPLOAD = 50 * 1024 * 1024;
@@ -157,7 +157,7 @@ async function route(req, env, url) {
     if (!cfg.anthropic_api_key || !cfg.supabase_url || !cfg.supabase_service_key) return bad('config incomplete (Settings)', 412); // token stays unused
     const exp = tok.exp || Math.floor(Date.now() / 1000) + RUN_TOKEN_TTL;
     await env.SETTINGS.put(tok.key, JSON.stringify({ run_id: tok.run_id, used: true, exp }), { expiration: exp });
-    return json({ anthropic_api_key: cfg.anthropic_api_key, model: cfg.model, model_light: cfg.model_light || '', budget_usd: cfg.budget_usd || '', supabase_url: cfg.supabase_url, supabase_service_key: cfg.supabase_service_key });
+    return json({ anthropic_api_key: cfg.anthropic_api_key, model: cfg.model, model_light: cfg.model_light || '', model_review: cfg.model_review || '', budget_usd: cfg.budget_usd || '', supabase_url: cfg.supabase_url, supabase_service_key: cfg.supabase_service_key });
   }
 
   // engine: record a failure when the workflow has no Supabase env (e.g. the config step failed). Run token, used or not.
