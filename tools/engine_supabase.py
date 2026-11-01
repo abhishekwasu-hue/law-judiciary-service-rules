@@ -227,6 +227,13 @@ def fill_case(found):
             patch[k] = v
     if found.get("category") in CATS and cur.get("category") in (None, "", "इतर"):
         patch["category"] = found["category"]
+    if patch.get("cr_no") and (patch.get("cr_year") or cur.get("cr_year")):
+        yr = patch.get("cr_year") or cur.get("cr_year")
+        dup = rest("GET", f"cases?cr_no=eq.{patch['cr_no']}&cr_year=eq.{yr}&id=neq.{CASE}&select=id&limit=1") or []
+        if dup:  # same C R/year already in another case: keep it out, still fill the rest, tell the user
+            activity("case_cr_duplicate", {"cr": f"{patch['cr_no']}/{yr}", "existing_id": dup[0]["id"]})
+            patch.pop("cr_no", None)
+            patch.pop("cr_year", None)
     if not patch:
         return
     try:

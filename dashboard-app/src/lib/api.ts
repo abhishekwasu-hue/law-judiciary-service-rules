@@ -2,7 +2,7 @@
 import { hasSupabase, sb } from './supabase';
 
 export class ApiError extends Error {
-  constructor(public status: number, message: string) {
+  constructor(public status: number, message: string, public data?: unknown) {
     super(message);
   }
 }
@@ -69,7 +69,7 @@ export async function api<T = unknown>(path: string, opt: { method?: string; bod
   }
   if (!r.ok) {
     const m = j && typeof j === 'object' && 'error' in j ? String((j as { error: unknown }).error) : `HTTP ${r.status}`;
-    throw new ApiError(r.status, m);
+    throw new ApiError(r.status, m, j);
   }
   return j as T;
 }

@@ -1,6 +1,6 @@
 import { useRef, useState, type DragEvent, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { api, humanError, uploadFile } from '../lib/api';
+import { ApiError, api, humanError, uploadFile } from '../lib/api';
 import { useCanWrite } from '../lib/auth';
 import { CATEGORIES, PRIORITIES, isStale } from '../lib/constants';
 import { crLabel, fmtBytes } from '../lib/format';
@@ -48,6 +48,7 @@ export default function NewProposal() {
   const [ups, setUps] = useState<Up[]>([]);
   const [created, setCreated] = useState<Case | null>(null);
   const [runErr, setRunErr] = useState('');
+  const [dupId, setDupId] = useState<number | null>(null); // C R/year already in another case
   const runs = useRuns(created?.id ?? null);
   const run: Run | undefined = created ? runs?.[0] : undefined; // ignore the previous case after reset
   const statusRef = useRef<HTMLDivElement>(null);
@@ -125,6 +126,12 @@ export default function NewProposal() {
         setRunErr(humanError(x));
       }
     } catch (x) {
+      if (x instanceof ApiError && x.message === 'duplicate_cr') {
+        const id = Number((x.data as { existing_id?: number } | undefined)?.existing_id) || null;
+        setDupId(id);
+        toast(`हा C R आधीच प्रकरण #${id ?? '?'} मध्ये आहे`, 'err');
+        return;
+      }
       toast(humanError(x), 'err');
     } finally {
       setBusy(false);
@@ -205,6 +212,13 @@ export default function NewProposal() {
           </div>
         </Section>
 
+        {dupId != null && (
+          <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-amber-900 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-100 lg:col-span-2" role="alert">
+            <div className="font-bold">हा C R क्र. / वर्ष आधीच प्रकरण #{dupId} मध्ये नोंदलेला आहे.</div>
+            <div className="mt-1 text-sm">तेच प्रकरण पुढे न्यायचे असल्यास ते उघडा (तिथे “पुन्हा तयार करा” वापरा). नवीन प्रकरण हवेच असल्यास C R व वर्ष रिकामे ठेवून पुन्हा जमा करा.</div>
+            <Link className="btn-primary mt-2 inline-flex" to={`/cases/${dupId}`}>प्रकरण #{dupId} उघडा →</Link>
+          </div>
+        )}
         <Section title="तपशील">
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3">

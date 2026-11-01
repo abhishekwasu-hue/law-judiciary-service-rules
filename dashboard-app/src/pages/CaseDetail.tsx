@@ -173,6 +173,19 @@ export default function CaseDetail() {
       <div className="no-print">
         <Link to="/cases" className="text-sm font-semibold text-navy-600 hover:underline dark:text-navy-200">← प्रकरणे</Link>
       </div>
+      {!c.cr_no && (() => {
+        // engine found this C R/year on the निर्देशपत्र but it already belongs to another case
+        const d = activity.find(a => a.action === 'case_cr_duplicate');
+        const det = (d?.detail || {}) as { cr?: string; existing_id?: number };
+        if (!d) return null;
+        return (
+          <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-amber-900 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-100" role="alert">
+            <div className="font-bold">PDF वरून C R {det.cr} सापडला, पण तो आधीच प्रकरण #{det.existing_id} मध्ये आहे.</div>
+            <div className="mt-1 text-sm">एकच प्रकरण ठेवायचे असल्यास दुसऱ्याचा टप्पा “बंद” करा.</div>
+            {det.existing_id && <Link className="btn-ghost mt-2 inline-flex" to={`/cases/${det.existing_id}`}>प्रकरण #{det.existing_id} उघडा →</Link>}
+          </div>
+        );
+      })()}
       <header className="card space-y-3 p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">

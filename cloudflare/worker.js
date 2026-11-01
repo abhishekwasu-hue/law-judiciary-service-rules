@@ -228,6 +228,10 @@ async function route(req, env, url) {
     if (b.cr_year && !/^\d{4}$/.test(String(b.cr_year))) return bad('cr_year: 4 digits');
     const allowed = ['cr_no', 'cr_year', 'file_no', 'subject', 'category', 'priority', 'employee_name', 'post', 'office', 'received_from', 'received_via', 'inward_date', 'due_date'];
     const row = Object.fromEntries(allowed.filter(k => b[k] !== undefined && b[k] !== '').map(k => [k, b[k]]));
+    if (row.cr_no && row.cr_year) {
+      const dup = await db.rest(`cases?cr_no=eq.${encodeURIComponent(row.cr_no)}&cr_year=eq.${encodeURIComponent(row.cr_year)}&select=id&limit=1`);
+      if (dup.length) return json({ error: 'duplicate_cr', existing_id: dup[0].id }, 409);
+    }
     const [c] = await db.rest('cases', { method: 'POST', body: JSON.stringify(row) });
     await log(cfg, c.id, user.id, 'case_created', { cr: c.cr_no ? `${c.cr_no}/${c.cr_year || ''}` : '' });
     return json(c);
