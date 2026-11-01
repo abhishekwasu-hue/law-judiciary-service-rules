@@ -39,7 +39,7 @@ Q3. Second AI provider as fallback — default: none.
 
 ## Build order and status
 1. Supabase schema + storage + RLS — `supabase/migrations/20261101000001_init.sql`, seed `supabase/seed.sql` (tools/app_seed_gr.py) — DONE. Tested in PGlite with stub auth/storage schemas: owner insert OK, senior insert refused by RLS, senior read OK, non-member reads 0 rows, stage change logged in `activity`, 19 GR rows. Note: Marathi stage/category are text + CHECK (Postgres enum labels max 63 bytes).
-2. Worker API + settings store — `cloudflare/` — TODO
+2. Worker API + settings store — `cloudflare/worker.js`, `cloudflare/wrangler.toml` (no keys; KV id pasted at deploy) — DONE. Endpoints: public-config, setup, settings (owner, secrets masked), me, members (invite), cases, upload (original name, versions), run (dispatch), files/:id (signed 10 min), gr (fetch by सांकेतांक), search (register/), letters, engine/config (one-time run token). Test: `node --test cloudflare/test/worker.test.mjs` passes.
 3. Engine workflow `repository_dispatch` → Supabase — TODO (needs Abhi's accounts for the live test)
 4. Front end: upload → live status → three downloads + previews + Settings — TODO
 5. Charts / Kanban / rest of prompt §6 — TODO
