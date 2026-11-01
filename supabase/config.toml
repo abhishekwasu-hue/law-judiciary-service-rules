@@ -1,0 +1,11 @@
+# प्रस्ताव कक्ष (app B) — minimal Supabase CLI config. No keys here.
+# Use: npx supabase link --project-ref <your project ref>   then   npx supabase db push --include-seed
+# project_id is only a local name; the real project is chosen by `supabase link`.
+project_id = "PASTE_SUPABASE_PROJECT_REF"
+
+[db]
+major_version = 15
+
+[db.seed]
+enabled = true
+sql_paths = ["./seed.sql"]

@@ -1,0 +1,168 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { PDFDocumentProxy } from 'pdfjs-dist';
+import { fileBytes } from '../lib/api';
+import { openPdf } from '../lib/pdf';
+import { Skeleton } from './ui';
+
+interface OutlineNode { title: string; page: number | null; items: OutlineNode[] }
+
+async function resolveOutline(doc: PDFDocumentProxy): Promise<OutlineNode[]> {
+  const raw = (await doc.getOutline()) || [];
+  const walk = async (items: typeof raw): Promise<OutlineNode[]> =>
+    Promise.all(
+      items.map(async it => {
+        let page: number | null = null;
+        try {
+          const dest = typeof it.dest === 'string' ? await doc.getDestination(it.dest) : it.dest;
+          if (Array.isArray(dest) && dest[0]) page = typeof dest[0] === 'number' ? dest[0] + 1 : (await doc.getPageIndex(dest[0])) + 1;
+        } catch {
+          page = null;
+        }
+        return { title: it.title, page, items: await walk(it.items || []) };
+      }),
+    );
+  return walk(raw);
+}
+
+function Page({ doc, n, width }: { doc: PDFDocumentProxy; n: number; width: number }) {
+  const holder = useRef<HTMLDivElement>(null);
+  const canvas = useRef<HTMLCanvasElement>(null);
+  const [visible, setVisible] = useState(false);
+  const [ratio, setRatio] = useState(1.414);
+
+  useEffect(() => {
+    const el = holder.current;
+    if (!el) return;
+    const io = new IntersectionObserver(es => es.some(e => e.isIntersecting) && setVisible(true), { rootMargin: '600px' });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!visible || !width) return;
+    let cancelled = false;
+    let task: { cancel: () => void; promise: Promise<unknown> } | null = null;
+    (async () => {
+      const page = await doc.getPage(n);
+      const base = page.getViewport({ scale: 1 });
+      setRatio(base.height / base.width);
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const vp = page.getViewport({ scale: (width / base.width) * dpr });
+      const c = canvas.current;
+      if (!c || cancelled) return;
+      c.width = vp.width;
+      c.height = vp.height;
+      // Default annotation mode draws existing annotations (the yellow highlights) onto the canvas.
+      task = page.render({ canvasContext: c.getContext('2d')!, viewport: vp });
+      await task.promise.catch(() => {});
+    })();
+    return () => {
+      cancelled = true;
+      task?.cancel();
+    };
+  }, [visible, width, doc, n]);
+
+  return (
+    <div ref={holder} data-page={n} className="relative mx-auto bg-white shadow" style={{ width, height: width * ratio }}>
+      <canvas ref={canvas} style={{ width: '100%', height: '100%' }} aria-label={`पृष्ठ ${n}`} />
+      <span className="absolute right-1 top-1 rounded bg-black/60 px-1.5 text-xs text-white">{n}</span>
+    </div>
+  );
+}
+
+function Outline({ nodes, go, depth = 0 }: { nodes: OutlineNode[]; go: (p: number) => void; depth?: number }) {
+  return (
+    <ul className={depth ? 'ml-3 border-l border-slate-200 pl-2 dark:border-navy-700' : ''}>
+      {nodes.map((o, i) => (
+        <li key={i}>
+          <button className="min-h-tap w-full rounded px-2 py-1 text-left text-sm hover:bg-slate-100 disabled:opacity-50 dark:hover:bg-navy-800" disabled={!o.page} onClick={() => o.page && go(o.page)}>
+            {o.title} {o.page && <span className="text-slate-500">• पृ. {o.page}</span>}
+          </button>
+          {o.items.length > 0 && <Outline nodes={o.items} go={go} depth={depth + 1} />}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+export default function PdfViewer({ fileId, url, jumpTo }: { fileId?: number; url?: string; jumpTo?: { page: number; at: number } }) {
+  const [doc, setDoc] = useState<PDFDocumentProxy | null>(null);
+  const [outline, setOutline] = useState<OutlineNode[]>([]);
+  const [err, setErr] = useState('');
+  const [width, setWidth] = useState(0);
+  const [showOutline, setShowOutline] = useState(true);
+  const [pageInput, setPageInput] = useState('');
+  const scroller = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let alive = true;
+    let d: PDFDocumentProxy | null = null;
+    setDoc(null);
+    setErr('');
+    (async () => {
+      try {
+        const data = fileId != null ? (await fileBytes(fileId)).data : await (await fetch(url!)).arrayBuffer();
+        d = await openPdf(data);
+        if (!alive) return void d.destroy();
+        setDoc(d);
+        const o = await resolveOutline(d);
+        if (alive) {
+          setOutline(o);
+          if (!o.length) setShowOutline(false);
+        }
+      } catch (e) {
+        if (alive) setErr(e instanceof Error ? e.message : String(e));
+      }
+    })();
+    return () => {
+      alive = false;
+      void d?.destroy();
+    };
+  }, [fileId, url]);
+
+  useEffect(() => {
+    const el = scroller.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setWidth(Math.min(el.clientWidth - 16, 1000)));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [doc]);
+
+  const go = useCallback((p: number) => {
+    const el = scroller.current?.querySelector<HTMLElement>(`[data-page="${p}"]`);
+    if (el && scroller.current) scroller.current.scrollTo({ top: el.offsetTop - 8, behavior: 'smooth' });
+  }, []);
+  useEffect(() => {
+    if (jumpTo && doc) setTimeout(() => go(jumpTo.page), 50);
+  }, [jumpTo, doc, go]);
+
+  if (err) return <div className="rounded-lg bg-red-100 p-3 text-red-900 dark:bg-red-900/40 dark:text-red-100">PDF उघडता आला नाही: {err}</div>;
+  if (!doc) return <div className="space-y-3"><Skeleton className="h-8 w-1/2" /><Skeleton className="h-[60vh] w-full" /></div>;
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap items-center gap-2">
+        {outline.length > 0 && (
+          <button className="btn-ghost" onClick={() => setShowOutline(s => !s)} aria-pressed={showOutline}>☰ Bookmarks</button>
+        )}
+        <span className="text-sm text-slate-500">एकूण {doc.numPages} पाने</span>
+        <form className="ml-auto flex items-center gap-1" onSubmit={e => { e.preventDefault(); const n = Number(pageInput); if (n >= 1 && n <= doc.numPages) go(n); }}>
+          <input className="input w-20" inputMode="numeric" placeholder="पृ." value={pageInput} onChange={e => setPageInput(e.target.value.replace(/\D/g, ''))} aria-label="पृष्ठ क्रमांक" />
+          <button className="btn-ghost">जा</button>
+        </form>
+      </div>
+      <div className="flex gap-2">
+        {showOutline && outline.length > 0 && (
+          <nav className="card max-h-[75vh] w-64 shrink-0 overflow-auto p-2 max-md:fixed max-md:inset-x-3 max-md:bottom-20 max-md:z-40 max-md:max-h-[50vh] max-md:w-auto" aria-label="Bookmarks">
+            <Outline nodes={outline} go={p => { go(p); if (window.innerWidth < 768) setShowOutline(false); }} />
+          </nav>
+        )}
+        <div ref={scroller} className="relative h-[75vh] min-w-0 flex-1 overflow-auto rounded-lg bg-slate-200 p-2 dark:bg-navy-950">
+          <div className="flex flex-col gap-3">
+            {width > 0 && Array.from({ length: doc.numPages }, (_, i) => <Page key={i} doc={doc} n={i + 1} width={width} />)}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

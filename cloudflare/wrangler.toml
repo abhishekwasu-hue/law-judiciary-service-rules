@@ -1,10 +1,15 @@
-name = "proposal-dashboard"
+# प्रस्ताव कक्ष Worker (app B). No keys here: all keys/URLs are entered on the app's Settings screen (KV "SETTINGS").
+# Before the first deploy: `npx wrangler kv namespace create SETTINGS` and paste the printed id below.
+name = "prastav-kaksha"
 main = "worker.js"
 compatibility_date = "2024-11-01"
+
 [assets]
-directory = "../dashboard"
+directory = "../dashboard-app/dist"
 binding = "ASSETS"
+not_found_handling = "single-page-application"
 run_worker_first = ["/api/*"]
-[vars]
-GH_REPO = "abhishekwasu-hue/law-judiciary-service-rules"
-GH_BRANCH = "main"
+
+[[kv_namespaces]]
+binding = "SETTINGS"
+id = "PASTE_KV_NAMESPACE_ID"

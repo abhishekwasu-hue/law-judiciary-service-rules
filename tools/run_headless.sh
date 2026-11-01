@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# SUPERSEDED by tools/ENGINE_PROMPT.md + tools/engine_supabase.py (.github/workflows/process-proposal.yml). Kept for reference only.
 # usage: tools/run_headless.sh <PREFIX>   (run from repo root; needs ANTHROPIC_API_KEY)
 set -u
 P="$1"; OUT="cases/$P"; mkdir -p "$OUT"
