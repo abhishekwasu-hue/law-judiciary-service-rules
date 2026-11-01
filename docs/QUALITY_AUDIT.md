@@ -1,6 +1,6 @@
 # QUALITY_AUDIT.md — productivity + output-quality audit (01.11.2026)
 
-Read-only audits; nothing fixed yet. Abhi chooses what to fix (OWNER_RULES A.5/A.6). Severity H/M/L, effort S/M/L.
+Read-only audits. Pack 1 + Pack 2 FIXED 01.11.2026 (tests: tests/test_tools.py 10, tests/test_verify_outputs.py 17, tests/engine_supabase_test.py, cloudflare/test/worker.test.mjs 3; migration 0004). Pack 3 open. Abhi chooses what to fix (OWNER_RULES A.5/A.6). Severity H/M/L, effort S/M/L.
 
 ## 1. Procedure, rules and quality gates
 | Sev | Where | Problem | Fix | Eff |

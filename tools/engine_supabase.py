@@ -2,7 +2,8 @@
 """engine_supabase.py — app B engine <-> Supabase (stdlib only). Used by .github/workflows/process-proposal.yml.
 Env: SUPABASE_URL, SUPABASE_SERVICE_KEY, CASE_ID, RUN_ID (keys come from the Worker at run time, masked; never stored).
 Commands:
-  fetch <workdir>     newest version of each input file (case_files kinds proposal / extra_doc / reply) ->
+  fetch <workdir>     the NEWEST proposal (by created_at, version, id — a corrected proposal under a new name replaces
+                      the old one) + newest version of each extra_doc / reply file ->
                       <workdir>/in/<kind>/<original_name>; <workdir>/case.json (case row, files, run, instructions);
                       runs: state=running, started_at, step "पाने वाचत आहे".
   step "<text>"       runs.step = text (live progress).
@@ -11,9 +12,17 @@ Commands:
                       (named as the ORIGINAL proposal file, INSTRUCTIONS §4.16; LibreOffice previews *_Study.pdf /
                       *_Note_and_Letter.pdf are ignored) -> bucket outputs/<case>/<kind>/v<n>/<name>, case_files rows,
                       runs done + summary fields, cases.stage "मसुदा तयार", activity run_done. Incomplete -> fail.
+  claude_result <claude.json> [<stderr file>] [<exit code>]
+                      Claude Code `--output-format json` result -> runs.cost_usd, num_turns, duration_s. An error result
+                      (max turns, API key, credit, ...) -> fail with a Marathi reason + next step; exit 1.
+  verify <outdir> [<workdir>]
+                      runs tools/verify_outputs.py <outdir> <PREFIX> "<package pdf>" <proposal pages> (PREFIX/package
+                      from status.json `prefix` / `package_pdf`, else from the file names; proposal pages = page count
+                      of the fetched proposal, else status.json `proposal_pages`). Not ALL OK -> fail with the FAIL lines.
+  warn "<text>"       runs.warnings += text (non-fatal, e.g. new GRs not pushed); activity run_warning.
   fail "<reason>"     runs: state failed, step reason, finished_at; activity run_failed; exit 1.
                       (If the run is already failed, the earlier, more specific reason is kept.)"""
-import datetime, glob, json, mimetypes, os, re, sys, urllib.error, urllib.parse, urllib.request
+import datetime, glob, json, mimetypes, os, re, subprocess, sys, urllib.error, urllib.parse, urllib.request
 
 INPUT_KINDS = ("proposal", "extra_doc", "reply")
 MIME = {".pdf": "application/pdf", ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"}
@@ -90,13 +99,28 @@ def newest(files, kinds):
     return sorted(best.values(), key=lambda f: (f["kind"], f["original_name"]))
 
 
+def upload_order(f):
+    return (str(f.get("created_at") or ""), f.get("version") or 0, f.get("id") or 0)
+
+
+def newest_proposal(files):
+    """The one proposal of the case = the latest upload of kind proposal (any name), not the alphabetically last."""
+    props = [f for f in files if f["kind"] == "proposal"]
+    return max(props, key=upload_order) if props else None
+
+
+def inputs_of(files):
+    p = newest_proposal(files)
+    return ([p] if p else []) + newest(files, ("extra_doc", "reply"))
+
+
 def cmd_fetch(work):
     case = (rest("GET", f"cases?id=eq.{CASE}&select=*") or [None])[0]
     run = (rest("GET", f"runs?id=eq.{RUN}&select=*") or [None])[0]
     if not case or not run or str(run["case_id"]) != CASE:
         raise RuntimeError("case/run not found or run not of this case")
     files = rest("GET", f"case_files?case_id=eq.{CASE}&select=*&order=created_at.asc") or []
-    inputs = newest(files, INPUT_KINDS)
+    inputs = inputs_of(files)
     if not any(f["kind"] == "proposal" for f in inputs):
         raise RuntimeError("प्रस्ताव PDF अपलोड केलेला नाही")
     got = []
@@ -110,7 +134,7 @@ def cmd_fetch(work):
     prop = [f for f in got if f["kind"] == "proposal"]
     info = {"case": case, "run": {"id": run["id"], "instructions": run.get("instructions") or ""},
             "instructions": run.get("instructions") or "",
-            "proposal_original_name": prop[-1]["original_name"],
+            "proposal_original_name": prop[0]["original_name"],
             "inputs": got,
             "files": [{k: f[k] for k in ("id", "kind", "original_name", "version", "storage_path", "created_at")} for f in files]}
     os.makedirs(work, exist_ok=True)
@@ -123,6 +147,11 @@ def strip_upload_prefix(n):
     return re.sub(r"^[0-9a-f]{8}-", "", n)
 
 
+def package_pdfs(out):
+    return [p for p in glob.glob(os.path.join(out, "*.pdf"))
+            if not re.search(r"_(Study|Note_and_Letter|Note|Letter)\.pdf$", p)]
+
+
 def cmd_finish(out):
     try:
         st = json.load(open(os.path.join(out, "status.json"), encoding="utf-8"))
@@ -132,10 +161,9 @@ def cmd_finish(out):
         return cmd_fail(f"status.json state = {st.get('state')!r}: {st.get('summary') or ''}")
     study = glob.glob(os.path.join(out, "*_Study.docx"))
     nl = glob.glob(os.path.join(out, "*_Note_and_Letter.docx"))
-    pdfs = [p for p in glob.glob(os.path.join(out, "*.pdf"))
-            if not re.search(r"_(Study|Note_and_Letter|Note|Letter)\.pdf$", p)]
-    props = newest(rest("GET", f"case_files?case_id=eq.{CASE}&kind=eq.proposal&select=*") or [], ("proposal",))
-    names = {safe_name(f["original_name"]) for f in props} | {strip_upload_prefix(safe_name(f["original_name"])) for f in props}
+    pdfs = package_pdfs(out)
+    prop = newest_proposal(rest("GET", f"case_files?case_id=eq.{CASE}&kind=eq.proposal&select=*") or [])
+    names = {safe_name(prop["original_name"]), strip_upload_prefix(safe_name(prop["original_name"]))} if prop else set()
     probs = []
     if len(study) != 1: probs.append(f"*_Study.docx: {len(study)}")
     if len(nl) != 1: probs.append(f"*_Note_and_Letter.docx: {len(nl)}")
@@ -196,8 +224,131 @@ def fill_case(found):
     activity("case_filled_from_pdf", {"fields": patch})
 
 
+def claude_reason(res, err, rc):
+    """Marathi reason + next step for a failed Claude Code run (res = parsed JSON result or None)."""
+    sub = str((res or {}).get("subtype") or "")
+    txt = " ".join(str(x) for x in ((res or {}).get("result"), err) if x)[:4000]
+    low = txt.lower()
+    if str(rc) == "124":  # `timeout` in the workflow stopped Claude
+        return "वेळ संपली — अभ्यास ठरलेल्या वेळेत पूर्ण झाला नाही. पुन्हा तयार करा."
+    if sub == "error_max_turns":
+        return "अभ्यास अपूर्ण — कमाल पायऱ्या (max turns) संपल्या. पुन्हा तयार करा (आवश्यक तर सूचना थोडक्यात द्या)."
+    if re.search(r"credit balance|billing|insufficient.?(credit|fund|quota)|payment required", low):
+        return "Anthropic खात्यात credit शिल्लक नाही — credit तपासा/भरा, नंतर पुन्हा तयार करा."
+    if re.search(r"invalid.{0,12}api.?key|authentication_error|x-api-key|\b401\b|unauthori[sz]ed|please run /login|not logged in", low):
+        return "Anthropic key अमान्य — Settings मधील Anthropic key तपासा, नंतर पुन्हा तयार करा."
+    if re.search(r"model.{0,40}(not.?found|not_found_error|does not exist|invalid)|not_found_error.{0,40}model", low):
+        return "मॉडेलचे नाव चुकीचे — Settings मधील model तपासा (रिकामे ठेवल्यास डिफॉल्ट), नंतर पुन्हा तयार करा."
+    if re.search(r"rate.?limit|overloaded|\b429\b|\b529\b", low):
+        return "Anthropic सेवा व्यस्त (rate limit / overloaded) — थोड्या वेळाने पुन्हा तयार करा."
+    tail = re.sub(r"\s+", " ", txt).strip()[:150]
+    what = sub or (f"exit {rc}" if str(rc) not in ("", "0") else "error")
+    return f"अभ्यास अयशस्वी ({what})" + (f": {tail}" if tail else "") + " — पुन्हा तयार करा."
+
+
+def read_claude_json(path):
+    try:
+        raw = open(path, encoding="utf-8", errors="replace").read().strip()
+    except Exception:
+        return None
+    res = None
+    try:
+        res = json.loads(raw)
+    except ValueError:  # extra lines: take the last JSON object line
+        for line in reversed(raw.splitlines()):
+            if line.strip().startswith("{"):
+                try:
+                    res = json.loads(line); break
+                except ValueError:
+                    continue
+    if isinstance(res, list):  # a message list: the result is the last "result" item
+        res = next((x for x in reversed(res) if isinstance(x, dict) and x.get("type") == "result"), None)
+    return res if isinstance(res, dict) else None
+
+
+def cmd_claude_result(args):
+    res = read_claude_json(args[0]) if args else None
+    err = ""
+    if len(args) > 1 and os.path.exists(args[1]):
+        err = open(args[1], encoding="utf-8", errors="replace").read()[-4000:]
+    rc = args[2] if len(args) > 2 else "0"
+    if res:
+        cost = res.get("total_cost_usd", res.get("cost_usd"))
+        fields = {}
+        if isinstance(cost, (int, float)): fields["cost_usd"] = round(float(cost), 4)
+        if isinstance(res.get("num_turns"), int): fields["num_turns"] = res["num_turns"]
+        if isinstance(res.get("duration_ms"), (int, float)): fields["duration_s"] = round(res["duration_ms"] / 1000, 1)
+        if fields:
+            try:
+                patch_run(fields)
+            except Exception as e:
+                print("engine_supabase: cost not stored:", e, file=sys.stderr)
+        print("claude:", res.get("subtype"), "| turns", res.get("num_turns"), "| cost", cost)
+    failed = res is None or bool(res.get("is_error")) or res.get("subtype") not in (None, "success") or str(rc) not in ("", "0")
+    if failed:
+        cmd_fail(claude_reason(res, err, rc))
+
+
+def cmd_verify(args):
+    out = args[0]
+    work = args[1] if len(args) > 1 else ""
+    try:
+        st = json.load(open(os.path.join(out, "status.json"), encoding="utf-8"))
+    except Exception as e:
+        return cmd_fail(f"status.json वाचता आले नाही: {e}")
+    if st.get("state") != "done":
+        return  # `finish` records the engine's own failure reason
+    prefix = str(st.get("prefix") or "").strip()
+    if not prefix:
+        sf = glob.glob(os.path.join(out, "*_Study.docx"))
+        prefix = os.path.basename(sf[0])[: -len("_Study.docx")] if len(sf) == 1 else ""
+    pkg = os.path.join(out, os.path.basename(str(st["package_pdf"]))) if st.get("package_pdf") else ""
+    if not pkg or not os.path.exists(pkg):
+        pp = package_pdfs(out)
+        pkg = pp[0] if len(pp) == 1 else ""
+    pages = None
+    if work:
+        try:
+            cj = json.load(open(os.path.join(work, "case.json"), encoding="utf-8"))
+            src = next(os.path.join(work, f["local_path"]) for f in cj["inputs"] if f["kind"] == "proposal")
+            import pymupdf  # on the runner (tools/requirements-engine.txt)
+            with pymupdf.open(src) as d:
+                pages = len(d)
+        except Exception as e:
+            print(f"engine_supabase verify: proposal pages from status.json ({e})", file=sys.stderr)
+    if pages is None and str(st.get("proposal_pages") or "").strip().isdigit():
+        pages = int(str(st["proposal_pages"]).strip())
+    missing = [x for x, v in (("PREFIX", prefix), ("package PDF", pkg), ("proposal pages", pages)) if not v]
+    if missing:
+        return cmd_fail("पडताळणी करता आली नाही — माहिती नाही: " + ", ".join(missing))
+    script = os.environ.get("VERIFY_SCRIPT") or os.path.join(os.path.dirname(os.path.abspath(__file__)), "verify_outputs.py")
+    r = subprocess.run([sys.executable, script, out, prefix, pkg, str(pages)], capture_output=True, text=True,
+                       encoding="utf-8", errors="replace")
+    lines = (r.stdout or "").splitlines()
+    print(r.stdout, end="")
+    fails = [l for l in lines if l.startswith("FAIL")]
+    if r.returncode == 0 and not fails and any(l.startswith("ALL OK") for l in lines):
+        print("verify: ALL OK")
+        return
+    if fails:
+        detail = "; ".join(l[5:].strip() if l.startswith("FAIL:") else l for l in fails[:6])
+        if len(fails) > 6: detail += f"; … (+{len(fails) - 6})"
+    else:
+        errl = (r.stderr or "").strip().splitlines()
+        detail = errl[-1] if errl else f"exit {r.returncode}"
+    cmd_fail(f"पडताळणी (verify_outputs) अयशस्वी — {detail}"[:500])
+
+
+def cmd_warn(text):
+    text = (text or "").strip()[:300]
+    cur = (rest("GET", f"runs?id=eq.{RUN}&select=warnings") or [{}])[0]
+    w = cur.get("warnings") if isinstance(cur.get("warnings"), list) else []
+    patch_run({"warnings": w + [text]})
+    activity("run_warning", {"run_id": int(RUN), "warning": text})
+
+
 def cmd_fail(reason):
-    reason = (reason or "अयशस्वी").strip()[:300]
+    reason = (reason or "अयशस्वी").strip()[:500]
     try:
         cur = (rest("GET", f"runs?id=eq.{RUN}&select=state,step") or [{}])[0]
         if cur.get("state") == "failed":
@@ -211,7 +362,7 @@ def cmd_fail(reason):
 
 
 def main(a):
-    if len(a) < 2 or a[0] not in ("fetch", "step", "log_url", "finish", "fail"):
+    if len(a) < 2 or a[0] not in ("fetch", "step", "log_url", "finish", "fail", "claude_result", "verify", "warn"):
         print(__doc__); sys.exit(2)
     init()
     c, arg = a[0], " ".join(a[1:])
@@ -222,10 +373,13 @@ def main(a):
         elif c == "step": patch_run({"step": arg[:200]})
         elif c == "log_url": patch_run({"log_url": arg})
         elif c == "finish": cmd_finish(arg)
+        elif c == "claude_result": cmd_claude_result(a[1:])
+        elif c == "verify": cmd_verify(a[1:])
+        elif c == "warn": cmd_warn(arg)
     except SystemExit:
         raise
     except Exception as e:
-        if c in ("fetch", "finish"):
+        if c in ("fetch", "finish", "claude_result", "verify"):
             cmd_fail(f"{c}: {e}")
         print(f"engine_supabase {c}: {e}", file=sys.stderr); sys.exit(1)
 

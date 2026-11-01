@@ -1,13 +1,13 @@
 import { useMemo, useRef, useState, type FormEvent } from 'react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { api, downloadFile, humanError, uploadFile } from '../lib/api';
-import { ACTION_LABEL, FILE_KIND_LABEL, LETTER_STATUSES, RUN_STATE_LABEL, TONE_HEX, runTone } from '../lib/constants';
+import { ACTION_LABEL, FILE_KIND_LABEL, LETTER_STATUSES, RUN_STATE_LABEL, TONE_HEX, runActive, runTone } from '../lib/constants';
 import { asArray, daysBetween, fmtDate, fmtDateTime, textOf, todayISO } from '../lib/format';
 import { diffLines, type DiffLine } from '../lib/diff';
 import type { CaseFile, Letter, Run } from '../lib/types';
 import { Chip, Empty, Field, Modal, Section, SkeletonRows, Spinner } from '../components/ui';
 import { useToast } from '../components/Toast';
-import RunProgress from '../components/RunProgress';
+import RunProgress, { RunCost, RunWarnings } from '../components/RunProgress';
 import PdfViewer from '../components/PdfViewer';
 import DocxView, { docxParagraphs } from '../components/DocxView';
 import type { CaseCtx } from './CaseDetail';
@@ -59,7 +59,7 @@ export function ReRun({ ctx, title = 'सुधारणा करून पु�
   const [text, setText] = useState(preset);
   const [busy, setBusy] = useState(false);
   const r = latestRun(ctx.runs);
-  const running = !!r && (r.state === 'queued' || r.state === 'running');
+  const running = runActive(r); // a failed or stale (> 3.5 h) latest run does not block
   if (!ctx.canWrite) return null;
   async function go(e: FormEvent) {
     e.preventDefault();
@@ -123,6 +123,8 @@ export function BriefingTab({ ctx }: { ctx: CaseCtx }) {
               <div className="text-sm font-semibold text-slate-500">माहिती-मागणी पत्र</div>
               <div className="mt-2">{run.letter_needed == null ? '—' : run.letter_needed ? <Chip tone="amber">आवश्यक</Chip> : <Chip tone="green">आवश्यक नाही</Chip>}</div>
               <div className="mt-3 text-sm text-slate-500">अभ्यास पूर्ण: {fmtDateTime(run.finished_at)}</div>
+              <div className="mt-2"><RunCost run={run} /></div>
+              <div className="mt-2"><RunWarnings run={run} /></div>
             </div>
           </div>
           {points.length > 0 && (

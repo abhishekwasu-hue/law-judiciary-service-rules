@@ -9,8 +9,10 @@ spec.json:
    "first": "text of para 1 (starts after a tab; ends with ... सादर.)",
    "paras": [{"table": [["अ.क्र.","..."],["1","..."]], "bold_last": false} or "para text without number (numbering 2., 3., ... added automatically)", ...],
    "sub": {"<para index in paras, 0-based>": ["(१) ...", "(२) ..."]},   # optional lettered/numbered sub-points after that para
-   "closing": "मान्यतेस्तव सादर.",
-   "signers": ["का.अ. (श्री. वसू)", "अ.स. (        )", ...]
+   "closing": "सबब, उपरोक्त माहिती तक्त्याच्या स्वरूपात कळविण्याबाबतच्या पत्राचे प्रारुप पृ.      /प.वि. वर मान्यतेस्तव सादर. मान्य झाल्यास पत्र निर्गमित करण्यात येईल.",
+              # or (no letter): "सबब, ... प्रस्ताव वित्त विभागाच्या मान्यतेस्तव सादर करण्यात येत आहे."  (PROPOSAL_SOP Step 4)
+   "signers": ["का. अ. (श्रीम. कऱ्हाडे)", "अ.स. (श्री. वडनेरकर)", "उ.वि.स. नि. उ.स. (श्री. बोंद्रे)", "प्र.स. व वि.प. (श्री. खटी)"]
+              # add "अ.मु.स. (वित्त)" only when the file goes to Finance (INSTRUCTIONS §4.6)
  },
  "related": [ {"heading": "<GR/नियम/पूर्वोदाहरण शीर्षक>", "text": ["<जसाच्या तसा उतारा परिच्छेद>", "..."], "source": "<क्रमांक, दिनांक, पृ., परि.>"} ],   # शेवटी 'संबंधित माहिती'
  "letter": {   # optional — omit when no letter is needed (note only)
@@ -200,7 +202,7 @@ def build_letter(spec, out):
     nomirror(d); d.save(out)
 
 if __name__ == "__main__":
-    spec = json.load(open(sys.argv[1], encoding="utf-8")); od, pre = sys.argv[2], sys.argv[3]
+    spec = json.load(open(sys.argv[1], encoding="utf-8-sig")); od, pre = sys.argv[2], sys.argv[3]
     build_note(spec, os.path.join(od, f"{pre}_Note.docx"))
     if spec.get("letter"): build_letter(spec, os.path.join(od, f"{pre}_Letter.docx"))
     print("ok", pre)

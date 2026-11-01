@@ -1,6 +1,8 @@
 name: Process proposal
 # App B engine (docs/APP_B_DESIGN.md D4-D6). The Worker dispatches `process_proposal` with
 # client_payload {case_id, run_id, token, worker}; keys are fetched from the Worker at run time (no repo secrets).
+# Every failure (also cancel / time-out / config failure) is recorded on the run with a Marathi reason, so Abhi never
+# needs the GitHub log (github.com is blocked at the office). Stuck runs are also swept by the Worker (/api/runs/sweep).
 on:
   repository_dispatch:
     types: [process_proposal]
@@ -8,21 +10,24 @@ on:
     inputs:
       case_id: { description: 'cases.id', required: true }
       run_id: { description: 'runs.id (created by the Worker /api/run)', required: true }
-      token: { description: 'one-time run token (from the Worker)', required: true }
+      token: { description: 'run token (from the Worker)', required: true }
       worker: { description: 'Worker origin, e.g. https://xxx.workers.dev', required: true }
 permissions:
   contents: write
 concurrency:
   group: proposal-case-${{ github.event.client_payload.case_id || github.event.inputs.case_id }}
   cancel-in-progress: false
+env:
+  CLAUDE_CODE_VERSION: '2.1.300'   # exact pin (published 14.10.2026); change deliberately
 jobs:
   run:
     runs-on: ubuntu-latest
     timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
-        with: { fetch-depth: 0 }
+        with: { fetch-depth: 1 }
       # Payload is read from the event file (never interpolated into scripts); every value is masked before use.
+      # The run token is single use for the config (Worker); it stays valid for /api/engine/fail (no secrets) until expiry.
       - name: Get run config from the Worker (masked)
         run: |
           set -euo pipefail
@@ -34,7 +39,18 @@ jobs:
           echo "::add-mask::$TOKEN"
           [[ "$CASE_ID" =~ ^[0-9]+$ && "$RUN_ID" =~ ^[0-9]+$ ]] || { echo "bad case_id/run_id"; exit 1; }
           [[ "$WORKER" =~ ^https://[A-Za-z0-9.-]+(:[0-9]+)?$ ]] || { echo "bad worker origin"; exit 1; }
-          curl -fsS --retry 3 -H "Authorization: Bearer $TOKEN" "$WORKER/api/engine/config?run_id=$RUN_ID" -o /tmp/cfg.json
+          # first, so that "Record failure" can reach the Worker even if the config call fails
+          { echo "CASE_ID=$CASE_ID"; echo "RUN_ID=$RUN_ID"; echo "RUN_TOKEN=$TOKEN"; echo "WORKER=$WORKER"; } >> "$GITHUB_ENV"
+          CODE=$(curl -sS --retry 2 -o /tmp/cfg.json -w '%{http_code}' -H "Authorization: Bearer $TOKEN" \
+                 "$WORKER/api/engine/config?run_id=$RUN_ID" || echo 000)
+          if [ "$CODE" != "200" ]; then
+            case "$CODE" in
+              412) R="सेटिंग्ज अपूर्ण — Settings मधील Anthropic key व Supabase तपासा, नंतर पुन्हा तयार करा." ;;
+              403) R="इंजिन टोकन अमान्य/कालबाह्य — पुन्हा तयार करा." ;;
+              *)   R="इंजिनला Worker कडून सेटिंग्ज मिळाल्या नाहीत (HTTP $CODE) — पुन्हा तयार करा." ;;
+            esac
+            echo "$R" > /tmp/fail_reason.txt; rm -f /tmp/cfg.json; echo "config: HTTP $CODE"; exit 1
+          fi
           for k in anthropic_api_key supabase_url supabase_service_key model; do
             V=$(jq -r ".$k // empty" /tmp/cfg.json)
             if [ -n "$V" ]; then echo "::add-mask::$V"; fi
@@ -44,47 +60,128 @@ jobs:
           S=$(jq -r '.supabase_service_key // empty' /tmp/cfg.json)
           M=$(jq -r '.model // empty' /tmp/cfg.json)
           rm -f /tmp/cfg.json
-          [ -n "$A" ] && [ -n "$U" ] && [ -n "$S" ] || { echo "config incomplete (Settings)"; exit 1; }
+          if [ -z "$A" ] || [ -z "$U" ] || [ -z "$S" ]; then
+            echo "सेटिंग्ज अपूर्ण — Settings मधील Anthropic key व Supabase तपासा, नंतर पुन्हा तयार करा." > /tmp/fail_reason.txt
+            echo "config incomplete (Settings)"; exit 1
+          fi
           {
-            echo "CASE_ID=$CASE_ID"; echo "RUN_ID=$RUN_ID"
             echo "ANTHROPIC_API_KEY=$A"; echo "SUPABASE_URL=$U"; echo "SUPABASE_SERVICE_KEY=$S"; echo "MODEL=$M"
           } >> "$GITHUB_ENV"
       - name: Record log URL
         run: python3 tools/engine_supabase.py log_url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" || true
       - uses: actions/setup-python@v5
-        with: { python-version: '3.12' }
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: tools/requirements-engine.txt
       - uses: actions/setup-node@v4
-        with: { node-version: '20' }
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: .github/workflows/process-proposal.yml   # global install, version pinned in this file
       - name: Install tools
         run: |
+          set -euo pipefail
+          trap 'echo "साधने install झाली नाहीत (apt/pip/npm) — पुन्हा तयार करा." > /tmp/fail_reason.txt' ERR
           sudo apt-get update -y
-          sudo apt-get install -y poppler-utils tesseract-ocr libreoffice-writer fonts-freefont-ttf
-          pip install pymupdf docxcompose python-docx
-          npm install -g @anthropic-ai/claude-code
+          sudo apt-get install -y poppler-utils tesseract-ocr tesseract-ocr-mar libreoffice-writer fonts-freefont-ttf
+          pip install -r tools/requirements-engine.txt
+          npm install -g "@anthropic-ai/claude-code@$CLAUDE_CODE_VERSION"
       - name: Fetch case files from Supabase
         run: python3 tools/engine_supabase.py fetch /tmp/case
+      # SOP Step 0.4 + INSTRUCTIONS §7.1 for the engine: old-case text corpus and the precedent library (non-fatal).
+      - name: Prepare precedent sources
+        run: |
+          set -uo pipefail
+          python3 tools/oldcases_text.py /tmp/old || python3 tools/engine_supabase.py warn "जुन्या प्रकरणांचा मजकूर-संग्रह (/tmp/old) तयार झाला नाही" || true
+          python3 - <<'PY' || python3 tools/engine_supabase.py warn "पूर्वोदाहरण-ग्रंथालय (/tmp/precedent) उघडले नाही" || true
+          import os, zipfile
+          dst = "/tmp/precedent"; n = 0
+          with zipfile.ZipFile("precedent-library/Precedent-Library.zip") as z:
+              for i in z.infolist():
+                  name = i.filename
+                  if not i.flag_bits & 0x800:
+                      try: name = name.encode("cp437").decode("utf-8")
+                      except Exception: pass
+                  if name.startswith("/") or ".." in name.split("/") or name.endswith("/"): continue
+                  p = os.path.join(dst, name); os.makedirs(os.path.dirname(p), exist_ok=True)
+                  open(p, "wb").write(z.read(i)); n += 1
+          print(n, "files ->", dst)
+          PY
+      # CLAUDE.md is moved aside for this step only: it would auto-load OWNER_RULES (trading/apps/diet) and HANDOVER
+      # (session to-dos, SOP Step 0b/8 commit work) into every turn. ENGINE_PROMPT names exactly what to read instead;
+      # running from the repo root keeps every tool's relative path (tools/, pdf/, सन*.zip) working. Restored before commit.
       - name: Process the proposal (Claude Code headless)
         run: |
-          set -euo pipefail
+          set -uo pipefail
           mkdir -p /tmp/out
+          mv CLAUDE.md /tmp/CLAUDE.md.repo
           PROMPT="$(cat tools/ENGINE_PROMPT.md)
 
           WORKDIR=/tmp/case
-          OUTDIR=/tmp/out"
-          ARGS=(-p "$PROMPT" --dangerously-skip-permissions --max-turns 400)
+          OUTDIR=/tmp/out
+          OLDCASES=/tmp/old
+          PRECEDENT=/tmp/precedent"
+          ARGS=(-p "$PROMPT" --dangerously-skip-permissions --max-turns 400 --output-format json)
           if [ -n "${MODEL:-}" ]; then ARGS+=(--model "$MODEL"); fi
-          claude "${ARGS[@]}"
+          rc=0
+          timeout -k 60 150m claude "${ARGS[@]}" > /tmp/claude.json 2> /tmp/claude.err || rc=$?
+          mv /tmp/CLAUDE.md.repo CLAUDE.md
+          echo "claude exit $rc"; tail -n 20 /tmp/claude.err || true
+          python3 tools/engine_supabase.py claude_result /tmp/claude.json /tmp/claude.err "$rc"
+      - name: Verify outputs (verify_outputs.py must print ALL OK)
+        run: python3 tools/engine_supabase.py verify /tmp/out /tmp/case
       - name: Upload outputs and finish
         run: python3 tools/engine_supabase.py finish /tmp/out
       - name: Record failure
-        if: failure()
+        if: failure() || cancelled()
+        env:
+          JOB_STATUS: ${{ job.status }}
         run: |
-          python3 tools/engine_supabase.py fail "इंजिन अयशस्वी — लॉग पहा: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          set -u
+          R=""
+          if [ -s /tmp/fail_reason.txt ]; then R=$(head -c 600 /tmp/fail_reason.txt); fi
+          if [ -z "$R" ]; then
+            if [ "$JOB_STATUS" = "cancelled" ]; then R="अभ्यास थांबवला गेला / वेळ संपली — पुन्हा तयार करा."
+            else R="इंजिन अयशस्वी — पुन्हा तयार करा."; fi
+          fi
+          # 1) with Supabase env (keeps an earlier, more specific reason); 2) always also via the Worker + run token
+          #    (works when the config step failed; changes nothing if the run is already failed)
+          if [ -n "${SUPABASE_URL:-}" ] && [ -n "${SUPABASE_SERVICE_KEY:-}" ]; then
+            python3 tools/engine_supabase.py fail "$R" || true
+          fi
+          if [ -n "${RUN_TOKEN:-}" ] && [ -n "${WORKER:-}" ] && [ -n "${RUN_ID:-}" ]; then
+            jq -n --arg r "$R" --argjson id "$RUN_ID" '{run_id: $id, reason: $r}' |
+              curl -sS --retry 3 -X POST -H "Authorization: Bearer $RUN_TOKEN" -H 'content-type: application/json' \
+                   --data-binary @- "$WORKER/api/engine/fail" || echo "could not reach the Worker"
+          fi
+          exit 0
+      # New GRs (pdf/gr + the request list with retry counters). Shallow clone: our ONE commit is replayed onto the
+      # fetched tip (rebase --onto); INDEX.tsv / gr-request.txt merge by union (concurrent runs both append).
+      # A failed push does not change the case result; it is recorded as a warning on the run and fails this job.
       - name: Commit new GRs (pdf/gr only)
         if: always()
         run: |
+          set -u
+          [ -f /tmp/CLAUDE.md.repo ] && mv /tmp/CLAUDE.md.repo CLAUDE.md
           git config user.name github-actions; git config user.email actions@github.com
-          git add -- pdf/gr
+          printf 'pdf/gr/INDEX.tsv merge=union\ntools/gr-request.txt merge=union\n' >> .git/info/attributes
+          git add -- pdf/gr tools/gr-request.txt
           git diff --cached --quiet && exit 0
-          git commit -m "GR fetched by engine (case $CASE_ID)"
-          for i in 1 2 3; do git pull --rebase --autostash origin "$GITHUB_REF_NAME" && git push origin "HEAD:$GITHUB_REF_NAME" && break || sleep 5; done
+          git commit -q -m "GR fetched by engine (case ${CASE_ID:-?})" || exit 0
+          ok=0
+          for i in 1 2 3; do
+            if git fetch -q --depth 1 origin "$GITHUB_REF_NAME" &&
+               git rebase -q --autostash --onto FETCH_HEAD HEAD~1 &&
+               git push -q origin "HEAD:$GITHUB_REF_NAME"; then ok=1; break; fi
+            git rebase --abort 2>/dev/null || true
+            sleep 5
+          done
+          if [ "$ok" != 1 ]; then
+            echo "::error::new GRs were NOT pushed to $GITHUB_REF_NAME"
+            if [ -n "${SUPABASE_URL:-}" ]; then
+              python3 tools/engine_supabase.py warn "नवीन GR रेपोमध्ये जतन झाले नाहीत (push अयशस्वी) — पुढच्या अभ्यासात पुन्हा उतरवले जातील." || true
+            fi
+            exit 1
+          fi
+          echo "pushed: $(git log -1 --format=%h)"

@@ -2,7 +2,7 @@ import { useRef, useState, type DragEvent, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { api, humanError, uploadFile } from '../lib/api';
 import { useCanWrite } from '../lib/auth';
-import { CATEGORIES, PRIORITIES } from '../lib/constants';
+import { CATEGORIES, PRIORITIES, isStale } from '../lib/constants';
 import { crLabel, fmtBytes } from '../lib/format';
 import { guessSubject } from '../lib/pdf';
 import type { Case, Run } from '../lib/types';
@@ -163,7 +163,7 @@ export default function NewProposal() {
               </Field>
             </div>
             <Field label="विशेष सूचना (ऐच्छिक)"><textarea className="input min-h-[72px]" value={f.instructions} onChange={set('instructions')} /></Field>
-            <button className="btn-accent w-full text-lg" disabled={busy || !proposal || (!!run && run.state !== 'failed')}>
+            <button className="btn-accent w-full text-lg" disabled={busy || !proposal || (!!run && run.state !== 'failed' && !isStale(run))}>
               {busy && <Spinner />} {created ? 'पुन्हा प्रयत्न करा' : 'अभ्यास सुरू करा'}
             </button>
           </div>

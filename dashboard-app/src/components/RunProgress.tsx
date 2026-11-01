@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { sb } from '../lib/supabase';
 import type { Run } from '../lib/types';
-import { RUN_STATE_LABEL, RUN_STEPS, runTone } from '../lib/constants';
-import { fmtDateTime } from '../lib/format';
+import { RUN_STATE_LABEL, RUN_STEPS, STALE_REASON, isStale, runTone } from '../lib/constants';
+import { asArray, fmtDateTime, textOf } from '../lib/format';
 import { Chip, Progress } from './ui';
 
 /** Latest runs of a case, kept live through Supabase Realtime (table `runs`). */
@@ -46,20 +46,51 @@ function stepIndex(r: Run): number {
   return i < 0 ? (r.state === 'running' ? 1 : 0) : i;
 }
 
+const num = (v: unknown): number | null => {
+  const n = typeof v === 'string' ? Number(v) : typeof v === 'number' ? v : NaN;
+  return Number.isFinite(n) ? n : null;
+};
+export function fmtDuration(s: number): string {
+  const m = Math.round(s / 60);
+  return m < 60 ? `${m} मि.` : `${Math.floor(m / 60)} ता. ${m % 60} मि.`;
+}
+
+/** Cost / turns / duration of one run (from Claude Code's JSON result, stored by the engine). */
+export function RunCost({ run }: { run: Run }) {
+  const cost = num(run.cost_usd), turns = num(run.num_turns), dur = num(run.duration_s);
+  if (cost == null && turns == null && dur == null) return null;
+  return (
+    <div className="flex flex-wrap gap-2 text-sm">
+      {cost != null && <span className="rounded-md bg-amber-100 px-2 py-0.5 font-semibold text-amber-900 dark:bg-amber-900/40 dark:text-amber-100">खर्च ${cost.toFixed(2)}</span>}
+      {turns != null && <span className="rounded-md bg-slate-100 px-2 py-0.5 text-slate-700 dark:bg-navy-800 dark:text-slate-200">पायऱ्या {turns}</span>}
+      {dur != null && <span className="rounded-md bg-slate-100 px-2 py-0.5 text-slate-700 dark:bg-navy-800 dark:text-slate-200">वेळ {fmtDuration(dur)}</span>}
+    </div>
+  );
+}
+
+export function RunWarnings({ run }: { run: Run }) {
+  const w = asArray(run.warnings).map(textOf).filter(Boolean);
+  if (!w.length) return null;
+  return (
+    <ul className="space-y-1 rounded-lg bg-amber-100 px-3 py-2 text-sm text-amber-900 dark:bg-amber-900/40 dark:text-amber-100">
+      {w.map((x, i) => <li key={i}>⚠ {x}</li>)}
+    </ul>
+  );
+}
+
 export default function RunProgress({ run }: { run: Run }) {
   const idx = stepIndex(run);
-  const failed = run.state === 'failed';
+  const stale = isStale(run);
+  const failed = run.state === 'failed' || stale;
   const pct = run.state === 'done' ? 100 : Math.round((idx / (RUN_STEPS.length - 1)) * 100);
   return (
     <div className="space-y-3" aria-live="polite">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <Chip tone={runTone(run.state)}>{RUN_STATE_LABEL[run.state] || run.state}</Chip>
+          <Chip tone={stale ? 'red' : runTone(run.state)}>{stale ? 'वेळ संपली' : RUN_STATE_LABEL[run.state] || run.state}</Chip>
           <span className="text-sm text-slate-500 dark:text-slate-400">अभ्यास #{run.id} • {fmtDateTime(run.created_at)}</span>
         </div>
-        {run.log_url && (
-          <span className="text-sm text-slate-500" title={run.log_url}>log उपलब्ध</span>
-        )}
+        <RunCost run={run} />
       </div>
       <Progress pct={failed ? 100 : pct} tone={failed ? 'red' : run.state === 'done' ? 'green' : 'blue'} />
       <ol className="grid grid-cols-4 gap-1 text-center text-xs sm:grid-cols-7 sm:text-sm">
@@ -82,8 +113,15 @@ export default function RunProgress({ run }: { run: Run }) {
           );
         })}
       </ol>
-      {run.step && <div className="text-sm text-slate-600 dark:text-slate-300">सद्य: {run.step}</div>}
-      {failed && <div className="rounded-lg bg-red-100 px-3 py-2 text-red-900 dark:bg-red-900/40 dark:text-red-100">अभ्यास अयशस्वी. {run.step || ''}</div>}
+      {run.step && !failed && <div className="text-sm text-slate-600 dark:text-slate-300">सद्य: {run.step}</div>}
+      {failed && (
+        <div className="rounded-lg bg-red-100 px-3 py-2 text-red-900 dark:bg-red-900/40 dark:text-red-100" role="alert">
+          <div className="font-semibold">अभ्यास अयशस्वी</div>
+          <div className="mt-1 whitespace-pre-wrap break-words">{stale ? STALE_REASON : run.step || 'कारण उपलब्ध नाही — पुन्हा तयार करा'}</div>
+          <div className="mt-1 text-sm">खालील "पुन्हा तयार करा" वापरा.</div>
+        </div>
+      )}
+      <RunWarnings run={run} />
     </div>
   );
 }

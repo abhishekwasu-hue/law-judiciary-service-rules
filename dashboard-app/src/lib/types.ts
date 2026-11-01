@@ -16,6 +16,8 @@ export interface Run {
   started_at: string | null; finished_at: string | null; instructions: string | null; log_url: string | null;
   summary: string | null; letter_needed: boolean | null; essential_points: unknown; grs_attached: unknown;
   grs_missing: unknown; created_by: string | null; created_at: string;
+  // migration 20261101000004_reliability.sql (numeric may arrive as string)
+  cost_usd?: number | string | null; num_turns?: number | null; duration_s?: number | string | null; warnings?: unknown;
 }
 export interface Letter {
   id: number; case_id: number; ref_no: string | null; addressed_to: string | null; sent_date: string | null;

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Stdlib test for tools/engine_supabase.py: a local http.server mocks Supabase REST + Storage.
-Runs fetch -> step -> finish (fake outputs), then a fail case (missing outputs). Run: py tests/engine_supabase_test.py"""
+Runs fetch -> step -> finish (fake outputs), then a fail case (missing outputs), then claude_result (cost + Marathi
+failure reasons), verify (fake verify_outputs), warn, and the newest-proposal pick. Run: py tests/engine_supabase_test.py"""
 import json, os, subprocess, sys, tempfile, threading, urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -33,7 +34,7 @@ def match(rows, q):
         if v.startswith("eq."): out = [r for r in out if str(r.get(k)) == v[3:]]
     if "order" in q:
         col, _, d = q["order"][0].partition(".")
-        out = sorted(out, key=lambda r: r.get(col) or 0, reverse=(d == "desc"))
+        out = sorted(out, key=lambda r: (0, r[col], "") if isinstance(r.get(col), (int, float)) else (1, 0, str(r.get(col) or "")), reverse=(d == "desc"))
     if "limit" in q: out = out[: int(q["limit"][0])]
     return out
 
@@ -61,7 +62,7 @@ class H(BaseHTTPRequestHandler):
             if self.command == "GET": return self.send(200, match(rows, q))
             data = json.loads(body)
             if self.command == "POST":
-                data["id"] = len(rows) + 100; rows.append(data); return self.send(201)
+                data["id"] = len(rows) + 100; data.setdefault("created_at", "8"); rows.append(data); return self.send(201)
             if self.command == "PATCH":
                 for r in match(rows, q): r.update(data)
                 return self.send(204)
@@ -70,8 +71,8 @@ class H(BaseHTTPRequestHandler):
     do_GET = do_POST = do_PATCH = handle_any
 
 
-def run(*args):
-    env = dict(os.environ, SUPABASE_URL=BASE, SUPABASE_SERVICE_KEY=KEY, CASE_ID="7", RUN_ID="11", PYTHONIOENCODING="utf-8")
+def run(*args, **extra):
+    env = dict(os.environ, SUPABASE_URL=BASE, SUPABASE_SERVICE_KEY=KEY, CASE_ID="7", RUN_ID="11", PYTHONIOENCODING="utf-8", **extra)
     return subprocess.run([sys.executable, TOOL, *args], env=env, capture_output=True, text=True, encoding="utf-8")
 
 
@@ -148,6 +149,84 @@ reason = run_row["step"]; r = run("fail", "इंजिन अयशस्वी
 check(r.returncode == 1 and run_row["step"] == reason, "fail: exit 1, earlier reason kept")
 run_row.update(state="running")
 r = run("fail", "claude step failed"); check(r.returncode == 1 and run_row["state"] == "failed" and run_row["step"] == "claude step failed", "fail: runs failed + step reason")
+
+# --- claude_result: cost/turns/duration stored; error results -> Marathi reason + next step
+def claude(obj, err="", rc="0", raw=None):
+    run_row.update(state="running", step="तपासणी चालू")
+    jf, ef = os.path.join(tmp, "claude.json"), os.path.join(tmp, "claude.err")
+    open(jf, "w", encoding="utf-8").write(raw if raw is not None else json.dumps(obj))
+    open(ef, "w", encoding="utf-8").write(err)
+    return run("claude_result", jf, ef, rc)
+
+r = claude({"type": "result", "subtype": "success", "is_error": False, "num_turns": 87, "duration_ms": 1234567, "total_cost_usd": 3.14159, "result": "पूर्ण"})
+check(r.returncode == 0 and run_row["state"] == "running", f"claude_result success: exit 0, run still running ({r.stderr[:200]})")
+check(run_row["cost_usd"] == 3.1416 and run_row["num_turns"] == 87 and run_row["duration_s"] == 1234.6, "claude_result: cost_usd, num_turns, duration_s stored")
+r = claude({"type": "result", "subtype": "error_max_turns", "is_error": True, "num_turns": 400, "duration_ms": 1000, "total_cost_usd": 9.5})
+check(r.returncode == 1 and run_row["state"] == "failed" and "max turns" in run_row["step"] and "पुन्हा तयार करा" in run_row["step"]
+      and run_row["num_turns"] == 400, f"claude_result max turns: failed + Marathi reason ({run_row['step']})")
+r = claude({"type": "result", "subtype": "success", "is_error": True, "result": "Invalid API key · Please run /login"}, rc="1")
+check(r.returncode == 1 and "Settings मधील Anthropic key" in run_row["step"], "claude_result auth error: key reason")
+r = claude(None, err="API Error: 400 Your credit balance is too low to access the Anthropic API", rc="1", raw="")
+check(r.returncode == 1 and "credit" in run_row["step"] and run_row["state"] == "failed", "claude_result no JSON + credit text: credit reason")
+r = claude(None, err="", rc="124", raw="")
+check(r.returncode == 1 and "वेळ संपली" in run_row["step"], "claude_result timeout (exit 124): Marathi time-out reason")
+r = claude(None, err="something odd", rc="137", raw="not json")
+check(r.returncode == 1 and "exit 137" in run_row["step"], f"claude_result unknown error: exit code in reason ({run_row['step']})")
+
+# --- verify: runs verify_outputs with PREFIX / package / proposal pages; FAIL lines become the reason
+fake = os.path.join(tmp, "fake_verify.py"); argf = os.path.join(tmp, "verify_args.json")
+open(fake, "w", encoding="utf-8").write(
+    "import json, os, sys\n"
+    f"json.dump(sys.argv[1:], open({argf!r}, 'w', encoding='utf-8'), ensure_ascii=False)\n"
+    "if os.environ.get('FAKE_FAIL'):\n"
+    "    print('FAIL: Study: 3 runs without DVOT-SurekhMR'); print('FAIL: page 4: no page stamp'); print('FIX THE FAILS ABOVE | pages 9')\n"
+    "else:\n"
+    "    print('ALL OK | pages 9 | toc 3')\n")
+st["prefix"] = "CR130_2026"; st["package_pdf"] = PROP; st["proposal_pages"] = 5
+json.dump(st, open(os.path.join(out, "status.json"), "w", encoding="utf-8"), ensure_ascii=False)
+run_row.update(state="running", step="तपासणी चालू")
+r = run("verify", out, work, VERIFY_SCRIPT=fake)
+a = json.load(open(argf, encoding="utf-8"))
+check(r.returncode == 0 and run_row["state"] == "running", f"verify ALL OK: exit 0 ({r.stderr[:200]})")
+check(a[1] == "CR130_2026" and os.path.basename(a[2]) == PROP and a[0] == out, "verify: outdir, PREFIX, package PDF passed")
+check(a[3] == "5", f"verify: proposal pages from status.json when the PDF cannot be read ({a[3]})")
+try:
+    import pymupdf
+    d = pymupdf.open()
+    for _ in range(3): d.new_page()
+    d.save(os.path.join(work, "in", "proposal", PROP)); d.close()
+    r = run("verify", out, work, VERIFY_SCRIPT=fake)
+    check(json.load(open(argf, encoding="utf-8"))[3] == "3", "verify: proposal pages = page count of the fetched proposal")
+except ImportError:
+    print("skip  verify page count (pymupdf not installed)")
+r = run("verify", out, work, VERIFY_SCRIPT=fake, FAKE_FAIL="1")
+check(r.returncode == 1 and run_row["state"] == "failed" and "DVOT-SurekhMR" in run_row["step"] and "page 4" in run_row["step"],
+      f"verify FAIL: case failed with the FAIL lines ({run_row['step']})")
+
+# --- warn: non-fatal, appended
+run_row.update(state="done", warnings=[])
+r = run("warn", "नवीन GR रेपोमध्ये जतन झाले नाहीत"); r = run("warn", "दुसरी सूचना")
+check(r.returncode == 0 and run_row["warnings"] == ["नवीन GR रेपोमध्ये जतन झाले नाहीत", "दुसरी सूचना"] and run_row["state"] == "done",
+      "warn: runs.warnings appended, state unchanged")
+check(any(a["action"] == "run_warning" for a in DB["activity"]), "warn: activity run_warning")
+
+# --- newest proposal by upload time, not by name: a corrected proposal under a new name replaces the old one
+NEWP = "दुरुस्त प्रस्ताव.pdf"   # sorts before PROP alphabetically
+DB["case_files"].append({"id": 50, "case_id": 7, "kind": "proposal", "storage_path": f"proposals/7/proposal/v1/{NEWP}",
+                         "original_name": NEWP, "version": 1, "created_at": "9"})
+STORE[f"proposals/7/proposal/v1/{NEWP}"] = b"%PDF corrected"
+work2 = os.path.join(tmp, "case2")
+r = run("fetch", work2); check(r.returncode == 0, f"fetch with two proposal names: exit 0 ({r.stderr[:300]})")
+cj = json.load(open(os.path.join(work2, "case.json"), encoding="utf-8"))
+check(cj["proposal_original_name"] == NEWP and os.listdir(os.path.join(work2, "in", "proposal")) == [NEWP],
+      "fetch: only the newest proposal (by created_at), under its own name")
+out3 = os.path.join(tmp, "out3"); os.makedirs(out3)
+for n in ("CR130_2026_Study.docx", "CR130_2026_Note_and_Letter.docx", PROP):
+    open(os.path.join(out3, n), "wb").write(b"x")
+json.dump({"state": "done", "summary": "s"}, open(os.path.join(out3, "status.json"), "w", encoding="utf-8"))
+run_row.update(state="running")
+r = run("finish", out3)
+check(r.returncode == 1 and "मूळ प्रस्ताव" in run_row["step"], "finish: package named after the OLD proposal is refused")
 
 srv.shutdown()
 print("ALL TESTS PASSED")

@@ -17,7 +17,7 @@ from docx.enum.text import WD_BREAK
 from docx.oxml.ns import qn
 from docx.oxml import OxmlElement
 F = "DVOT-SurekhMR"
-spec = json.load(open(sys.argv[1], encoding="utf-8")); out = sys.argv[2]
+spec = json.load(open(sys.argv[1], encoding="utf-8-sig")); out = sys.argv[2]
 d = Document(); s = d.sections[0]; s.page_width, s.page_height = Cm(21), Cm(29.7)
 for a in ("left_margin", "right_margin", "top_margin", "bottom_margin"): setattr(s, a, Cm(2))
 def rf(el):

@@ -12,9 +12,10 @@ The quality standard = the approved notes in `samples/specs/` (C R 66, 122, 128,
 ## Step 0 — Before starting
 1. Read OWNER_RULES.md, INSTRUCTIONS.md, this file. Several proposals in one message = separate cases; never mix them.
 2. Make a task list (one task per proposal).
-3. Tools needed: `pip install pymupdf docxcompose python-docx --break-system-packages`; `soffice` (LibreOffice) and `tesseract` are used for checking/OCR.
-4. Build the old-case text corpus once per session: `python3 tools/oldcases_text.py /tmp/old` (grep `/tmp/old/index.tsv`).
-5. Proposals uploaded in the "प्रस्ताव कक्ष" page: see Step 0b.
+3. Commands: on Windows run the tools with `py`, in the runner / Linux with `python3` (same arguments; 01.11.2026 सुसंगती).
+4. Tools needed: `pip install pymupdf docxcompose python-docx --break-system-packages`; `soffice` (LibreOffice) and `tesseract` are used for checking/OCR.
+5. Build the old-case text corpus once per session: `python3 tools/oldcases_text.py /tmp/old` (grep `/tmp/old/index.tsv`).
+6. Proposals uploaded in the "प्रस्ताव कक्ष" page: see Step 0b.
 
 ## Step 0b — intake from प्रस्ताव कक्ष
 Page: https://claude.ai/artifact/RYzwfiGwJpbVxyD5C2rCy2 (source `desk/proposal-desk.html`; data model `docs/PROPOSAL_DESK.md`).
@@ -64,14 +65,14 @@ Copy the structure of the nearest sample in `samples/specs/` and fill your facts
   - Facts, posts, periods and amounts go in TABLES: a `{"table": [[...],[...]], "bold_last": true}` item in `note.paras`.
   - GR/rule text verbatim in “ ” with "(पृ.N/प.वि.)".
   - Earlier record of the same matter = stated as a fact with its reference.
-- **Page references:** only "पृ.N/प.वि.", where N = page in the returned PDF (proposal pages 1..n, then the attached GR pages). Never "पॅकेज PDF" in the note body.
-- **Banned words:** no commentary or theory — no "दिसून येते", "पडताळणी केली असता", "माझ्या मते", no arithmetic explanations, no "ठरवावे" advice.
+- **Page references:** only "पृ.N/प.वि.", where N = page in the returned PDF (proposal pages 1..n, then the attached GR pages). Never "पॅकेज PDF" in the note body or the letter.
+- **Banned words:** no commentary or theory, no arithmetic explanations, no advice. Closed list (checked by `tools/verify_outputs.py` in the note body and the letter; keep both lists identical — 01.11.2026 सुसंगती): "दिसून येते", "असे दिसते", "पडताळणी केली असता", "माझ्या मते", "मला वाटते", "असे वाटते", "ठरवावे", "कदाचित", "बहुधा".
 - **Missing information para:** "प्रस्तावासोबत खालील माहिती उपलब्ध नाही.:- (1)…; (2)…".
 - **Last para, one of:**
   - "सबब, उपरोक्त माहिती तक्त्याच्या स्वरूपात … कळविण्याबाबतच्या पत्राचे प्रारुप पृ.      /प.वि. वर मान्यतेस्तव सादर. मान्य झाल्यास पत्र निर्गमित करण्यात येईल."
   - "सबब, … प्रस्ताव वित्त विभागाच्या मान्यतेस्तव सादर करण्यात येत आहे."
 - **Signers** (`note.signers`, in order): का. अ. (श्रीम. कऱ्हाडे) / अ.स. (श्री. वडनेरकर) / उ.वि.स. नि. उ.स. (श्री. बोंद्रे) / प्र.स. व वि.प. (श्री. खटी). Add "अ.मु.स. (वित्त)" only when the file goes to Finance.
-- **`related`** ("संबंधित माहिती (संदर्भासाठी)"): verbatim extracts. Each source ends with "पॅकेज PDF पृ. N".
+- **`related`** ("संबंधित माहिती (संदर्भासाठी)"): verbatim extracts. Each source ends with exactly "(पॅकेज PDF पृ. N)" (several pages: "(पॅकेज PDF पृ. N-M)" / "(पॅकेज PDF पृ. N,M)"), or "(पॅकेज PDF मध्ये नाही)" when the page is not in the package (01.11.2026 सुसंगती). No repo paths (register/, service-rules/, pdf/ …) and no internal ids in `related`.
 - **Letter (`letter`):**
   - `ref_no`: "संकिर्ण-2026/<file no>/प्र.क्र.<n>/का.6"; `date`: "__.__.2026".
   - `to`; `subject`; `refs` ("आपले पत्र क्र.…, दि.…").
@@ -103,15 +104,15 @@ Copy the structure of the nearest sample in `samples/specs/` and fill your facts
 2. **Parts 1–7** per tools/PROPOSAL_PROMPT.md: Marathi rendering page-wise, gist, provisions (verbatim + source), doubts, note draft, letter draft, verification note.
 
 ## Step 7 — Verify (must print ALL OK)
-`python3 tools/verify_outputs.py <outdir> <PREFIX> "<package pdf>" <number of proposal pages>`. It checks:
-- fonts (DVOT-SurekhMR on every run);
-- letter ending;
-- no internal ids;
-- no "पॅकेज PDF" in the note body;
-- every पृ./प.वि. is within the package;
-- page stamps and bookmarks;
-- no annotation on proposal pages;
-- only Highlight annotations.
+`python3 tools/verify_outputs.py <outdir> <PREFIX> "<package pdf>" <number of proposal pages>`. It prints one line per check (01.11.2026 सुसंगती; tests: `tests/test_verify_outputs.py`):
+- fonts: ascii/hAnsi/cs/eastAsia = DVOT-SurekhMR on every text run, incl. headers/footers (Study, note, letter);
+- no internal ids (`z<digit>_<4 digits>`) anywhere; no repo paths (register/, service-rules/, precedent-library/, pdf/, repo) in the note/letter;
+- every "पृ.N/प.वि." (also lists 5,7, ranges 5-7 / 5 ते 7, Devanagari digits) and "पॅकेज PDF पृ. N" in note, letter and Study is within 1..package pages;
+- no "पॅकेज PDF" in the note body or the letter; no banned word (Step 4 list) in the note body or the letter;
+- note signer chain = INSTRUCTIONS §4.6 in order; "अ.मु.स. (वित्त)" present only when the last para contains "वित्त विभागाच्या मान्यतेस्तव";
+- letter: new page/section; ref no. `संकिर्ण-<year>/<file no>/प्र.क्र.<n>/का.6`; e-mail; विषय/संदर्भ bold + centre; "आपला," (no "आपली,"); "( राजेश वडनेरकर )", "अवर सचिव ,महाराष्ट्र शासन", "प्रत : निवड नस्ती";
+- Study headings भाग 0 … भाग 7;
+- package: original file name (not `*_Proposal_with_GRs.pdf`); exactly "पृ. i / N" in the bottom strip of every page; bookmarks; page count = proposal + enclosure pages of `<pdf>.map.json` (no separator pages); no mark "TEXT NOT FOUND"/0 hits; no annotation on proposal pages; only Highlight annotations.
 
 Then a second read of every number and date against the page images.
 

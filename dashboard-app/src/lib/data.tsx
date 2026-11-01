@@ -1,6 +1,8 @@
 // Shared case + letter store for list, Kanban, Home and the command palette. Reads go straight to Supabase (RLS).
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import { sb } from './supabase';
+import { api } from './api';
+import { useCanWrite } from './auth';
 import type { Case, Letter } from './types';
 import { addDaysISO, todayISO } from './format';
 
@@ -32,6 +34,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setLetters((l.data as Letter[]) || []);
     setLoading(false);
   }, []);
+
+  // Stuck runs (queued/running > 3.5 h) → failed "वेळ संपली — पुन्हा तयार करा" (Worker, service role). Once per app load.
+  const canWrite = useCanWrite();
+  useEffect(() => {
+    if (canWrite) void api('/api/runs/sweep', { method: 'POST', body: {} }).catch(() => undefined);
+  }, [canWrite]);
 
   useEffect(() => {
     void refresh();

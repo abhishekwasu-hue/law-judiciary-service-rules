@@ -7,6 +7,12 @@ const PLAIN_KEYS = ['supabase_url', 'supabase_anon_key', 'github_repo', 'github_
 const ALL_KEYS = [...SECRET_KEYS, ...PLAIN_KEYS];
 const FILE_KINDS = ['proposal', 'extra_doc', 'reply'];
 const MAX_UPLOAD = 50 * 1024 * 1024;
+const SIGN_BUCKETS = ['proposals', 'outputs', 'gr-library'];
+// Run token (D4): created at dispatch, sent to GitHub in the payload. Single use for /api/engine/config (the secrets);
+// after that it is only good for /api/engine/fail (marks THIS run failed, returns nothing secret) until it expires.
+const RUN_TOKEN_TTL = 4 * 3600;                 // > job timeout (180 min) + queue time
+const STALE_MS = 3.5 * 3600 * 1000;             // queued/running longer than this = stuck (job timeout 180 min)
+const STALE_REASON = 'वेळ संपली — पुन्हा तयार करा';
 
 const json = (o, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { 'content-type': 'application/json; charset=utf-8' } });
 const bad = (msg, s = 400) => json({ error: msg }, s);
@@ -70,13 +76,38 @@ async function log(cfg, case_id, actor, action, detail = {}) {
 // ---------- engine dispatch (GitHub Actions, server-side only) ----------
 async function dispatchRun(env, cfg, run, origin) {
   const token = randomToken();
-  await env.SETTINGS.put(`run_token:${token}`, String(run.id), { expirationTtl: 3 * 3600 });
+  const exp = Math.floor(Date.now() / 1000) + RUN_TOKEN_TTL;
+  await env.SETTINGS.put(`run_token:${token}`, JSON.stringify({ run_id: String(run.id), used: false, exp }), { expiration: exp });
   const r = await fetch(`https://api.github.com/repos/${cfg.github_repo}/dispatches`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${cfg.github_token}`, Accept: 'application/vnd.github+json', 'User-Agent': 'prastav-kaksha' },
     body: JSON.stringify({ event_type: 'process_proposal', client_payload: { case_id: run.case_id, run_id: run.id, token, worker: origin } }),
   });
   if (!r.ok) throw new Error(`dispatch ${r.status}: ${(await r.text()).slice(0, 200)}`);
+}
+
+// Token record: JSON {run_id, used, exp}; a plain run id (tokens issued before this change) counts as unused.
+async function runToken(env, req) {
+  const t = (req.headers.get('authorization') || '').replace(/^Bearer /, '').trim();
+  if (!t) return null;
+  const v = await env.SETTINGS.get(`run_token:${t}`);
+  if (!v) return null;
+  let rec;
+  try { rec = JSON.parse(v); } catch { rec = null; }
+  if (!rec || typeof rec !== 'object') rec = { run_id: String(v), used: false, exp: 0 };
+  return { key: `run_token:${t}`, ...rec, run_id: String(rec.run_id) };
+}
+
+// Mark runs failed (engine fail without Supabase env, stale-run sweep). Only queued/running rows change.
+async function failRuns(cfg, filter, reason, actor = null) {
+  const db = sb(cfg);
+  const rows = await db.rest(`runs?${filter}&state=in.(queued,running)`, {
+    method: 'PATCH', body: JSON.stringify({ state: 'failed', step: reason, finished_at: new Date().toISOString() }),
+  });
+  if (rows && rows.length)
+    await db.rest('activity', { method: 'POST', headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify(rows.map(r => ({ case_id: r.case_id, actor, action: 'run_failed', detail: { run_id: r.id, reason } }))) });
+  return rows || [];
 }
 
 // ---------- routes ----------
@@ -119,12 +150,25 @@ async function route(req, env, url) {
     return json({ ok: true });
   }
 
-  // engine: config for one run, by one-time token (D4)
+  // engine: config for one run, by the run token (D4) — single use
   if (p === '/api/engine/config' && M === 'GET') {
-    const t = (req.headers.get('authorization') || '').replace(/^Bearer /, '');
-    const runId = t && (await env.SETTINGS.get(`run_token:${t}`));
-    if (!runId || runId !== url.searchParams.get('run_id')) return bad('bad token', 403);
+    const tok = await runToken(env, req);
+    if (!tok || tok.used || tok.run_id !== url.searchParams.get('run_id')) return bad('bad token', 403);
+    if (!cfg.anthropic_api_key || !cfg.supabase_url || !cfg.supabase_service_key) return bad('config incomplete (Settings)', 412); // token stays unused
+    const exp = tok.exp || Math.floor(Date.now() / 1000) + RUN_TOKEN_TTL;
+    await env.SETTINGS.put(tok.key, JSON.stringify({ run_id: tok.run_id, used: true, exp }), { expiration: exp });
     return json({ anthropic_api_key: cfg.anthropic_api_key, model: cfg.model, supabase_url: cfg.supabase_url, supabase_service_key: cfg.supabase_service_key });
+  }
+
+  // engine: record a failure when the workflow has no Supabase env (e.g. the config step failed). Run token, used or not.
+  if (p === '/api/engine/fail' && M === 'POST') {
+    const tok = await runToken(env, req);
+    const b = await req.json().catch(() => ({}));
+    if (!tok || tok.run_id !== String(b.run_id || '')) return bad('bad token', 403);
+    if (!cfg.supabase_url || !cfg.supabase_service_key) return bad('not configured', 503);
+    const reason = String(b.reason || 'इंजिन अयशस्वी — पुन्हा तयार करा').trim().slice(0, 300);
+    const rows = await failRuns(cfg, `id=eq.${Number(tok.run_id)}`, reason);
+    return json({ ok: true, changed: rows.length });
   }
 
   if (!configured) return bad('not configured', 503);
@@ -134,6 +178,14 @@ async function route(req, env, url) {
   const db = sb(cfg);
 
   if (p === '/api/me') return json(user);
+
+  // POST /api/runs/sweep → runs queued/running for more than 3.5 h are marked failed (called by the app on load)
+  if (p === '/api/runs/sweep' && M === 'POST') {
+    if (!canWrite(user)) return bad('read-only', 403);
+    const before = new Date(Date.now() - STALE_MS).toISOString();
+    const rows = await failRuns(cfg, `created_at=lt.${encodeURIComponent(before)}`, STALE_REASON, user.id);
+    return json({ ok: true, failed: rows.map(r => r.id) });
+  }
 
   if (p === '/api/settings' && M === 'GET') {
     if (user.role !== 'owner') return bad('owner only', 403);
@@ -189,6 +241,8 @@ async function route(req, env, url) {
     if (!caseId || !FILE_KINDS.includes(kind) || !name || /[\\/]/.test(name)) return bad('case_id, kind, x-file-name required');
     const len = Number(req.headers.get('content-length') || 0);
     if (len > MAX_UPLOAD) return bad('file over 50 MB', 413);
+    const exists = await db.rest(`cases?id=eq.${caseId}&select=id`);
+    if (!exists.length) return bad('case not found', 404); // no orphan object in Storage
     const prev = await db.rest(`case_files?case_id=eq.${caseId}&kind=eq.${kind}&original_name=eq.${encodeURIComponent(name)}&select=version&order=version.desc&limit=1`);
     const version = prev.length ? prev[0].version + 1 : 1;
     const path = `${caseId}/${kind}/v${version}/${name}`;
@@ -225,6 +279,7 @@ async function route(req, env, url) {
     const [f] = await db.rest(`case_files?id=eq.${m[1]}&select=storage_path,original_name`);
     if (!f) return bad('not found', 404);
     const [bucket, ...rest] = f.storage_path.split('/');
+    if (!SIGN_BUCKETS.includes(bucket) || !rest.length) return bad('bad storage path', 403);
     return json({ url: await db.sign(bucket, rest.join('/'), url.searchParams.get('download') ? f.original_name : null), name: f.original_name });
   }
 

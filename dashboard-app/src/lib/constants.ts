@@ -49,6 +49,15 @@ export function runTone(s: string): Tone {
   return s === 'done' ? 'green' : s === 'failed' ? 'red' : s === 'running' ? 'blue' : 'amber';
 }
 
+/** A run queued/running longer than this is stuck (engine job timeout 180 min). Same limit as the Worker's /api/runs/sweep. */
+export const STALE_MS = 3.5 * 3600 * 1000;
+export const STALE_REASON = 'वेळ संपली — पुन्हा तयार करा';
+export const isStale = (r: { state: string; created_at: string }) =>
+  (r.state === 'queued' || r.state === 'running') && Date.now() - new Date(r.created_at).getTime() > STALE_MS;
+/** Run in progress (blocks a new run). A stale run does not block. */
+export const runActive = (r: { state: string; created_at: string } | null | undefined) =>
+  !!r && (r.state === 'queued' || r.state === 'running') && !isStale(r);
+
 /** Live progress steps (prompt §6.2). Keys = the exact runs.step texts written by the engine (tools/ENGINE_PROMPT.md rule 4). */
 export const RUN_STEPS: { key: string; label: string }[] = [
   { key: 'queued', label: 'रांगेत' },
@@ -67,5 +76,5 @@ export const FILE_KIND_LABEL: Record<string, string> = {
 
 export const ACTION_LABEL: Record<string, string> = {
   case_created: 'प्रकरण नोंदवले', file_uploaded: 'फाइल अपलोड', run_started: 'अभ्यास सुरू',
-  stage_changed: 'टप्पा बदलला', letter_saved: 'पत्र नोंदवले', run_done: 'अभ्यास पूर्ण', run_failed: 'अभ्यास अयशस्वी',
+  stage_changed: 'टप्पा बदलला', letter_saved: 'पत्र नोंदवले', run_done: 'अभ्यास पूर्ण', run_failed: 'अभ्यास अयशस्वी', run_warning: 'अभ्यास-सूचना',
 };
