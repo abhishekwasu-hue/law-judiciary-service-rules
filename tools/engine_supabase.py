@@ -13,19 +13,30 @@ Commands:
                       *_Note_and_Letter.pdf are ignored) -> bucket outputs/<case>/<kind>/v<n>/file<ext> (ASCII key:
                       Storage refuses non-ASCII keys; the real name only in case_files.original_name), case_files rows,
                       runs done + summary fields, cases.stage "मसुदा तयार", activity run_done. Incomplete -> fail.
-  claude_result <claude.json> [<stderr file>] [<exit code>] [--part1 <part1.json>] [--wall <seconds>]
+  claude_result <claude.json> [<stderr file>] [<exit code>] [--part1 <part1.json>] [--wall <seconds>] [--status <status.json>]
                       Claude Code `--output-format json` result(s) -> runs.cost_usd and num_turns = SUM of the main run
                       and the parallel Study-part-1 run (--part1, if its JSON exists); duration_s = --wall (wall clock
                       of the whole step: the two runs overlap, so a sum would overstate it), else the longer of the two
                       runs' duration_ms. An error result of the MAIN run (max turns, API key, credit, ...) -> fail with
                       a Marathi reason + next step; exit 1. A part-1 error alone is only a warning (the main run then
-                      writes part 1 itself; verify/finish still check the Study).
+                      writes part 1 itself; verify/finish still check the Study). Adds "मॉडेल: " lines to
+                      runs.warnings (status.json model_log entries, per-model cost from modelUsage) and, when the
+                      total cost is over BUDGET_USD, "खर्च-मर्यादा ओलांडली — दर्जा राखण्यासाठी (…)" (soft budget).
   verify <outdir> [<workdir>]
                       runs tools/verify_outputs.py <outdir> <PREFIX> "<package pdf>" <proposal pages>
                       --original-name "<newest proposal's original name>" (PREFIX/package from status.json `prefix` /
                       `package_pdf`, else from the file names; proposal pages = page count of the fetched proposal,
                       else status.json `proposal_pages`; original name from <workdir>/case.json, so a real file name
                       such as CR66_Proposal_with_GRs.pdf is accepted). Not ALL OK -> fail with the FAIL lines.
+  config <cfg.json>   (local) the non-secret run settings from the Worker's /api/engine/config JSON as KEY=VALUE
+                      lines for $GITHUB_ENV: MODEL (main tier, every quality-critical task; default claude-opus-5-5),
+                      MODEL_LIGHT (mechanical tier + orchestrating session; default claude-haiku-5-5), MODEL_STRONG
+                      (optional one-way escalation tier; default off), EFFORT (default medium), BUDGET_USD (SOFT,
+                      default 0.75 — never stops or degrades the run). Invalid values -> defaults.
+  agents <out.json>   (local) Claude Code --agents JSON: drafter (MODEL) [+ drafter_strong (MODEL_STRONG)].
+  part1check <facts.json> <study_part1.json>
+                      (local) cheap-tier Study part 1 vs the main tier's facts: every number/date (and Devanagari
+                      name/post) of a page must occur in that page's part-1 text. PART1 OK / MISMATCH lines, exit 1.
   warn "<text>"       runs.warnings += text (non-fatal, e.g. new GRs not pushed); activity run_warning.
   fail "<reason>"     runs: state failed, step reason, finished_at; activity run_failed; exit 1.
                       (If the run is already failed, the earlier, more specific reason is kept.)"""
@@ -251,6 +262,9 @@ def claude_reason(res, err, rc):
     low = txt.lower()
     if str(rc) == "124":  # `timeout` in the workflow stopped Claude
         return "वेळ संपली — अभ्यास ठरलेल्या वेळेत पूर्ण झाला नाही. पुन्हा तयार करा."
+    if sub == "error_max_budget_usd" or re.search(r"max.?budget|budget.{0,20}(exceeded|exhausted|reached)", low):
+        return ("खर्च-मर्यादा ओलांडली — Claude Code ने अभ्यास थांबवला (इंजिन खर्च-मर्यादा कठोर ठेवत नाही; workflow तपासा),"
+                " नंतर पुन्हा तयार करा.")
     if sub == "error_max_turns":
         return "अभ्यास अपूर्ण — कमाल पायऱ्या (max turns) संपल्या. पुन्हा तयार करा (आवश्यक तर सूचना थोडक्यात द्या)."
     if re.search(r"credit balance|billing|insufficient.?(credit|fund|quota)|payment required", low):
@@ -301,13 +315,189 @@ def claude_fields(results, wall=None):
     return fields
 
 
+DEFAULTS = {"model": "claude-opus-5-5", "model_light": "claude-haiku-5-5", "model_strong": "",
+            "effort": "medium", "budget_usd": 0.75}
+EFFORTS = ("low", "medium", "high", "xhigh", "max")
+OFF = ("none", "off", "no", "-", "0", "false")
+MODEL_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:@\[\]/-]{1,99}")
+
+
+def engine_config(cfg):
+    """Non-secret run settings from the Worker config dict (keys model, model_light, model_strong, effort,
+    budget_usd); every missing/invalid value -> DEFAULTS. Tiers: MODEL = main tier (every quality-critical task;
+    default = the Opus-class model that produced the approved outputs), MODEL_LIGHT = mechanical tier (orchestrator,
+    tools, builds, lint/verify fixes, Study part 1 draft), MODEL_STRONG = optional one-way escalation tier above MODEL
+    (empty / "none" = off). BUDGET_USD is SOFT: the run is never stopped or degraded for it; going over it only adds
+    the warning "खर्च-मर्यादा ओलांडली — दर्जा राखण्यासाठी"."""
+    cfg = cfg if isinstance(cfg, dict) else {}
+    def model(k):
+        v = cfg.get(k)
+        v = v.strip() if isinstance(v, str) else ""
+        if k == "model_strong" and v.lower() in OFF:
+            return ""
+        return v if MODEL_RE.fullmatch(v) else DEFAULTS[k]
+    eff = cfg.get("effort")
+    eff = eff.strip().lower() if isinstance(eff, str) and eff.strip().lower() in EFFORTS else DEFAULTS["effort"]
+    bud = cfg.get("budget_usd")
+    try:
+        bud = float(bud) if bud is not None and not isinstance(bud, bool) and str(bud).strip() != "" else DEFAULTS["budget_usd"]
+    except (TypeError, ValueError):
+        bud = DEFAULTS["budget_usd"]
+    if not (0.05 <= bud <= 50):  # also NaN
+        bud = DEFAULTS["budget_usd"]
+    strong = model("model_strong")
+    main = model("model")
+    if strong == main:
+        strong = ""
+    return {"MODEL": main, "MODEL_LIGHT": model("model_light"), "MODEL_STRONG": strong, "EFFORT": eff,
+            "BUDGET_USD": f"{bud:.2f}"}
+
+
+def cmd_config(path):
+    try:
+        cfg = json.load(open(path, encoding="utf-8"))
+    except Exception:
+        cfg = {}
+    for k, v in engine_config(cfg).items():
+        print(f"{k}={v}")
+
+
+def agents_json(conf, brief="tools/ENGINE_BRIEF.md"):
+    """Claude Code --agents definitions (pinned CLI: description, prompt, model per agent). The orchestrating session
+    runs on MODEL_LIGHT; quality-critical work goes to `drafter` (MODEL); `drafter_strong` (MODEL_STRONG) exists
+    only when configured. Prompts are fixed text (stable prefix for prompt caching)."""
+    base = ("You are a subagent of the Law & Judiciary engine run (one case). The binding rules are " + brief +
+            " (read it once, fully) and the tool docstrings in /tmp/work/TOOL_DOCS.md; INSTRUCTIONS.md wins on any doubt"
+            " (grep the exact item). Nothing of your own; verbatim quotes with source; unreadable = \"अस्पष्ट\". "
+            "Do exactly the task in the delegation message, write the files it names, and reply in at most 5 lines "
+            "(files written, open doubts, anything you could not read). Batch independent tool calls in one message; "
+            "never read a file twice; limit command output. No git, no questions, never print environment values.")
+    out = {"drafter": {
+        "description": "Main tier. Quality-critical work: read facts/numbers/dates/names/handwriting/stamps from the "
+                       "proposal page images; letter-or-not decision; GR selection and verbatim quotes; note and "
+                       "letter spec; Study parts 0, 2, 3, 4, 7; Study part 1 pages that failed the part-1 check; "
+                       "content fixes that lint/verify still reports after 2 mechanical attempts.",
+        "prompt": base, "model": conf["MODEL"]}}
+    if conf.get("MODEL_STRONG"):
+        out["drafter_strong"] = {
+            "description": "Escalation tier (one-way up, only per the escalation rules): a page or a content problem "
+                           "the main tier reported as still unclear / still failing.",
+            "prompt": base, "model": conf["MODEL_STRONG"]}
+    return out
+
+
+def cmd_agents(args):
+    """agents <out.json> — writes agents_json(engine_config(env)) (env MODEL, MODEL_LIGHT, MODEL_STRONG)."""
+    conf = {k: os.environ.get(k, "") for k in ("MODEL", "MODEL_LIGHT", "MODEL_STRONG")}
+    conf["MODEL"] = conf["MODEL"] or DEFAULTS["model"]
+    json.dump(agents_json(conf), open(args[0], "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+
+
+NUM_RE = re.compile(r"\d+(?:[./-]\d+)*")
+DEV_DIGITS = str.maketrans("०१२३४५६७८९", "0123456789")
+
+
+def part1_check(facts, part1):
+    """Part 1 (cheap tier) against the main tier's facts list: every number/date of every facts item must occur in
+    that page's part-1 text (Devanagari digits normalised); a Devanagari value without digits (name, post) must
+    occur as written (spaces ignored). -> list of "page N: <what> = <value>" mismatches; [] = confirmed."""
+    pages, cur = {}, None
+    for b in (part1 or {}).get("blocks") or []:
+        if not isinstance(b, dict): continue
+        if "subheading" in b:
+            m = re.search(r"पान\s*(\d+)", str(b["subheading"]).translate(DEV_DIGITS))
+            cur = int(m.group(1)) if m else cur
+        txt = json.dumps(b, ensure_ascii=False).translate(DEV_DIGITS)
+        if cur is not None:
+            pages[cur] = pages.get(cur, "") + "\n" + txt
+    bad = []
+    for f in (facts or {}).get("facts") or []:
+        if not isinstance(f, dict): continue
+        try: pg = int(f.get("page"))
+        except (TypeError, ValueError): continue
+        text = pages.get(pg)
+        flat = re.sub(r"\s+", "", text or "")
+        for it in f.get("items") or []:
+            if not isinstance(it, dict): continue
+            v = str(it.get("value") or "").strip()
+            if not v or v == "अस्पष्ट" or it.get("clear") is False: continue
+            vn = v.translate(DEV_DIGITS)
+            nums = [n for n in NUM_RE.findall(vn) if len(n.replace(".", "").replace("/", "").replace("-", "")) >= 2]
+            if text is None:
+                bad.append(f"page {pg}: no part-1 section"); break
+            if nums:
+                miss = [n for n in nums if n not in text]
+                if miss: bad.append(f"page {pg}: {it.get('what')} = {v} (missing {', '.join(miss)})")
+            elif re.search(r"[\u0900-\u097F]", v) and re.sub(r"\s+", "", v) not in flat:
+                bad.append(f"page {pg}: {it.get('what')} = {v}")
+    return bad
+
+
+def cmd_part1check(args):
+    """part1check <facts.json> <study_part1.json> -> prints PART1 OK or the mismatches (exit 1)."""
+    try:
+        facts = json.load(open(args[0], encoding="utf-8")); p1 = json.load(open(args[1], encoding="utf-8"))
+    except Exception as e:
+        print("PART1 CHECK ERROR:", e); sys.exit(1)
+    bad = part1_check(facts, p1)
+    for l in bad: print("MISMATCH", l)
+    print("PART1 OK" if not bad else f"PART1 FAIL ({len(bad)})")
+    sys.exit(0 if not bad else 1)
+
+
+def short_model(m):
+    """claude-haiku-5-5 -> Haiku 5.5 (for the Marathi run lines)."""
+    mm = re.fullmatch(r"claude-([a-z]+)-(\d+)(?:-(\d+))?(.*)", str(m or ""))
+    return f"{mm.group(1).capitalize()} {mm.group(2)}{'.' + mm.group(3) if mm.group(3) else ''}" if mm else str(m or "?")
+
+
+def model_lines(results, status_path=None, budget=None):
+    """'मॉडेल: ' run lines (runs.warnings — no schema change; contract with the UI): each routing/escalation entry of
+    status.json `model_log` [{task, from, to, reason}] (kept also when the run failed), one per-model cost line from
+    the results' modelUsage, and the soft-budget warning when the total cost is over BUDGET_USD."""
+    lines, log = [], []
+    if status_path and os.path.exists(status_path):
+        try:
+            log = json.load(open(status_path, encoding="utf-8")).get("model_log") or []
+        except Exception:
+            log = []
+    for e in log if isinstance(log, list) else []:
+        if not isinstance(e, dict): continue
+        t, fr, to, why = (str(e.get(k) or "").strip() for k in ("task", "from", "to", "reason"))
+        if t and to:
+            lines.append(f"मॉडेल: {t} → {short_model(to)}" + (f" (पूर्वी {short_model(fr)})" if fr else "")
+                         + (f" ({why})" if why else ""))
+    cost = {}
+    for r in results:
+        mu = r.get("modelUsage") if isinstance(r.get("modelUsage"), dict) else {}
+        for m, u in mu.items():
+            c = u.get("costUSD") if isinstance(u, dict) else None
+            if isinstance(c, (int, float)) and not isinstance(c, bool):
+                cost[m] = cost.get(m, 0.0) + float(c)
+    if cost:
+        lines.append("मॉडेल: खर्च — " + ", ".join(f"{short_model(m)} ${c:.2f}" for m, c in sorted(cost.items(), key=lambda x: -x[1])))
+    total = [r.get("total_cost_usd", r.get("cost_usd")) for r in results]
+    total = sum(float(c) for c in total if isinstance(c, (int, float)) and not isinstance(c, bool))
+    if budget is not None and total > budget:
+        lines.append(f"खर्च-मर्यादा ओलांडली — दर्जा राखण्यासाठी (खर्च ${total:.2f} / मर्यादा ${budget:.2f})")
+    return [l[:300] for l in lines]
+
+
+def add_warnings(lines):
+    if not lines: return
+    cur = (rest("GET", f"runs?id=eq.{RUN}&select=warnings") or [{}])[0]
+    w = cur.get("warnings") if isinstance(cur.get("warnings"), list) else []
+    patch_run({"warnings": w + lines})
+
+
 def cmd_claude_result(args):
     args = list(args)
-    part1 = wall = None
-    for flag in ("--part1", "--wall"):
+    part1 = wall = status = None
+    for flag in ("--part1", "--wall", "--status"):
         if flag in args:
             k = args.index(flag); v = args[k + 1] if k + 1 < len(args) else ""; del args[k:k + 2]
             if flag == "--part1": part1 = v
+            elif flag == "--status": status = v
             else:
                 try: wall = float(v)
                 except ValueError: wall = None
@@ -324,6 +514,11 @@ def cmd_claude_result(args):
             patch_run(fields)
         except Exception as e:
             print("engine_supabase: cost not stored:", e, file=sys.stderr)
+    try:
+        b = os.environ.get("BUDGET_USD")
+        add_warnings(model_lines(results, status, float(b) if b else None))
+    except Exception as e:
+        print("engine_supabase: model lines not stored:", e, file=sys.stderr)
     if res:
         print("claude:", res.get("subtype"), "| turns", res.get("num_turns"), "| cost", res.get("total_cost_usd", res.get("cost_usd")))
     if p1:
@@ -418,6 +613,12 @@ def cmd_fail(reason):
 
 
 def main(a):
+    if len(a) == 2 and a[0] == "config":  # local commands: no Supabase env needed
+        return cmd_config(a[1])
+    if len(a) == 2 and a[0] == "agents":
+        return cmd_agents(a[1:])
+    if len(a) == 3 and a[0] == "part1check":
+        return cmd_part1check(a[1:])
     if len(a) < 2 or a[0] not in ("fetch", "step", "log_url", "finish", "fail", "claude_result", "verify", "warn"):
         print(__doc__); sys.exit(2)
     init()

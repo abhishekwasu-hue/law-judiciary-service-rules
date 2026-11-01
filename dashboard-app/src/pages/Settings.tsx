@@ -7,15 +7,15 @@ import { fmtDate } from '../lib/format';
 import { Chip, Field, Section, SkeletonRows, Spinner } from '../components/ui';
 import { useToast } from '../components/Toast';
 
-const PLAIN: { k: string; label: string; hint?: string; num?: boolean }[] = [
+const PLAIN: { k: string; label: string; hint?: string; num?: boolean; ai?: boolean; ph?: string }[] = [
   { k: 'owner_email', label: 'मालकाचा ई-मेल', hint: 'या ई-मेलने लॉगिन करणाऱ्याला सेटिंग्ज बदलण्याचा अधिकार' },
   { k: 'supabase_url', label: 'Supabase URL', hint: 'माहिती-साठ्याचा पत्ता — Supabase प्रकल्पाच्या सेटिंग्जमध्ये मिळतो' },
   { k: 'supabase_anon_key', label: 'Supabase anon key', hint: 'त्याच ठिकाणची सार्वजनिक की (anon)' },
   { k: 'github_repo', label: 'GitHub repo', hint: 'नियम व साधने असलेला रेपो — उदा. owner/repo' },
   { k: 'github_branch', label: 'GitHub branch', hint: 'सहसा main' },
-  { k: 'model', label: 'AI मॉडेल (Model)', hint: 'प्रक्रियेसाठी वापरायच्या Claude मॉडेलचे नाव — स्वस्त मॉडेल निवडल्यास खर्च कमी होतो' },
-  { k: 'model_light', label: 'हलके AI मॉडेल (model_light)', hint: 'पाने वाचणे व भाग 1 साठी स्वस्त मॉडेल; रिकामे = डीफॉल्ट' },
-  { k: 'budget_usd', label: 'कमाल खर्च ($) (budget_usd)', hint: 'प्रत्येक प्रस्तावासाठी कमाल खर्च ($). डीफॉल्ट 0.75', num: true },
+  { k: 'model', label: 'मुख्य मॉडेल (model)', hint: 'नोंद, पत्र व GR साठी; रिकामे = डीफॉल्ट', ai: true, ph: 'उदा. claude-opus-… (दर्जा राखण्यासाठी)' },
+  { k: 'model_light', label: 'स्वस्त मॉडेल (model_light)', hint: 'पाने वाचणे, भाग 1 व यांत्रिक कामासाठी; रिकामे = डीफॉल्ट', ai: true, ph: 'उदा. claude-haiku-…' },
+  { k: 'budget_usd', label: 'कमाल खर्च ($) (budget_usd)', hint: 'प्रत्येक प्रस्तावासाठी कमाल खर्च ($). डीफॉल्ट 0.75', num: true, ai: true, ph: 'उदा. 0.75' },
 ];
 const SECRET: { k: string; label: string; hint: string }[] = [
   { k: 'supabase_service_key', label: 'Supabase service_role key', hint: 'माहिती-साठ्याची गुप्त की' },
@@ -52,6 +52,12 @@ export default function Settings() {
   }, [me?.role]);
 
   if (me?.role !== 'owner') return <div className="card p-6 text-center">सेटिंग्ज फक्त मालकासाठी.</div>;
+
+  const plainField = (p: (typeof PLAIN)[number]) => (
+    <Field key={p.k} label={p.label} hint={p.hint}>
+      <input className="input font-mono" {...(p.num ? { type: 'number', inputMode: 'decimal' as const, min: 0.01, max: 20, step: 0.01 } : {})} placeholder={p.ph} value={edit[p.k] ?? ''} onChange={e => setEdit(s => ({ ...s, [p.k]: e.target.value }))} />
+    </Field>
+  );
 
   async function save(e: FormEvent) {
     e.preventDefault();
@@ -106,12 +112,15 @@ export default function Settings() {
         ) : (
           <form onSubmit={save} className="space-y-4">
             <div className="grid gap-4 md:grid-cols-2">
-              {PLAIN.map(p => (
-                <Field key={p.k} label={p.label} hint={p.hint}>
-                  <input className="input font-mono" {...(p.num ? { type: 'number', inputMode: 'decimal' as const, min: 0.01, max: 20, step: 0.01 } : {})} value={edit[p.k] ?? ''} onChange={e => setEdit(s => ({ ...s, [p.k]: e.target.value }))} />
-                </Field>
-              ))}
+              {PLAIN.filter(p => !p.ai).map(plainField)}
             </div>
+            <fieldset className="space-y-3 rounded-lg border border-slate-200 p-4 dark:border-navy-800">
+              <legend className="px-1 text-lg font-bold">AI मॉडेल व खर्च</legend>
+              <p className="text-sm text-slate-600 dark:text-slate-300">स्वस्त मॉडेल — पाने वाचणे, भाग 1, यांत्रिक काम; मुख्य मॉडेल — नोंद/पत्र/GR; गरज पडल्यासच अधिक सक्षम मॉडेल आपोआप</p>
+              <div className="grid gap-4 md:grid-cols-3">
+                {PLAIN.filter(p => p.ai).map(plainField)}
+              </div>
+            </fieldset>
             <div className="grid gap-4 md:grid-cols-3">
               {SECRET.map(s => (
                 <Field

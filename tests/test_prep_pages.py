@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Test for tools/prep_pages.py: a 3-page PDF (one page with a text layer) -> 3 PNGs, 3 .txt, pages.json;
+"""Test for tools/prep_pages.py: a 3-page PDF (one page with a text layer) -> 3 PNGs (+ 3 small 80 dpi PNGs), 3 .txt, pages.json;
 OCR skipped cleanly when tesseract is missing (forced with an empty PATH). Run: py tests/test_prep_pages.py"""
 import json, os, subprocess, sys, tempfile
 
@@ -37,7 +37,10 @@ out = os.path.join(tmp, "pages")
 r = run(out, path=os.path.join(tmp, "nobin"))
 check(r.returncode == 0, f"exit 0 without tesseract ({r.stderr.strip()[:200]})")
 names = sorted(os.listdir(out))
-check([n for n in names if n.endswith(".png")] == ["p-01.png", "p-02.png", "p-03.png"], "3 PNGs p-01..p-03")
+check([n for n in names if n.endswith(".png") and not n.endswith(".sm.png")] == ["p-01.png", "p-02.png", "p-03.png"], "3 PNGs p-01..p-03")
+check([n for n in names if n.endswith(".sm.png")] == ["p-01.sm.png", "p-02.sm.png", "p-03.sm.png"], "3 small PNGs p-NN.sm.png")
+ws = pymupdf.Pixmap(os.path.join(out, "p-01.sm.png")).width
+check(abs(ws - 595 * 80 / 72) <= 2, f"small PNG rendered at 80 dpi (width {ws})")
 check([n for n in names if n.endswith(".txt")] == ["p-01.txt", "p-02.txt", "p-03.txt"], "3 text-layer files, no .ocr.txt")
 w = pymupdf.Pixmap(os.path.join(out, "p-01.png")).width
 check(abs(w - 595 * 110 / 72) <= 2, f"PNG rendered at 110 dpi (width {w})")
@@ -48,6 +51,15 @@ check(info["pages"] == 3 and info["has_text_layer"] == [False, True, False], "pa
 check([f["png"] for f in info["files"]] == ["p-01.png", "p-02.png", "p-03.png"] and all(f["ocr"] is None for f in info["files"]),
       "pages.json: files[], ocr null")
 check(info["ocr_lang"] is None and info["dpi"] == 110 and info["pdf"] == "प्रस्ताव.pdf", "pages.json: ocr_lang null, dpi, pdf name")
+check(info["small_dpi"] == 80 and [f["png_small"] for f in info["files"]] == ["p-01.sm.png", "p-02.sm.png", "p-03.sm.png"],
+      "pages.json: small_dpi + png_small")
+out4 = os.path.join(tmp, "pages_nosmall")
+r = run(out4, os.path.join(tmp, "nobin"), "--small-dpi", "0", "--dpi", "90")
+info4 = json.load(open(os.path.join(out4, "pages.json"), encoding="utf-8"))
+check(r.returncode == 0 and not any(n.endswith(".sm.png") for n in os.listdir(out4)) and info4["small_dpi"] is None
+      and all(f["png_small"] is None for f in info4["files"]) and info4["dpi"] == 90
+      and abs(pymupdf.Pixmap(os.path.join(out4, "p-01.png")).width - 595 * 90 / 72) <= 2,
+      f"--small-dpi 0 --dpi 90: no small PNGs, full PNG at 90 dpi ({r.stderr.strip()[:200]})")
 
 # --- fake tesseract (exercises the OCR path where tesseract is not installed): lists mar+eng, echoes lang + image
 fb = os.path.join(tmp, "fakebin"); os.makedirs(fb)

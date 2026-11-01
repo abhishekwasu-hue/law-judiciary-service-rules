@@ -60,6 +60,13 @@ export function fmtDuration(s: number): string {
   return m < 60 ? `${m} मि.` : `${Math.floor(m / 60)} ता. ${m % 60} मि.`;
 }
 
+const COST_TARGET = 'प्रति प्रस्ताव लक्ष्य $0.50';
+/** green ≤ $0.50 (target), amber ≤ $1, red above. */
+const costTone = (c: number) =>
+  c <= 0.5 ? 'bg-green-100 text-green-900 dark:bg-green-900/40 dark:text-green-100'
+    : c <= 1 ? 'bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-100'
+      : 'bg-red-100 text-red-900 dark:bg-red-900/40 dark:text-red-100';
+
 /** Cost / turns / duration of one run (from Claude Code's JSON result, stored by the engine). */
 export function RunCost({ run }: { run: Run }) {
   const { me } = useAuth();
@@ -69,7 +76,11 @@ export function RunCost({ run }: { run: Run }) {
   if (cost == null && turns == null && dur == null) return null;
   return (
     <div className="no-print flex flex-wrap gap-2 text-sm">
-      {cost != null && <span className="rounded-md bg-amber-100 px-2 py-0.5 font-semibold text-amber-900 dark:bg-amber-900/40 dark:text-amber-100">खर्च ${cost.toFixed(2)}</span>}
+      {cost != null && (
+        <span className={`rounded-md px-2 py-0.5 font-semibold ${costTone(cost)}`} title={COST_TARGET} aria-label={`खर्च $${cost.toFixed(2)} — ${COST_TARGET}`}>
+          खर्च ${cost.toFixed(2)}
+        </span>
+      )}
       {turns != null && <span className="rounded-md bg-slate-100 px-2 py-0.5 text-slate-700 dark:bg-navy-800 dark:text-slate-200">पायऱ्या {turns}</span>}
       {dur != null && <span className="rounded-md bg-slate-100 px-2 py-0.5 text-slate-700 dark:bg-navy-800 dark:text-slate-200">वेळ {fmtDuration(dur)}</span>}
     </div>
@@ -132,13 +143,33 @@ export function RunEta({ run }: { run: Run }) {
   );
 }
 
+/** Engine model-routing lines in `runs.warnings` start with this prefix (not real warnings). */
+const MODEL_PREFIX = 'मॉडेल:';
+
 export function RunWarnings({ run }: { run: Run }) {
-  const w = asArray(run.warnings).map(textOf).filter(Boolean);
-  if (!w.length) return null;
+  const { me } = useAuth();
+  const all = asArray(run.warnings).map(textOf).map(x => x.trim()).filter(Boolean);
+  const models = all.filter(x => x.startsWith(MODEL_PREFIX)).map(x => x.slice(MODEL_PREFIX.length).trim());
+  const w = all.filter(x => !x.startsWith(MODEL_PREFIX));
+  // model-routing list: owner-only, never printed
+  const showModels = me?.role === 'owner' && models.length > 0;
+  if (!w.length && !showModels) return null;
   return (
-    <ul className="space-y-1 rounded-lg bg-amber-100 px-3 py-2 text-sm text-amber-900 dark:bg-amber-900/40 dark:text-amber-100">
-      {w.map((x, i) => <li key={i}>⚠ {x}</li>)}
-    </ul>
+    <>
+      {w.length > 0 && (
+        <ul className="space-y-1 rounded-lg bg-amber-100 px-3 py-2 text-sm text-amber-900 dark:bg-amber-900/40 dark:text-amber-100">
+          {w.map((x, i) => <li key={i}>⚠ {x}</li>)}
+        </ul>
+      )}
+      {showModels && (
+        <details className="no-print rounded-lg bg-slate-100 px-3 py-2 text-sm text-slate-700 dark:bg-navy-800 dark:text-slate-200">
+          <summary className="cursor-pointer font-semibold">मॉडेल-वापर ({models.length})</summary>
+          <ul className="mt-1 space-y-0.5 break-words">
+            {models.map((x, i) => <li key={i}>• {x}</li>)}
+          </ul>
+        </details>
+      )}
+    </>
   );
 }
 

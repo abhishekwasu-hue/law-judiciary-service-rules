@@ -278,5 +278,98 @@ run_row.update(state="running")
 r = run("finish", out3)
 check(r.returncode == 1 and "मूळ प्रस्ताव" in run_row["step"], "finish: package named after the OLD proposal is refused")
 
+# --- model tiers + soft budget: config parsing (local command, no Supabase env), agents JSON, part1check, "मॉडेल: " lines
+sys.path.insert(0, os.path.join(ROOT, "tools"))
+import engine_supabase as es
+
+c = es.engine_config({})
+check(c == {"MODEL": "claude-opus-5-5", "MODEL_LIGHT": "claude-haiku-5-5", "MODEL_STRONG": "", "EFFORT": "medium",
+            "BUDGET_USD": "0.75"}, f"config: defaults (main Opus-class, light Haiku, no strong tier, soft budget 0.75) {c}")
+c = es.engine_config({"model": " claude-sonnet-5-5 ", "model_light": "claude-haiku-5-5", "model_strong": "claude-fable-5-1",
+                      "effort": "HIGH", "budget_usd": "1.5"})
+check(c["MODEL"] == "claude-sonnet-5-5" and c["MODEL_STRONG"] == "claude-fable-5-1" and c["EFFORT"] == "high"
+      and c["BUDGET_USD"] == "1.50", f"config: three tiers, effort, budget string parsed {c}")
+for bad in ({"model": "x; rm -rf /", "model_light": "$(id)", "budget_usd": "abc", "effort": "turbo"},
+            {"model": 5, "model_light": None, "budget_usd": True}, {"budget_usd": -1}, {"budget_usd": 1e9}, {"budget_usd": float("nan")}):
+    c = es.engine_config(bad)
+    check(c["MODEL"] == "claude-opus-5-5" and c["MODEL_LIGHT"] == "claude-haiku-5-5" and c["BUDGET_USD"] == "0.75"
+          and c["EFFORT"] == "medium", f"config: invalid values -> defaults ({bad})")
+check(es.engine_config({"model_strong": "none"})["MODEL_STRONG"] == "" and es.engine_config({"model_strong": "OFF"})["MODEL_STRONG"] == ""
+      and es.engine_config({"model": "claude-opus-5-5", "model_strong": "claude-opus-5-5"})["MODEL_STRONG"] == "",
+      "config: model_strong none/off/same as main -> no escalation tier")
+check(es.engine_config("not a dict")["MODEL"] == "claude-opus-5-5", "config: non-dict -> defaults")
+cfgf = os.path.join(tmp, "cfg.json")
+json.dump({"anthropic_api_key": "sk-secret", "model": "claude-opus-5-5", "model_light": "claude-haiku-5-5", "budget_usd": 0.9},
+          open(cfgf, "w", encoding="utf-8"))
+r = subprocess.run([sys.executable, TOOL, "config", cfgf], capture_output=True, text=True, encoding="utf-8",
+                   env={k: v for k, v in os.environ.items() if not k.startswith("SUPABASE")})
+check(r.returncode == 0 and r.stdout.splitlines() == ["MODEL=claude-opus-5-5", "MODEL_LIGHT=claude-haiku-5-5", "MODEL_STRONG=",
+      "EFFORT=medium", "BUDGET_USD=0.90"] and "sk-secret" not in r.stdout, f"config CLI: KEY=VALUE lines, no secret, no Supabase env ({r.stdout!r} {r.stderr[:200]})")
+r = subprocess.run([sys.executable, TOOL, "config", os.path.join(tmp, "absent.json")], capture_output=True, text=True, encoding="utf-8")
+check(r.returncode == 0 and "MODEL=claude-opus-5-5" in r.stdout, "config CLI: unreadable file -> defaults")
+
+ag = es.agents_json({"MODEL": "claude-opus-5-5", "MODEL_LIGHT": "claude-haiku-5-5", "MODEL_STRONG": ""})
+check(set(ag) == {"drafter"} and ag["drafter"]["model"] == "claude-opus-5-5" and ag["drafter"]["description"] and ag["drafter"]["prompt"],
+      "agents: drafter on the main tier only (no strong tier configured)")
+ag = es.agents_json({"MODEL": "claude-opus-5-5", "MODEL_STRONG": "claude-fable-5-1"})
+check(ag["drafter_strong"]["model"] == "claude-fable-5-1" and "ENGINE_BRIEF" in ag["drafter_strong"]["prompt"], "agents: drafter_strong when configured")
+agf = os.path.join(tmp, "agents.json")
+r = subprocess.run([sys.executable, TOOL, "agents", agf], capture_output=True, text=True, encoding="utf-8",
+                   env=dict(os.environ, MODEL="claude-sonnet-5-5", MODEL_LIGHT="claude-haiku-5-5", MODEL_STRONG="claude-opus-5-5"))
+aj = json.load(open(agf, encoding="utf-8"))
+check(r.returncode == 0 and aj["drafter"]["model"] == "claude-sonnet-5-5" and aj["drafter_strong"]["model"] == "claude-opus-5-5",
+      f"agents CLI: file written from env ({r.stderr[:200]})")
+
+facts = {"pages": 2, "facts": [
+    {"page": 1, "document": "निर्देशपत्र", "items": [{"what": "नस्ती क्र.", "value": "संकीर्ण-2026/979/प्र.क्र.130/का.6", "clear": True},
+                                                  {"what": "दिनांक", "value": "05.08.2026", "clear": True}]},
+    {"page": 2, "document": "पत्र", "items": [{"what": "रक्कम", "value": "रु. १२,५००/-", "clear": True},
+                                           {"what": "पद", "value": "लघुलेखक", "clear": True},
+                                           {"what": "शेरा", "value": "अस्पष्ट", "clear": False}]}]}
+p1 = {"heading": "भाग 1 — प्रस्तावाचे मराठी रूपांतर", "blocks": [
+    {"subheading": "PDF पान 1 — निर्देशपत्र"}, {"para": "नस्ती क्र. संकीर्ण-2026/979/प्र.क्र.130/का.6, दिनांक 05.08.2026"},
+    {"subheading": "PDF पान २ — पत्र"}, {"table": [["पद", "लघुलेखक"], ["रक्कम", "रु. 12,500/-"]]}]}
+check(es.part1_check(facts, p1) == [], "part1check: numbers (Devanagari digits normalised), dates and posts match -> OK")
+p1b = json.loads(json.dumps(p1)); p1b["blocks"][1]["para"] = "नस्ती क्र. संकीर्ण-2026/979/प्र.क्र.130/का.6, दिनांक 06.08.2026"
+p1b["blocks"][3]["table"][0][1] = "लिपिक"
+bad = es.part1_check(facts, p1b)
+check(len(bad) == 2 and bad[0].startswith("page 1:") and "05.08.2026" in bad[0] and bad[1].startswith("page 2:"),
+      f"part1check: wrong date and wrong post reported per page {bad}")
+check(any("no part-1 section" in b for b in es.part1_check(facts, {"blocks": p1["blocks"][:2]})), "part1check: missing page section reported")
+ff, pf = os.path.join(tmp, "facts.json"), os.path.join(tmp, "p1.json")
+json.dump(facts, open(ff, "w", encoding="utf-8"), ensure_ascii=False); json.dump(p1b, open(pf, "w", encoding="utf-8"), ensure_ascii=False)
+r = subprocess.run([sys.executable, TOOL, "part1check", ff, pf], capture_output=True, text=True, encoding="utf-8",
+                   env=dict(os.environ, PYTHONIOENCODING="utf-8"))
+check(r.returncode == 1 and "PART1 FAIL (2)" in r.stdout and r.stdout.count("MISMATCH") == 2, f"part1check CLI: exit 1 + MISMATCH lines ({r.stdout[:300]})")
+json.dump(p1, open(pf, "w", encoding="utf-8"), ensure_ascii=False)
+r = subprocess.run([sys.executable, TOOL, "part1check", ff, pf], capture_output=True, text=True, encoding="utf-8",
+                   env=dict(os.environ, PYTHONIOENCODING="utf-8"))
+check(r.returncode == 0 and "PART1 OK" in r.stdout, "part1check CLI: PART1 OK, exit 0")
+
+check(es.short_model("claude-haiku-5-5") == "Haiku 5.5" and es.short_model("claude-opus-5") == "Opus 5", "short_model names")
+stf = os.path.join(tmp, "status_ml.json")
+json.dump({"state": "done", "model_log": [{"task": "पान 3", "from": "claude-opus-5-5", "to": "claude-fable-5-1", "reason": "हस्तलेख अस्पष्ट"},
+                                          {"task": "भाग 1 + साधने", "from": "", "to": "claude-haiku-5-5", "reason": "यांत्रिक"}, "junk"]},
+          open(stf, "w", encoding="utf-8"), ensure_ascii=False)
+res = [{"total_cost_usd": 0.9, "modelUsage": {"claude-opus-5-5": {"costUSD": 0.8}, "claude-haiku-5-5": {"costUSD": 0.1}}}]
+ls = es.model_lines(res, stf, 0.75)
+check(ls[0] == "मॉडेल: पान 3 → Fable 5.1 (पूर्वी Opus 5.5) (हस्तलेख अस्पष्ट)" and ls[1] == "मॉडेल: भाग 1 + साधने → Haiku 5.5 (यांत्रिक)"
+      and ls[2] == "मॉडेल: खर्च — Opus 5.5 $0.80, Haiku 5.5 $0.10" and ls[3].startswith("खर्च-मर्यादा ओलांडली — दर्जा राखण्यासाठी")
+      and len(ls) == 4, f"model_lines: escalations, per-model cost, soft-budget warning {ls}")
+check(not any(l.startswith("खर्च-मर्यादा") for l in es.model_lines(res, None, 2.0)), "model_lines: under budget -> no budget warning")
+
+# claude_result end to end: lines land in runs.warnings; over budget does NOT fail the run
+run_row.update(state="running", step="तपासणी चालू", warnings=[])
+open(jf, "w", encoding="utf-8").write(json.dumps({"type": "result", "subtype": "success", "is_error": False, "num_turns": 40,
+                                                  "total_cost_usd": 1.2, "modelUsage": {"claude-opus-5-5": {"costUSD": 1.1},
+                                                                                        "claude-haiku-5-5": {"costUSD": 0.1}}}))
+r = run("claude_result", jf, ef, "0", "--wall", "300", "--status", stf, BUDGET_USD="0.75")
+check(r.returncode == 0 and run_row["state"] == "running" and run_row["cost_usd"] == 1.2, f"claude_result over soft budget: not failed ({r.stderr[:200]})")
+check([w for w in run_row["warnings"] if w.startswith("मॉडेल: ")] == ls[:2] + ["मॉडेल: खर्च — Opus 5.5 $1.10, Haiku 5.5 $0.10"]
+      and any(w.startswith("खर्च-मर्यादा ओलांडली — दर्जा राखण्यासाठी") and "$1.20" in w for w in run_row["warnings"]),
+      f"claude_result: मॉडेल lines + soft-budget warning stored {run_row['warnings']}")
+r = claude({"type": "result", "subtype": "error_max_budget_usd", "is_error": True, "num_turns": 12, "total_cost_usd": 0.8})
+check(r.returncode == 1 and run_row["step"].startswith("खर्च-मर्यादा ओलांडली"), f"claude_result budget stop: Marathi reason ({run_row['step']})")
+
 srv.shutdown()
 print("ALL TESTS PASSED")

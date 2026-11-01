@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
-"""prep_pages.py <proposal.pdf> <outdir> [--dpi 110] [--no-ocr]
+"""prep_pages.py <proposal.pdf> <outdir> [--dpi 110] [--small-dpi 80] [--no-ocr]
 Pre-step for the engine (docs/QUALITY_AUDIT.md §5 item 1). No network. Per page NN (01, 02, ...):
   <outdir>/p-NN.png       page image at 110 dpi (pymupdf — no poppler needed); the model still LOOKS at every image
                           (PROPOSAL_SOP Step 1) — the text files below are only a cross-check.
+  <outdir>/p-NN.sm.png    the same page at 80 dpi (--small-dpi; 0 = none): about half the image tokens of the 110 dpi
+                          PNG; the main engine run looks at this one and opens p-NN.png only where it is not clear
   <outdir>/p-NN.txt       PDF text layer (empty file when the page has none, e.g. a scan)
   <outdir>/p-NN.ocr.txt   tesseract OCR, only when tesseract is installed (lang mar+eng if both installed, else eng /
                           whatever is available; the lang used is recorded)
-  <outdir>/pages.json     {"pdf", "pages", "dpi", "files": [{"page", "png", "txt", "ocr"}], "ocr_lang", "ocr_error",
+  <outdir>/pages.json     {"pdf", "pages", "dpi", "small_dpi", "files": [{"page", "png", "png_small", "txt", "ocr"}],
+                           "ocr_lang", "ocr_error",
                            "has_text_layer": [bool per page]}
 Exit 0 also when OCR is unavailable (ocr_lang = null); exit 1 only when the PDF cannot be read/rendered."""
 import json, os, shutil, subprocess, sys
@@ -42,9 +45,11 @@ def ocr_page(exe, lang, png, dst):
 
 def main(argv):
     args = [a for a in argv if not a.startswith("--")]
-    dpi = 110
+    dpi, small = 110, 80
     if "--dpi" in argv:
-        dpi = int(argv[argv.index("--dpi") + 1]); args.remove(str(dpi))
+        v = argv[argv.index("--dpi") + 1]; dpi = int(v); args.remove(v)
+    if "--small-dpi" in argv:
+        v = argv[argv.index("--small-dpi") + 1]; small = int(v); args.remove(v)
     if len(args) != 2:
         print(__doc__); return 2
     src, out = args
@@ -58,10 +63,13 @@ def main(argv):
     for i, page in enumerate(doc):
         stem = f"p-{i + 1:0{w}d}"
         page.get_pixmap(dpi=dpi).save(os.path.join(out, stem + ".png"))
+        if small > 0:
+            page.get_pixmap(dpi=small).save(os.path.join(out, stem + ".sm.png"))
         txt = page.get_text("text") or ""
         open(os.path.join(out, stem + ".txt"), "w", encoding="utf-8").write(txt)
         has_text.append(bool(txt.strip()))
-        files.append({"page": i + 1, "png": stem + ".png", "txt": stem + ".txt", "ocr": None})
+        files.append({"page": i + 1, "png": stem + ".png", "png_small": stem + ".sm.png" if small > 0 else None,
+                      "txt": stem + ".txt", "ocr": None})
     doc.close()
     exe, lang = (None, None) if "--no-ocr" in argv else ocr_lang()
     err = None
@@ -78,7 +86,7 @@ def main(argv):
             err = str(e)[:300]
     elif exe:
         err = "tesseract has no mar/eng language data"
-    info = {"pdf": os.path.basename(src), "pages": n, "dpi": dpi, "files": files,
+    info = {"pdf": os.path.basename(src), "pages": n, "dpi": dpi, "small_dpi": small if small > 0 else None, "files": files,
             "ocr_lang": lang if exe and lang and not err else None, "ocr_error": err, "has_text_layer": has_text}
     json.dump(info, open(os.path.join(out, "pages.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     print(f"prep_pages: {n} page(s) -> {out} | text layer on {sum(has_text)} | ocr {info['ocr_lang'] or 'none'}"

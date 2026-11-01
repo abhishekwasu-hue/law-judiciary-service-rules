@@ -86,3 +86,44 @@ Estimate for 15 pages / 3 GRs: setup 4–7 min + model 40–100 min ≈ 50–110
 | 8 | Faster model for part 1 only | 5–10 | med | S |
 | 9 | Docstrings only, not whole tool files | 1–2 | none | S |
 Keep LibreOffice (preview check). Lower max-turns does not speed a successful run. Priority suggested: 1, 3, 2, 5, 4, 6. UI ETA default set to 70 min until real medians exist.
+
+## 6. Cost per run — model tiers (01.11.2026; quality first)
+Prices (claude-api skill, models table cached 2026-10-06, $/MTok): Opus 5.5 in 4 / out 20, cache read 0.20, 5-min write 5;
+Sonnet 5.5 2 / 10, read 0.20, write 2.50; Haiku 5.5 0.10 / 0.50 (prompt ≤100K; 0.50 / 2.50 above), read 0.1x, write 1.25x.
+Images ≈ 1 token per 28×28 px: A4 page at 110 dpi ≈ 1,490 tokens, at 80 dpi ≈ 790.
+Owner rule (Abhi): quality must not drop — quality-critical work stays on the main tier (Opus-class, the model of the
+approved outputs); the budget is SOFT (over it = warning "खर्च-मर्यादा ओलांडली — दर्जा राखण्यासाठी", never a stop).
+
+**Where the $ went (old design, estimate calibrated to the live run $3.32 / 79 turns, all on Opus 5.5)**
+| Item | Tokens (est.) | $ | Share |
+|---|---|---|---|
+| Cache reads: 79 turns × ~75k avg context (rules files ~40k, 15 page images ~22k, tool output) | ~5.9M | ~1.2 | ~36 % |
+| Cache writes: each new tool result written once | ~150k | ~0.75 | ~23 % |
+| Output incl. thinking: Study part 1 ~20k, Study/spec ~25k, thinking ~25k | ~70k | ~1.4 | ~41 % |
+Per-model split was not recorded for that run (now stored: "मॉडेल: खर्च — …" line from modelUsage).
+
+**Routing (task → tier → why quality is unaffected)**
+| Task | Tier | Why |
+|---|---|---|
+| Facts from page images (numbers, dates, names, stamps, handwriting), letter-or-not, GR selection + verbatim quotes, note + letter spec, Study parts 0, 2, 3, 4, 7 | `drafter` subagent = MODEL (default claude-opus-5-5) | same tier as approved outputs; every page read at 110 dpi |
+| Escalation (unclear page after the main tier; lint/verify still failing after 2 main-tier attempts) | `drafter_strong` = MODEL_STRONG (optional, off by default) | one-way up only |
+| Orchestration, text/OCR first pass, GR search/fetch, precedent grep, pkg3/highlight/builds, lint/verify runs, page numbers from map.json, Study parts 5–6 copied from the spec | orchestrating session = MODEL_LIGHT (claude-haiku-5-5) | mechanical; results machine-checked (LINT OK, ALL OK, workflow re-verify) |
+| Lint/verify fixes | light, max 2 attempts → drafter | content fixes go up |
+| Study part 1 (page rendering) | helper run on MODEL_LIGHT | kept only if `part1check` matches the drafter's facts (every number/date/name per page); failing pages redone by drafter |
+Other free levers: compact brief + tool docstrings in the prompt (stable prefix, cached; no Read of rule files/tool
+sources), 5-minute cache writes forced (FORCE_PROMPT_CACHING_5M), tool set limited (no WebSearch/WebFetch/sub-sub-agents),
+batched tool calls, no re-reads, lint before builds. Gates unchanged.
+
+**Expected cost per typical proposal (15 pages, 3 GRs) — estimate, not yet measured live**
+| Part | $ |
+|---|---|
+| drafter (Opus 5.5): ~20 turns × ~45k avg context, ~80k writes, ~20–35k output | 0.9–1.5 |
+| orchestrator (Haiku 5.5): ~50 turns, mostly under 100K prompt | 0.05–0.30 |
+| part-1 helper (Haiku 5.5) | 0.02–0.05 |
+| escalations (part-1 pages redone, content fixes) when needed | 0–0.4 |
+| **Total** | **≈ 1.0–1.8** (was 2.3–3.3) |
+≈ $0.50 is NOT reachable without moving quality-critical drafting off the Opus-class tier (its output tokens alone
+cost ~$0.4–0.7). Real floor with the quality rule ≈ $1.0. Setting `model` = claude-sonnet-5-5 would give roughly
+$0.5–0.9 but changes the drafting model — only after a side-by-side check against approved notes (Abhi's decision).
+Unverified until a live run: subagent `model` honoured by the pinned CLI 2.1.300 (schema has it), Haiku as
+orchestrator following the routing, real turn counts, part1check false-mismatch rate.

@@ -2,11 +2,15 @@
 
 Given at run time (end of this prompt): PAGES (page files of the proposal), WORKDIR (case inputs), OUT (where you write).
 Working directory = repo root. You do ONE thing: write Study part 1 — "भाग 1 — प्रस्तावाचे मराठी रूपांतर" — for this one
-case. The main run (in parallel) does everything else and inserts your part into the Study unchanged.
+case. The main run (in parallel) does everything else; it checks your part against the main tier's own reading of
+the images (`engine_supabase.py part1check`: every number, date and name per page must match) and inserts it
+unchanged only when it matches — pages that do not match are redone by the main tier. So copy every number, date
+and name exactly as on the image. Work in few turns: several Read calls in ONE message, no file read twice.
 
 ## Read first
-1. `tools/PROPOSAL_PROMPT.md` — section "कायमच्या सूचना" and the paragraph "भाग 1 — प्रस्तावाचे मराठी रूपांतर (जसेच्या तसे)".
-   Those rules are binding. INSTRUCTIONS.md §1 (nothing of your own; what cannot be read = "अस्पष्ट") also binds.
+1. `tools/ENGINE_BRIEF.md` (the binding rules of the engine run; its Study part 1 rules and source rules apply),
+   then in `tools/PROPOSAL_PROMPT.md` only the section "कायमच्या सूचना" and the paragraph "भाग 1 — प्रस्तावाचे मराठी
+   रूपांतर (जसेच्या तसे)" (Read with offset/limit). INSTRUCTIONS.md wins on any doubt.
 2. The docstring of `tools/build_study.py` (the block format).
 3. `PAGES/pages.json` — `pages`, `files[]` (`png`, `txt`, `ocr`), `has_text_layer[]`, `ocr_lang`.
 Do not read other rule files, GRs or old cases; they are not needed for part 1.
