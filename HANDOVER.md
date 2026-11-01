@@ -5,14 +5,16 @@
 - Proposals delivered: C R 66, 122, 128, 130, 131, 133 /2026 (three files each, sent to Abhi). GRs used are in pdf/gr/ (+INDEX.tsv), SC order in pdf/sc/, MCS (Pay) Rules 1981 full in pdf/01-mcs-pay-rules-1981/.
 - App prompts: A = docs/APP_A_PROPOSAL_DESK_PAGE_PROMPT.md (claude.ai page), B = docs/APP_B_FULLSTACK_PROMPT.md (Cloudflare + Supabase + GitHub Actions app). Abhi gives each to a new session.
 - 01.11.2026: CR 128 — found on archive.org (identifier prefix search) and downloaded: pdf/gr/202608051759229212.pdf (05.08.2026, retirement age 62) and pdf/gr/202204191851066912.pdf (19.04.2022, संकीर्ण-2021/98/प्र.क्र.32). Not on archive.org under their date prefix: 12.03.2014, 31.03.2018, 14.05.2021, 02.12.2022. Also checked ±2–3 day prefixes (incl. 31.01.2018, the date the spec notes for the 31.03.2018 GR): no L&J pay-scale GR — only court-building/post/fund GRs.
-- 01.11.2026: Option A built — "प्रस्ताव कक्ष" page https://claude.ai/artifact/8cJP8wz6j5tYM5kRHK1rVx (source desk/proposal-desk.html, flow docs/PROPOSAL_DESK.md, chunk tool tools/desk_chunks.py). Republished 01.11.2026 after the first page was deleted; store starts empty (no seeded cases).
+- 01.11.2026: Build prompt A done — "प्रस्ताव कक्ष" page https://claude.ai/artifact/RYzwfiGwJpbVxyD5C2rCy2 (source desk/proposal-desk.html v2, data model + test record docs/PROPOSAL_DESK.md, intake = PROPOSAL_SOP.md Step 0b, chunk tool tools/desk_chunks.py). End-to-end storage test passed (case TEST-1). Old seed rows removed (prompt: no sample data).
+- Two desk pages exist: RYzwfiGwJpbVxyD5C2rCy2 (this account; v2 per prompt A, tested) and 8cJP8wz6j5tYM5kRHK1rVx (published by another session/account from the v1 source; empty store). Abhi to choose ONE; delete the other.
 - Repo is now private (anonymous git ls-remote refused, 01.11.2026).
 
 ## Pending
 1. **C R 128/2026** — still need सांकेतांक for 4 GRs: 12.03.2014, 31.03.2018, 14.05.2021, 02.12.2022 (05.08.2026 and 19.04.2022 now in pdf/gr/), and Abhi's CR 128 proposal PDF (not in repo; upload it in प्रस्ताव कक्ष or attach). Then: download (gr.maharashtra.gov.in/Site/Upload/Government%20Resolutions/Marathi/<code>.pdf), add to the package after the existing enclosures (the package's spec/enclosures were in the old session's scratch — rebuild: proposal = Abhi's CR 128 PDF; enclosures: SC order pdf/sc/... pages 1,2,20,34,35 (para 14 a–c highlighted, p.34), pdf/gr/202204191549468012.pdf p1-2, pdf/gr/202301111807499612.pdf p1-2, MJS Rules 2008 pdf/71-district-court-staff-recruitment-rules/... pages 1,2,18,19,20, MCS Pension Rules 1982 pdf/80-retirement-age-group-d-reemployment/... pages 11,12,22), highlight the posts, update पृ./प.वि. in samples/specs/CR128_*.json and rebuild with tools/build_note_letter.py. Ask Abhi to re-attach the CR 128 proposal PDF if needed.
 2. **Study part 0 (briefing for seniors, §4.17)** — not yet in the Study files of C R 130, 131, 133 (made before the rule). Add only if Abhi asks.
-3. **प्रस्ताव कक्ष** — built (see Done). Open: stage list (प्राप्त / माहिती मागवली / उत्तर प्राप्त / वित्त-सा.प्र.वि. कडे / निकाली) is provisional — Abhi to confirm; first real end-to-end run when Abhi uploads a proposal.
-4. Repo private — done.
+3. **प्रस्ताव कक्ष** — Abhi to open the page, click the three download buttons on case TEST-1 (browser check Claude could not do), then Claude deletes TEST-1 (cases/TEST-1, outputs/TEST-1__*, assets bdb3fa89612a93be3a0df53ac37f98e9 and cfa33bb4f301bb18e77e27aa9eb41fd6).
+4. **Build prompt B (full-stack app, Cloudflare + Supabase)** — started after A. Owner rule (01.11.2026): Anthropic API key, Supabase and Cloudflare settings are entered in the app's Settings screen, never hard-coded.
+5. Repo private — done.
 
 ## Network notes
 - Session allowlist was set to "All domains" by Abhi (gr.maharashtra.gov.in, archive.org, sci.gov.in, finance.maharashtra.gov.in reachable). If blocked again, use the GitHub Action "GR request" (push tools/gr-request.txt).

@@ -14,7 +14,18 @@ The quality standard = the approved notes in `samples/specs/` (C R 66, 122, 128,
 2. Make a task list (one task per proposal).
 3. Tools needed: `pip install pymupdf docxcompose python-docx --break-system-packages`; `soffice` (LibreOffice) and `tesseract` are used for checking/OCR.
 4. Build the old-case text corpus once per session: `python3 tools/oldcases_text.py /tmp/old` (grep `/tmp/old/index.tsv`).
-5. Proposals uploaded in the "प्रस्ताव कक्ष" page (Abhi: "प्रस्ताव कक्षातील नवीन प्रस्ताव तयार कर"): input/output flow in `docs/PROPOSAL_DESK.md`.
+5. Proposals uploaded in the "प्रस्ताव कक्ष" page: see Step 0b.
+
+## Step 0b — intake from प्रस्ताव कक्ष
+Page: https://claude.ai/artifact/RYzwfiGwJpbVxyD5C2rCy2 (source `desk/proposal-desk.html`; data model `docs/PROPOSAL_DESK.md`).
+Trigger: Abhi says "प्रस्ताव कक्षातील नवीन प्रस्ताव तयार कर". Pin every write with `if_version`.
+1. **Find queued cases:** `ArtifactData` `query` collection `cases` where `status == "queued"`; set `status = "processing"`, `stage = "अभ्यास चालू"`.
+2. **Get the inputs:** for each `inputs[]` item, `Artifact` `read` with `url` = page URL and `path` = `asset_id`. Copy the saved file to its ORIGINAL `name` (§4.16). `kind`: proposal / extra / reply (a reply = the office's answer to our letter → next note).
+3. **Make the three files:** Steps 1–7 below, exactly. `instruction`, if set, is Abhi's correction for this run.
+4. **Upload the package PDF:** `Artifact` publish with `url` = page URL, `asset: true`, `file_path` = the PDF → output `{kind:"package_pdf", name, store:"asset", ref:<asset id>}`.
+5. **Store the Word files** (assets refuse .docx): `python tools/desk_chunks.py <file.docx> <caseId> <study|note_letter> <scratch dir>` → write the chunk files with `ArtifactData` `batch` (op set, collection `outputs`, doc_id = file stem, `file_path`); the tool prints the `outputs[]` record. Overwrite or delete old chunks of the same case/kind first.
+6. **Close the case:** `ArtifactData` `update` — `outputs`, `summary` (1 line), `letter_needed`, `essential_points`, `grs` [{code, date, title, pages}], `missing_grs`, `status = "done"`, `stage = "मसुदा तयार"`, `updated_at`, and a `history` entry {at, stage, note}. On error: `status = "failed"` + history note.
+7. **Report** in Marathi, 3–4 lines per case (Step 8.2).
 
 ## Step 1 — Read the proposal (every page, as images)
 1. `pdftoppm -r 110 -png <proposal.pdf> pg/p` and LOOK at every page image. Read stamps, inward nos., handwritten remarks, dates and amounts twice. Unclear → "अस्पष्ट".
