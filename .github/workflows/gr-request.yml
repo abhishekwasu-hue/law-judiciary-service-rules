@@ -3,6 +3,8 @@ on:
   push:
     paths: ['tools/gr-request.txt']
   workflow_dispatch:
+  repository_dispatch:
+    types: [fetch_gr]
 permissions:
   contents: write
 concurrency:
@@ -12,11 +14,30 @@ jobs:
   fetch:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
     steps:
       - uses: actions/checkout@v4
+      - name: Request from the dashboard (GR जोडा)
+        if: github.event_name == 'repository_dispatch'
+        env:
+          CODE: ${{ github.event.client_payload.code }}
+        run: |
+          echo "$CODE" | grep -Eq '^[0-9]{12,20}$' || { echo "bad code"; exit 1; }
+          python3 - <<'PY'
+          import os
+          p = "tools/gr-request.txt"; s = open(p, encoding="utf-8").read()
+          line = "code " + os.environ["CODE"] + "\n"
+          s = s.replace("# done", line + "# done", 1) if "# done" in s else s + "\n" + line
+          open(p, "w", encoding="utf-8").write(s)
+          PY
       - run: python3 tools/gr_request.py
       - run: |
           git config user.name github-actions; git config user.email actions@github.com
           git add pdf/gr tools/gr-request.txt
           git commit -m "GR request: fetched" || exit 0
           for i in 1 2 3; do git pull --rebase origin main && git push && break || sleep 5; done
+      - name: Sync GR library to the dashboard (Supabase)
+        if: env.SUPABASE_URL != ''
+        run: python3 tools/sb.py seed-gr
