@@ -78,12 +78,26 @@ class LintSpec(unittest.TestCase):
     def test_letter_tatkal(self):
         def f(s):
             s["letter"]["intro"] = s["letter"]["intro"].replace("शासनास", "शासनास तात्काळ")
-        self.bad(self.s122, f, "'तात्काळ' नको", "letter.intro")
+        self.bad(self.s122, f, "'तात्काळ / तातडीने", "letter.intro")
 
     def test_letter_request_form(self):
         def f(s):
             s["letter"]["intro"] = s["letter"]["intro"].replace(", ही विनंती", "")
         self.bad(self.s122, f, "ही विनंती", "letter.intro")
+
+    def test_letter_urgent_words(self):
+        def f(s):
+            s["letter"]["intro"] = s["letter"]["intro"].replace("शासनास", "शासनास त्वरित")
+        self.bad(self.s122, f, "'लवकरात लवकर' वापरा", "letter.intro")
+
+    def test_letter_bare_command(self):
+        def f(s):
+            s["letter"]["points"] = ["आदेशाची प्रत सादर करावी."]
+        self.bad(self.s122, f, "थेट आदेशात्मक शेवट", "letter.points[0]")
+
+    def test_kai_space(self):
+        self.bad(self.s122, lambda s: s["note"]["paras"].__setitem__(0, s["note"]["paras"][0] + " कै.मिलिंद"),
+                 "'कै.' नंतर एक जागा", "note.paras[0]")
 
     # ---- must fail: spec ----
     def test_banned_word(self):
