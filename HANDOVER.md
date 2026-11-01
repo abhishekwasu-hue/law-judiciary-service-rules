@@ -3,7 +3,7 @@
 ## Done (all in this repo)
 - Procedure: INSTRUCTIONS.md §4 items 1–17, PROPOSAL_SOP.md (step-by-step), PROPOSAL_WORKFLOW.md, samples/specs/ (approved notes), tools/ (mkdocs, build_note_letter, build_study, pkg3, highlight, verify_outputs, gr_request, oldcases_text).
 - Proposals delivered: C R 66, 122, 128, 130, 131, 133 /2026 (three files each, sent to Abhi). GRs used are in pdf/gr/ (+INDEX.tsv), SC order in pdf/sc/, MCS (Pay) Rules 1981 full in pdf/01-mcs-pay-rules-1981/.
-- Dashboard build prompt for a real app: docs/DASHBOARD_BUILD_PROMPT.md (option B, to be given by Abhi to a Claude Code session).
+- App prompts: A = docs/APP_A_PROPOSAL_DESK_PAGE_PROMPT.md (claude.ai page), B = docs/APP_B_FULLSTACK_PROMPT.md (Cloudflare + Supabase + GitHub Actions app). Abhi gives each to a new session.
 - 01.11.2026: CR 128 — found on archive.org (identifier prefix search) and downloaded: pdf/gr/202608051759229212.pdf (05.08.2026, retirement age 62) and pdf/gr/202204191851066912.pdf (19.04.2022, संकीर्ण-2021/98/प्र.क्र.32). Not on archive.org under their date prefix: 12.03.2014, 31.03.2018, 14.05.2021, 02.12.2022. Also checked ±2–3 day prefixes (incl. 31.01.2018, the date the spec notes for the 31.03.2018 GR): no L&J pay-scale GR — only court-building/post/fund GRs.
 - 01.11.2026: Option A built — "प्रस्ताव कक्ष" page https://claude.ai/artifact/RYzwfiGwJpbVxyD5C2rCy2 (source desk/proposal-desk.html, flow docs/PROPOSAL_DESK.md, chunk tool tools/desk_chunks.py). Seeded cases CR 122/128/130/131/133 (metadata only, no outputs). CR 131 and 133 category set to "इतर" (library mapping not certain) — Abhi to confirm.
 - Repo is now private (anonymous git ls-remote refused, 01.11.2026).
