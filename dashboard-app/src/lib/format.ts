@@ -50,3 +50,17 @@ export function textOf(v: unknown): string {
   return String(v);
 }
 export const asArray = (v: unknown): unknown[] => (Array.isArray(v) ? v : v == null ? [] : [v]);
+
+/** "CR131_2026_Note_and_Letter.docx" → "C R 131/2026" (engine output names carry the C R). */
+export function crFromFileName(name: string | null | undefined): string | null {
+  const m = /^CR(\d+)_(\d{4})_/.exec(name || '');
+  return m ? `C R ${m[1]}/${m[2]}` : null;
+}
+/** Case title for headings and lists: C R → C R from output file → प्रकरण #id. */
+export function caseTitle(c: { id: number; cr_no: string | null; cr_year: number | null }, fileName?: string | null): string {
+  return c.cr_no ? crLabel(c) : crFromFileName(fileName) || `प्रकरण #${c.id}`;
+}
+/** Subject line: subject from the PDF → summary of the latest finished run → hint. */
+export function caseSubject(c: { subject: string | null }, runSummary?: string | null): string {
+  return c.subject || runSummary || 'विषय PDF वरून येईल';
+}

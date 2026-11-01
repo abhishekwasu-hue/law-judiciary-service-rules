@@ -3,7 +3,7 @@
 // every key/URL lives in KV namespace SETTINGS, entered on the app's Settings screen (owner only).
 
 const SECRET_KEYS = ['supabase_service_key', 'github_token', 'anthropic_api_key'];
-const PLAIN_KEYS = ['supabase_url', 'supabase_anon_key', 'github_repo', 'github_branch', 'model', 'owner_email'];
+const PLAIN_KEYS = ['supabase_url', 'supabase_anon_key', 'github_repo', 'github_branch', 'model', 'model_light', 'budget_usd', 'owner_email'];
 const ALL_KEYS = [...SECRET_KEYS, ...PLAIN_KEYS];
 const FILE_KINDS = ['proposal', 'extra_doc', 'reply'];
 const MAX_UPLOAD = 50 * 1024 * 1024;
@@ -157,7 +157,7 @@ async function route(req, env, url) {
     if (!cfg.anthropic_api_key || !cfg.supabase_url || !cfg.supabase_service_key) return bad('config incomplete (Settings)', 412); // token stays unused
     const exp = tok.exp || Math.floor(Date.now() / 1000) + RUN_TOKEN_TTL;
     await env.SETTINGS.put(tok.key, JSON.stringify({ run_id: tok.run_id, used: true, exp }), { expiration: exp });
-    return json({ anthropic_api_key: cfg.anthropic_api_key, model: cfg.model, supabase_url: cfg.supabase_url, supabase_service_key: cfg.supabase_service_key });
+    return json({ anthropic_api_key: cfg.anthropic_api_key, model: cfg.model, model_light: cfg.model_light || '', budget_usd: cfg.budget_usd || '', supabase_url: cfg.supabase_url, supabase_service_key: cfg.supabase_service_key });
   }
 
   // engine: record a failure when the workflow has no Supabase env (e.g. the config step failed). Run token, used or not.
@@ -197,6 +197,11 @@ async function route(req, env, url) {
   if (p === '/api/settings' && M === 'PUT') {
     if (user.role !== 'owner') return bad('owner only', 403);
     const b = await req.json();
+    // budget_usd: empty = engine default; otherwise a positive number <= 20 (validated before anything is saved)
+    if ('budget_usd' in b && b.budget_usd !== null && String(b.budget_usd).trim() !== '') {
+      const n = Number(String(b.budget_usd).trim());
+      if (!Number.isFinite(n) || n <= 0 || n > 20) return bad('budget_usd: positive number <= 20');
+    }
     for (const k of ALL_KEYS) {
       if (!(k in b) || b[k] === null) continue;
       const v = String(b[k]).trim();

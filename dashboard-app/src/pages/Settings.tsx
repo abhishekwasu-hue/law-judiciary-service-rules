@@ -7,13 +7,15 @@ import { fmtDate } from '../lib/format';
 import { Chip, Field, Section, SkeletonRows, Spinner } from '../components/ui';
 import { useToast } from '../components/Toast';
 
-const PLAIN: { k: string; label: string; hint?: string }[] = [
+const PLAIN: { k: string; label: string; hint?: string; num?: boolean }[] = [
   { k: 'owner_email', label: 'मालकाचा ई-मेल', hint: 'या ई-मेलने लॉगिन करणाऱ्याला सेटिंग्ज बदलण्याचा अधिकार' },
   { k: 'supabase_url', label: 'Supabase URL', hint: 'माहिती-साठ्याचा पत्ता — Supabase प्रकल्पाच्या सेटिंग्जमध्ये मिळतो' },
   { k: 'supabase_anon_key', label: 'Supabase anon key', hint: 'त्याच ठिकाणची सार्वजनिक की (anon)' },
   { k: 'github_repo', label: 'GitHub repo', hint: 'नियम व साधने असलेला रेपो — उदा. owner/repo' },
   { k: 'github_branch', label: 'GitHub branch', hint: 'सहसा main' },
-  { k: 'model', label: 'AI मॉडेल (Model)', hint: 'प्रक्रियेसाठी वापरायच्या Claude मॉडेलचे नाव' },
+  { k: 'model', label: 'AI मॉडेल (Model)', hint: 'प्रक्रियेसाठी वापरायच्या Claude मॉडेलचे नाव — स्वस्त मॉडेल निवडल्यास खर्च कमी होतो' },
+  { k: 'model_light', label: 'हलके AI मॉडेल (model_light)', hint: 'पाने वाचणे व भाग 1 साठी स्वस्त मॉडेल; रिकामे = डीफॉल्ट' },
+  { k: 'budget_usd', label: 'कमाल खर्च ($) (budget_usd)', hint: 'प्रत्येक प्रस्तावासाठी कमाल खर्च ($). डीफॉल्ट 0.75', num: true },
 ];
 const SECRET: { k: string; label: string; hint: string }[] = [
   { k: 'supabase_service_key', label: 'Supabase service_role key', hint: 'माहिती-साठ्याची गुप्त की' },
@@ -59,6 +61,11 @@ export default function Settings() {
       const body: Record<string, string> = {};
       for (const p of PLAIN) if (cur && edit[p.k] !== (cur[p.k] || '')) body[p.k] = edit[p.k] ?? '';
       for (const s of SECRET) if (edit[s.k]) body[s.k] = edit[s.k];
+      const bu = (edit.budget_usd ?? '').trim();
+      if (bu && !(Number(bu) > 0 && Number(bu) <= 20)) {
+        toast('कमाल खर्च: 0 पेक्षा जास्त व 20 पर्यंतची संख्या लिहा', 'err');
+        return;
+      }
       if (!Object.keys(body).length) {
         toast('काहीही बदल नाही', 'info');
         return;
@@ -101,7 +108,7 @@ export default function Settings() {
             <div className="grid gap-4 md:grid-cols-2">
               {PLAIN.map(p => (
                 <Field key={p.k} label={p.label} hint={p.hint}>
-                  <input className="input font-mono" value={edit[p.k] ?? ''} onChange={e => setEdit(s => ({ ...s, [p.k]: e.target.value }))} />
+                  <input className="input font-mono" {...(p.num ? { type: 'number', inputMode: 'decimal' as const, min: 0.01, max: 20, step: 0.01 } : {})} value={edit[p.k] ?? ''} onChange={e => setEdit(s => ({ ...s, [p.k]: e.target.value }))} />
                 </Field>
               ))}
             </div>

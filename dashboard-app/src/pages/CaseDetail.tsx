@@ -4,7 +4,7 @@ import { sb } from '../lib/supabase';
 import { useData, overdueIds } from '../lib/data';
 import { useCanWrite } from '../lib/auth';
 import { CATEGORIES, PRIORITIES, STAGES, stageTone } from '../lib/constants';
-import { crLabel, fmtDate } from '../lib/format';
+import { caseSubject, caseTitle, fmtDate } from '../lib/format';
 import { humanError } from '../lib/api';
 import type { Activity, Case, CaseFile, Letter, Member } from '../lib/types';
 import { Chip, Empty, Field, Modal, Skeleton, Spinner } from '../components/ui';
@@ -190,12 +190,12 @@ export default function CaseDetail() {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-2xl font-bold">{crLabel(c)}</h1>
+              <h1 className="text-2xl font-bold">{caseTitle(c, files.find(f => /^CR\d+_\d{4}_/.test(f.original_name))?.original_name)}</h1>
               <Chip tone={stageTone(c.stage)}>{c.stage}</Chip>
               {c.priority === 'तातडीचे' && <Chip tone="amber">तातडीचे</Chip>}
               {overdue.has(c.id) && <Chip tone="red">मुदत संपली</Chip>}
             </div>
-            <p className="mt-1 text-lg">{c.subject}</p>
+            <p className={`mt-1 text-lg ${c.subject ? "" : "text-slate-600 dark:text-slate-300"}`}>{caseSubject(c, runs?.find(r => r.state === "done")?.summary)}</p>
           </div>
           {canWrite && (
             <div className="no-print flex flex-wrap gap-2">

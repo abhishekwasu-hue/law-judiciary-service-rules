@@ -145,7 +145,7 @@ export default function Cases() {
                   <tr key={c.id} className="cursor-pointer border-b border-slate-100 hover:bg-slate-50 dark:border-navy-800/60 dark:hover:bg-navy-800/50" onClick={() => nav(`/cases/${c.id}`)}>
                     <td className="td whitespace-nowrap font-semibold"><Link to={`/cases/${c.id}`} onClick={e => e.stopPropagation()} className="underline-offset-2 hover:underline">{crLabel(c)}</Link>{c.priority === 'तातडीचे' && <span className="ml-1 text-saffron-600" title="तातडीचे">●</span>}</td>
                     <td className="td whitespace-nowrap"><RunStateBadge run={latestRuns.get(c.id)} /></td>
-                    <td className="td max-w-md"><div className="line-clamp-2">{c.subject || <span className="text-slate-500">विषय PDF वरून येईल</span>}</div></td>
+                    <td className="td max-w-md"><div className="line-clamp-2">{c.subject || <span className="text-slate-500">{latestRuns.get(c.id)?.summary || 'विषय PDF वरून येईल'}</span>}</div></td>
                     <td className="td whitespace-nowrap">{c.category}</td>
                     <td className="td">{c.office || '—'}</td>
                     <td className="td"><Chip tone={stageTone(c.stage)}>{c.stage}</Chip></td>
@@ -163,7 +163,7 @@ export default function Cases() {
                     <span className="font-bold">{crLabel(c)}{c.priority === 'तातडीचे' && <span className="ml-1 text-saffron-600">●</span>}</span>
                     {overdue.has(c.id) ? <Chip tone="red">मुदत संपली</Chip> : <span className="text-sm text-slate-500">{c.category}</span>}
                   </div>
-                  <div className="mt-1 line-clamp-2">{c.subject || <span className="text-slate-500">विषय PDF वरून येईल</span>}</div>
+                  <div className="mt-1 line-clamp-2">{c.subject || <span className="text-slate-500">{latestRuns.get(c.id)?.summary || 'विषय PDF वरून येईल'}</span>}</div>
                   <div className="mt-2 flex flex-wrap items-center gap-2"><Chip tone={stageTone(c.stage)}>{c.stage}</Chip>{latestRuns.get(c.id) && <RunStateBadge run={latestRuns.get(c.id)} />}</div>
                 </Link>
               </li>
@@ -216,7 +216,7 @@ function Kanban({ rows, overdue, canWrite, onMove, runs }: { rows: Case[]; overd
                       <span className="font-bold">{crLabel(c)}</span>
                       {c.priority === 'तातडीचे' && <span className="text-sm font-semibold text-saffron-600">तातडीचे</span>}
                     </div>
-                    <div className="mt-1 line-clamp-3 text-sm">{c.subject || <span className="text-slate-500">विषय PDF वरून येईल</span>}</div>
+                    <div className="mt-1 line-clamp-3 text-sm">{c.subject || <span className="text-slate-500">{runs.get(c.id)?.summary || 'विषय PDF वरून येईल'}</span>}</div>
                     <div className="mt-1 text-xs text-slate-500">{c.category}{c.office ? ` • ${c.office}` : ''}</div>
                     {runs.get(c.id) && <div className="mt-2"><RunStateBadge run={runs.get(c.id)} /></div>}
                   </Link>
