@@ -3,6 +3,20 @@ Give this whole file, as one message, to the coding session (Claude Code) or the
 code, comments and identifiers in English.
 
 
+
+> **OWNER'S CONSTRAINT (01.11.2026): github.com does NOT open in the office.** The user must never need GitHub in his browser.
+> - Everything the user touches: Cloudflare (Pages + Worker, *.workers.dev) and Supabase (Auth, DB, Storage, Realtime). Login, upload,
+>   status, previews, downloads, re-run, GR library — all through these two only.
+> - AI: use the owner's **Anthropic API key** (secret `ANTHROPIC_API_KEY`), via the Claude Agent SDK / Claude Code headless running the
+>   repo's PROPOSAL_SOP.md. Optionally a second provider key as fallback; keep model + keys in Worker/engine secrets, never in the browser.
+> - Processing engine (needs Python: pymupdf, python-docx, docxcompose, LibreOffice, tesseract; runs 10–30 min per proposal — too long for
+>   Workers or Supabase Edge Functions). Pick ONE, in this order, and say which you chose:
+>   (a) GitHub Actions used purely server-side (the Worker calls the GitHub API with a token; the office block is irrelevant because the
+>       browser never contacts GitHub); (b) Cloudflare Containers; (c) a small always-on VM (Fly.io/Render) polling a Supabase `jobs` table.
+>   The engine reads the repo (rules, tools, samples, pdf/) server-side, downloads the proposal from Supabase Storage, writes the three
+>   outputs + status back to Supabase. The user sees only status changes in the app.
+> - Test from a network that blocks github.com (e.g. block it in the browser) to prove the app works without it.
+
 > **READ FIRST — what to build.** A real, deployed full-stack WEB APPLICATION with working upload (input) and download (output),
 > wired to the back end. NOT a claude.ai "Dashboard" artifact, NOT a static mock-up, NOT charts over sample data.
 > Work inside the repo `abhishekwasu-hue/law-judiciary-service-rules` (clone it; read CLAUDE.md, PROPOSAL_SOP.md, this file).
