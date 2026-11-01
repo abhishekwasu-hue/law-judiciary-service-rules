@@ -1,20 +1,32 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, type ComponentType } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider, useAuth } from './lib/auth';
 import { DataProvider } from './lib/data';
+import { humanError } from './lib/api';
 import { ToastProvider } from './components/Toast';
 import Layout, { Brand } from './components/Layout';
 import { Skeleton, Spinner } from './components/ui';
 import Setup from './pages/Setup';
 import Login, { NotMember } from './pages/Login';
+import { isChunkError, reloadOnceForNewBuild } from './components/ErrorBoundary';
 
-const Home = lazy(() => import('./pages/Home'));
-const NewProposal = lazy(() => import('./pages/NewProposal'));
-const Cases = lazy(() => import('./pages/Cases'));
-const CaseDetail = lazy(() => import('./pages/CaseDetail'));
-const GrLibrary = lazy(() => import('./pages/GrLibrary'));
-const RegisterSearch = lazy(() => import('./pages/RegisterSearch'));
-const Settings = lazy(() => import('./pages/Settings'));
+/** lazy() that survives a redeploy: a failed page-file load reloads the page once (guarded per build, no loop). */
+function lazyRetry<T extends ComponentType<object>>(load: () => Promise<{ default: T }>) {
+  return lazy(() =>
+    load().catch((e: unknown) => {
+      if (isChunkError(e) && reloadOnceForNewBuild()) return new Promise<{ default: T }>(() => undefined); // page is reloading
+      throw e;
+    }),
+  );
+}
+
+const Home = lazyRetry(() => import('./pages/Home'));
+const NewProposal = lazyRetry(() => import('./pages/NewProposal'));
+const Cases = lazyRetry(() => import('./pages/Cases'));
+const CaseDetail = lazyRetry(() => import('./pages/CaseDetail'));
+const GrLibrary = lazyRetry(() => import('./pages/GrLibrary'));
+const RegisterSearch = lazyRetry(() => import('./pages/RegisterSearch'));
+const Settings = lazyRetry(() => import('./pages/Settings'));
 
 function PageFallback() {
   return (
@@ -40,7 +52,7 @@ function Gate() {
         <Brand />
         <div className="card mt-6 space-y-3 p-5">
           <h1 className="text-xl font-bold">सर्व्हरशी संपर्क झाला नाही</h1>
-          <p className="break-words text-slate-600 dark:text-slate-300">{error}</p>
+          <p className="break-words text-slate-600 dark:text-slate-300">{humanError(error)}</p>
           <button className="btn-primary w-full" onClick={reload}>पुन्हा प्रयत्न करा</button>
         </div>
       </div>

@@ -8,17 +8,17 @@ import { Chip, Field, Section, SkeletonRows, Spinner } from '../components/ui';
 import { useToast } from '../components/Toast';
 
 const PLAIN: { k: string; label: string; hint?: string }[] = [
-  { k: 'owner_email', label: 'मालकाचा ई-मेल' },
-  { k: 'supabase_url', label: 'Supabase URL' },
-  { k: 'supabase_anon_key', label: 'Supabase anon key' },
-  { k: 'github_repo', label: 'GitHub repo', hint: 'owner/repo' },
-  { k: 'github_branch', label: 'GitHub branch' },
-  { k: 'model', label: 'Model' },
+  { k: 'owner_email', label: 'मालकाचा ई-मेल', hint: 'या ई-मेलने लॉगिन करणाऱ्याला सेटिंग्ज बदलण्याचा अधिकार' },
+  { k: 'supabase_url', label: 'Supabase URL', hint: 'माहिती-साठ्याचा पत्ता — Supabase प्रकल्पाच्या सेटिंग्जमध्ये मिळतो' },
+  { k: 'supabase_anon_key', label: 'Supabase anon key', hint: 'त्याच ठिकाणची सार्वजनिक की (anon)' },
+  { k: 'github_repo', label: 'GitHub repo', hint: 'नियम व साधने असलेला रेपो — उदा. owner/repo' },
+  { k: 'github_branch', label: 'GitHub branch', hint: 'सहसा main' },
+  { k: 'model', label: 'AI मॉडेल (Model)', hint: 'प्रक्रियेसाठी वापरायच्या Claude मॉडेलचे नाव' },
 ];
-const SECRET: { k: string; label: string }[] = [
-  { k: 'supabase_service_key', label: 'Supabase service_role key' },
-  { k: 'github_token', label: 'GitHub token' },
-  { k: 'anthropic_api_key', label: 'Anthropic API key' },
+const SECRET: { k: string; label: string; hint: string }[] = [
+  { k: 'supabase_service_key', label: 'Supabase service_role key', hint: 'माहिती-साठ्याची गुप्त की' },
+  { k: 'github_token', label: 'GitHub token', hint: 'प्रक्रिया सुरू करण्यासाठी GitHub ची परवानगी-की' },
+  { k: 'anthropic_api_key', label: 'Anthropic API key', hint: 'AI प्रक्रियेसाठीची की' },
 ];
 const ROLE_LABEL: Record<string, string> = { owner: 'मालक', staff: 'कार्यासन कर्मचारी', senior: 'वरिष्ठ (फक्त वाचन)' };
 
@@ -41,6 +41,7 @@ export default function Settings() {
       toast(humanError(e), 'err');
     }
     const m = await sb().from('members').select('*').order('created_at');
+    if (m.error) toast(humanError(m.error.message), 'err');
     setMembers((m.data as Member[]) || []);
   };
   useEffect(() => {
@@ -74,6 +75,7 @@ export default function Settings() {
 
   async function invite(e: FormEvent) {
     e.preventDefault();
+    if (!/^\S+@\S+\.\S+$/.test(inv.email.trim())) return toast('योग्य ई-मेल लिहा', 'err');
     setInvBusy(true);
     try {
       await api('/api/members', { body: { email: inv.email.trim(), role: inv.role } });
@@ -108,7 +110,7 @@ export default function Settings() {
                 <Field
                   key={s.k}
                   label={s.label}
-                  hint={cur[s.k] ? <>सध्या: <span className="font-mono">{cur[s.k]}</span> — बदलायची असल्यासच टाइप करा</> : <Chip tone="amber">भरलेली नाही</Chip>}
+                  hint={<>{s.hint} • {cur[s.k] ? <>सध्या: <span className="font-mono">{cur[s.k]}</span> — बदलायची असल्यासच टाइप करा</> : <Chip tone="amber">भरलेली नाही</Chip>}</>}
                 >
                   <input className="input font-mono" type="password" autoComplete="off" placeholder={cur[s.k] || ''} value={edit[s.k] ?? ''} onChange={e => setEdit(x => ({ ...x, [s.k]: e.target.value }))} />
                 </Field>
@@ -140,7 +142,7 @@ export default function Settings() {
             </table>
           </div>
         )}
-        <form onSubmit={invite} className="mt-4 grid gap-3 md:grid-cols-[1fr_220px_auto] md:items-end">
+        <form onSubmit={invite} noValidate className="mt-4 grid gap-3 md:grid-cols-[1fr_220px_auto] md:items-end">
           <Field label="नवीन सदस्याचा ई-मेल">
             <input className="input" type="email" required value={inv.email} onChange={e => setInv(s => ({ ...s, email: e.target.value }))} />
           </Field>
@@ -155,7 +157,7 @@ export default function Settings() {
       </Section>
 
       <Section title="टिप्पणीतील सही-साखळी, पत्राचे पत्ते, सूचना">
-        <p className="text-slate-600 dark:text-slate-300">या सेटिंग्ज अजून उपलब्ध नाहीत. सध्या सही-साखळी व पत्राचा मजकूर रेपोतील नियमांनुसार (INSTRUCTIONS.md §4) back-end ठरवते.</p>
+        <p className="text-slate-600 dark:text-slate-300">या सेटिंग्ज अजून उपलब्ध नाहीत. सध्या सही-साखळी व पत्राचा मजकूर कार्यासनाच्या कायमच्या सूचनांनुसार (§4) आपोआप ठरतो.</p>
       </Section>
     </div>
   );

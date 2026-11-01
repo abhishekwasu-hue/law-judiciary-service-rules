@@ -27,7 +27,7 @@ export default function CommandPalette({ open, onClose }: { open: boolean; onClo
       { id: 'home', label: 'मुख्य पृष्ठ', go: '/' },
       { id: 'new', label: 'नवीन प्रस्ताव', hint: 'n', go: '/new' },
       { id: 'cases', label: 'प्रकरणे — तक्ता', hint: '/', go: '/cases' },
-      { id: 'kanban', label: 'प्रकरणे — Kanban', go: '/cases?view=kanban' },
+      { id: 'kanban', label: 'प्रकरणे — फलक', go: '/cases?view=kanban' },
       { id: 'overdue', label: 'मुदत संपलेली प्रकरणे', go: '/cases?overdue=1' },
       { id: 'gr', label: 'GR ग्रंथालय', go: '/gr' },
       { id: 'search', label: 'नोंदवही शोध', go: '/search' },
@@ -50,11 +50,11 @@ export default function CommandPalette({ open, onClose }: { open: boolean; onClo
   };
   return (
     <div className="fixed inset-0 z-[55] flex items-start justify-center bg-black/50 p-3 pt-[10vh]" onMouseDown={e => e.target === e.currentTarget && onClose()}>
-      <div className="card w-full max-w-xl overflow-hidden" role="dialog" aria-modal="true" aria-label="आदेश शोधा">
+      <div className="card w-full max-w-xl overflow-hidden" role="dialog" aria-modal="true" aria-label="झटपट शोध">
         <input
           ref={input}
           className="w-full border-b border-slate-200 bg-transparent px-4 py-4 text-lg outline-none dark:border-navy-800"
-          placeholder="आदेश किंवा प्रकरण (C R क्र., विषय) शोधा…"
+          placeholder="झटपट शोध — पान किंवा प्रकरण (C R क्र., विषय)…"
           value={q}
           onChange={e => {
             setQ(e.target.value);

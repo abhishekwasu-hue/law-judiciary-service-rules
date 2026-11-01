@@ -6,7 +6,7 @@ import { CATEGORIES, STAGES, stageTone } from '../lib/constants';
 import { crLabel, fmtDate } from '../lib/format';
 import { RunStateBadge } from '../components/RunProgress';
 import { humanError } from '../lib/api';
-import type { Case } from '../lib/types';
+import type { Case, Run } from '../lib/types';
 import { Chip, Empty, SkeletonRows } from '../components/ui';
 import { useToast } from '../components/Toast';
 
@@ -87,7 +87,7 @@ export default function Cases() {
           <div className="inline-flex rounded-lg border border-slate-300 p-0.5 dark:border-navy-700" role="tablist">
             {(['table', 'kanban'] as const).map(v => (
               <button key={v} role="tab" aria-selected={view === v} className={`min-h-tap rounded-md px-3 font-semibold ${view === v ? 'bg-navy-700 text-white' : ''}`} onClick={() => setParam('view', v === 'table' ? '' : v)}>
-                {v === 'table' ? 'तक्ता' : 'Kanban'}
+                {v === 'table' ? 'तक्ता' : 'फलक'}
               </button>
             ))}
           </div>
@@ -124,7 +124,7 @@ export default function Cases() {
         )}
       </div>
 
-      {error && <div className="card border-red-300 p-3 text-red-800">{error}</div>}
+      {error && <div className="card border-red-300 p-3 text-red-800" role="alert">{humanError(error)}</div>}
       {loading ? (
         <div className="card"><SkeletonRows n={6} /></div>
       ) : cases.length === 0 ? (
@@ -163,21 +163,21 @@ export default function Cases() {
                     <span className="font-bold">{crLabel(c)}{c.priority === 'तातडीचे' && <span className="ml-1 text-saffron-600">●</span>}</span>
                     {overdue.has(c.id) ? <Chip tone="red">मुदत संपली</Chip> : <span className="text-sm text-slate-500">{c.category}</span>}
                   </div>
-                  <div className="mt-1 line-clamp-2">{c.subject}</div>
-                  <div className="mt-2"><Chip tone={stageTone(c.stage)}>{c.stage}</Chip></div>
+                  <div className="mt-1 line-clamp-2">{c.subject || <span className="text-slate-500">विषय PDF वरून येईल</span>}</div>
+                  <div className="mt-2 flex flex-wrap items-center gap-2"><Chip tone={stageTone(c.stage)}>{c.stage}</Chip>{latestRuns.get(c.id) && <RunStateBadge run={latestRuns.get(c.id)} />}</div>
                 </Link>
               </li>
             ))}
           </ul>
         </>
       ) : (
-        <Kanban rows={rows} overdue={overdue} canWrite={canWrite} onMove={move} />
+        <Kanban rows={rows} overdue={overdue} canWrite={canWrite} onMove={move} runs={latestRuns} />
       )}
     </div>
   );
 }
 
-function Kanban({ rows, overdue, canWrite, onMove }: { rows: Case[]; overdue: Set<number>; canWrite: boolean; onMove: (id: number, stage: string) => void }) {
+function Kanban({ rows, overdue, canWrite, onMove, runs }: { rows: Case[]; overdue: Set<number>; canWrite: boolean; onMove: (id: number, stage: string) => void; runs: Map<number, Run> }) {
   const [over, setOver] = useState<string | null>(null);
   const drop = (stage: string) => (e: DragEvent) => {
     e.preventDefault();
@@ -216,8 +216,9 @@ function Kanban({ rows, overdue, canWrite, onMove }: { rows: Case[]; overdue: Se
                       <span className="font-bold">{crLabel(c)}</span>
                       {c.priority === 'तातडीचे' && <span className="text-sm font-semibold text-saffron-600">तातडीचे</span>}
                     </div>
-                    <div className="mt-1 line-clamp-3 text-sm">{c.subject}</div>
+                    <div className="mt-1 line-clamp-3 text-sm">{c.subject || <span className="text-slate-500">विषय PDF वरून येईल</span>}</div>
                     <div className="mt-1 text-xs text-slate-500">{c.category}{c.office ? ` • ${c.office}` : ''}</div>
+                    {runs.get(c.id) && <div className="mt-2"><RunStateBadge run={runs.get(c.id)} /></div>}
                   </Link>
                   {canWrite && (
                     <select className="input mt-2 text-sm" value={c.stage} onChange={e => onMove(c.id, e.target.value)} aria-label="टप्पा बदला">

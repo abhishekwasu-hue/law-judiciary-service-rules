@@ -12,6 +12,8 @@ const calls = [];
 const members = [];
 const patches = [], acts = [], uploads = [];
 const run55 = { state: 'queued' };
+const letterPatches = [];
+let pendingLetters = [];
 globalThis.fetch = async (u, opt = {}) => {
   u = String(u); calls.push({ u, opt });
   const res = (o, s = 200) => new Response(JSON.stringify(o), { status: s });
@@ -35,11 +37,14 @@ globalThis.fetch = async (u, opt = {}) => {
   if (u.startsWith(`${SB}/rest/v1/cases?id=eq.7&select=id`)) return res([{ id: 7 }]);
   if (u.startsWith(`${SB}/rest/v1/cases?id=eq.8&select=id`)) return res([]);
   if (u.startsWith(`${SB}/rest/v1/case_files?case_id=eq.7&kind=eq.extra_doc`)) return res([]);
+  if (u.startsWith(`${SB}/rest/v1/case_files?case_id=eq.7&kind=eq.reply`)) return res([]);
   if (u.startsWith(`${SB}/rest/v1/case_files?id=eq.1&`)) return res([{ storage_path: 'outputs/7/study/v1/a.docx', original_name: 'a.docx' }]);
   if (u.startsWith(`${SB}/rest/v1/case_files?id=eq.2&`)) return res([{ storage_path: 'backups/7/x', original_name: 'x' }]);
   if (u === `${SB}/rest/v1/case_files` && opt.method === 'POST') return res([{ id: 9, ...JSON.parse(opt.body) }], 201);
   if (u.startsWith(`${SB}/storage/v1/object/sign/`)) return res({ signedURL: '/object/sign/x?token=t' });
   if (u.startsWith(`${SB}/storage/v1/object/`)) { uploads.push(u); return res({ Key: 'k' }); }
+  if (u.startsWith(`${SB}/rest/v1/letters?case_id=eq.7&sent_date=not.is.null&reply_received_date=is.null`)) return res(pendingLetters);
+  if (u.startsWith(`${SB}/rest/v1/letters?id=eq.`) && opt.method === 'PATCH') { letterPatches.push({ u, body: JSON.parse(opt.body) }); return res([{ id: 1 }]); }
   if (u.startsWith(`${SB}/rest/v1/`)) return new Response(null, { status: 204 });
   if (u.endsWith('/dispatches')) return new Response(null, { status: 204 });
   throw new Error('unexpected fetch ' + u);
@@ -143,4 +148,26 @@ test('sweep, upload case check, signed-URL bucket whitelist', async () => {
 
   assert.equal((await call('/api/files/1', { headers: owner })).status, 200);
   assert.equal((await call('/api/files/2', { headers: owner })).status, 403, 'bucket outside proposals|outputs|gr-library refused');
+});
+
+test('reply upload marks the single pending letter answered; several pending left alone', async () => {
+  const owner = { authorization: 'Bearer owner-jwt' };
+  const up = () => call('/api/upload?case_id=7&kind=reply', { method: 'POST', headers: { ...owner, 'x-file-name': encodeURIComponent('उत्तर.pdf'), 'content-type': 'application/pdf' }, body: 'x' });
+  letterPatches.length = 0;
+  pendingLetters = [{ id: 31 }];
+  const r1 = await up(); const one = await body(r1); assert.equal(r1.status, 200, JSON.stringify(one));
+  assert.equal(one.letter_updated, 31); assert.equal(one.pending_letters, 1);
+  assert.equal(letterPatches.length, 1);
+  assert.ok(letterPatches[0].u.includes('letters?id=eq.31'));
+  assert.equal(letterPatches[0].body.status, 'उत्तर प्राप्त');
+  assert.match(letterPatches[0].body.reply_received_date, /^\d{4}-\d{2}-\d{2}$/);
+
+  pendingLetters = [{ id: 31 }, { id: 32 }];
+  const many = await body(await up());
+  assert.equal(many.letter_updated, null); assert.equal(many.pending_letters, 2);
+  assert.equal(letterPatches.length, 1, 'several pending: none patched');
+
+  pendingLetters = [];
+  const ex = await body(await call('/api/upload?case_id=7&kind=extra_doc', { method: 'POST', headers: { ...owner, 'x-file-name': encodeURIComponent('a.pdf') }, body: 'x' }));
+  assert.equal(ex.letter_updated, null);
 });

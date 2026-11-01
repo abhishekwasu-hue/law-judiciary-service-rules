@@ -13,22 +13,41 @@ async function token(): Promise<string | null> {
   return data.session?.access_token ?? null;
 }
 
-const MARATHI: [RegExp, string][] = [
-  [/login required/, 'कृपया पुन्हा लॉगिन करा'],
-  [/not a member/, 'आपण या कक्षाचे सदस्य नाही'],
-  [/owner only/, 'फक्त मालकासाठी'],
-  [/read-only/, 'आपल्याला फक्त वाचण्याची परवानगी आहे'],
-  [/setup code wrong/, 'सेटअप कोड चुकीचा'],
-  [/already configured/, 'सेटअप आधीच झाला आहे'],
-  [/file over 50 MB/, 'फाइल 50 MB पेक्षा मोठी'],
-  [/upload the proposal PDF first/, 'आधी प्रस्ताव PDF अपलोड करा'],
-  [/Settings: GitHub repo\/token and Anthropic key needed/, 'सेटिंग्जमध्ये GitHub repo/token व Anthropic key भरा'],
-  [/duplicate key|23505/, 'हा C R क्रमांक/वर्ष आधीच नोंदवलेला आहे'],
+// Order matters: specific messages first, generic (status codes, network) last.
+export const MARATHI: [RegExp, string][] = [
+  [/login required|JWT expired|invalid JWT|\b401\b/i, 'कृपया पुन्हा लॉगिन करा'],
+  [/not a member/i, 'आपण या कक्षाचे सदस्य नाही'],
+  [/owner only/i, 'हे काम फक्त मालक (owner) करू शकतात'],
+  [/read-only/i, 'आपल्याला फक्त पाहण्याची परवानगी आहे — बदल करता येणार नाही'],
+  [/setup code wrong/i, 'सेटअप कोड चुकीचा'],
+  [/already configured/i, 'सेटअप आधीच झाला आहे'],
+  [/not configured/i, 'app ची सेटिंग्ज अजून पूर्ण नाहीत — मालकाने सेटिंग्ज भरावीत'],
+  [/bad token/i, 'प्रक्रियेची परवानगी संपली — पुन्हा तयार करा'],
+  [/file over 50 MB|\b413\b/i, 'फाइल 50 MB पेक्षा मोठी आहे — लहान फाइल निवडा'],
+  [/upload the proposal PDF first/i, 'आधी प्रस्ताव PDF अपलोड करा'],
+  [/Settings: GitHub repo\/token and Anthropic key needed/i, 'सेटिंग्जमध्ये GitHub repo/token व Anthropic key भरा'],
+  [/duplicate key|23505/i, 'हा C R क्रमांक/वर्ष आधीच नोंदवलेला आहे'],
+  [/cr_no: digits only/i, 'C R क्रमांकात फक्त अंक लिहा'],
+  [/cr_year/i, 'वर्ष 4 अंकी लिहा (उदा. 2026)'],
+  [/case not found/i, 'हे प्रकरण सापडले नाही (कदाचित काढून टाकले असेल)'],
+  [/not found|\b404\b/i, 'माहिती सापडली नाही'],
+  [/^storage \d+/i, 'फाइल साठवताना त्रुटी आली — पुन्हा प्रयत्न करा'],
+  [/^dispatch \d+/i, 'प्रक्रिया सुरू करता आली नाही — सेटिंग्जमधील GitHub token तपासा व पुन्हा तयार करा'],
+  [/^db \d+/i, 'माहिती जतन करताना त्रुटी आली — पुन्हा प्रयत्न करा'],
+  [/^sign \d+/i, 'फाइल उघडता आली नाही — पुन्हा प्रयत्न करा'],
+  [/HTTP 5\d\d|\b50[0-4]\b/i, 'सर्व्हरमध्ये तात्पुरती त्रुटी — थोड्या वेळाने पुन्हा प्रयत्न करा'],
+  [/Failed to fetch|NetworkError|Load failed|network|नेटवर्क त्रुटी/i, 'इंटरनेट/नेटवर्क संपर्क तुटला — जोडणी तपासून पुन्हा प्रयत्न करा'],
 ];
+const GENERIC = 'तांत्रिक त्रुटी — पुन्हा प्रयत्न करा';
+/** Message already meant for the user (Devanagari, no English sentence / JSON / code). */
+const looksMarathi = (m: string) => /[ऀ-ॿ]/.test(m) && !/[{}[\]]|\b[a-z]+ [a-z]+ [a-z]+\b/i.test(m);
+
+/** Any error → short Marathi text for a non-technical user. Unknown technical text → generic message. */
 export function humanError(e: unknown): string {
-  const msg = e instanceof Error ? e.message : String(e);
+  const msg = e instanceof Error ? e.message : String(e ?? '');
   for (const [re, mr] of MARATHI) if (re.test(msg)) return mr;
-  return msg;
+  if (looksMarathi(msg)) return msg;
+  return GENERIC;
 }
 
 export async function api<T = unknown>(path: string, opt: { method?: string; body?: unknown } = {}): Promise<T> {

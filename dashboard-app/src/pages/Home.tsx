@@ -13,10 +13,10 @@ const CAT_COLORS = ['#2b4477', '#ee8a1c', '#3b82f6', '#0d9488', '#7c3aed', '#be1
 
 function Kpi({ label, value, tone, to }: { label: string; value: number | null; tone: Tone; to: string }) {
   return (
-    <Link to={to} className="card block p-4 transition hover:-translate-y-0.5 hover:shadow-md">
-      <div className="text-sm font-semibold text-slate-500 dark:text-slate-400">{label}</div>
-      <div className="mt-1 font-head text-3xl font-bold" style={{ color: TONE_HEX[tone] }}>
-        {value === null ? <Skeleton className="h-9 w-12" /> : value}
+    <Link to={to} className="card block p-3 transition hover:-translate-y-0.5 hover:shadow-md sm:p-4">
+      <div className="text-sm font-semibold leading-tight text-slate-500 dark:text-slate-400">{label}</div>
+      <div className="mt-1 font-head text-2xl font-bold sm:text-3xl" style={{ color: TONE_HEX[tone] }}>
+        {value === null ? <Skeleton className="h-8 w-10" /> : value}
       </div>
     </Link>
   );
@@ -28,6 +28,8 @@ export default function Home() {
   const { cases, letters, loading } = useData();
   const nav = useNavigate();
   const [acts, setActs] = useState<Activity[] | null>(null);
+  // charts: open by default on a wide screen, folded on phones (आज करायचे comes first there)
+  const [chartsOpen, setChartsOpen] = useState(() => typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches);
 
   useEffect(() => {
     const since = new Date();
@@ -120,13 +122,13 @@ export default function Home() {
 
   const tipStyle = { contentStyle: { borderRadius: 8, fontSize: 14 } };
   return (
-    <div className="space-y-5">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+    <div className="grid gap-5 lg:grid-cols-2">
+      <div className="order-first flex flex-wrap items-center justify-between gap-2 lg:col-span-2">
         <h1 className="text-2xl font-bold">मुख्य पृष्ठ</h1>
         <Link to="/new" className="btn-accent">+ नवीन प्रस्ताव</Link>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+      <div className="order-2 grid grid-cols-3 gap-2 sm:grid-cols-5 sm:gap-3 lg:order-1 lg:col-span-2">
         <Kpi label="नवीन" value={loading ? null : kpi.new} tone="navy" to="/cases?stage=प्राप्त" />
         <Kpi label="अभ्यास चालू" value={loading ? null : kpi.study} tone="blue" to="/cases?stage=अभ्यास चालू" />
         <Kpi label="उत्तर प्रतीक्षेत" value={loading ? null : kpi.waiting} tone="amber" to={`/cases?stage=${encodeURIComponent('पत्र पाठवले (माहिती प्रतीक्षेत)')}`} />
@@ -134,7 +136,7 @@ export default function Home() {
         <Kpi label="या महिन्यात बंद" value={loading ? null : kpi.closed} tone="green" to="/cases?stage=बंद" />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="order-1 min-w-0 lg:order-2">
         <Section title="आज करायचे" right={<Link to="/cases?overdue=1" className="text-sm font-semibold text-red-700 hover:underline dark:text-red-300">मुदत संपलेली →</Link>}>
           {todo.length === 0 && overdueCases.length === 0 ? (
             <Empty icon="✅" title="आज काही प्रलंबित नाही" hint="मुदत संपलेली किंवा 7 दिवसांत येणारी उत्तरे येथे दिसतील." />
@@ -167,7 +169,9 @@ export default function Home() {
             </ul>
           )}
         </Section>
+      </div>
 
+      <div className="order-3 min-w-0">
         <Section title="अलीकडील हालचाल">
           {!acts ? <div className="space-y-2">{[0, 1, 2, 3].map(i => <Skeleton key={i} className="h-8 w-full" />)}</div> : acts.length === 0 ? (
             <Empty icon="🕘" title="हालचाल नाही" />
@@ -192,7 +196,12 @@ export default function Home() {
         </Section>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <details className="order-4 min-w-0 lg:col-span-2" open={chartsOpen} onToggle={e => setChartsOpen((e.currentTarget as HTMLDetailsElement).open)}>
+        <summary className="card flex list-none [&::-webkit-details-marker]:hidden min-h-tap cursor-pointer select-none items-center justify-between px-4 py-3 text-base font-bold">
+          <span>आलेख</span>
+          <span className="text-sm font-normal text-slate-500">{chartsOpen ? 'लपवा ▲' : 'दाखवा ▼'}</span>
+        </summary>
+      {chartsOpen && <div className="mt-4 grid gap-4 lg:grid-cols-2">
         <Section title="प्रवर्गनिहाय प्रकरणे">
           <div className="h-72">
             {catData.length === 0 ? <Empty title="माहिती नाही" /> : (
@@ -268,7 +277,8 @@ export default function Home() {
             )}
           </div>
         </Section>
-      </div>
+      </div>}
+      </details>
     </div>
   );
 }

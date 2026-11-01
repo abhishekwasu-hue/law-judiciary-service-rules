@@ -29,7 +29,7 @@ export default function RegisterSearch() {
     <div className="space-y-4">
       <h1 className="text-2xl font-bold">नोंदवही शोध</h1>
       <form onSubmit={go} className="card flex gap-2 p-3">
-        <input className="input" type="search" autoFocus placeholder="नियम, GR, शब्द… (register/ मधील पडताळलेले उतारे)" value={q} onChange={e => setQ(e.target.value)} aria-label="शोधा" />
+        <input className="input" type="search" autoFocus placeholder="नियम, GR, शब्द… (पडताळलेल्या उताऱ्यांत शोध)" value={q} onChange={e => setQ(e.target.value)} aria-label="शोधा" />
         <button className="btn-primary shrink-0" disabled={busy}>{busy ? <Spinner /> : '🔎'} शोधा</button>
       </form>
       {err && <div className="card p-3 text-red-800 dark:text-red-300" role="alert">{err}</div>}

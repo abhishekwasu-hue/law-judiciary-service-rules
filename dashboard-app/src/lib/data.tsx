@@ -1,10 +1,11 @@
-// Shared case + letter store for list, Kanban, Home and the command palette. Reads go straight to Supabase (RLS).
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
+// Shared case + letter store for list, फलक (Kanban), Home and the command palette. Reads go straight to Supabase (RLS).
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { sb } from './supabase';
 import { api } from './api';
 import { useCanWrite } from './auth';
 import type { Case, Letter, Run } from './types';
-import { addDaysISO, todayISO } from './format';
+import { addDaysISO, crLabel, todayISO } from './format';
+import { useToast } from '../components/Toast';
 
 interface DataState {
   latestRuns: Map<number, Run>;
@@ -25,6 +26,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState('');
   // latest run of every case (for list status + the global 'अभ्यास चालू' bar), kept live via Realtime
   const [latestRuns, setLatestRuns] = useState<Map<number, Run>>(new Map());
+  // Toast when a run finishes (queued/running → done/failed) so a user on another page learns of it.
+  const toast = useToast();
+  const runState = useRef<Map<number, Run['state']>>(new Map()); // run id → last known state
+  const casesRef = useRef<Case[]>([]);
+  useEffect(() => {
+    casesRef.current = cases;
+  }, [cases]);
 
   const refresh = useCallback(async () => {
     const [c, l] = await Promise.all([
@@ -37,7 +45,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setLetters((l.data as Letter[]) || []);
     const r = await sb().from('runs').select('*').order('created_at', { ascending: false }).limit(500);
     const m = new Map<number, Run>();
-    for (const x of (r.data as Run[]) || []) if (!m.has(x.case_id)) m.set(x.case_id, x);
+    for (const x of (r.data as Run[]) || []) {
+      if (!m.has(x.case_id)) m.set(x.case_id, x);
+      runState.current.set(x.id, x.state);
+    }
     setLatestRuns(m);
     setLoading(false);
   }, []);
@@ -67,6 +78,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'runs' }, payload => {
         const row = payload.new as Run;
         if (!row?.id) return;
+        const prev = runState.current.get(row.id);
+        runState.current.set(row.id, row.state);
+        if ((prev === 'queued' || prev === 'running') && (row.state === 'done' || row.state === 'failed')) {
+          const c = casesRef.current.find(x => x.id === row.case_id);
+          const label = c ? crLabel(c) : `प्रकरण #${row.case_id}`;
+          if (row.state === 'done') toast(`${label}: प्रक्रिया तयार — प्रकरणे मध्ये पाहा`, 'ok');
+          else toast(`${label}: प्रक्रिया अयशस्वी — प्रकरण उघडून "पुन्हा तयार करा" दाबा`, 'err');
+        }
         setLatestRuns(s => {
           const cur = s.get(row.case_id);
           if (cur && cur.id > row.id) return s;
@@ -80,7 +99,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       void sb().removeChannel(ch);
       void sb().removeChannel(chr);
     };
-  }, [refresh]);
+  }, [refresh, toast]);
 
   const patchLocal = useCallback((row: Case) => setCases(s => s.map(x => (x.id === row.id ? row : x))), []);
 

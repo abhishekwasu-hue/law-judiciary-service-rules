@@ -51,7 +51,21 @@ export default function NewProposal() {
   const runs = useRuns(created?.id ?? null);
   const run: Run | undefined = created ? runs?.[0] : undefined; // ignore the previous case after reset
   const statusRef = useRef<HTMLDivElement>(null);
+  const yearRef = useRef<HTMLInputElement>(null);
   const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF(s => ({ ...s, [k]: e.target.value }));
+  // C R / वर्ष: digits only; "128/2026" typed or pasted in C R is split into C R and वर्ष
+  const setCr = (e: { target: { value: string } }) => {
+    const m = e.target.value.match(/^\D*(\d*)\s*[/\\-]\s*(\d*)/);
+    if (m) {
+      setF(s => ({ ...s, cr_no: m[1], cr_year: m[2].slice(0, 4) || s.cr_year }));
+      if (!m[2]) yearRef.current?.focus(); // "128/" typed by hand → continue in वर्ष
+    }
+    else setF(s => ({ ...s, cr_no: e.target.value.replace(/\D/g, '') }));
+  };
+  const setYear = (e: { target: { value: string } }) => setF(s => ({ ...s, cr_year: e.target.value.replace(/\D/g, '').slice(0, 4) }));
+  const done = run?.state === 'done';
+  const running = !!run && (run.state === 'queued' || run.state === 'running') && !isStale(run);
+  const failed = !!run && !done && !running;
 
   if (!canWrite) return <div className="card p-6 text-center">आपल्याला फक्त वाचण्याची परवानगी आहे.</div>;
 
@@ -194,8 +208,8 @@ export default function NewProposal() {
         <Section title="तपशील">
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
-              <Field label="C R क्र."><input className="input" inputMode="numeric" pattern="\d+" placeholder="PDF वरून" disabled={locked} value={f.cr_no} onChange={set('cr_no')} /></Field>
-              <Field label="वर्ष"><input className="input" inputMode="numeric" pattern="\d{4}" placeholder="PDF वरून" disabled={locked} value={f.cr_year} onChange={set('cr_year')} /></Field>
+              <Field label="C R क्र."><input className="input" inputMode="numeric" placeholder="PDF वरून (उदा. 128/2026)" disabled={locked} value={f.cr_no} onChange={setCr} /></Field>
+              <Field label="वर्ष"><input ref={yearRef} className="input" inputMode="numeric" maxLength={4} placeholder="PDF वरून" disabled={locked} value={f.cr_year} onChange={setYear} /></Field>
             </div>
             <Field label="नस्ती क्र. (निर्देशपत्र)"><input className="input" placeholder="संकीर्ण-2026/___/प्र.क्र.___/का.6" disabled={locked} value={f.file_no} onChange={set('file_no')} /></Field>
             <Field label="विषय"><textarea className="input min-h-[88px]" placeholder="रिकामे ठेवल्यास PDF वरून भरले जाईल" disabled={locked} value={f.subject} onChange={set('subject')} /></Field>
@@ -208,9 +222,27 @@ export default function NewProposal() {
               </Field>
             </div>
             <Field label="विशेष सूचना (ऐच्छिक)"><textarea className="input min-h-[72px]" value={f.instructions} onChange={set('instructions')} /></Field>
-            <button className="btn-accent w-full text-lg" disabled={busy || !proposal || (!!run && run.state !== 'failed' && !isStale(run))}>
-              {busy && <Spinner />} {created ? 'पुन्हा प्रयत्न करा' : 'अभ्यास सुरू करा'}
-            </button>
+            {done && created ? (
+              <Link className="btn-accent flex w-full items-center justify-center py-3 text-xl" to={`/cases/${created.id}?tab=note`}>
+                तयार फाइल पाहा →
+              </Link>
+            ) : running ? (
+              <div className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-100 px-3 py-3 text-lg font-bold text-blue-900 dark:bg-blue-900/40 dark:text-blue-100" role="status">
+                <Spinner /> प्रक्रिया चालू — पूर्ण झाल्यावर येथे बटण येईल
+              </div>
+            ) : (
+              <button className="btn-accent w-full text-lg" disabled={busy || !proposal}>
+                {busy && <Spinner />}{' '}
+                {busy
+                  ? 'फाइल अपलोड होत आहे…'
+                  : failed || (created && (runErr || ups.some(u => u.state === 'err')))
+                    ? '↻ पुन्हा तयार करा'
+                    : created
+                      ? 'प्रक्रिया सुरू करा'
+                      : 'अभ्यास सुरू करा'}
+              </button>
+            )}
+            {failed && !busy && <div className="text-center text-sm font-semibold text-red-700 dark:text-red-400">प्रक्रिया अयशस्वी — वरील "↻ पुन्हा तयार करा" दाबा</div>}
           </div>
         </Section>
       </form>

@@ -16,7 +16,7 @@ function ActiveRunsBar() {
   return (
     <div className="no-print mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-blue-900 dark:border-blue-900 dark:bg-blue-900/30 dark:text-blue-100" role="status">
       <Spinner className="h-4 w-4" />
-      <span className="font-bold">{active.length} अभ्यास चालू — दुसऱ्या पानावर गेलात तरी काम चालूच राहते</span>
+      <span className="font-bold">{active.length} प्रक्रिया चालू — दुसऱ्या पानावर गेलात तरी काम चालूच राहते</span>
       {active.map(r => {
         const c = cases.find(x => x.id === r.case_id);
         return (
@@ -66,13 +66,42 @@ export function ThemeToggle() {
   );
 }
 
+/** Logout with an in-app confirmation (no window.confirm). */
+function LogoutButton({ className, label }: { className: string; label: string }) {
+  const { signOut } = useAuth();
+  const [ask, setAsk] = useState(false);
+  useEffect(() => {
+    if (!ask) return;
+    const k = (e: KeyboardEvent) => e.key === 'Escape' && setAsk(false);
+    window.addEventListener('keydown', k);
+    return () => window.removeEventListener('keydown', k);
+  }, [ask]);
+  return (
+    <>
+      <button className={className} onClick={() => setAsk(true)}>{label}</button>
+      {ask && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4" onMouseDown={e => e.target === e.currentTarget && setAsk(false)}>
+          <div className="card w-full max-w-sm space-y-4 p-5" role="alertdialog" aria-modal="true" aria-labelledby="logout-q">
+            <div id="logout-q" className="text-lg font-bold">app मधून बाहेर पडायचे का?</div>
+            <p className="text-slate-600 dark:text-slate-300">चालू प्रक्रिया थांबणार नाही; पुन्हा लॉगिन करून पाहता येईल.</p>
+            <div className="flex gap-2">
+              <button className="btn-ghost min-h-tap flex-1" onClick={() => setAsk(false)} autoFocus>नाही, थांबा</button>
+              <button className="btn-primary min-h-tap flex-1" onClick={() => void signOut()}>होय, बाहेर पडा</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 const isTyping = (t: EventTarget | null) => {
   const el = t as HTMLElement | null;
   return !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable);
 };
 
 export default function Layout() {
-  const { me, signOut } = useAuth();
+  const { me } = useAuth();
   const nav = useNavigate();
   const [palette, setPalette] = useState(false);
 
@@ -116,12 +145,12 @@ export default function Layout() {
         </nav>
         <div className="mt-auto space-y-2 text-sm">
           <button className="btn-ghost w-full justify-between" onClick={() => setPalette(true)}>
-            आदेश शोधा <kbd className="rounded border px-1 text-xs">Ctrl K</kbd>
+            झटपट शोध <kbd className="rounded border px-1 text-xs">Ctrl K</kbd>
           </button>
           <div className="break-all text-slate-500 dark:text-slate-400">{me?.email}</div>
           <div className="flex gap-2">
             <ThemeToggle />
-            <button className="btn-ghost flex-1" onClick={() => void signOut()}>बाहेर पडा</button>
+            <LogoutButton className="btn-ghost min-h-tap flex-1" label="बाहेर पडा" />
           </div>
         </div>
       </aside>
@@ -133,12 +162,12 @@ export default function Layout() {
             <span className="font-head text-lg font-bold">प्रस्ताव कक्ष</span>
           </div>
           <div className="flex items-center gap-1">
-            <button className="btn-ghost min-w-tap px-2" onClick={() => setPalette(true)} aria-label="आदेश शोधा">⌘</button>
+            <button className="btn-ghost min-h-tap min-w-tap px-2 text-sm font-semibold" onClick={() => setPalette(true)}>शोध</button>
             <ThemeToggle />
             {me?.role === 'owner' && (
               <NavLink to="/settings" className="btn-ghost min-w-tap px-2" aria-label="सेटिंग्ज">⚙️</NavLink>
             )}
-            <button className="btn-ghost min-w-tap px-2" onClick={() => void signOut()} aria-label="बाहेर पडा">⎋</button>
+            <LogoutButton className="btn-ghost min-h-tap min-w-tap whitespace-nowrap px-2 text-sm font-semibold" label="बाहेर पडा" />
           </div>
         </header>
         <main className="mx-auto w-full max-w-7xl px-4 pb-28 pt-4 md:pb-10 md:pt-6">

@@ -25,7 +25,7 @@ export default function GrLibrary() {
   const [opening, setOpening] = useState('');
 
   const load = () => sb().from('gr_library').select('*').order('date', { ascending: false, nullsFirst: false }).then(({ data, error }) => {
-    if (error) toast(error.message, 'err');
+    if (error) toast(humanError(error.message), 'err');
     setRows((data as GrRow[]) || []);
   });
   useEffect(() => {
@@ -48,6 +48,7 @@ export default function GrLibrary() {
 
   async function add(e: FormEvent) {
     e.preventDefault();
+    if (!/^\d{16,20}$/.test(code)) return toast('सांकेतांक 16 ते 20 अंकी असावा (उदा. 202204191549468012)', 'err');
     setAdding(true);
     try {
       const r = await api<{ code: string }>('/api/gr', { body: { code: code.trim() } });
@@ -88,8 +89,8 @@ export default function GrLibrary() {
       {canWrite && (
         <form onSubmit={add} className="card flex flex-col gap-2 p-3 sm:flex-row sm:items-end">
           <div className="flex-1">
-            <Field label="GR जोडा — सांकेतांक" hint="gr.maharashtra.gov.in किंवा archive.org वरून Worker PDF आणतो.">
-              <input className="input font-mono" inputMode="numeric" pattern="\d{16,20}" required placeholder="उदा. 202204191549468012" value={code} onChange={e => setCode(e.target.value.replace(/\D/g, ''))} />
+            <Field label="GR जोडा — सांकेतांक" hint="सांकेतांक टाकल्यावर अधिकृत संकेतस्थळावरून (gr.maharashtra.gov.in) PDF आणली जाते.">
+              <input className="input font-mono" inputMode="numeric" placeholder="उदा. 202204191549468012" value={code} onChange={e => setCode(e.target.value.replace(/\D/g, ''))} />
             </Field>
           </div>
           <button className="btn-primary sm:mb-6" disabled={adding}>{adding && <Spinner />} GR जोडा</button>
@@ -116,7 +117,7 @@ export default function GrLibrary() {
                     </div>
                   )}
                 </div>
-                <button className="btn-ghost shrink-0" disabled={!r.storage_path || opening === r.code} onClick={() => void open(r)} title={r.storage_path ? '' : 'PDF अजून Storage मध्ये नाही'}>
+                <button className="btn-ghost shrink-0" disabled={!r.storage_path || opening === r.code} onClick={() => void open(r)} title={r.storage_path ? '' : 'या GR ची PDF अजून आणलेली नाही'}>
                   {opening === r.code ? <Spinner /> : '📄'} उघडा
                 </button>
               </li>

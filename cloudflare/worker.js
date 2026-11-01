@@ -252,8 +252,21 @@ async function route(req, env, url) {
     await db.upload('proposals', path, req.body, req.headers.get('content-type'));
     const [f] = await db.rest('case_files', { method: 'POST', body: JSON.stringify({ case_id: caseId, kind, storage_path: `proposals/${path}`, original_name: name, version, uploaded_by: user.id }) });
     await log(cfg, caseId, user.id, 'file_uploaded', { kind, name, version });
-    if (kind === 'reply') await db.rest(`cases?id=eq.${caseId}`, { method: 'PATCH', body: JSON.stringify({ stage: 'माहिती प्राप्त' }) });
-    return json(f);
+    let letter_updated = null, pending_letters = 0;
+    if (kind === 'reply') {
+      await db.rest(`cases?id=eq.${caseId}`, { method: 'PATCH', body: JSON.stringify({ stage: 'माहिती प्राप्त' }) });
+      // The reply answers the pending letter: exactly one sent letter without a reply -> mark it answered.
+      // Several pending -> leave them (the UI asks which one).
+      const pend = (await db.rest(`letters?case_id=eq.${caseId}&sent_date=not.is.null&reply_received_date=is.null&select=id`)) || [];
+      pending_letters = pend.length;
+      if (pend.length === 1) {
+        const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' }); // YYYY-MM-DD
+        await db.rest(`letters?id=eq.${pend[0].id}`, { method: 'PATCH', body: JSON.stringify({ reply_received_date: today, status: 'उत्तर प्राप्त' }) });
+        letter_updated = pend[0].id;
+        await log(cfg, caseId, user.id, 'letter_reply_received', { letter_id: letter_updated, date: today });
+      }
+    }
+    return json({ ...f, letter_updated, pending_letters });
   }
 
   // POST /api/run {case_id, instructions} → runs row + dispatch
