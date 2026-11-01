@@ -89,6 +89,31 @@ def ref_problems(text, npages, label, skip_quotes=False):
     return probs
 
 
+QUOTE_RE = re.compile(r"“[^”]*”|\"[^\"]*\"")
+def unquoted(text):
+    """Text outside “…” quotes (verbatim extracts keep their own wording)."""
+    return QUOTE_RE.sub(" ", text or "")
+
+
+# INSTRUCTIONS §4.18 (01.11.2026): respectful, clear official Marathi
+STYLE_RULES = [
+    (re.compile(r"सौ\."), "आदरार्थी उल्लेख — 'सौ.' ऐवजी 'श्रीमती' (§4.18)"),
+    (re.compile(r"(?<![ऀ-ॿ])श्री\.(?=[^\s(])"), "आदरार्थी उल्लेख — 'श्री.' नंतर जागा व आद्याक्षरांमध्ये जागा, उदा. 'श्री. आर. टी. लाखे' (§4.18)"),
+]
+LETTER_STYLE_RULES = [
+    (re.compile(r"तात्काळ"), "पत्राची भाषा — 'तात्काळ' नको; विनंतीपूर्वक भाषा वापरा (§4.18)"),
+]
+REQUEST = "ही विनंती"
+
+
+def style_hits(text, letter=False):
+    t = unquoted(text)
+    out = [msg for rx, msg in STYLE_RULES if rx.search(t)]
+    if letter:
+        out += [msg for rx, msg in LETTER_STYLE_RULES if rx.search(t)]
+    return out
+
+
 def banned_hits(text):
     return [w for w in BANNED if w in text]
 
@@ -154,6 +179,10 @@ def lint_spec(spec, pages=None):
     for path, t in body + letter:
         for w in banned_hits(t): P.append(f"{path}: banned word — '{w}'")
         if PKG in t: P.append(f"{path}: 'पॅकेज PDF' only in संबंधित माहिती — use पृ.N/प.वि.")
+    for path, t in body:
+        P += [f"{path}: {m}" for m in style_hits(t)]
+    for path, t in letter:
+        P += [f"{path}: {m}" for m in style_hits(t, letter=True)]
     for path, t in body + letter:
         P += [f"{path}: पृ. reference — {x.split(': ', 1)[1]}" for x in ref_problems(t, pages, path)]
     for path, t in related:
@@ -210,6 +239,8 @@ def lint_spec(spec, pages=None):
                 P.append(f"letter.intro: intro wording — must start with '{INTRO_START}'")
             if INTRO_HAS not in it:
                 P.append(f"letter.intro: intro wording — must contain '{INTRO_HAS}'")
+            if REQUEST not in it:
+                P.append(f"letter.intro: पत्राची भाषा — माहिती मागताना '…, {REQUEST}.' अशी विनंतीपूर्वक मांडणी हवी (§4.18)")
             if L.get("points") and not it.endswith(":-"):
                 P.append("letter.intro: intro wording — must end with ':-' before the points")
     return P

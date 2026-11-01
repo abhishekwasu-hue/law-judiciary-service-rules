@@ -61,6 +61,30 @@ class LintSpec(unittest.TestCase):
                 self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
                 self.assertEqual(r.stdout.strip(), "LINT OK")
 
+    # ---- §4.18 language (01.11.2026) ----
+    def test_sau_not_shrimati(self):
+        self.bad(self.s122, lambda s: s["note"]["paras"].__setitem__(0, s["note"]["paras"][0] + " सौ. एन. जी. बारई"),
+                 "'सौ.' ऐवजी 'श्रीमती'", "note.paras[0]")
+
+    def test_unspaced_initials(self):
+        self.bad(self.s122, lambda s: s["note"]["paras"].__setitem__(0, s["note"]["paras"][0] + " श्री.आर.टी.लाखे"),
+                 "'श्री.' नंतर जागा", "note.paras[0]")
+
+    def test_quoted_text_is_exempt(self):
+        s = copy.deepcopy(self.s122)
+        s["note"]["paras"][0] += " अर्जात “सौ.बारई यांनी तात्काळ” असे नमूद आहे."
+        self.assertFalse([p for p in L.lint_spec(s) if "§4.18" in p])
+
+    def test_letter_tatkal(self):
+        def f(s):
+            s["letter"]["intro"] = s["letter"]["intro"].replace("शासनास", "शासनास तात्काळ")
+        self.bad(self.s122, f, "'तात्काळ' नको", "letter.intro")
+
+    def test_letter_request_form(self):
+        def f(s):
+            s["letter"]["intro"] = s["letter"]["intro"].replace(", ही विनंती", "")
+        self.bad(self.s122, f, "ही विनंती", "letter.intro")
+
     # ---- must fail: spec ----
     def test_banned_word(self):
         self.bad(self.s122, lambda s: s["note"]["paras"].__setitem__(0, s["note"]["paras"][0] + " असे दिसून येते."),

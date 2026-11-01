@@ -60,6 +60,7 @@ Trigger: Abhi says "प्रस्ताव कक्षातील नवी�
 
 ## Step 4 — Write the note (टिप्पणी) — spec.json
 Copy the structure of the nearest sample in `samples/specs/` and fill your facts. Rules:
+- **Language (INSTRUCTIONS §4.18, 01.11.2026):** short sentences, one point each, clear subject (who did what); "श्रीमती" (not "सौ."), spaced honorifics/initials ("श्री. आर. टी. लाखे"); missing-information list as a table; letter: no "तात्काळ", request form "…उपलब्ध करुन देण्यात यावी, ही विनंती." Quotes stay verbatim. lint_spec.py checks this.
 - **Para 1:** "<authority> यांच्या पृ.__/प.वि. वरील दि.__ रोजीच्या पत्रास अनुसरुन सादर." (or "…पत्रासोबत प्राप्त … पत्रास अनुसरुन सादर.")
 - **Body:** short numbered paras.
   - Facts, posts, periods and amounts go in TABLES: a `{"table": [[...],[...]], "bold_last": true}` item in `note.paras`.
