@@ -2,6 +2,14 @@
 Give this whole file, as one message, to the coding session (Claude Code) or the design tool. All UI text must be in Marathi (Devanagari);
 code, comments and identifiers in English.
 
+
+> **READ FIRST — what to build.** A real, deployed full-stack WEB APPLICATION with working upload (input) and download (output),
+> wired to the back end. NOT a claude.ai "Dashboard" artifact, NOT a static mock-up, NOT charts over sample data.
+> Work inside the repo `abhishekwasu-hue/law-judiciary-service-rules` (clone it; read CLAUDE.md, PROPOSAL_SOP.md, this file).
+> Build in this order and show proof after each: (1) Supabase schema + storage + auth, (2) Worker API, (3) GitHub Action
+> `repository_dispatch` engine end-to-end on one sample PDF (outputs land in Supabase), (4) front end: upload → live status →
+> three download buttons + previews, (5) charts/Kanban/rest of §6. Ask the owner only for the secrets listed in §10.5.
+
 ---
 
 ## 1. Who it is for and what it does
