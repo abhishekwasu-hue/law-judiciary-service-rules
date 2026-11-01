@@ -14,6 +14,8 @@ const patches = [], acts = [], uploads = [];
 const run55 = { state: 'queued' };
 const letterPatches = [];
 let pendingLetters = [];
+let monthRuns = [];
+const spendQueries = [];
 globalThis.fetch = async (u, opt = {}) => {
   u = String(u); calls.push({ u, opt });
   const res = (o, s = 200) => new Response(JSON.stringify(o), { status: s });
@@ -27,6 +29,7 @@ globalThis.fetch = async (u, opt = {}) => {
   if (u === `${SB}/rest/v1/members`) { members.push(JSON.parse(opt.body)); return res([JSON.parse(opt.body)], 201); }
   if (u.startsWith(`${SB}/rest/v1/case_files?case_id=eq.7&kind=eq.proposal`)) return res([{ id: 1 }]);
   if (u === `${SB}/rest/v1/runs`) return res([{ id: 55, case_id: 7 }], 201);
+  if (u.startsWith(`${SB}/rest/v1/runs?created_at=gte.`) && !opt.method) { spendQueries.push(u); return res(monthRuns); }
   if (u.startsWith(`${SB}/rest/v1/runs?`) && opt.method === 'PATCH') {
     patches.push({ u, body: JSON.parse(opt.body) });
     if (u.includes('id=eq.55&state=in.(queued,running)')) return res(run55.state === 'failed' ? [] : (run55.state = 'failed', [{ id: 55, case_id: 7 }]));
@@ -91,6 +94,13 @@ test('setup → settings masking → auth → run dispatch → engine config', a
   assert.equal(s.model_light, 'claude-haiku-4-5'); assert.equal(s.model_review, 'claude-opus-5-5'); assert.equal(s.budget_usd, '0.75');
   assert.equal((await put({ budget_usd: '20' })).status, 200);
   assert.equal((await put({ budget_usd: '1.5' })).status, 200);
+  // monthly_budget_usd: plain setting, positive <= 1000, empty = no limit
+  for (const v of ['0', '-5', '1000.01', 'abc']) assert.equal((await put({ monthly_budget_usd: v })).status, 400, `monthly ${v} refused`);
+  assert.equal(env.SETTINGS.m.has('monthly_budget_usd'), false, 'nothing saved on a refused PUT');
+  assert.equal((await put({ monthly_budget_usd: '1000' })).status, 200);
+  assert.equal((await body(await call('/api/settings', { headers: owner }))).monthly_budget_usd, '1000');
+  assert.equal((await put({ monthly_budget_usd: '' })).status, 200);
+  assert.equal(env.SETTINGS.m.get('monthly_budget_usd'), '', 'empty clears the limit');
 
   const run = await call('/api/run', { method: 'POST', headers: owner, body: JSON.stringify({ case_id: 7, instructions: 'पत्र नको' }) });
   assert.equal(run.status, 200, await run.clone().text());
@@ -179,4 +189,60 @@ test('reply upload marks the single pending letter answered; several pending lef
   pendingLetters = [];
   const ex = await body(await call('/api/upload?case_id=7&kind=extra_doc', { method: 'POST', headers: { ...owner, 'x-file-name': encodeURIComponent('a.pdf') }, body: 'x' }));
   assert.equal(ex.letter_updated, null);
+});
+
+test('monthly spend: IST month sum, boundary, 402 block on /api/run', async () => {
+  const owner = { authorization: 'Bearer owner-jwt' };
+  const realNow = Date.now;
+  // 2026-10-31 19:00 UTC = 2026-11-01 00:30 IST → month 2026-11 (IST month starts 2026-10-31 18:30 UTC)
+  Date.now = () => Date.parse('2026-10-31T19:00:00Z');
+  try {
+    monthRuns = [
+      { cost_usd: '9.99', created_at: '2026-10-31T18:29:59Z' }, // 31.10 23:59:59 IST → previous month
+      { cost_usd: '0.5', created_at: '2026-10-31T18:30:00Z' },  // 01.11 00:00 IST → counted
+      { cost_usd: 1.25, created_at: '2026-11-15T10:00:00+00:00' },
+      { cost_usd: null, created_at: '2026-11-20T10:00:00Z' },   // run without cost → counts as a run, $0
+      { cost_usd: '7', created_at: '2026-11-30T18:30:00Z' },    // 01.12 00:00 IST → next month
+    ];
+    spendQueries.length = 0;
+    env.SETTINGS.m.set('monthly_budget_usd', '');
+    const s = await body(await call('/api/spend', { headers: owner }));
+    assert.deepEqual(s, { month: '2026-11', spent_usd: 1.75, limit_usd: 20, runs: 3 }, 'empty setting = default $20');
+    const q = decodeURIComponent(spendQueries[0]);
+    assert.ok(q.includes('created_at=gte.2026-10-31T18:30:00.000Z'), q);
+    assert.ok(q.includes('created_at=lt.2026-11-30T18:30:00.000Z'), q);
+    assert.ok(q.includes('select=cost_usd,created_at'));
+
+    // one minute before the IST month boundary: 31.10 18:29 UTC = 31.10 23:59 IST → still October
+    Date.now = () => Date.parse('2026-10-31T18:29:00Z');
+    assert.equal((await body(await call('/api/spend', { headers: owner }))).month, '2026-10');
+    Date.now = () => Date.parse('2026-10-31T19:00:00Z');
+
+    const dispatches = () => calls.filter(c => c.u.endsWith('/dispatches')).length;
+    const run = () => call('/api/run', { method: 'POST', headers: owner, body: JSON.stringify({ case_id: 7 }) });
+    env.SETTINGS.m.set('monthly_budget_usd', '1.75');
+    const n0 = dispatches();
+    const r = await run();
+    assert.equal(r.status, 402);
+    assert.deepEqual(await r.json(), { error: 'monthly_budget_reached', spent_usd: 1.75, limit_usd: 1.75 });
+    assert.equal(dispatches(), n0, 'no dispatch when the limit is reached');
+    assert.equal((await body(await call('/api/spend', { headers: owner }))).limit_usd, 1.75);
+
+    env.SETTINGS.m.set('monthly_budget_usd', '2');
+    assert.equal((await run()).status, 200, 'under the limit → runs');
+    assert.equal(dispatches(), n0 + 1);
+    // default $20: 19.99 runs, 20 (= limit) blocks
+    env.SETTINGS.m.set('monthly_budget_usd', '');
+    monthRuns = [{ cost_usd: '19.99', created_at: '2026-11-02T10:00:00Z' }];
+    assert.equal((await run()).status, 200, 'below default $20 → runs');
+    monthRuns = [{ cost_usd: '12', created_at: '2026-11-02T10:00:00Z' }, { cost_usd: '8', created_at: '2026-11-03T10:00:00Z' }];
+    const rd = await run();
+    assert.equal(rd.status, 402, 'default $20 reached → blocked');
+    assert.deepEqual(await rd.json(), { error: 'monthly_budget_reached', spent_usd: 20, limit_usd: 20 });
+    assert.equal(dispatches(), n0 + 2);
+  } finally {
+    Date.now = realNow;
+    env.SETTINGS.m.set('monthly_budget_usd', '');
+    monthRuns = [];
+  }
 });

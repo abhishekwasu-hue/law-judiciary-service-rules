@@ -1,7 +1,7 @@
-import { useRef, useState, type DragEvent, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type DragEvent, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { ApiError, api, humanError, uploadFile } from '../lib/api';
-import { useCanWrite } from '../lib/auth';
+import { ApiError, api, budgetReachedText, fmtUsd, getSpend, humanError, uploadFile, type Spend } from '../lib/api';
+import { useAuth, useCanWrite } from '../lib/auth';
 import { CATEGORIES, PRIORITIES, isStale } from '../lib/constants';
 import { crLabel, fmtBytes } from '../lib/format';
 import { guessSubject } from '../lib/pdf';
@@ -40,7 +40,14 @@ function DropZone({ label, hint, accept, multiple, onFiles }: { label: string; h
 
 export default function NewProposal() {
   const canWrite = useCanWrite();
+  const isOwner = useAuth().me?.role === 'owner';
   const toast = useToast();
+  // monthly spend limit: checked on open and again before upload (Worker also refuses /api/run with 402)
+  const [spend, setSpend] = useState<Spend | null>(null);
+  useEffect(() => {
+    if (canWrite) void getSpend().then(setSpend, () => setSpend(null));
+  }, [canWrite]);
+  const overBudget = !!spend && spend.spent_usd >= spend.limit_usd;
   const [proposal, setProposal] = useState<File | null>(null);
   const [extras, setExtras] = useState<File[]>([]);
   const [f, setF] = useState({ cr_no: '', cr_year: '', file_no: '', subject: '', category: '', priority: 'सामान्य', instructions: '' });
@@ -94,6 +101,17 @@ export default function NewProposal() {
     if (!proposal) return toast('प्रस्ताव PDF निवडा', 'err');
     setBusy(true);
     setRunErr('');
+    try {
+      const sp = await getSpend();
+      setSpend(sp);
+      if (sp.spent_usd >= sp.limit_usd) {
+        toast(budgetReachedText(sp.limit_usd), 'err');
+        setBusy(false);
+        return; // nothing uploaded
+      }
+    } catch {
+      /* spend check unavailable: the Worker still enforces the limit on /api/run */
+    }
     // show the status panel (top of the page) right away — Abhi's request 01.11.2026
     requestAnimationFrame(() => statusRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
     try {
@@ -159,6 +177,13 @@ export default function NewProposal() {
           </button>
         )}
       </div>
+      {overBudget && spend && (
+        <div className="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-red-900 dark:border-red-800 dark:bg-red-900/30 dark:text-red-100" role="alert">
+          <div className="font-bold">{isOwner ? budgetReachedText(spend.limit_usd) : `या महिन्याची खर्च-मर्यादा (${fmtUsd(spend.limit_usd)}) संपली — मालकाने सेटिंग्जमध्ये मर्यादा वाढवावी`}</div>
+          <div className="mt-1 text-sm">या महिन्याचा खर्च {fmtUsd(spend.spent_usd)} / {fmtUsd(spend.limit_usd)} • नवीन प्रक्रिया सुरू होणार नाही; चालू प्रक्रिया पूर्ण होतील.</div>
+          {isOwner && <Link className="btn-primary mt-2 inline-flex" to="/settings">सेटिंग्ज उघडा →</Link>}
+        </div>
+      )}
       {(ups.length > 0 || created) && (
         <div ref={statusRef} className="scroll-mt-4">
           <Section title={created ? `स्थिती — ${crLabel(created)}` : 'स्थिती'} right={created ? <Link className="btn-ghost" to={`/cases/${created.id}`}>प्रकरण उघडा →</Link> : undefined}>
@@ -245,7 +270,7 @@ export default function NewProposal() {
                 <Spinner /> प्रक्रिया चालू — पूर्ण झाल्यावर येथे बटण येईल
               </div>
             ) : (
-              <button className="btn-accent w-full text-lg" disabled={busy || !proposal}>
+              <button className="btn-accent w-full text-lg" disabled={busy || !proposal || overBudget}>
                 {busy && <Spinner />}{' '}
                 {busy
                   ? 'फाइल अपलोड होत आहे…'

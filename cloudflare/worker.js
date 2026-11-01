@@ -3,7 +3,7 @@
 // every key/URL lives in KV namespace SETTINGS, entered on the app's Settings screen (owner only).
 
 const SECRET_KEYS = ['supabase_service_key', 'github_token', 'anthropic_api_key'];
-const PLAIN_KEYS = ['supabase_url', 'supabase_anon_key', 'github_repo', 'github_branch', 'model', 'model_light', 'model_review', 'budget_usd', 'owner_email'];
+const PLAIN_KEYS = ['supabase_url', 'supabase_anon_key', 'github_repo', 'github_branch', 'model', 'model_light', 'model_review', 'budget_usd', 'monthly_budget_usd', 'owner_email'];
 const ALL_KEYS = [...SECRET_KEYS, ...PLAIN_KEYS];
 const FILE_KINDS = ['proposal', 'extra_doc', 'reply'];
 const MAX_UPLOAD = 50 * 1024 * 1024;
@@ -110,6 +110,32 @@ async function failRuns(cfg, filter, reason, actor = null) {
   return rows || [];
 }
 
+// ---------- monthly spend (calendar month in India time: IST = UTC+5:30, no DST) ----------
+const IST_MS = 5.5 * 3600 * 1000;
+function istMonth(nowMs = Date.now()) {
+  const d = new Date(nowMs + IST_MS);
+  const y = d.getUTCFullYear(), mo = d.getUTCMonth();
+  return {
+    month: `${y}-${String(mo + 1).padStart(2, '0')}`,
+    start: new Date(Date.UTC(y, mo, 1) - IST_MS).toISOString(),
+    end: new Date(Date.UTC(y, mo + 1, 1) - IST_MS).toISOString(),
+  };
+}
+// empty (or an invalid stored value) = default $20 (Abhi, 01.11.2026)
+const DEFAULT_MONTHLY_USD = 20;
+function monthlyLimit(cfg) {
+  const v = String(cfg.monthly_budget_usd || '').trim();
+  const n = Number(v);
+  return v && Number.isFinite(n) && n > 0 ? n : DEFAULT_MONTHLY_USD;
+}
+async function monthSpend(cfg) {
+  const { month, start, end } = istMonth();
+  const rows = (await sb(cfg).rest(`runs?created_at=gte.${encodeURIComponent(start)}&created_at=lt.${encodeURIComponent(end)}&select=cost_usd,created_at`)) || [];
+  const inMonth = rows.filter(r => r.created_at && istMonth(new Date(r.created_at).getTime()).month === month);
+  const spent = inMonth.reduce((t, r) => t + (Number(r.cost_usd) || 0), 0);
+  return { month, spent_usd: Math.round(spent * 10000) / 10000, limit_usd: monthlyLimit(cfg), runs: inMonth.length };
+}
+
 // ---------- routes ----------
 export default {
   async fetch(req, env) {
@@ -179,6 +205,9 @@ async function route(req, env, url) {
 
   if (p === '/api/me') return json(user);
 
+  // GET /api/spend (members) → {month, spent_usd, limit_usd (empty setting = 20), runs}: runs.cost_usd this IST calendar month
+  if (p === '/api/spend' && M === 'GET') return json(await monthSpend(cfg));
+
   // POST /api/runs/sweep → runs queued/running for more than 3.5 h are marked failed (called by the app on load)
   if (p === '/api/runs/sweep' && M === 'POST') {
     if (!canWrite(user)) return bad('read-only', 403);
@@ -201,6 +230,11 @@ async function route(req, env, url) {
     if ('budget_usd' in b && b.budget_usd !== null && String(b.budget_usd).trim() !== '') {
       const n = Number(String(b.budget_usd).trim());
       if (!Number.isFinite(n) || n <= 0 || n > 20) return bad('budget_usd: positive number <= 20');
+    }
+    // monthly_budget_usd: empty = default $20; otherwise a positive number <= 1000
+    if ('monthly_budget_usd' in b && b.monthly_budget_usd !== null && String(b.monthly_budget_usd).trim() !== '') {
+      const n = Number(String(b.monthly_budget_usd).trim());
+      if (!Number.isFinite(n) || n <= 0 || n > 1000) return bad('monthly_budget_usd: positive number <= 1000');
     }
     for (const k of ALL_KEYS) {
       if (!(k in b) || b[k] === null) continue;
@@ -286,6 +320,9 @@ async function route(req, env, url) {
     if (!case_id) return bad('case_id required');
     const has = await db.rest(`case_files?case_id=eq.${case_id}&kind=eq.proposal&select=id&limit=1`);
     if (!has.length) return bad('upload the proposal PDF first');
+    // monthly limit: once this month's spend reached it, no new run is dispatched (runs already going finish)
+    const sp = await monthSpend(cfg);
+    if (sp.spent_usd >= sp.limit_usd) return json({ error: 'monthly_budget_reached', spent_usd: sp.spent_usd, limit_usd: sp.limit_usd }, 402);
     const [run] = await db.rest('runs', { method: 'POST', body: JSON.stringify({ case_id, instructions: instructions || null, created_by: user.id }) });
     try {
       await dispatchRun(env, cfg, run, url.origin);

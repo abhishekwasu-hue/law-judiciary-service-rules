@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { sb } from '../lib/supabase';
+import { fmtUsd, getSpend, type Spend } from '../lib/api';
+import { useAuth } from '../lib/auth';
 import { dueSoon, isPendingLetter, useData } from '../lib/data';
 import { ACTION_LABEL, CATEGORIES, STAGES, TONE_HEX, stageTone, type Tone } from '../lib/constants';
 import { crLabel, daysBetween, fmtDate, fmtDateTime, monthLabel, textOf, todayISO } from '../lib/format';
@@ -22,12 +24,33 @@ function Kpi({ label, value, tone, to }: { label: string; value: number | null; 
   );
 }
 
-const chartAxis = { tick: { fontSize: 12, fill: '#64748b' } };
+// Owner only: this month's AI spend against the monthly limit (green < 80% ≤ amber < 100% ≤ red).
+function SpendKpi({ spend }: { spend: Spend | null | 'err' }) {
+  const ok = spend && spend !== 'err';
+  const pct = ok && spend.limit_usd > 0 ? (spend.spent_usd / spend.limit_usd) * 100 : 0;
+  const tone: Tone = !ok ? 'slate' : pct >= 100 ? 'red' : pct >= 80 ? 'amber' : 'green';
+  return (
+    <Link to="/settings" className="card block p-3 transition hover:-translate-y-0.5 hover:shadow-md sm:p-4" title={ok ? `${spend.runs} प्रक्रिया • ${Math.round(pct)}%` : undefined}>
+      <div className="text-sm font-semibold leading-tight text-slate-500 dark:text-slate-400">या महिन्याचा खर्च</div>
+      <div className="mt-1 font-head text-2xl font-bold sm:text-3xl" style={{ color: TONE_HEX[tone] }}>
+        {spend === null ? <Skeleton className="h-8 w-16" /> : ok ? fmtUsd(spend.spent_usd) : '—'}
+      </div>
+      {ok && <div className="text-sm font-semibold text-slate-500 dark:text-slate-400">/ {fmtUsd(spend.limit_usd)}{pct >= 100 ? ' • मर्यादा संपली' : ''}</div>}
+    </Link>
+  );
+}
+
+const chartAxis ={ tick: { fontSize: 12, fill: '#64748b' } };
 
 export default function Home() {
   const { cases, letters, loading } = useData();
   const nav = useNavigate();
   const [acts, setActs] = useState<Activity[] | null>(null);
+  const isOwner = useAuth().me?.role === 'owner';
+  const [spend, setSpend] = useState<Spend | null | 'err'>(null);
+  useEffect(() => {
+    if (isOwner) void getSpend().then(setSpend, () => setSpend('err'));
+  }, [isOwner, cases.length]);
   // charts: open by default on a wide screen, folded on phones (आज करायचे comes first there)
   const [chartsOpen, setChartsOpen] = useState(() => typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches);
 
@@ -128,12 +151,13 @@ export default function Home() {
         <Link to="/new" className="btn-accent">+ नवीन प्रस्ताव</Link>
       </div>
 
-      <div className="order-2 grid grid-cols-3 gap-2 sm:grid-cols-5 sm:gap-3 lg:order-1 lg:col-span-2">
+      <div className={`order-2 grid grid-cols-3 gap-2 sm:gap-3 lg:order-1 lg:col-span-2 ${isOwner ? 'lg:grid-cols-6' : 'sm:grid-cols-5'}`}>
         <Kpi label="नवीन" value={loading ? null : kpi.new} tone="navy" to="/cases?stage=प्राप्त" />
         <Kpi label="अभ्यास चालू" value={loading ? null : kpi.study} tone="blue" to="/cases?stage=अभ्यास चालू" />
         <Kpi label="उत्तर प्रतीक्षेत" value={loading ? null : kpi.waiting} tone="amber" to={`/cases?stage=${encodeURIComponent('पत्र पाठवले (माहिती प्रतीक्षेत)')}`} />
         <Kpi label="वित्त विभागाकडे" value={loading ? null : kpi.finance} tone="amber" to={`/cases?stage=${encodeURIComponent('वित्त/सा.प्र.वि. कडे')}`} />
         <Kpi label="या महिन्यात बंद" value={loading ? null : kpi.closed} tone="green" to="/cases?stage=बंद" />
+        {isOwner && <SpendKpi spend={spend} />}
       </div>
 
       <div className="order-1 min-w-0 lg:order-2">

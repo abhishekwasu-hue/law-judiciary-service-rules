@@ -7,7 +7,7 @@ import { fmtDate } from '../lib/format';
 import { Chip, Field, Section, SkeletonRows, Spinner } from '../components/ui';
 import { useToast } from '../components/Toast';
 
-const PLAIN: { k: string; label: string; hint?: string; num?: boolean; ai?: boolean; ph?: string }[] = [
+const PLAIN: { k: string; label: string; hint?: string; num?: boolean; max?: number; ai?: boolean; ph?: string }[] = [
   { k: 'owner_email', label: 'मालकाचा ई-मेल', hint: 'या ई-मेलने लॉगिन करणाऱ्याला सेटिंग्ज बदलण्याचा अधिकार' },
   { k: 'supabase_url', label: 'Supabase URL', hint: 'माहिती-साठ्याचा पत्ता — Supabase प्रकल्पाच्या सेटिंग्जमध्ये मिळतो' },
   { k: 'supabase_anon_key', label: 'Supabase anon key', hint: 'त्याच ठिकाणची सार्वजनिक की (anon)' },
@@ -16,7 +16,8 @@ const PLAIN: { k: string; label: string; hint?: string; num?: boolean; ai?: bool
   { k: 'model', label: 'मुख्य मॉडेल (model)', hint: 'मसुदा (तथ्ये, नोंद, पत्र, GR) — उदा. claude-sonnet-…', ai: true, ph: 'उदा. claude-sonnet-…' },
   { k: 'model_review', label: 'अंतिम पडताळणी मॉडेल (model_review)', hint: 'नोंद, पत्र व ब्रीफिंगची अंतिम तपासणी व मंजुरी — सर्वात सक्षम मॉडेल ठेवा; रिकामे = डीफॉल्ट', ai: true, ph: 'उदा. claude-opus-…' },
   { k: 'model_light', label: 'स्वस्त मॉडेल (model_light)', hint: 'Study भाग 1–7, संबंधित माहिती व यांत्रिक काम — स्वस्त मॉडेल; रिकामे = डीफॉल्ट', ai: true, ph: 'उदा. claude-haiku-…' },
-  { k: 'budget_usd', label: 'कमाल खर्च ($) (budget_usd)', hint: 'प्रत्येक प्रस्तावासाठी अपेक्षित कमाल खर्च ($). ओलांडल्यास फक्त सूचना येते — काम थांबत नाही, दर्जा घटत नाही. रिकामे = 0.75', num: true, ai: true, ph: 'उदा. 1.5' },
+  { k: 'budget_usd', label: 'कमाल खर्च ($) (budget_usd)', hint: 'प्रत्येक प्रस्तावासाठी अपेक्षित कमाल खर्च ($). ओलांडल्यास फक्त सूचना येते — काम थांबत नाही, दर्जा घटत नाही. रिकामे = 0.75', num: true, max: 20, ai: true, ph: 'उदा. 1.5' },
+  { k: 'monthly_budget_usd', label: 'मासिक कमाल खर्च ($) (monthly_budget_usd)', hint: 'या महिन्यात (भारतीय वेळ) एकूण कमाल खर्च; ओलांडल्यावर नवीन प्रक्रिया सुरू होत नाही, चालू प्रक्रिया पूर्ण होते. रिकामे = $20', num: true, max: 1000, ai: true, ph: 'रिकामे = $20' },
 ];
 const SECRET: { k: string; label: string; hint: string }[] = [
   { k: 'supabase_service_key', label: 'Supabase service_role key', hint: 'माहिती-साठ्याची गुप्त की' },
@@ -56,7 +57,7 @@ export default function Settings() {
 
   const plainField = (p: (typeof PLAIN)[number]) => (
     <Field key={p.k} label={p.label} hint={p.hint}>
-      <input className="input font-mono" {...(p.num ? { type: 'number', inputMode: 'decimal' as const, min: 0.01, max: 20, step: 0.01 } : {})} placeholder={p.ph} value={edit[p.k] ?? ''} onChange={e => setEdit(s => ({ ...s, [p.k]: e.target.value }))} />
+      <input className="input font-mono" {...(p.num ? { type: 'number', inputMode: 'decimal' as const, min: 0.01, max: p.max, step: 0.01 } : {})} placeholder={p.ph} value={edit[p.k] ?? ''} onChange={e => setEdit(s => ({ ...s, [p.k]: e.target.value }))} />
     </Field>
   );
 
@@ -71,6 +72,11 @@ export default function Settings() {
       const bu = (edit.budget_usd ?? '').trim();
       if (bu && !(Number(bu) > 0 && Number(bu) <= 20)) {
         toast('कमाल खर्च: 0 पेक्षा जास्त व 20 पर्यंतची संख्या लिहा', 'err');
+        return;
+      }
+      const mb = (edit.monthly_budget_usd ?? '').trim();
+      if (mb && !(Number(mb) > 0 && Number(mb) <= 1000)) {
+        toast('मासिक कमाल खर्च: 0 पेक्षा जास्त व 1000 पर्यंतची संख्या लिहा (रिकामे = $20)', 'err');
         return;
       }
       if (!Object.keys(body).length) {

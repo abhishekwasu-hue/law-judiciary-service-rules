@@ -39,12 +39,23 @@ export const MARATHI: [RegExp, string][] = [
   [/Failed to fetch|NetworkError|Load failed|network|नेटवर्क त्रुटी/i, 'इंटरनेट/नेटवर्क संपर्क तुटला — जोडणी तपासून पुन्हा प्रयत्न करा'],
 ];
 const GENERIC = 'तांत्रिक त्रुटी — पुन्हा प्रयत्न करा';
+
+// ---------- monthly spend limit (Worker GET /api/spend; POST /api/run → 402 monthly_budget_reached) ----------
+export interface Spend { month: string; spent_usd: number; limit_usd: number; runs: number }
+export const getSpend = () => api<Spend>('/api/spend');
+export const fmtUsd = (n: number) => `$${(Math.round(n * 100) / 100).toFixed(2)}`;
+export const budgetReachedText = (limit: number | null) =>
+  `या महिन्याची खर्च-मर्यादा${limit !== null ? ` (${fmtUsd(limit)})` : ''} संपली — सेटिंग्जमध्ये मर्यादा वाढवा`;
 /** Message already meant for the user (Devanagari, no English sentence / JSON / code). */
 const looksMarathi = (m: string) => /[ऀ-ॿ]/.test(m) && !/[{}[\]]|\b[a-z]+ [a-z]+ [a-z]+\b/i.test(m);
 
 /** Any error → short Marathi text for a non-technical user. Unknown technical text → generic message. */
 export function humanError(e: unknown): string {
   const msg = e instanceof Error ? e.message : String(e ?? '');
+  if (msg === 'monthly_budget_reached') {
+    const lim = e instanceof ApiError ? Number((e.data as { limit_usd?: unknown } | undefined)?.limit_usd) : NaN;
+    return budgetReachedText(Number.isFinite(lim) ? lim : null);
+  }
   for (const [re, mr] of MARATHI) if (re.test(msg)) return mr;
   if (looksMarathi(msg)) return msg;
   return GENERIC;
