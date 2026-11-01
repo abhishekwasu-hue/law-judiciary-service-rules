@@ -71,3 +71,18 @@ Tests: only engine_supabase has one. Smallest useful per tool listed in the agen
 | L | dashboard/, HEADLESS_PROMPT.md, run_headless.sh, bulk-download workflows | Superseded files | Archive/delete after Abhi confirms; decide if App A stays | S |
 Stale HANDOVER: item 4 says B "not deployed" (it is live); item 5 done; App A items (TEST-1, two pages) — still relevant?; CR128 pending.
 Flow per proposal: upload → auto-run → download. Leaves the app only on failure (GitHub log) or stuck run.
+
+## 5. Run time (independent audit 01.11.2026 — estimates, no live timings yet)
+Estimate for 15 pages / 3 GRs: setup 4–7 min + model 40–100 min ≈ 50–110 min (~100–200 turns); model turns ≈ 85–90%. Biggest single output: Study part 1 (full Marathi rendering, ~15–30k tokens). Rules read by the engine ≈ 75–125 KB, largely repeated across INSTRUCTIONS/SOP/WORKFLOW/PROPOSAL_PROMPT.
+| # | Change | Saves (est.) | Quality risk | Eff |
+|---|---|---|---|---|
+| 1 | Pre-step script: page PNGs + text layer + Marathi OCR before Claude (model still looks at every page) | 3–8 min | none | S |
+| 2 | One compact engine brief generated from the rule files + check that it matches them | 5–12 | low–med | M |
+| 3 | Study part 1 (page-wise rendering) in parallel with GR search/note/PDF | 10–20 | low | M |
+| 4 | GR pre-lookup script (dates/codes → INDEX.tsv / archive.org candidates; Claude decides) | 3–10 | low | M |
+| 5 | Lint spec/Study JSON with verify's checks before building (fewer fix loops) | 2–6 | none | S |
+| 6 | Prebuilt container image for installs | 2–4 | none | M |
+| 7 | Partial checkout of pdf/ | 1–2 | med | M |
+| 8 | Faster model for part 1 only | 5–10 | med | S |
+| 9 | Docstrings only, not whole tool files | 1–2 | none | S |
+Keep LibreOffice (preview check). Lower max-turns does not speed a successful run. Priority suggested: 1, 3, 2, 5, 4, 6. UI ETA default set to 70 min until real medians exist.

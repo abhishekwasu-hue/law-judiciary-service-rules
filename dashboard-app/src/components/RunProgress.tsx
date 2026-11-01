@@ -69,7 +69,7 @@ export function RunCost({ run }: { run: Run }) {
 }
 
 /** Provisional total when no run has finished yet (minutes). Replaced by the median of real runs. */
-const DEFAULT_RUN_MIN = 30;
+const DEFAULT_RUN_MIN = 70; // independent audit 01.11.2026: ~50–110 min for 15 pages / 3 GRs
 
 /** Median wall-clock seconds (created → finished) of the last finished runs, all cases. */
 export function useTypicalRunSeconds() {
@@ -107,7 +107,7 @@ export function RunEta({ run }: { run: Run }) {
   if (!typical) return null;
   const elapsed = Math.max(0, (now - Date.parse(run.created_at)) / 1000);
   const left = typical.sec - elapsed;
-  const basis = typical.n ? `मागील ${typical.n} पूर्ण अभ्यासांवरून` : 'प्राथमिक अंदाज';
+  const basis = typical.n ? `मागील ${typical.n} पूर्ण अभ्यासांवरून` : 'प्राथमिक अंदाज (साधारण 50–110 मि.)';
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg bg-blue-50 px-3 py-2 text-sm text-blue-900 dark:bg-blue-900/30 dark:text-blue-100">
       <span>⏱ लागलेला वेळ <b>{fmtDuration(elapsed)}</b></span>
