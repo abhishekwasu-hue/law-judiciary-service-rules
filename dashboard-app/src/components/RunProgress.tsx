@@ -68,6 +68,59 @@ export function RunCost({ run }: { run: Run }) {
   );
 }
 
+/** Provisional total when no run has finished yet (minutes). Replaced by the median of real runs. */
+const DEFAULT_RUN_MIN = 30;
+
+/** Median wall-clock seconds (created → finished) of the last finished runs, all cases. */
+export function useTypicalRunSeconds() {
+  const [v, setV] = useState<{ sec: number; n: number } | null>(null);
+  useEffect(() => {
+    let alive = true;
+    void sb()
+      .from('runs')
+      .select('created_at,finished_at')
+      .eq('state', 'done')
+      .not('finished_at', 'is', null)
+      .order('finished_at', { ascending: false })
+      .limit(10)
+      .then(({ data }) => {
+        if (!alive) return;
+        const d = ((data as { created_at: string; finished_at: string }[]) || [])
+          .map(r => (Date.parse(r.finished_at) - Date.parse(r.created_at)) / 1000)
+          .filter(x => x > 0)
+          .sort((a, b) => a - b);
+        setV(d.length ? { sec: d[Math.floor(d.length / 2)], n: d.length } : { sec: DEFAULT_RUN_MIN * 60, n: 0 });
+      });
+    return () => { alive = false; };
+  }, []);
+  return v;
+}
+
+/** Elapsed + estimated remaining time for an active run (refreshes every 30 s). */
+export function RunEta({ run }: { run: Run }) {
+  const typical = useTypicalRunSeconds();
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 30000);
+    return () => clearInterval(t);
+  }, []);
+  if (!typical) return null;
+  const elapsed = Math.max(0, (now - Date.parse(run.created_at)) / 1000);
+  const left = typical.sec - elapsed;
+  const basis = typical.n ? `मागील ${typical.n} पूर्ण अभ्यासांवरून` : 'प्राथमिक अंदाज';
+  return (
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg bg-blue-50 px-3 py-2 text-sm text-blue-900 dark:bg-blue-900/30 dark:text-blue-100">
+      <span>⏱ लागलेला वेळ <b>{fmtDuration(elapsed)}</b></span>
+      {left > 60 ? (
+        <span>अंदाजे उरलेला वेळ <b>~{fmtDuration(left)}</b> (एकूण ~{fmtDuration(typical.sec)})</span>
+      ) : (
+        <span>अपेक्षेपेक्षा जास्त वेळ — अजून काही मिनिटे लागू शकतात</span>
+      )}
+      <span className="text-xs opacity-75">{basis}</span>
+    </div>
+  );
+}
+
 export function RunWarnings({ run }: { run: Run }) {
   const w = asArray(run.warnings).map(textOf).filter(Boolean);
   if (!w.length) return null;
@@ -114,6 +167,7 @@ export default function RunProgress({ run }: { run: Run }) {
         })}
       </ol>
       {run.step && !failed && <div className="text-sm text-slate-600 dark:text-slate-300">सद्य: {run.step}</div>}
+      {!failed && (run.state === 'queued' || run.state === 'running') && <RunEta run={run} />}
       {failed && (
         <div className="rounded-lg bg-red-100 px-3 py-2 text-red-900 dark:bg-red-900/40 dark:text-red-100" role="alert">
           <div className="font-semibold">अभ्यास अयशस्वी</div>
