@@ -1,3 +1,4 @@
+<!-- SUPERSEDED by tools/ENGINE_PROMPT.md (app B engine, Supabase). Kept for reference only; rule 5 file name is wrong (INSTRUCTIONS §4.16). -->
 # Headless run — one proposal -> three files (used by .github/workflows/process-proposal.yml)
 
 Variables given at run time: PREFIX, PROPOSAL_PDF (inbox/<PREFIX>.pdf), OUTDIR (cases/<PREFIX>), FILE_NO (optional, from inbox/<PREFIX>.json).

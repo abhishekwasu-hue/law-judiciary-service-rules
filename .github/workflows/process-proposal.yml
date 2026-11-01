@@ -1,51 +1,90 @@
 name: Process proposal
+# App B engine (docs/APP_B_DESIGN.md D4-D6). The Worker dispatches `process_proposal` with
+# client_payload {case_id, run_id, token, worker}; keys are fetched from the Worker at run time (no repo secrets).
 on:
-  push:
-    paths: ['inbox/*.pdf']
+  repository_dispatch:
+    types: [process_proposal]
   workflow_dispatch:
     inputs:
-      prefix:
-        description: 'Case prefix (file inbox/<prefix>.pdf must exist)'
-        required: true
+      case_id: { description: 'cases.id', required: true }
+      run_id: { description: 'runs.id (created by the Worker /api/run)', required: true }
+      token: { description: 'one-time run token (from the Worker)', required: true }
+      worker: { description: 'Worker origin, e.g. https://xxx.workers.dev', required: true }
 permissions:
   contents: write
 concurrency:
-  group: proposal-${{ github.ref }}
+  group: proposal-case-${{ github.event.client_payload.case_id || github.event.inputs.case_id }}
   cancel-in-progress: false
 jobs:
   run:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
         with: { fetch-depth: 0 }
-      - name: Find new proposals
-        id: find
+      # Payload is read from the event file (never interpolated into scripts); every value is masked before use.
+      - name: Get run config from the Worker (masked)
         run: |
-          if [ -n "${{ github.event.inputs.prefix }}" ]; then
-            echo "list=${{ github.event.inputs.prefix }}" >> $GITHUB_OUTPUT
-          else
-            L=$(git diff --name-only --diff-filter=AM ${{ github.event.before }} ${{ github.sha }} -- 'inbox/*.pdf' 2>/dev/null | sed 's#inbox/##;s#\.pdf$##' | tr '\n' ' ')
-            echo "list=$L" >> $GITHUB_OUTPUT
-          fi
+          set -euo pipefail
+          E="$GITHUB_EVENT_PATH"
+          CASE_ID=$(jq -r '.client_payload.case_id // .inputs.case_id // empty' "$E")
+          RUN_ID=$(jq -r '.client_payload.run_id // .inputs.run_id // empty' "$E")
+          TOKEN=$(jq -r '.client_payload.token // .inputs.token // empty' "$E")
+          WORKER=$(jq -r '.client_payload.worker // .inputs.worker // empty' "$E")
+          echo "::add-mask::$TOKEN"
+          [[ "$CASE_ID" =~ ^[0-9]+$ && "$RUN_ID" =~ ^[0-9]+$ ]] || { echo "bad case_id/run_id"; exit 1; }
+          [[ "$WORKER" =~ ^https://[A-Za-z0-9.-]+(:[0-9]+)?$ ]] || { echo "bad worker origin"; exit 1; }
+          curl -fsS --retry 3 -H "Authorization: Bearer $TOKEN" "$WORKER/api/engine/config?run_id=$RUN_ID" -o /tmp/cfg.json
+          for k in anthropic_api_key supabase_url supabase_service_key model; do
+            V=$(jq -r ".$k // empty" /tmp/cfg.json)
+            if [ -n "$V" ]; then echo "::add-mask::$V"; fi
+          done
+          A=$(jq -r '.anthropic_api_key // empty' /tmp/cfg.json)
+          U=$(jq -r '.supabase_url // empty' /tmp/cfg.json)
+          S=$(jq -r '.supabase_service_key // empty' /tmp/cfg.json)
+          M=$(jq -r '.model // empty' /tmp/cfg.json)
+          rm -f /tmp/cfg.json
+          [ -n "$A" ] && [ -n "$U" ] && [ -n "$S" ] || { echo "config incomplete (Settings)"; exit 1; }
+          {
+            echo "CASE_ID=$CASE_ID"; echo "RUN_ID=$RUN_ID"
+            echo "ANTHROPIC_API_KEY=$A"; echo "SUPABASE_URL=$U"; echo "SUPABASE_SERVICE_KEY=$S"; echo "MODEL=$M"
+          } >> "$GITHUB_ENV"
+      - name: Record log URL
+        run: python3 tools/engine_supabase.py log_url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" || true
       - uses: actions/setup-python@v5
         with: { python-version: '3.12' }
       - uses: actions/setup-node@v4
         with: { node-version: '20' }
       - name: Install tools
         run: |
-          sudo apt-get update -y && sudo apt-get install -y poppler-utils
+          sudo apt-get update -y
+          sudo apt-get install -y poppler-utils tesseract-ocr libreoffice-writer fonts-freefont-ttf
           pip install pymupdf docxcompose python-docx
           npm install -g @anthropic-ai/claude-code
-      - name: Process each proposal (one at a time, never mixed)
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      - name: Fetch case files from Supabase
+        run: python3 tools/engine_supabase.py fetch /tmp/case
+      - name: Process the proposal (Claude Code headless)
         run: |
-          git config user.name bot; git config user.email bot@users.noreply.github.com
-          for P in ${{ steps.find.outputs.list }}; do
-            mkdir -p cases/$P
-            echo '{"state":"running"}' > cases/$P/status.json
-            git add cases/$P/status.json; git commit -qm "case $P: running" || true; git pull -q --rebase || true; git push -q || true
-            tools/run_headless.sh $P
-            git add cases/$P; git commit -qm "case $P: finished" || true; git pull -q --rebase || true; git push -q || true
-          done
+          set -euo pipefail
+          mkdir -p /tmp/out
+          PROMPT="$(cat tools/ENGINE_PROMPT.md)
+
+          WORKDIR=/tmp/case
+          OUTDIR=/tmp/out"
+          ARGS=(-p "$PROMPT" --dangerously-skip-permissions --max-turns 400)
+          if [ -n "${MODEL:-}" ]; then ARGS+=(--model "$MODEL"); fi
+          claude "${ARGS[@]}"
+      - name: Upload outputs and finish
+        run: python3 tools/engine_supabase.py finish /tmp/out
+      - name: Record failure
+        if: failure()
+        run: |
+          python3 tools/engine_supabase.py fail "इंजिन अयशस्वी — लॉग पहा: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+      - name: Commit new GRs (pdf/gr only)
+        if: always()
+        run: |
+          git config user.name github-actions; git config user.email actions@github.com
+          git add -- pdf/gr
+          git diff --cached --quiet && exit 0
+          git commit -m "GR fetched by engine (case $CASE_ID)"
+          for i in 1 2 3; do git pull --rebase --autostash origin "$GITHUB_REF_NAME" && git push origin "HEAD:$GITHUB_REF_NAME" && break || sleep 5; done
