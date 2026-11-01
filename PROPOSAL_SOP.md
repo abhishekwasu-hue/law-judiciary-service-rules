@@ -14,6 +14,7 @@ The quality standard = the approved notes in `samples/specs/` (C R 66, 122, 128,
 2. Make a task list (one task per proposal).
 3. Tools needed: `pip install pymupdf docxcompose python-docx --break-system-packages`; `soffice` (LibreOffice) and `tesseract` are used for checking/OCR.
 4. Build the old-case text corpus once per session: `python3 tools/oldcases_text.py /tmp/old` (grep `/tmp/old/index.tsv`).
+5. Proposals uploaded in the "प्रस्ताव कक्ष" page (Abhi: "प्रस्ताव कक्षातील नवीन प्रस्ताव तयार कर"): input/output flow in `docs/PROPOSAL_DESK.md`.
 
 ## Step 1 — Read the proposal (every page, as images)
 1. `pdftoppm -r 110 -png <proposal.pdf> pg/p` and LOOK at every page image. Read stamps, inward nos., handwritten remarks, dates and amounts twice. Unclear → "अस्पष्ट".

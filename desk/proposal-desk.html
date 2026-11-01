@@ -1,0 +1,296 @@
+<title>प्रस्ताव कक्ष</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mukta:wght@400;500;600;700&family=Tiro+Devanagari+Marathi&display=swap">
+<style>
+/* Layout: file-register desk — summary strip, then case cards (main) beside charts and intake (aside); one column on phones. */
+:root{
+  --bg:#f4f6fa; --surface:#ffffff; --sunk:#eaeef5; --line:#d6dce8;
+  --fg:#18233d; --muted:#5a6680; --navy:#1f3263; --navy-ink:#ffffff;
+  --saffron:#c8701e; --saffron-soft:#fbeedd;
+  --ok:#1d7a4a; --ok-soft:#e1f3e9; --warn:#a8650b; --warn-soft:#fdf0d8; --info:#2457a6; --info-soft:#e3ecfa; --bad:#b03030; --bad-soft:#fbe6e6;
+  --f-body:"Mukta","Noto Sans Devanagari","Nirmala UI",system-ui,sans-serif;
+  --f-display:"Tiro Devanagari Marathi","Mukta","Nirmala UI",serif;
+  --r:10px;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0e1424; --surface:#161f35; --sunk:#1c2742; --line:#2b3757;
+  --fg:#e6eaf3; --muted:#9aa6c0; --navy:#8fa8e8; --navy-ink:#0e1424;
+  --saffron:#e99a4f; --saffron-soft:#3a2a18;
+  --ok:#5fc791; --ok-soft:#163327; --warn:#e8b25a; --warn-soft:#3a2d15; --info:#86aef0; --info-soft:#1a2a4a; --bad:#ee8a8a; --bad-soft:#3d1c1f;
+  color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0e1424; --surface:#161f35; --sunk:#1c2742; --line:#2b3757;
+  --fg:#e6eaf3; --muted:#9aa6c0; --navy:#8fa8e8; --navy-ink:#0e1424;
+  --saffron:#e99a4f; --saffron-soft:#3a2a18;
+  --ok:#5fc791; --ok-soft:#163327; --warn:#e8b25a; --warn-soft:#3a2d15; --info:#86aef0; --info-soft:#1a2a4a; --bad:#ee8a8a; --bad-soft:#3d1c1f;
+  color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.55;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 40px}
+.wrap{max-width:1180px;margin:0 auto}
+header.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px;padding-block:22px 16px;border-bottom:2px solid var(--navy)}
+.brand h1{font-family:var(--f-display);font-weight:400;font-size:1.9rem;line-height:1.15;margin:0;color:var(--navy);text-wrap:balance}
+.brand p{margin:2px 0 0;color:var(--muted);font-size:.9rem}
+.btn{font:inherit;font-weight:600;border:1px solid var(--line);background:var(--surface);color:var(--fg);border-radius:8px;padding:7px 14px;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.btn:hover{border-color:var(--navy)}
+.btn:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,summary:focus-visible{outline:2px solid var(--saffron);outline-offset:2px}
+.btn.primary{background:var(--navy);color:var(--navy-ink);border-color:var(--navy)}
+.btn.accent{background:var(--saffron);color:#fff;border-color:var(--saffron)}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+.btn.sm{padding:4px 10px;font-size:.85rem}
+.strip{display:flex;flex-wrap:wrap;gap:8px;padding-block:14px}
+.chip{display:inline-flex;align-items:baseline;gap:8px;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:4px 12px;font-size:.88rem;cursor:pointer;color:var(--fg);font-family:inherit}
+.chip b{font-size:1.05rem;font-variant-numeric:tabular-nums}
+.chip[aria-pressed="true"]{border-color:var(--navy);box-shadow:inset 0 0 0 1px var(--navy)}
+.chip .dot{width:8px;height:8px;border-radius:50%;align-self:center}
+.layout{display:grid;grid-template-columns:1fr;gap:18px}
+@media (min-width:900px){.layout{grid-template-columns:minmax(0,1fr) 340px}}
+main,aside{min-width:0;display:flex;flex-direction:column;gap:12px}
+.tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.tools input{flex:1 1 200px;min-width:0}
+input,select,textarea{font:inherit;color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:7px 10px;width:100%}
+textarea{min-height:64px;resize:vertical}
+label{display:flex;flex-direction:column;gap:3px;font-size:.85rem;color:var(--muted);font-weight:500}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px}
+.panel h2{font-size:1rem;margin:0 0 10px;color:var(--navy);font-weight:700}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.grid2 .full{grid-column:1/-1}
+.card{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--line);border-radius:var(--r);padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+.card[data-status="queued"]{border-left-color:var(--warn)}
+.card[data-status="processing"]{border-left-color:var(--info)}
+.card[data-status="done"]{border-left-color:var(--ok)}
+.card-h{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:baseline;justify-content:space-between}
+.cr{font-weight:700;font-size:1.05rem;color:var(--navy);font-variant-numeric:tabular-nums}
+.fileno{color:var(--muted);font-size:.82rem;font-variant-numeric:tabular-nums}
+.subj{margin:0;font-weight:500}
+.pills{display:flex;flex-wrap:wrap;gap:6px}
+.pill{font-size:.78rem;font-weight:600;border-radius:999px;padding:1px 9px;background:var(--sunk);color:var(--muted)}
+.pill.queued{background:var(--warn-soft);color:var(--warn)}
+.pill.processing{background:var(--info-soft);color:var(--info)}
+.pill.done{background:var(--ok-soft);color:var(--ok)}
+.pill.urgent{background:var(--bad-soft);color:var(--bad)}
+.pill.stage{background:var(--saffron-soft);color:var(--saffron)}
+.summary{margin:0;color:var(--fg);font-size:.92rem}
+.pts{margin:0;padding-left:20px;font-size:.9rem}
+.dl{display:flex;flex-wrap:wrap;gap:6px}
+details.more summary{cursor:pointer;color:var(--navy);font-weight:600;font-size:.88rem}
+details.more[open]{display:flex;flex-direction:column;gap:8px}
+.inner{display:flex;flex-direction:column;gap:8px;padding-top:8px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.hist{margin:0;padding-left:18px;font-size:.82rem;color:var(--muted)}
+.muted{color:var(--muted)}
+.empty{border:1px dashed var(--line);border-radius:var(--r);padding:22px;text-align:center;color:var(--muted)}
+.chart svg{width:100%;height:auto;display:block}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));background:var(--navy);color:var(--navy-ink);padding:8px 16px;border-radius:8px;font-weight:600;z-index:20;max-width:calc(100% - 32px)}
+.note{font-size:.82rem;color:var(--muted);margin:0}
+.files{font-size:.85rem;margin:0;padding-left:18px}
+@media (prefers-reduced-motion:no-preference){.card{transition:border-color .2s}}
+@media (max-width:480px){.grid2{grid-template-columns:1fr}.brand h1{font-size:1.6rem}}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <h1>प्रस्ताव कक्ष</h1>
+      <p>विधि व न्याय विभाग · कार्यासन-6 · प्रस्ताव, नोंद-पत्र व GR सह PDF</p>
+    </div>
+    <button class="btn accent" id="btnNew" type="button" hidden>+ नवीन प्रस्ताव</button>
+  </header>
+
+  <div class="strip" id="strip" aria-label="स्थितीनुसार गणना"></div>
+
+  <div class="layout">
+    <main>
+      <div class="tools">
+        <input id="q" type="search" placeholder="शोधा: C R क्र., नस्ती क्र., विषय" aria-label="शोध">
+        <select id="fCat" aria-label="प्रवर्ग"></select>
+      </div>
+      <div id="list"><div class="empty" id="loading">प्रकरणे उघडत आहे…</div></div>
+    </main>
+
+    <aside>
+      <section class="panel" id="newPanel" hidden>
+        <h2>नवीन प्रस्ताव</h2>
+        <form id="fNew" class="grid2">
+          <label>C R क्र.<input id="nCr" inputmode="numeric" required placeholder="उदा. 134"></label>
+          <label>वर्ष<input id="nYear" inputmode="numeric" required></label>
+          <label class="full">नस्ती क्र.<input id="nFile" placeholder="संकिर्ण-2026/____/प्र.क्र.___/का.6"></label>
+          <label class="full">विषय<textarea id="nSubj" required placeholder="प्रस्तावाचा विषय (निर्देशपत्रावरून)"></textarea></label>
+          <label>प्रवर्ग<select id="nCat"></select></label>
+          <label>प्राधान्य<select id="nPri"><option value="normal">सामान्य</option><option value="urgent">तातडीचे</option></select></label>
+          <label class="full">प्रस्ताव PDF (एक किंवा अधिक)<input id="nPdf" type="file" accept="application/pdf,image/*" multiple required></label>
+          <label class="full">Claude साठी सूचना (असल्यास)<textarea id="nIns" placeholder="उदा. पत्र उच्च न्यायालयामार्फत; वित्त विभागाकडे नस्ती"></textarea></label>
+          <div class="full row"><button class="btn primary" id="nSave" type="submit">प्रस्ताव जमा करा</button><button class="btn" type="button" id="nCancel">रद्द</button></div>
+          <p class="note full">जमा केल्यावर Claude ला सांगा: “प्रस्ताव कक्षातील नवीन प्रस्ताव तयार कर”.</p>
+        </form>
+      </section>
+
+      <section class="panel chart"><h2>टप्प्यानुसार</h2><div id="chStage"></div></section>
+      <section class="panel chart"><h2>प्रवर्गानुसार</h2><div id="chCat"></div></section>
+      <p class="note" id="who"></p>
+    </aside>
+  </div>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+const STATUS={queued:"रांगेत",processing:"प्रक्रियेत",done:"तयार"};
+const STAGES=[["received","प्राप्त"],["info_sought","माहिती मागवली"],["reply_received","उत्तर प्राप्त"],["sent_fin_gad","वित्त/सा.प्र.वि. कडे"],["closed","निकाली"]];
+const STAGE=Object.fromEntries(STAGES);
+const CATS=["वैद्यकीय प्रतिपूर्ती","वेतननिश्चिती/पदोन्नती","वेतनश्रेणी-संवर्ग","ACP/वेतनवाढ","जुनी पेन्शन/NPS","निवृत्तीवेतन/उपदान/GPF","सेवा-बाबी","भत्ते","इतर"];
+const KIND={study:"अभ्यास-फाइल",note_letter:"नोंद + पत्र",package:"GR सह प्रस्ताव PDF"};
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const toMr=s=>String(s).replace(/\d/g,d=>"०१२३४५६७८९"[d]);
+const fmtDate=iso=>{try{const d=new Date(iso);return d.toLocaleDateString("en-GB").replace(/\//g,".")}catch(e){return ""}};
+let db=null,assets=null,downloads=null,canEdit=false,cases=[],filt={stage:null,status:null,q:"",cat:""};
+
+function toast(msg){const t=$("toast");t.textContent=msg;t.hidden=false;clearTimeout(toast._t);toast._t=setTimeout(()=>t.hidden=true,3200)}
+
+$("nYear").value=new Date().getFullYear();
+$("nCat").innerHTML=CATS.map(c=>`<option>${esc(c)}</option>`).join("");
+$("fCat").innerHTML=`<option value="">सर्व प्रवर्ग</option>`+CATS.map(c=>`<option>${esc(c)}</option>`).join("");
+
+function renderStrip(){
+  const n=k=>cases.filter(c=>c.status===k).length;
+  const items=[["status","queued",STATUS.queued,"var(--warn)",n("queued")],["status","processing",STATUS.processing,"var(--info)",n("processing")],["status","done",STATUS.done,"var(--ok)",n("done")]]
+    .concat(STAGES.map(([k,l])=>["stage",k,l,"var(--saffron)",cases.filter(c=>c.stage===k).length]));
+  $("strip").innerHTML=`<button class="chip" type="button" data-k="all" aria-pressed="${!filt.stage&&!filt.status}"><b>${toMr(cases.length)}</b>एकूण</button>`+
+    items.map(([t,k,l,col,v])=>`<button class="chip" type="button" data-t="${t}" data-k="${k}" aria-pressed="${filt[t]===k}"><span class="dot" style="background:${col}"></span><b>${toMr(v)}</b>${esc(l)}</button>`).join("");
+}
+$("strip").addEventListener("click",e=>{const b=e.target.closest(".chip");if(!b)return;
+  if(b.dataset.k==="all"){filt.stage=filt.status=null}else{const t=b.dataset.t;filt[t]=filt[t]===b.dataset.k?null:b.dataset.k;filt[t==="stage"?"status":"stage"]=null}
+  render()});
+$("q").addEventListener("input",e=>{filt.q=e.target.value.trim().toLowerCase();renderList()});
+$("fCat").addEventListener("change",e=>{filt.cat=e.target.value;renderList()});
+
+function bars(el,rows){
+  const max=Math.max(1,...rows.map(r=>r[1])),W=320,lw=120,rh=26,H=rows.length*rh+4;
+  el.innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="आलेख">`+rows.map(([l,v],i)=>{const y=i*rh+4,w=Math.round((W-lw-34)*v/max);
+    return `<text x="0" y="${y+15}" font-size="12" fill="var(--muted)">${esc(l)}</text><rect x="${lw}" y="${y+3}" width="${W-lw-34}" height="16" rx="3" fill="var(--sunk)"/>`+
+    (v?`<rect x="${lw}" y="${y+3}" width="${w}" height="16" rx="3" fill="var(--navy)"/>`:"")+`<text x="${lw+w+6}" y="${y+15}" font-size="12" font-weight="600" fill="var(--fg)">${toMr(v)}</text>`}).join("")+`</svg>`;
+}
+function renderCharts(){
+  bars($("chStage"),STAGES.map(([k,l])=>[l,cases.filter(c=>c.stage===k).length]));
+  const used=CATS.filter(c=>cases.some(x=>x.category===c));
+  bars($("chCat"),(used.length?used:CATS.slice(0,4)).map(c=>[c,cases.filter(x=>x.category===c).length]));
+}
+
+function match(c){
+  if(filt.stage&&c.stage!==filt.stage)return false;
+  if(filt.status&&c.status!==filt.status)return false;
+  if(filt.cat&&c.category!==filt.cat)return false;
+  if(filt.q){const h=[c.cr,c.year,c.file_no,c.subject,c.summary].join(" ").toLowerCase();if(!h.includes(filt.q))return false}
+  return true;
+}
+function card(c){
+  const outs=(c.outputs||[]).map((o,i)=>`<button class="btn sm${o.kind==="package"?"":" primary"}" type="button" data-act="dl" data-i="${i}" ${downloads?"":"disabled"}>⤓ ${esc(KIND[o.kind]||o.name)}</button>`).join("");
+  const pts=(c.essential_points||[]).map(p=>`<li>${esc(p)}</li>`).join("");
+  const grs=(c.grs||[]).map(g=>`<li>${esc(g)}</li>`).join("");
+  const ins=(c.inputs||[]).map(f=>`<li>${esc(f.name)}${f.kind==="reply"?" (उत्तर)":""} <span class="muted">${f.size?toMr((f.size/1048576).toFixed(1))+" MB":""}</span></li>`).join("");
+  const hist=(c.history||[]).slice(-6).reverse().map(h=>`<li>${esc(fmtDate(h.at))} · ${h.by==="claude"?"Claude":"आपण"} · ${esc(h.text)}</li>`).join("");
+  const stageOpts=STAGES.map(([k,l])=>`<option value="${k}" ${c.stage===k?"selected":""}>${esc(l)}</option>`).join("");
+  return `<article class="card" data-status="${esc(c.status)}" data-id="${esc(c.id)}">
+    <div class="card-h"><span class="cr">C R ${esc(c.cr)}/${esc(c.year)}</span><span class="fileno">${esc(c.file_no||"")}</span></div>
+    <p class="subj">${esc(c.subject)}</p>
+    <div class="pills"><span class="pill ${esc(c.status)}">${esc(STATUS[c.status]||c.status)}</span><span class="pill stage">${esc(STAGE[c.stage]||"—")}</span><span class="pill">${esc(c.category||"")}</span>${c.priority==="urgent"?`<span class="pill urgent">तातडीचे</span>`:""}${c.letter_needed===true?`<span class="pill">पत्र: होय</span>`:c.letter_needed===false?`<span class="pill">पत्र: नाही</span>`:""}</div>
+    ${c.summary?`<p class="summary">${esc(c.summary)}</p>`:""}
+    ${pts?`<div><span class="muted" style="font-size:.82rem">पत्रात मागवलेले अत्यावश्यक मुद्दे</span><ol class="pts">${pts}</ol></div>`:""}
+    ${outs?`<div class="dl">${outs}</div>`:c.status==="done"?"":`<p class="note">${c.status==="processing"?"Claude काम करत आहे…":"Claude ची प्रतीक्षा — सांगा: “प्रस्ताव कक्षातील नवीन प्रस्ताव तयार कर”"}</p>`}
+    <details class="more"><summary>तपशील${canEdit?" व कार्यवाही":""}</summary><div class="inner">
+      ${grs?`<div><span class="muted" style="font-size:.82rem">जोडलेले GR</span><ul class="files">${grs}</ul></div>`:""}
+      ${ins?`<div><span class="muted" style="font-size:.82rem">अपलोड केलेल्या फाइल</span><ul class="files">${ins}</ul></div>`:""}
+      ${canEdit?`<label>टप्पा<select data-act="stage">${stageOpts}</select></label>
+      <label>पुन्हा तयार करण्यासाठी सूचना<textarea data-f="ins" placeholder="उदा. पत्रातील मुद्दा 2 वगळा"></textarea></label>
+      <div class="row"><button class="btn sm primary" type="button" data-act="rerun">पुन्हा तयार करा</button></div>
+      ${assets?`<label>कार्यालयाकडून आलेले उत्तर (PDF)<input type="file" data-f="reply" accept="application/pdf,image/*" multiple></label>
+      <div class="row"><button class="btn sm" type="button" data-act="reply">उत्तर जमा करा</button></div>`:""}`:""}
+      ${hist?`<ul class="hist">${hist}</ul>`:""}
+    </div></details>
+  </article>`;
+}
+function renderList(){
+  const L=$("list");
+  if(!cases.length){L.innerHTML=`<div class="empty">अजून प्रकरण नाही.${canEdit?" वरील “+ नवीन प्रस्ताव” ने प्रस्ताव PDF जमा करा.":""}</div>`;return}
+  const rows=cases.filter(match);
+  L.innerHTML=rows.length?`<div style="display:flex;flex-direction:column;gap:10px">${rows.map(card).join("")}</div>`:`<div class="empty">या निवडीत प्रकरण नाही.</div>`;
+}
+function render(){renderStrip();renderCharts();renderList()}
+
+function sortCases(a,b){const o={queued:0,processing:1,done:2};return (o[a.status]??3)-(o[b.status]??3)||String(b.created_at||"").localeCompare(String(a.created_at||""))}
+const nowIso=()=>new Date().toISOString();
+
+async function uploadFiles(fileList,kind){
+  const out=[];
+  for(const f of fileList){const r=await assets.upload(f);out.push({asset_id:r.id,name:f.name,size:f.size,kind})}
+  return out;
+}
+
+$("btnNew").addEventListener("click",()=>{$("newPanel").hidden=false;$("nCr").focus()});
+$("nCancel").addEventListener("click",()=>{$("newPanel").hidden=true});
+$("fNew").addEventListener("submit",async e=>{
+  e.preventDefault();
+  const cr=$("nCr").value.trim(),year=$("nYear").value.trim(),files=$("nPdf").files;
+  if(!cr||!year||!files.length)return;
+  const btn=$("nSave");btn.disabled=true;btn.textContent="अपलोड होत आहे…";
+  try{
+    let id=`CR${cr.replace(/[^0-9A-Za-z]/g,"")}-${year.replace(/\D/g,"")}`;
+    if((await db.doc("cases/"+id).get()).exists)id+="-"+Date.now().toString(36);
+    const inputs=await uploadFiles(files,"proposal");
+    const ins=$("nIns").value.trim();
+    await db.doc("cases/"+id).set({cr,year,file_no:$("nFile").value.trim(),subject:$("nSubj").value.trim(),category:$("nCat").value,priority:$("nPri").value,
+      stage:"received",status:"queued",created_at:nowIso(),inputs,outputs:[],letter_needed:null,summary:"",essential_points:[],grs:[],instruction:ins,
+      history:[{at:nowIso(),by:"user",text:"प्रस्ताव जमा"+(ins?" — सूचना: "+ins:"")}]});
+    e.target.reset();$("nYear").value=new Date().getFullYear();$("newPanel").hidden=true;
+    toast("जमा झाले. आता Claude ला सांगा: प्रस्ताव कक्षातील नवीन प्रस्ताव तयार कर");
+  }catch(err){toast("जमा झाले नाही: "+(err&&err.code||"त्रुटी")+". पुन्हा प्रयत्न करा.")}
+  finally{btn.disabled=false;btn.textContent="प्रस्ताव जमा करा"}
+});
+
+function b64ToBytes(b){const s=atob(b),u=new Uint8Array(s.length);for(let i=0;i<s.length;i++)u[i]=s.charCodeAt(i);return u}
+async function fetchOutput(o){
+  if(o.store==="asset"){const r=await fetch("/_blob/"+o.ref);if(!r.ok)throw {code:"not_found"};return await r.blob()}
+  const parts=[];for(let i=0;i<(o.chunks||1);i++){const s=await db.doc(`outputs/${o.ref}__${i}`).get();if(!s.exists)throw {code:"missing_chunk"};parts.push(b64ToBytes(s.data().data))}
+  return new Blob(parts,{type:o.mime||"application/octet-stream"});
+}
+
+$("list").addEventListener("click",async e=>{
+  const b=e.target.closest("button[data-act]");if(!b)return;
+  const el=b.closest(".card"),c=cases.find(x=>x.id===el.dataset.id);if(!c)return;
+  const act=b.dataset.act;
+  try{
+    if(act==="dl"){const o=c.outputs[+b.dataset.i];b.disabled=true;const blob=await fetchOutput(o);await downloads.save({filename:o.name,data:blob});b.disabled=false;return}
+    if(act==="rerun"){const ta=el.querySelector('[data-f="ins"]'),t=ta.value.trim();if(!t){toast("आधी सूचना लिहा");ta.focus();return}
+      await db.doc("cases/"+c.id).update({instruction:t,status:"queued",history:[...(c.history||[]),{at:nowIso(),by:"user",text:"पुन्हा तयार — "+t}]});toast("रांगेत टाकले. Claude ला सांगा.");return}
+    if(act==="reply"){const inp=el.querySelector('[data-f="reply"]');if(!inp.files.length){toast("आधी उत्तराची PDF निवडा");return}
+      b.disabled=true;b.textContent="अपलोड होत आहे…";const added=await uploadFiles(inp.files,"reply");
+      await db.doc("cases/"+c.id).update({inputs:[...(c.inputs||[]),...added],stage:"reply_received",status:"queued",history:[...(c.history||[]),{at:nowIso(),by:"user",text:"उत्तर जमा ("+added.length+" फाइल)"}]});
+      toast("उत्तर जमा झाले. Claude ला सांगा: पुढील नोंद तयार कर");return}
+  }catch(err){b.disabled=false;if(act==="reply")b.textContent="उत्तर जमा करा";
+    toast(err&&err.code==="declined"?"डाउनलोड रद्द केले":"काम झाले नाही: "+(err&&err.code||"त्रुटी"))}
+});
+$("list").addEventListener("change",async e=>{
+  const s=e.target.closest('select[data-act="stage"]');if(!s)return;
+  const c=cases.find(x=>x.id===s.closest(".card").dataset.id);if(!c)return;
+  try{await db.doc("cases/"+c.id).update({stage:s.value,history:[...(c.history||[]),{at:nowIso(),by:"user",text:"टप्पा: "+STAGE[s.value]}]});toast("टप्पा बदलला")}
+  catch(err){toast("टप्पा बदलला नाही: "+(err&&err.code||"त्रुटी"))}
+});
+
+render();
+(async()=>{
+  const [d,a,dl,u]=await Promise.all(["db","assets","downloads","user"].map(n=>window.claude?.use?window.claude.use(n).catch(()=>null):Promise.resolve(null)));
+  db=d;assets=a;downloads=dl;
+  canEdit=!!(u&&u.canEdit&&u.canEdit());
+  if(!db){$("list").innerHTML=`<div class="empty">प्रकरणे उघडता आली नाहीत. हे पान claude.ai वर साइन-इन करून उघडा.</div>`;return}
+  $("btnNew").hidden=!(canEdit&&assets);
+  $("who").textContent=canEdit?"":"आपल्याला फक्त पाहण्याची परवानगी आहे.";
+  const timer=setTimeout(()=>{if(!cases.length)$("list").innerHTML=`<div class="empty">प्रकरणे उघडायला वेळ लागत आहे. थोड्या वेळाने पान पुन्हा उघडा.</div>`},10000);
+  db.collection("cases").onSnapshot(snap=>{clearTimeout(timer);
+    const open=[...document.querySelectorAll("details.more[open]")].map(x=>x.closest(".card").dataset.id);
+    cases=snap.docs.map(s=>({id:s.id,...s.data()})).sort(sortCases);render();
+    open.forEach(id=>{const el=document.querySelector(`.card[data-id="${CSS.escape(id)}"] details.more`);if(el)el.open=true});
+  },err=>{clearTimeout(timer);$("list").innerHTML=`<div class="empty">प्रकरणे उघडता आली नाहीत (${esc(err&&err.code)}).</div>`});
+})();
+</script>
