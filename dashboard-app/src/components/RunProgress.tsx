@@ -69,23 +69,26 @@ export function RunCost({ run }: { run: Run }) {
 }
 
 /** Provisional total when no run has finished yet (minutes). Replaced by the median of real runs. */
-const DEFAULT_RUN_MIN = 70; // independent audit 01.11.2026: ~50–110 min for 15 pages / 3 GRs
+const DEFAULT_RUN_MIN = 15; // first live run 01.11.2026: 10 min, 79 turns (all 3 files built)
 
-/** Median wall-clock seconds (created → finished) of the last finished runs, all cases. */
+/** Median engine seconds of recent runs that did the full work: done, or failed only at the end (≥30 turns). */
 export function useTypicalRunSeconds() {
   const [v, setV] = useState<{ sec: number; n: number } | null>(null);
   useEffect(() => {
     let alive = true;
     void sb()
       .from('runs')
-      .select('created_at,finished_at')
-      .eq('state', 'done')
+      .select('state,created_at,finished_at,duration_s,num_turns')
+      .in('state', ['done', 'failed'])
       .not('finished_at', 'is', null)
       .order('finished_at', { ascending: false })
-      .limit(10)
+      .limit(20)
       .then(({ data }) => {
         if (!alive) return;
-        const d = ((data as { created_at: string; finished_at: string }[]) || [])
+        type R = { state: string; created_at: string; finished_at: string; duration_s: number | string | null; num_turns: number | null };
+        const d = ((data as R[]) || [])
+          .filter(r => r.state === 'done' || (r.num_turns ?? 0) >= 30)
+          .slice(0, 10)
           .map(r => (Date.parse(r.finished_at) - Date.parse(r.created_at)) / 1000)
           .filter(x => x > 0)
           .sort((a, b) => a - b);
@@ -107,7 +110,7 @@ export function RunEta({ run }: { run: Run }) {
   if (!typical) return null;
   const elapsed = Math.max(0, (now - Date.parse(run.created_at)) / 1000);
   const left = typical.sec - elapsed;
-  const basis = typical.n ? `मागील ${typical.n} पूर्ण अभ्यासांवरून` : 'प्राथमिक अंदाज (साधारण 50–110 मि.)';
+  const basis = typical.n ? `मागील ${typical.n} अभ्यासांच्या प्रत्यक्ष वेळेवरून` : 'प्राथमिक अंदाज';
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg bg-blue-50 px-3 py-2 text-sm text-blue-900 dark:bg-blue-900/30 dark:text-blue-100">
       <span>⏱ लागलेला वेळ <b>{fmtDuration(elapsed)}</b></span>
