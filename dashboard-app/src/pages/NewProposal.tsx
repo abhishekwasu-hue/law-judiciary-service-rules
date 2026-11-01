@@ -50,6 +50,7 @@ export default function NewProposal() {
   const [runErr, setRunErr] = useState('');
   const runs = useRuns(created?.id ?? null);
   const run: Run | undefined = runs?.[0];
+  const statusRef = useRef<HTMLDivElement>(null);
   const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF(s => ({ ...s, [k]: e.target.value }));
 
   if (!canWrite) return <div className="card p-6 text-center">आपल्याला फक्त वाचण्याची परवानगी आहे.</div>;
@@ -78,6 +79,8 @@ export default function NewProposal() {
     if (!proposal) return toast('प्रस्ताव PDF निवडा', 'err');
     setBusy(true);
     setRunErr('');
+    // show the status panel (top of the page) right away — Abhi's request 01.11.2026
+    requestAnimationFrame(() => statusRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
     try {
       let c = created;
       if (!c) {
@@ -118,6 +121,31 @@ export default function NewProposal() {
   return (
     <div className="space-y-5">
       <h1 className="text-2xl font-bold">नवीन प्रस्ताव</h1>
+      {(ups.length > 0 || created) && (
+        <div ref={statusRef} className="scroll-mt-4">
+          <Section title={created ? `स्थिती — ${crLabel(created)}` : 'स्थिती'} right={created ? <Link className="btn-ghost" to={`/cases/${created.id}`}>प्रकरण उघडा →</Link> : undefined}>
+            <div className="space-y-4">
+              {runErr && <div className="rounded-lg bg-red-100 px-3 py-2 text-red-900 dark:bg-red-900/40 dark:text-red-100" role="alert">अभ्यास सुरू झाला नाही: {runErr}</div>}
+              {run ? <RunProgress run={run} /> : !runErr && <div className="text-slate-500">{busy ? 'फाइल अपलोड होत आहे…' : 'प्रतीक्षा…'}</div>}
+              {ups.length > 0 && (
+                <ul className="space-y-3">
+                  {ups.map((u, i) => (
+                    <li key={i} className="space-y-1">
+                      <div className="flex justify-between gap-2 text-sm">
+                        <span className="truncate">{u.file.name}</span>
+                        <span className={u.state === 'err' ? 'text-red-700' : u.state === 'ok' ? 'text-green-700 dark:text-green-400' : ''}>
+                          {u.state === 'ok' ? '✓ अपलोड पूर्ण' : u.state === 'err' ? u.err : u.state === 'up' ? `${u.pct}%` : 'प्रतीक्षा'}
+                        </span>
+                      </div>
+                      <Progress pct={u.pct} tone={u.state === 'err' ? 'red' : u.state === 'ok' ? 'green' : 'blue'} />
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </Section>
+        </div>
+      )}
       <form onSubmit={submit} className="grid gap-5 lg:grid-cols-2">
         <Section title="फाइल">
           <div className="space-y-4">
@@ -170,30 +198,6 @@ export default function NewProposal() {
         </Section>
       </form>
 
-      {ups.length > 0 && (
-        <Section title="अपलोड">
-          <ul className="space-y-3">
-            {ups.map((u, i) => (
-              <li key={i} className="space-y-1">
-                <div className="flex justify-between gap-2 text-sm">
-                  <span className="truncate">{u.file.name}</span>
-                  <span className={u.state === 'err' ? 'text-red-700' : u.state === 'ok' ? 'text-green-700 dark:text-green-400' : ''}>
-                    {u.state === 'ok' ? '✓ पूर्ण' : u.state === 'err' ? u.err : u.state === 'up' ? `${u.pct}%` : 'प्रतीक्षा'}
-                  </span>
-                </div>
-                <Progress pct={u.pct} tone={u.state === 'err' ? 'red' : u.state === 'ok' ? 'green' : 'blue'} />
-              </li>
-            ))}
-          </ul>
-        </Section>
-      )}
-
-      {created && (
-        <Section title={`प्रगती — ${crLabel(created)}`} right={<Link className="btn-ghost" to={`/cases/${created.id}`}>प्रकरण उघडा →</Link>}>
-          {runErr && <div className="mb-3 rounded-lg bg-red-100 px-3 py-2 text-red-900 dark:bg-red-900/40 dark:text-red-100" role="alert">अभ्यास सुरू झाला नाही: {runErr}</div>}
-          {run ? <RunProgress run={run} /> : !runErr && <div className="text-slate-500">{busy ? 'अपलोड चालू…' : 'प्रतीक्षा…'}</div>}
-        </Section>
-      )}
     </div>
   );
 }
