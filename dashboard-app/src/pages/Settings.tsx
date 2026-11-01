@@ -15,7 +15,7 @@ const PLAIN: { k: string; label: string; hint?: string; num?: boolean; ai?: bool
   { k: 'github_branch', label: 'GitHub branch', hint: 'सहसा main' },
   { k: 'model', label: 'मुख्य मॉडेल (model)', hint: 'नोंद, पत्र व GR साठी; रिकामे = डीफॉल्ट', ai: true, ph: 'उदा. claude-opus-… (दर्जा राखण्यासाठी)' },
   { k: 'model_light', label: 'स्वस्त मॉडेल (model_light)', hint: 'पाने वाचणे, भाग 1 व यांत्रिक कामासाठी; रिकामे = डीफॉल्ट', ai: true, ph: 'उदा. claude-haiku-…' },
-  { k: 'budget_usd', label: 'कमाल खर्च ($) (budget_usd)', hint: 'प्रत्येक प्रस्तावासाठी कमाल खर्च ($). डीफॉल्ट 0.75', num: true, ai: true, ph: 'उदा. 0.75' },
+  { k: 'budget_usd', label: 'कमाल खर्च ($) (budget_usd)', hint: 'प्रत्येक प्रस्तावासाठी अपेक्षित कमाल खर्च ($). ओलांडल्यास फक्त सूचना येते — काम थांबत नाही, दर्जा घटत नाही. रिकामे = 0.75', num: true, ai: true, ph: 'उदा. 1.5' },
 ];
 const SECRET: { k: string; label: string; hint: string }[] = [
   { k: 'supabase_service_key', label: 'Supabase service_role key', hint: 'माहिती-साठ्याची गुप्त की' },
