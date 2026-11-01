@@ -5,3 +5,6 @@
 @INSTRUCTIONS.md
 @PROPOSAL_SOP.md
 @PROPOSAL_WORKFLOW.md
+
+# Current state / pending work (read after the files above)
+@HANDOVER.md
