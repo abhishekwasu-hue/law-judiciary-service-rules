@@ -68,7 +68,7 @@ class LintSpec(unittest.TestCase):
 
     def test_unspaced_initials(self):
         self.bad(self.s122, lambda s: s["note"]["paras"].__setitem__(0, s["note"]["paras"][0] + " श्री.आर.टी.लाखे"),
-                 "'श्री.' नंतर जागा", "note.paras[0]")
+                 "'श्री.' नंतर एक जागा", "note.paras[0]")
 
     def test_quoted_text_is_exempt(self):
         s = copy.deepcopy(self.s122)

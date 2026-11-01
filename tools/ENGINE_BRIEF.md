@@ -64,7 +64,7 @@ From INSTRUCTIONS.md [I§.n], PROPOSAL_SOP.md [SOP step], tools/PROPOSAL_PROMPT.
   source; each ends with exactly "(पॅकेज PDF पृ. N)" ("(पॅकेज PDF पृ. N-M)" / "(पॅकेज PDF पृ. N,M)"), or
   "(पॅकेज PDF मध्ये नाही)" when not in the package [I4.11]. No repo paths, internal ids or old-case names.
 
-- [I4.18] Language: short sentences, one point each, clear subject ("<authority> यांनी … सादर केला आहे."); "श्रीमती" not "सौ."; spaced honorifics/initials "श्री. आर. टी. लाखे"; missing-information list as a table; letter: no "तात्काळ", request "…उपलब्ध करुन देण्यात यावी, ही विनंती." Quotes stay verbatim. Model: samples/specs/CR131_2026_special-pay_info-letter.json.
+- [I4.18] Language: short sentences, one point each, clear subject ("<authority> यांनी … सादर केला आहे."); "श्रीमती" not "सौ."; one space after "श्री."/"श्रीमती"; name as in the proposal (Marathi initials e.g. "ह. ना. आपटे" if the proposal has them, else as written); missing-information list as a table; letter: no "तात्काळ", request "…उपलब्ध करुन देण्यात यावी, ही विनंती." Quotes stay verbatim. Model: samples/specs/CR131_2026_special-pay_info-letter.json.
 
 ## 4. Letter [SOP4][I4.5][I4.10]
 - ref_no "संकिर्ण-2026/<file no>/प्र.क्र.<n>/का.6"; date "__.__.2026"; to; subject; refs ("आपले पत्र क्र.…, दि.…").

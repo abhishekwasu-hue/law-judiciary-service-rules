@@ -256,6 +256,42 @@ class VerifyOutputs(unittest.TestCase):
         build_study(st, d)
         self.must_fail(d, "heading भाग 0 missing")
 
+    # ---- §4.18 wording (note body + letter, outside “…” quotes) ----
+    def intro_with(self, old, new):
+        def f(s):
+            assert old in s["letter"]["intro"]
+            s["letter"]["intro"] = s["letter"]["intro"].replace(old, new)
+        return self.spec_with(f)
+
+    def test_sau_in_note(self):
+        d = self.case("sau")
+        build_note(self.spec_with(lambda s: s["note"]["paras"].__setitem__(0, s["note"]["paras"][0] + " सौ. ____ यांनी अर्ज केला.")), d)
+        self.must_fail(d, "respectful wording §4.18")
+
+    def test_unspaced_shri_in_letter(self):
+        d = self.case("shri")
+        build_note(self.intro_with("श्री. आर. एन.", "श्री.आर.एन."), d)
+        self.must_fail(d, "letter: आदरार्थी उल्लेख")
+
+    def test_tatkal_in_letter(self):
+        d = self.case("tatkal")
+        build_note(self.intro_with("सदर प्रकरणी", "सदर प्रकरणी तात्काळ"), d)
+        self.must_fail(d, "letter: पत्राची भाषा")
+
+    def test_intro_without_request(self):
+        d = self.case("vinanti")
+        build_note(self.intro_with(", ही विनंती", ""), d)
+        self.must_fail(d, "letter intro request wording")
+
+    def test_quoted_sau_tatkal_ok(self):
+        d = self.case("quoted")
+        s = self.intro_with("सदर प्रकरणी", "सदर प्रकरणी “तात्काळ”")
+        s["note"]["paras"][0] += " “सौ. ____ यांनी अर्ज केला.”"
+        build_note(s, d)
+        rc, out = self.run_verify(d)
+        self.assertEqual(rc, 0, out)
+        self.assertIn("ALL OK", out)
+
 
 if __name__ == "__main__":
     unittest.main()

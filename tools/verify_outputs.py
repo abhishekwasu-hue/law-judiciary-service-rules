@@ -17,11 +17,13 @@ Checks
   - signer chain = INSTRUCTIONS §4.6 names in order, "अ.मु.स. (वित्त)" last
   - "अ.मु.स. (वित्त)" present  <=>  last numbered para contains "वित्त विभागाच्या मान्यतेस्तव"
  Note body and letter: no "पॅकेज PDF" (allowed only in "संबंधित माहिती" and the Study); no BANNED word
+ Note body and letter (§4.18, text outside “…” quotes only): no 'सौ.'; 'श्री.' followed by a space; letter: no 'तात्काळ'
  Note_and_Letter (whole file): no repo paths (register/, service-rules/, precedent-library/, pdf/, repo, रेपो)
  Letter (when present: a "प्रति," or "क्रमांक :-" paragraph):
   - starts on a new page / new section (page break or section break before the letterhead)
   - ref no. संकिर्ण-<year>/<file no>/प्र.क्र.<n>/का.6 ; e-mail lnjd.desk6-mh@mah.gov.in on the letterhead
   - विषय and संदर्भ paragraphs: centred, every run bold
+  - intro paragraph (starting "उपरोक्त विषयाबाबत") contains "ही विनंती" outside quotes (§4.18)
   - "आपला," present, signature "आपली," absent ("आपली पत्रे" in संदर्भ is allowed); lines "( राजेश वडनेरकर )", "अवर सचिव ,महाराष्ट्र शासन", "प्रत : निवड नस्ती"
  Study: headings भाग 0 … भाग 7
  Package PDF:
@@ -48,9 +50,10 @@ FONT_ATTRS = ("ascii", "hAnsi", "cs", "eastAsia")
 THEME_ATTRS = ("asciiTheme", "hAnsiTheme", "cstheme", "eastAsiaTheme")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 # shared rule definitions — ONE copy, in tools/lint_spec.py (pre-build lint uses the same rules)
-from lint_spec import (AMS, BANNED, FIN, ID_RE, LH_EMAIL, RELATED, REF_NO, REPO_RE, SIGNERS,  # noqa: E402,F401
-                       banned_hits, finance_problems, heading_problems, id_hits, ns, num, part_no, ref_problems,
-                       repo_hits, signer_problems)
+from lint_spec import (AMS, BANNED, FIN, ID_RE, LH_EMAIL, RELATED, REF_NO, REPO_RE, REQUEST,  # noqa: E402,F401
+                       SIGNERS, banned_hits, finance_problems, heading_problems, id_hits, ns, num, part_no,
+                       ref_problems, repo_hits, signer_problems, style_hits, unquoted)
+INTRO_HEAD = "उपरोक्त विषयाबाबत"  # letter intro paragraph (lint_spec.INTRO_START begins with it)
 UPLOAD_PREFIX = re.compile(r"^[0-9a-fA-F]{8}-")
 
 results = []
@@ -205,6 +208,10 @@ def main(argv):
         check("banned words (note body, letter)",
               [f"{where}: '{w}'" for where, t in (("note", note_txt), ("letter", letter_txt)) for w in banned_hits(t)])
 
+        check("respectful wording §4.18 (note body, letter)",
+              [f"{where}: {x}" for where, t, isl in (("note", note_txt, False), ("letter", letter_txt, True))
+               for x in style_hits(t, letter=isl)])
+
         # signer chain + Finance
         ne = [b for b in bl[:note_end] if b["kind"] == "p" and ns(b["text"])]
         ntexts = [ns(b["text"]) for b in ne]
@@ -251,6 +258,11 @@ def main(argv):
                     if not p_centred(p): vb.append(f"not centred: '{ns(p.text)[:40]}'")
                     if not p_bold(p): vb.append(f"not bold: '{ns(p.text)[:40]}'")
             check("letter विषय/संदर्भ bold + centre", vb)
+            intro = next((t for t in lt if t.startswith(INTRO_HEAD)), None)
+            rq = []
+            if intro is None: rq.append("intro paragraph 'उपरोक्त विषयाबाबत …' missing")
+            elif REQUEST not in unquoted(intro): rq.append(f"intro lacks '{REQUEST}' — '…उपलब्ध करुन देण्यात यावी, {REQUEST}.'")
+            check("letter intro request wording §4.18", rq)
             en = []
             if "आपला," not in lt: en.append("'आपला,' line missing")
             if any(re.fullmatch(r"आपली\s*,?", t) for t in lt) or re.search(r"आपली\s*,", letter_txt):
