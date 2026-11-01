@@ -245,7 +245,10 @@ async function route(req, env, url) {
     if (!exists.length) return bad('case not found', 404); // no orphan object in Storage
     const prev = await db.rest(`case_files?case_id=eq.${caseId}&kind=eq.${kind}&original_name=eq.${encodeURIComponent(name)}&select=version&order=version.desc&limit=1`);
     const version = prev.length ? prev[0].version + 1 : 1;
-    const path = `${caseId}/${kind}/v${version}/${name}`;
+    // Supabase Storage keys must be ASCII (live 400 InvalidKey on a Devanagari name): store as file<ext>;
+    // the real name stays only in case_files.original_name (downloads use it — §4.16).
+    const ext = (name.match(/\.[A-Za-z0-9]{1,8}$/) || [''])[0].toLowerCase();
+    const path = `${caseId}/${kind}/v${version}-${crypto.randomUUID().slice(0, 8)}/file${ext}`; // unique per upload
     await db.upload('proposals', path, req.body, req.headers.get('content-type'));
     const [f] = await db.rest('case_files', { method: 'POST', body: JSON.stringify({ case_id: caseId, kind, storage_path: `proposals/${path}`, original_name: name, version, uploaded_by: user.id }) });
     await log(cfg, caseId, user.id, 'file_uploaded', { kind, name, version });
