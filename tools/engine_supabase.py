@@ -161,8 +161,39 @@ def cmd_finish(out):
                "letter_needed": bool(st.get("letter_needed")), "essential_points": lst("essential_points"),
                "grs_attached": lst("grs_attached"), "grs_missing": lst("grs_missing")})
     rest("PATCH", f"cases?id=eq.{CASE}", {"stage": "मसुदा तयार"}, "return=minimal")
+    fill_case(st.get("case"))
     activity("run_done", {"run_id": int(RUN), "files": uploaded})
     print("finished:", ", ".join(f"{u['kind']} v{u['version']} {u['name']}" for u in uploaded))
+
+
+CATS = {"वेतननिश्चिती", "भत्ते", "निवृत्तीवेतन", "जुनी पेन्शन", "विशेष वेतन", "विमा/GPF", "सेवा", "न्यायिक वेतन", "वैद्यकीय", "इतर"}
+
+
+def fill_case(found):
+    """Fill only the identity fields the user left empty at upload (category: only while it is "इतर")."""
+    if not isinstance(found, dict):
+        return
+    cur = (rest("GET", f"cases?id=eq.{CASE}&select=cr_no,cr_year,file_no,subject,category") or [{}])[0]
+    patch = {}
+    for k in ("cr_no", "cr_year", "file_no", "subject"):
+        v = found.get(k)
+        if v not in (None, "") and cur.get(k) in (None, ""):
+            v = str(v).strip()
+            if k == "cr_no" and not v.isdigit(): continue
+            if k == "cr_year":
+                if not re.fullmatch(r"\d{4}", v): continue
+                v = int(v)
+            patch[k] = v
+    if found.get("category") in CATS and cur.get("category") in (None, "", "इतर"):
+        patch["category"] = found["category"]
+    if not patch:
+        return
+    try:
+        rest("PATCH", f"cases?id=eq.{CASE}", patch, "return=minimal")
+    except Exception as e:  # e.g. the same C R no./year already exists
+        activity("case_fill_skipped", {"fields": patch, "reason": str(e)[:200]})
+        return
+    activity("case_filled_from_pdf", {"fields": patch})
 
 
 def cmd_fail(reason):

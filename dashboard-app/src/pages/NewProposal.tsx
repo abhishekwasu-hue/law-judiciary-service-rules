@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { api, humanError, uploadFile } from '../lib/api';
 import { useCanWrite } from '../lib/auth';
 import { CATEGORIES, PRIORITIES } from '../lib/constants';
-import { fmtBytes } from '../lib/format';
+import { crLabel, fmtBytes } from '../lib/format';
 import { guessSubject } from '../lib/pdf';
 import type { Case, Run } from '../lib/types';
 import { Field, Progress, Section, Spinner } from '../components/ui';
@@ -43,7 +43,7 @@ export default function NewProposal() {
   const toast = useToast();
   const [proposal, setProposal] = useState<File | null>(null);
   const [extras, setExtras] = useState<File[]>([]);
-  const [f, setF] = useState({ cr_no: '', cr_year: String(new Date().getFullYear()), file_no: '', subject: '', category: 'इतर', priority: 'सामान्य', instructions: '' });
+  const [f, setF] = useState({ cr_no: '', cr_year: '', file_no: '', subject: '', category: '', priority: 'सामान्य', instructions: '' });
   const [busy, setBusy] = useState(false);
   const [ups, setUps] = useState<Up[]>([]);
   const [created, setCreated] = useState<Case | null>(null);
@@ -82,7 +82,8 @@ export default function NewProposal() {
       let c = created;
       if (!c) {
         c = await api<Case>('/api/cases', {
-          body: { cr_no: f.cr_no.trim(), cr_year: Number(f.cr_year), file_no: f.file_no.trim(), subject: f.subject.trim(), category: f.category, priority: f.priority },
+          // every identity field is optional; empty ones are filled by the engine from the निर्देशपत्र
+          body: Object.fromEntries(Object.entries({ cr_no: f.cr_no.trim(), cr_year: f.cr_year.trim() ? Number(f.cr_year) : '', file_no: f.file_no.trim(), subject: f.subject.trim(), category: f.category, priority: f.priority }).filter(([, v]) => v !== '')),
         });
         setCreated(c);
       }
@@ -148,14 +149,14 @@ export default function NewProposal() {
         <Section title="तपशील">
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
-              <Field label="C R क्र. *"><input className="input" inputMode="numeric" pattern="\d+" required disabled={locked} value={f.cr_no} onChange={set('cr_no')} /></Field>
-              <Field label="वर्ष *"><input className="input" inputMode="numeric" pattern="\d{4}" required disabled={locked} value={f.cr_year} onChange={set('cr_year')} /></Field>
+              <Field label="C R क्र."><input className="input" inputMode="numeric" pattern="\d+" placeholder="PDF वरून" disabled={locked} value={f.cr_no} onChange={set('cr_no')} /></Field>
+              <Field label="वर्ष"><input className="input" inputMode="numeric" pattern="\d{4}" placeholder="PDF वरून" disabled={locked} value={f.cr_year} onChange={set('cr_year')} /></Field>
             </div>
             <Field label="नस्ती क्र. (निर्देशपत्र)"><input className="input" placeholder="संकीर्ण-2026/___/प्र.क्र.___/का.6" disabled={locked} value={f.file_no} onChange={set('file_no')} /></Field>
-            <Field label="विषय *"><textarea className="input min-h-[88px]" required disabled={locked} value={f.subject} onChange={set('subject')} /></Field>
+            <Field label="विषय"><textarea className="input min-h-[88px]" placeholder="रिकामे ठेवल्यास PDF वरून भरले जाईल" disabled={locked} value={f.subject} onChange={set('subject')} /></Field>
             <div className="grid grid-cols-2 gap-3">
               <Field label="प्रवर्ग">
-                <select className="input" disabled={locked} value={f.category} onChange={set('category')}>{CATEGORIES.map(c => <option key={c}>{c}</option>)}</select>
+                <select className="input" disabled={locked} value={f.category} onChange={set('category')}><option value="">PDF वरून ठरवा</option>{CATEGORIES.map(c => <option key={c}>{c}</option>)}</select>
               </Field>
               <Field label="प्राधान्य">
                 <select className="input" disabled={locked} value={f.priority} onChange={set('priority')}>{PRIORITIES.map(c => <option key={c}>{c}</option>)}</select>
@@ -188,7 +189,7 @@ export default function NewProposal() {
       )}
 
       {created && (
-        <Section title={`प्रगती — C R ${created.cr_no}/${created.cr_year}`} right={<Link className="btn-ghost" to={`/cases/${created.id}`}>प्रकरण उघडा →</Link>}>
+        <Section title={`प्रगती — ${crLabel(created)}`} right={<Link className="btn-ghost" to={`/cases/${created.id}`}>प्रकरण उघडा →</Link>}>
           {runErr && <div className="mb-3 rounded-lg bg-red-100 px-3 py-2 text-red-900 dark:bg-red-900/40 dark:text-red-100" role="alert">अभ्यास सुरू झाला नाही: {runErr}</div>}
           {run ? <RunProgress run={run} /> : !runErr && <div className="text-slate-500">{busy ? 'अपलोड चालू…' : 'प्रतीक्षा…'}</div>}
         </Section>

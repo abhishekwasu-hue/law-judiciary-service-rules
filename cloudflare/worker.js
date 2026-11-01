@@ -171,11 +171,13 @@ async function route(req, env, url) {
   if (p === '/api/cases' && M === 'POST') {
     if (!canWrite(user)) return bad('read-only', 403);
     const b = await req.json();
-    if (!/^\d+$/.test(String(b.cr_no || '')) || !/^\d{4}$/.test(String(b.cr_year || '')) || !b.subject) return bad('cr_no, cr_year, subject required');
+    // all identity fields optional (owner rule 01.11.2026): the engine fills empty ones from the निर्देशपत्र
+    if (b.cr_no && !/^\d+$/.test(String(b.cr_no))) return bad('cr_no: digits only');
+    if (b.cr_year && !/^\d{4}$/.test(String(b.cr_year))) return bad('cr_year: 4 digits');
     const allowed = ['cr_no', 'cr_year', 'file_no', 'subject', 'category', 'priority', 'employee_name', 'post', 'office', 'received_from', 'received_via', 'inward_date', 'due_date'];
     const row = Object.fromEntries(allowed.filter(k => b[k] !== undefined && b[k] !== '').map(k => [k, b[k]]));
     const [c] = await db.rest('cases', { method: 'POST', body: JSON.stringify(row) });
-    await log(cfg, c.id, user.id, 'case_created', { cr: `${c.cr_no}/${c.cr_year}` });
+    await log(cfg, c.id, user.id, 'case_created', { cr: c.cr_no ? `${c.cr_no}/${c.cr_year || ''}` : '' });
     return json(c);
   }
 

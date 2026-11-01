@@ -2,7 +2,7 @@ export type Role = 'owner' | 'staff' | 'senior';
 export interface Me { id: string; email: string; role: Role | null }
 
 export interface Case {
-  id: number; cr_no: string; cr_year: number; file_no: string | null; subject: string; category: string;
+  id: number; cr_no: string | null; cr_year: number | null; file_no: string | null; subject: string | null; category: string;
   employee_name: string | null; post: string | null; office: string | null; received_from: string | null;
   received_via: string | null; inward_date: string | null; stage: string; priority: string;
   due_date: string | null; assigned_to: string | null; created_at: string; updated_at: string;

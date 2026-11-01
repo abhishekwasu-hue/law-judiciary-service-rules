@@ -52,7 +52,7 @@ export default function Cases() {
     setSp(n, { replace: true });
   };
   const offices = useMemo(() => [...new Set(cases.map(c => c.office).filter(Boolean) as string[])].sort(), [cases]);
-  const years = useMemo(() => [...new Set(cases.map(c => c.cr_year))].sort((a, b) => b - a), [cases]);
+  const years = useMemo(() => [...new Set(cases.map(c => c.cr_year).filter((y): y is number => y != null))].sort((a, b) => b - a), [cases]);
 
   const rows = useMemo(() => {
     const q = (sp.get('q') || '').trim().toLowerCase();
@@ -62,7 +62,7 @@ export default function Cases() {
       if (sp.get('office') && c.office !== sp.get('office')) return false;
       if (sp.get('year') && String(c.cr_year) !== sp.get('year')) return false;
       if (sp.get('overdue') && !overdue.has(c.id)) return false;
-      if (q && !`${c.cr_no}/${c.cr_year} ${c.subject} ${c.file_no || ''} ${c.employee_name || ''} ${c.post || ''} ${c.office || ''}`.toLowerCase().includes(q)) return false;
+      if (q && !`${c.cr_no ?? ''}/${c.cr_year ?? ''} ${c.subject ?? ''} ${c.file_no || ''} ${c.employee_name || ''} ${c.post || ''} ${c.office || ''}`.toLowerCase().includes(q)) return false;
       return true;
     });
   }, [cases, sp, overdue]);

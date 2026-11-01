@@ -33,7 +33,7 @@ export function fmtBytes(n: number): string {
   if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`;
   return `${(n / 1024 / 1024).toFixed(1)} MB`;
 }
-export const crLabel = (c: { cr_no: string; cr_year: number }) => `C R ${c.cr_no}/${c.cr_year}`;
+export const crLabel = (c: { cr_no: string | null; cr_year: number | null }) => (c.cr_no ? `C R ${c.cr_no}/${c.cr_year ?? '—'}` : 'C R — (PDF वाचन बाकी)');
 
 /** Readable text for unknown jsonb (string | object | array). Never HTML. */
 export function textOf(v: unknown): string {

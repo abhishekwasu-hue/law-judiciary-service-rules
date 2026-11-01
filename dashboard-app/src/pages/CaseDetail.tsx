@@ -206,7 +206,7 @@ function EditCase({ open, onClose, c, onSaved }: { open: boolean; onClose: () =>
   return (
     <Modal open={open} onClose={onClose} title="प्रकरणाचा तपशील" wide>
       <form onSubmit={save} className="grid gap-3 sm:grid-cols-2">
-        <div className="sm:col-span-2"><Field label="विषय"><textarea className="input" required value={f.subject} onChange={set('subject')} /></Field></div>
+        <div className="sm:col-span-2"><Field label="विषय"><textarea className="input" value={f.subject ?? ''} onChange={set('subject')} /></Field></div>
         <Field label="नस्ती क्र."><input className="input" value={f.file_no} onChange={set('file_no')} /></Field>
         <Field label="प्रवर्ग"><select className="input" value={f.category} onChange={set('category')}>{CATEGORIES.map(x => <option key={x}>{x}</option>)}</select></Field>
         <Field label="प्राधान्य"><select className="input" value={f.priority} onChange={set('priority')}>{PRIORITIES.map(x => <option key={x}>{x}</option>)}</select></Field>

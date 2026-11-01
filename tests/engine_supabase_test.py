@@ -107,7 +107,9 @@ for n in ("CR130_2026_Study.docx", "CR130_2026_Note_and_Letter.docx", "CR130_202
     open(os.path.join(out, n), "wb").write(b"x" + n.encode())
 st = {"state": "done", "summary": "वेतननिश्चिती प्रस्ताव; माहिती-मागणी पत्र", "letter_needed": True,
       "essential_points": ["सेवापुस्तक उतारा"], "grs_attached": [{"code": "202204191549468012", "date": "19.04.2022", "title": "t", "pages": "12-13"}],
-      "grs_missing": [{"date": "12.03.2014", "title": "t2"}]}
+      "grs_missing": [{"date": "12.03.2014", "title": "t2"}],
+      "case": {"cr_no": "999", "cr_year": 2026, "file_no": "संकीर्ण-2026/979/प्र.क्र.130/का.6", "subject": "दुसरा विषय", "category": "भत्ते"}}
+DB["cases"][0].update(file_no=None, category="इतर")  # user left file no. and category empty at upload
 json.dump(st, open(os.path.join(out, "status.json"), "w", encoding="utf-8"), ensure_ascii=False)
 LOG.clear()
 r = run("finish", out); check(r.returncode == 0, f"finish exit 0 ({r.stderr.strip()[:300]})")
@@ -125,6 +127,10 @@ check(run_row["state"] == "done" and run_row["step"] == "तयार" and run_r
       and run_row["grs_missing"] == st["grs_missing"] and run_row["finished_at"], "finish: runs PATCH done + summary fields")
 check(DB["cases"][0]["stage"] == "मसुदा तयार", "finish: cases.stage मसुदा तयार")
 check(any(a["action"] == "run_done" for a in DB["activity"]), "finish: activity run_done")
+c0 = DB["cases"][0]
+check(c0["file_no"] == "संकीर्ण-2026/979/प्र.क्र.130/का.6" and c0["category"] == "भत्ते", "finish: empty file_no/category filled from PDF")
+check(c0["cr_no"] == "130" and c0["subject"] == "विषय", "finish: fields the user typed are not overwritten")
+check(any(a["action"] == "case_filled_from_pdf" for a in DB["activity"]), "finish: activity case_filled_from_pdf")
 
 # --- fail case: missing outputs
 run_row.update(state="running", step="तपासणी चालू"); n_files = len(DB["case_files"])

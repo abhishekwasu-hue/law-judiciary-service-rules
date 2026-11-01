@@ -29,7 +29,10 @@ delivery is done by the workflow, see below). INSTRUCTIONS.md wins on any confli
 4. Progress — run at each milestone (ignore an error from it, it is only the live status):
    `python3 tools/engine_supabase.py step "पाने वाचत आहे"` (Step 1), `"GR शोधत आहे"` (Step 2),
    `"मसुदा तयार करत आहे"` (Steps 3–4, 6), `"PDF बनवत आहे"` (Step 5), `"तपासणी चालू"` (Step 7).
-5. PREFIX = `CR<cr_no>_<cr_year>` from case.json (e.g. CR130_2026). Outputs in OUTDIR, nothing else there except the
+5. Case identity: cr_no, cr_year, file_no, subject and category may be EMPTY in case.json (Abhi may skip them at upload;
+   category "इतर" counts as not chosen). Take every empty one from the निर्देशपत्र (proposal page 1) exactly as written there;
+   never guess — unreadable = leave it out. Report them in status.json `case` (rule 9).
+   PREFIX = `CR<cr_no>_<cr_year>` from case.json, or from the निर्देशपत्र when empty (e.g. CR130_2026). Outputs in OUTDIR, nothing else there except the
    .map.json and LibreOffice previews:
    - `OUTDIR/<PREFIX>_Study.docx` (part 0 briefing + parts 1–7),
    - `OUTDIR/<PREFIX>_Note_and_Letter.docx`,
@@ -49,7 +52,9 @@ delivery is done by the workflow, see below). INSTRUCTIONS.md wins on any confli
  "letter_needed": true,
  "essential_points": ["<each point asked in the letter; [] if no letter>"],
  "grs_attached": [{"code": "<सांकेतांक or rule-book name>", "date": "DD.MM.YYYY", "title": "<title>", "pages": "<package pages, e.g. 12-14>"}],
- "grs_missing": [{"date": "DD.MM.YYYY", "title": "<title as cited>"}]}
+ "grs_missing": [{"date": "DD.MM.YYYY", "title": "<title as cited>"}],
+ "case": {"cr_no": "130", "cr_year": 2026, "file_no": "संकीर्ण-2026/979/प्र.क्र.130/का.6", "subject": "<as on the निर्देशपत्र>",
+          "category": "<one of: वेतननिश्चिती, भत्ते, निवृत्तीवेतन, जुनी पेन्शन, विशेष वेतन, विमा/GPF, सेवा, न्यायिक वेतन, वैद्यकीय, इतर>"}}
 ```
    If the case cannot be completed, write `{"state": "failed", "summary": "<reason>"}` instead.
 10. Final reply: Marathi, as few words as possible.

@@ -35,9 +35,9 @@ export default function CommandPalette({ open, onClose }: { open: boolean; onClo
     ];
     const s = q.trim().toLowerCase();
     const cs: Cmd[] = cases
-      .filter(c => !s || `${c.cr_no}/${c.cr_year} ${c.subject} ${c.file_no || ''} ${c.office || ''} ${c.employee_name || ''}`.toLowerCase().includes(s))
+      .filter(c => !s || `${c.cr_no ?? ''}/${c.cr_year ?? ''} ${c.subject ?? ''} ${c.file_no || ''} ${c.office || ''} ${c.employee_name || ''}`.toLowerCase().includes(s))
       .slice(0, 8)
-      .map(c => ({ id: `c${c.id}`, label: `${crLabel(c)} — ${c.subject}`, hint: c.stage, go: `/cases/${c.id}` }));
+      .map(c => ({ id: `c${c.id}`, label: `${crLabel(c)} — ${c.subject ?? ""}`, hint: c.stage, go: `/cases/${c.id}` }));
     const bs = base.filter(b => !s || b.label.toLowerCase().includes(s));
     return [...bs, ...(s ? cs : [])];
   }, [q, cases, me?.role]);
