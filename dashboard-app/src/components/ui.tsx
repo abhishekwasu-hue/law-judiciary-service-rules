@@ -37,24 +37,44 @@ export function Spinner({ className = 'h-5 w-5' }: { className?: string }) {
   return <span className={`inline-block animate-spin rounded-full border-2 border-current border-r-transparent ${className}`} aria-hidden="true" />;
 }
 
+const FOCUSABLE = 'a[href],button:not([disabled]),input:not([disabled]):not([type="hidden"]),textarea:not([disabled]),select:not([disabled]),[tabindex]:not([tabindex="-1"])';
+
 export function Modal({ open, onClose, title, children, wide }: { open: boolean; onClose: () => void; title: string; children: ReactNode; wide?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
   useEffect(() => {
     if (!open) return;
-    const k = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    const opener = document.activeElement as HTMLElement | null;
+    const k = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') return closeRef.current();
+      if (e.key !== 'Tab' || !ref.current) return;
+      // keep keyboard focus inside the dialog while it is open
+      const els = Array.from(ref.current.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(x => x.offsetParent !== null);
+      if (!els.length) return e.preventDefault();
+      const first = els[0], last = els[els.length - 1];
+      const inside = ref.current.contains(document.activeElement);
+      if (e.shiftKey && (document.activeElement === first || !inside)) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && (document.activeElement === last || !inside)) { e.preventDefault(); first.focus(); }
+    };
     window.addEventListener('keydown', k);
-    ref.current?.querySelector<HTMLElement>('input,textarea,select,button')?.focus();
-    return () => window.removeEventListener('keydown', k);
-  }, [open, onClose]);
+    const body = ref.current?.querySelector<HTMLElement>('[data-modal-body] input,[data-modal-body] textarea,[data-modal-body] select,[data-modal-body] button');
+    (body || ref.current?.querySelector<HTMLElement>(FOCUSABLE))?.focus();
+    return () => {
+      window.removeEventListener('keydown', k);
+      // return focus to the control that opened the dialog
+      if (opener && document.contains(opener)) opener.focus();
+    };
+  }, [open]);
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/50 p-3 pt-[8vh]" onMouseDown={e => e.target === e.currentTarget && onClose()}>
       <div ref={ref} role="dialog" aria-modal="true" aria-label={title} className={`card max-h-[84vh] w-full overflow-auto p-4 ${wide ? 'max-w-3xl' : 'max-w-lg'}`}>
         <div className="mb-3 flex items-center justify-between gap-2">
           <h2 className="text-lg font-bold">{title}</h2>
-          <button className="btn-ghost min-w-tap px-2" onClick={onClose} aria-label="बंद करा">✕</button>
+          <button className="btn-ghost min-h-tap min-w-tap px-2" onClick={onClose} aria-label="बंद करा">✕</button>
         </div>
-        {children}
+        <div data-modal-body>{children}</div>
       </div>
     </div>
   );
@@ -82,10 +102,10 @@ export function Section({ title, right, children, className = '' }: { title: str
   );
 }
 
-export function Progress({ pct, tone = 'blue', active = false }: { pct: number; tone?: 'blue' | 'green' | 'red'; active?: boolean }) {
+export function Progress({ pct, tone = 'blue', active = false, label = 'प्रगती' }: { pct: number; tone?: 'blue' | 'green' | 'red'; active?: boolean; label?: string }) {
   const c = tone === 'green' ? 'bg-green-600' : tone === 'red' ? 'bg-red-600' : 'bg-blue-600';
   return (
-    <div className={`${active ? 'h-3' : 'h-2'} w-full overflow-hidden rounded-full bg-slate-200 dark:bg-navy-800`} role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
+    <div className={`${active ? 'h-3' : 'h-2'} w-full overflow-hidden rounded-full bg-slate-200 dark:bg-navy-800`} role="progressbar" aria-label={label} aria-valuetext={`${label}: ${Math.round(pct)}%`} aria-valuenow={Math.round(pct)} aria-valuemin={0} aria-valuemax={100}>
       <div className={`h-full ${c} transition-all duration-700 ${active ? 'progress-stripes' : ''}`} style={{ width: `${pct}%` }} />
     </div>
   );

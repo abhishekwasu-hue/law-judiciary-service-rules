@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useState, type FormEvent, type KeyboardEvent } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { sb } from '../lib/supabase';
 import { useData, overdueIds } from '../lib/data';
@@ -16,7 +16,7 @@ const TABS = [
   { k: 'brief', label: 'ब्रीफिंग' },
   { k: 'note', label: 'टिप्पणी व पत्र' },
   { k: 'pdf', label: 'प्रस्ताव + GR' },
-  { k: 'study', label: 'अभ्यास' },
+  { k: 'study', label: 'अभ्यास-फाइल' },
   { k: 'letters', label: 'पत्रव्यवहार' },
   { k: 'history', label: 'इतिहास' },
 ] as const;
@@ -51,30 +51,70 @@ export default function CaseDetail() {
 
   const c = cases.find(x => x.id === id) ?? single ?? null;
 
+  // A failed fetch must not look like "अजून तयार नाही": keep the old data and show a reload message.
+  const [loadErr, setLoadErr] = useState(false);
+  const [reloading, setReloading] = useState(false);
+  const [caseTry, setCaseTry] = useState(0);
+
   useEffect(() => {
     if (!cases.find(x => x.id === id))
-      void sb().from('cases').select('*').eq('id', id).maybeSingle().then(({ data }) => setSingle((data as Case) || null));
-  }, [id, cases]);
+      void sb().from('cases').select('*').eq('id', id).maybeSingle().then(
+        ({ data, error }) => {
+          if (error) setLoadErr(true);
+          setSingle((data as Case) || null);
+        },
+        () => { setLoadErr(true); setSingle(null); },
+      );
+  }, [id, cases, caseTry]);
 
   const reloadFiles = useCallback(async () => {
-    const { data } = await sb().from('case_files').select('*').eq('case_id', id).order('version', { ascending: false }).order('created_at', { ascending: false });
-    setFiles((data as CaseFile[]) || []);
+    try {
+      const { data, error } = await sb().from('case_files').select('*').eq('case_id', id).order('version', { ascending: false }).order('created_at', { ascending: false });
+      if (error) return setLoadErr(true);
+      setFiles((data as CaseFile[]) || []);
+    } catch {
+      setLoadErr(true);
+    }
   }, [id]);
   const reloadLetters = useCallback(async () => {
-    const { data } = await sb().from('letters').select('*').eq('case_id', id).order('created_at', { ascending: false });
-    setLetters((data as Letter[]) || []);
-    void refresh();
+    try {
+      const { data, error } = await sb().from('letters').select('*').eq('case_id', id).order('created_at', { ascending: false });
+      if (error) return setLoadErr(true);
+      setLetters((data as Letter[]) || []);
+      void refresh();
+    } catch {
+      setLoadErr(true);
+    }
   }, [id, refresh]);
   const reloadActivity = useCallback(async () => {
-    const { data } = await sb().from('activity').select('*').eq('case_id', id).order('at', { ascending: false }).limit(300);
-    setActivity((data as Activity[]) || []);
+    try {
+      const { data, error } = await sb().from('activity').select('*').eq('case_id', id).order('at', { ascending: false }).limit(300);
+      if (error) return setLoadErr(true);
+      setActivity((data as Activity[]) || []);
+    } catch {
+      setLoadErr(true);
+    }
   }, [id]);
+  const reloadMembers = useCallback(async () => {
+    try {
+      const { data, error } = await sb().from('members').select('user_id,email');
+      if (error) return setLoadErr(true);
+      setMembers(new Map(((data as Member[]) || []).map(m => [m.user_id, m.email])));
+    } catch {
+      setLoadErr(true);
+    }
+  }, []);
+
+  const reloadAll = useCallback(async () => {
+    setLoadErr(false);
+    setReloading(true);
+    setCaseTry(n => n + 1);
+    await Promise.all([reloadFiles(), reloadLetters(), reloadActivity(), reloadMembers()]);
+    setReloading(false);
+  }, [reloadFiles, reloadLetters, reloadActivity, reloadMembers]);
 
   useEffect(() => {
-    void reloadFiles();
-    void reloadLetters();
-    void reloadActivity();
-    void sb().from('members').select('user_id,email').then(({ data }) => setMembers(new Map(((data as Member[]) || []).map(m => [m.user_id, m.email]))));
+    void reloadAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
@@ -91,9 +131,27 @@ export default function CaseDetail() {
   }, [c?.stage, reloadActivity]);
 
   const overdue = useMemo(() => overdueIds(c ? [c] : [], allLetters), [c, allLetters]);
+  const reloadBtn = (
+    <button className="btn-primary" disabled={reloading} onClick={() => void reloadAll()}>{reloading && <Spinner />} ↻ पुन्हा लोड करा</button>
+  );
+
+  function onTabKey(e: KeyboardEvent<HTMLButtonElement>, i: number) {
+    if (e.key !== 'ArrowRight' && e.key !== 'ArrowLeft' && e.key !== 'Home' && e.key !== 'End') return;
+    e.preventDefault();
+    const n = TABS.length;
+    const j = e.key === 'Home' ? 0 : e.key === 'End' ? n - 1 : (i + (e.key === 'ArrowRight' ? 1 : -1) + n) % n;
+    const k = TABS[j].k;
+    setSp(k === 'brief' ? {} : { tab: k }, { replace: true });
+    document.getElementById(`tab-${k}`)?.focus();
+  }
 
   if (single === undefined && !c) return <div className="space-y-3"><Skeleton className="h-10 w-1/2" /><Skeleton className="h-40 w-full" /></div>;
-  if (!c) return <div className="card"><Empty icon="❓" title="प्रकरण सापडले नाही" hint="यादीतून पुन्हा निवडा."><Link className="btn-ghost" to="/cases">प्रकरणे</Link></Empty></div>;
+  if (!c)
+    return loadErr ? (
+      <div className="card" role="alert"><Empty icon="⚠️" title="माहिती आणता आली नाही — पुन्हा लोड करा" hint="इंटरनेट जोडणी तपासा.">{reloadBtn}</Empty></div>
+    ) : (
+      <div className="card"><Empty icon="❓" title="प्रकरण सापडले नाही" hint="यादीतून पुन्हा निवडा."><Link className="btn-ghost" to="/cases">प्रकरणे</Link></Empty></div>
+    );
 
   async function changeStage(s: string) {
     try {
@@ -143,19 +201,30 @@ export default function CaseDetail() {
           ].map(([k, v]) => (
             <div key={k as string} className="min-w-0">
               <dt className="text-slate-500 dark:text-slate-400">{k}</dt>
-              <dd className="truncate font-semibold" title={(v as string) || ''}>{v || '—'}</dd>
+              <dd className="break-words font-semibold sm:truncate" title={(v as string) || ''}>{v || '—'}</dd>
             </div>
           ))}
         </dl>
       </header>
 
+      {loadErr && (
+        <div className="no-print flex flex-wrap items-center justify-between gap-3 rounded-lg bg-red-100 p-3 font-semibold text-red-900 dark:bg-red-900/40 dark:text-red-100" role="alert">
+          <span>माहिती आणता आली नाही — पुन्हा लोड करा</span>
+          {reloadBtn}
+        </div>
+      )}
+
       <div className="no-print -mx-4 overflow-x-auto px-4">
-        <div className="inline-flex min-w-full gap-1 border-b border-slate-200 dark:border-navy-800" role="tablist">
-          {TABS.map(t => (
+        <div className="inline-flex min-w-full gap-1 border-b border-slate-200 dark:border-navy-800" role="tablist" aria-label="प्रकरणाचे भाग">
+          {TABS.map((t, i) => (
             <button
               key={t.k}
+              id={`tab-${t.k}`}
               role="tab"
               aria-selected={tab === t.k}
+              aria-controls={`panel-${t.k}`}
+              tabIndex={tab === t.k ? 0 : -1}
+              onKeyDown={e => onTabKey(e, i)}
               className={`min-h-tap whitespace-nowrap border-b-4 px-3 font-semibold ${tab === t.k ? 'border-saffron-500 text-navy-800 dark:text-white' : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'}`}
               onClick={() => setSp(t.k === 'brief' ? {} : { tab: t.k }, { replace: true })}
             >
@@ -165,7 +234,7 @@ export default function CaseDetail() {
         </div>
       </div>
 
-      <div role="tabpanel">
+      <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`}>
         {tab === 'brief' && <BriefingTab ctx={ctx} />}
         {tab === 'note' && <NoteTab ctx={ctx} />}
         {tab === 'pdf' && <PackageTab ctx={ctx} />}

@@ -1,8 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
-import { fileBytes } from '../lib/api';
+import { fileBytes, humanError } from '../lib/api';
 import { openPdf } from '../lib/pdf';
 import { Skeleton } from './ui';
+import { isChunkError, reloadOnceForNewBuild } from './ErrorBoundary';
+
+const NEW_BUILD_MSG = 'app ची नवीन आवृत्ती आली आहे — पान रीलोड करत आहे';
 
 interface OutlineNode { title: string; page: number | null; items: OutlineNode[] }
 
@@ -93,6 +96,7 @@ export default function PdfViewer({ fileId, url, jumpTo }: { fileId?: number; ur
   const [showOutline, setShowOutline] = useState(true);
   const [pageInput, setPageInput] = useState('');
   const scroller = useRef<HTMLDivElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let alive = true;
@@ -111,7 +115,12 @@ export default function PdfViewer({ fileId, url, jumpTo }: { fileId?: number; ur
           if (!o.length) setShowOutline(false);
         }
       } catch (e) {
-        if (alive) setErr(e instanceof Error ? e.message : String(e));
+        if (alive) {
+          // an old tab after a redeploy cannot load the pdf.js chunk → reload once for the new build
+          if (isChunkError(e) && reloadOnceForNewBuild()) return setErr(NEW_BUILD_MSG);
+          const h = humanError(e);
+          setErr(/[ऀ-ॿ]/.test(h) ? h : 'फाइल उघडता आली नाही — पुन्हा लोड करा किंवा डाउनलोड करून पाहा.');
+        }
       }
     })();
     return () => {
@@ -133,17 +142,24 @@ export default function PdfViewer({ fileId, url, jumpTo }: { fileId?: number; ur
     if (el && scroller.current) scroller.current.scrollTo({ top: el.offsetTop - 8, behavior: 'smooth' });
   }, []);
   useEffect(() => {
-    if (jumpTo && doc) setTimeout(() => go(jumpTo.page), 50);
+    if (!jumpTo || !doc) return;
+    // on narrow layouts the viewer may be off-screen (list below it): bring it into view first, then jump
+    const root = rootRef.current;
+    const r = root?.getBoundingClientRect();
+    const off = !!r && (r.top < 0 || r.top > window.innerHeight * 0.5);
+    if (off) root!.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const t = setTimeout(() => go(jumpTo.page), off ? 350 : 50);
+    return () => clearTimeout(t);
   }, [jumpTo, doc, go]);
 
-  if (err) return <div className="rounded-lg bg-red-100 p-3 text-red-900 dark:bg-red-900/40 dark:text-red-100">PDF उघडता आला नाही: {err}</div>;
+  if (err) return <div className="rounded-lg bg-red-100 p-3 text-red-900 dark:bg-red-900/40 dark:text-red-100" role="alert">{err === NEW_BUILD_MSG ? err : `PDF उघडता आला नाही: ${err}`}</div>;
   if (!doc) return <div className="space-y-3"><Skeleton className="h-8 w-1/2" /><Skeleton className="h-[60vh] w-full" /></div>;
 
   return (
-    <div className="flex flex-col gap-2">
+    <div ref={rootRef} className="flex scroll-mt-4 flex-col gap-2">
       <div className="flex flex-wrap items-center gap-2">
         {outline.length > 0 && (
-          <button className="btn-ghost" onClick={() => setShowOutline(s => !s)} aria-pressed={showOutline}>☰ Bookmarks</button>
+          <button className="btn-ghost" onClick={() => setShowOutline(s => !s)} aria-pressed={showOutline}>☰ खूणपट्ट्या</button>
         )}
         <span className="text-sm text-slate-500">एकूण {doc.numPages} पाने</span>
         <form className="ml-auto flex items-center gap-1" onSubmit={e => { e.preventDefault(); const n = Number(pageInput); if (n >= 1 && n <= doc.numPages) go(n); }}>
@@ -153,7 +169,7 @@ export default function PdfViewer({ fileId, url, jumpTo }: { fileId?: number; ur
       </div>
       <div className="flex gap-2">
         {showOutline && outline.length > 0 && (
-          <nav className="card max-h-[75vh] w-64 shrink-0 overflow-auto p-2 max-md:fixed max-md:inset-x-3 max-md:bottom-20 max-md:z-40 max-md:max-h-[50vh] max-md:w-auto" aria-label="Bookmarks">
+          <nav className="card max-h-[75vh] w-64 shrink-0 overflow-auto p-2 max-md:fixed max-md:inset-x-3 max-md:bottom-20 max-md:z-40 max-md:max-h-[50vh] max-md:w-auto" aria-label="खूणपट्ट्या">
             <Outline nodes={outline} go={p => { go(p); if (window.innerWidth < 768) setShowOutline(false); }} />
           </nav>
         )}

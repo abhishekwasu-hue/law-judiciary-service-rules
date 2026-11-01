@@ -3,7 +3,12 @@ import { sb } from '../lib/supabase';
 import type { Run } from '../lib/types';
 import { RUN_STATE_LABEL, RUN_STEPS, STALE_REASON, isStale, runTone } from '../lib/constants';
 import { asArray, fmtDateTime, textOf } from '../lib/format';
+import { useAuth } from '../lib/auth';
 import { Chip, Progress, Spinner } from './ui';
+
+/** Glossary wording for a run state (प्रक्रिया रांगेत / चालू / तयार / अयशस्वी). */
+const STATE_TEXT: Record<string, string> = { queued: 'प्रक्रिया रांगेत', running: 'प्रक्रिया चालू', done: 'प्रक्रिया तयार', failed: 'प्रक्रिया अयशस्वी' };
+const stateText = (s: string) => STATE_TEXT[s] || RUN_STATE_LABEL[s] || s;
 
 /** Latest runs of a case, kept live through Supabase Realtime (table `runs`). */
 export function useRuns(caseId: number | null) {
@@ -57,10 +62,13 @@ export function fmtDuration(s: number): string {
 
 /** Cost / turns / duration of one run (from Claude Code's JSON result, stored by the engine). */
 export function RunCost({ run }: { run: Run }) {
+  const { me } = useAuth();
   const cost = num(run.cost_usd), turns = num(run.num_turns), dur = num(run.duration_s);
+  // owner-only, never printed (seniors' briefing)
+  if (me?.role !== 'owner') return null;
   if (cost == null && turns == null && dur == null) return null;
   return (
-    <div className="flex flex-wrap gap-2 text-sm">
+    <div className="no-print flex flex-wrap gap-2 text-sm">
       {cost != null && <span className="rounded-md bg-amber-100 px-2 py-0.5 font-semibold text-amber-900 dark:bg-amber-900/40 dark:text-amber-100">खर्च ${cost.toFixed(2)}</span>}
       {turns != null && <span className="rounded-md bg-slate-100 px-2 py-0.5 text-slate-700 dark:bg-navy-800 dark:text-slate-200">पायऱ्या {turns}</span>}
       {dur != null && <span className="rounded-md bg-slate-100 px-2 py-0.5 text-slate-700 dark:bg-navy-800 dark:text-slate-200">वेळ {fmtDuration(dur)}</span>}
@@ -110,7 +118,7 @@ export function RunEta({ run }: { run: Run }) {
   if (!typical) return null;
   const elapsed = Math.max(0, (now - Date.parse(run.created_at)) / 1000);
   const left = typical.sec - elapsed;
-  const basis = typical.n ? `मागील ${typical.n} अभ्यासांच्या प्रत्यक्ष वेळेवरून` : 'प्राथमिक अंदाज';
+  const basis = typical.n ? `मागील ${typical.n} प्रक्रियांच्या प्रत्यक्ष वेळेवरून` : 'प्राथमिक अंदाज';
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg bg-blue-50 px-3 py-2 text-sm text-blue-900 dark:bg-blue-900/30 dark:text-blue-100">
       <span>⏱ लागलेला वेळ <b>{fmtDuration(elapsed)}</b></span>
@@ -134,7 +142,8 @@ export function RunWarnings({ run }: { run: Run }) {
   );
 }
 
-export default function RunProgress({ run }: { run: Run }) {
+/** `retryHint`: shown under a failure only when the caller really renders a "पुन्हा तयार करा" control next to it. */
+export default function RunProgress({ run, retryHint }: { run: Run; retryHint?: string }) {
   const idx = stepIndex(run);
   const stale = isStale(run);
   const failed = run.state === 'failed' || stale;
@@ -162,13 +171,13 @@ export default function RunProgress({ run }: { run: Run }) {
               <Spinner className="h-4 w-4" /> {preparing ? 'तयारी चालू — सर्व्हर सुरू होत आहे' : 'प्रक्रिया चालू'}
             </span>
           ) : (
-            <Chip tone={stale ? 'red' : runTone(run.state)}>{stale ? 'वेळ संपली' : RUN_STATE_LABEL[run.state] || run.state}</Chip>
+            <Chip tone={stale ? 'red' : runTone(run.state)}>{stale ? 'वेळ संपली' : stateText(run.state)}</Chip>
           )}
-          <span className="text-sm text-slate-500 dark:text-slate-400">अभ्यास #{run.id} • {fmtDateTime(run.created_at)}</span>
+          <span className="text-sm text-slate-500 dark:text-slate-400">प्रक्रिया क्र. {run.id} • {fmtDateTime(run.created_at)}</span>
         </div>
         <RunCost run={run} />
       </div>
-      <Progress pct={failed ? 100 : pct} tone={failed ? 'red' : run.state === 'done' ? 'green' : 'blue'} active={active} />
+      <Progress pct={failed ? 100 : pct} tone={failed ? 'red' : run.state === 'done' ? 'green' : 'blue'} active={active} label={`प्रक्रिया क्र. ${run.id} — ${stale ? 'वेळ संपली' : stateText(run.state)}`} />
       <ol className="grid grid-cols-4 gap-1 text-center text-xs sm:grid-cols-7 sm:text-sm">
         {RUN_STEPS.map((s, i) => {
           const done = i < idx || run.state === 'done';
@@ -193,9 +202,9 @@ export default function RunProgress({ run }: { run: Run }) {
       {!failed && (run.state === 'queued' || run.state === 'running') && <RunEta run={run} />}
       {failed && (
         <div className="rounded-lg bg-red-100 px-3 py-2 text-red-900 dark:bg-red-900/40 dark:text-red-100" role="alert">
-          <div className="font-semibold">अभ्यास अयशस्वी</div>
-          <div className="mt-1 whitespace-pre-wrap break-words">{stale ? STALE_REASON : run.step || 'कारण उपलब्ध नाही — पुन्हा तयार करा'}</div>
-          <div className="mt-1 text-sm">खालील "पुन्हा तयार करा" वापरा.</div>
+          <div className="font-semibold">प्रक्रिया अयशस्वी</div>
+          <div className="mt-1 whitespace-pre-wrap break-words">{stale ? STALE_REASON : run.step || 'कारण उपलब्ध नाही'}</div>
+          {retryHint && <div className="mt-1 text-sm">{retryHint}</div>}
         </div>
       )}
       <RunWarnings run={run} />

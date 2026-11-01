@@ -8,6 +8,8 @@ export function pdfjs() {
       m.GlobalWorkerOptions.workerSrc = w.default;
       return m;
     });
+    // do not cache a failed import (e.g. old file names after a redeploy) — the next call retries
+    lib.catch(() => { lib = null; });
   }
   return lib;
 }

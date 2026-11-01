@@ -48,10 +48,23 @@ function DownloadBtn({ f, label = 'डाउनलोड' }: { f: CaseFile; labe
   );
 }
 
+/** Latest run failed or timed out (stale) → the banner itself offers "पुन्हा तयार करा". */
+const latestFailed = (ctx: CaseCtx) => {
+  const r = latestRun(ctx.runs);
+  return !!r && r.state !== 'done' && !runActive(r);
+};
+
 function RunBanner({ ctx }: { ctx: CaseCtx }) {
   const r = latestRun(ctx.runs);
   if (!r || r.state === 'done') return null;
-  return <Section title="अभ्यास प्रगती" className="mb-4"><RunProgress run={r} /></Section>;
+  const failed = latestFailed(ctx);
+  const canRetry = failed && ctx.canWrite;
+  return (
+    <Section title="प्रक्रियेची स्थिती" className="mb-4">
+      <RunProgress run={r} retryHint={canRetry ? 'खालील "पुन्हा तयार करा" बटण वापरा.' : failed ? 'पुन्हा तयार करण्याची परवानगी फक्त कार्यासनाला आहे.' : undefined} />
+      {canRetry && <div className="no-print mt-4 border-t border-slate-200 pt-4 dark:border-navy-800"><ReRun ctx={ctx} /></div>}
+    </Section>
+  );
 }
 
 export function ReRun({ ctx, title = 'सुधारणा करून पुन्हा तयार करा', preset = '' }: { ctx: CaseCtx; title?: string; preset?: string }) {
@@ -66,7 +79,7 @@ export function ReRun({ ctx, title = 'सुधारणा करून पु�
     setBusy(true);
     try {
       await api('/api/run', { body: { case_id: ctx.c.id, instructions: text.trim() || undefined } });
-      toast('पुन्हा अभ्यास सुरू झाला');
+      toast('प्रक्रिया पुन्हा सुरू झाली');
       setText('');
     } catch (x) {
       toast(humanError(x), 'err');
@@ -79,7 +92,8 @@ export function ReRun({ ctx, title = 'सुधारणा करून पु�
       <Field label={title}>
         <textarea className="input min-h-[80px]" placeholder="उदा. पत्रात फक्त सेवापुस्तकाची प्रत मागवा…" value={text} onChange={e => setText(e.target.value)} />
       </Field>
-      <button className="btn-primary" disabled={busy || running}>{busy && <Spinner />} {running ? 'अभ्यास चालू आहे…' : 'पुन्हा तयार करा'}</button>
+      <button className="btn-primary" disabled={busy || running}>{busy && <Spinner />} {running ? 'प्रक्रिया चालू…' : 'पुन्हा तयार करा'}</button>
+      {running && <p className="text-sm text-slate-500 dark:text-slate-400">प्रक्रिया चालू — संपल्यावर वापरा.</p>}
     </form>
   );
 }
@@ -110,7 +124,7 @@ export function BriefingTab({ ctx }: { ctx: CaseCtx }) {
     <div className="print-a4">
       <RunBanner ctx={ctx} />
       {!run ? (
-        <div className="card"><Empty icon="📝" title="अजून ब्रीफिंग नाही" hint="अभ्यास पूर्ण झाल्यावर येथे दिसेल." /></div>
+        <div className="card"><Empty icon="📝" title="अजून ब्रीफिंग नाही" hint="प्रक्रिया तयार झाल्यावर येथे दिसेल." /></div>
       ) : (
         <div className="space-y-4">
           <div className="no-print flex justify-end"><button className="btn-ghost" onClick={() => window.print()}>🖨 वरिष्ठांसाठी प्रिंट</button></div>
@@ -122,8 +136,8 @@ export function BriefingTab({ ctx }: { ctx: CaseCtx }) {
             <div className="card p-4">
               <div className="text-sm font-semibold text-slate-500">माहिती-मागणी पत्र</div>
               <div className="mt-2">{run.letter_needed == null ? '—' : run.letter_needed ? <Chip tone="amber">आवश्यक</Chip> : <Chip tone="green">आवश्यक नाही</Chip>}</div>
-              <div className="mt-3 text-sm text-slate-500">अभ्यास पूर्ण: {fmtDateTime(run.finished_at)}</div>
-              <div className="mt-2"><RunCost run={run} /></div>
+              <div className="mt-3 text-sm text-slate-500">प्रक्रिया तयार: {fmtDateTime(run.finished_at)}</div>
+              <RunCost run={run} />
               <div className="mt-2"><RunWarnings run={run} /></div>
             </div>
           </div>
@@ -137,8 +151,8 @@ export function BriefingTab({ ctx }: { ctx: CaseCtx }) {
               <ul className="divide-y divide-slate-100 dark:divide-navy-800">
                 {grs.map((g, i) => (
                   <li key={i} className="py-2">
-                    <div className="font-semibold">{g.title || g.code}</div>
-                    <div className="text-sm text-slate-500">{[g.code, g.date && fmtDate(g.date), g.pages != null && `पृ. ${textOf(g.pages)}`].filter(Boolean).join(' • ')}</div>
+                    <div className="break-words font-semibold">{textOf(g.title) || textOf(g.code) || '—'}</div>
+                    <div className="text-sm text-slate-500">{[textOf(g.code), g.date && fmtDate(textOf(g.date)), g.pages != null && `पृ. ${textOf(g.pages)}`].filter(Boolean).join(' • ')}</div>
                   </li>
                 ))}
               </ul>
@@ -200,7 +214,7 @@ export function NoteTab({ ctx }: { ctx: CaseCtx }) {
       <RunBanner ctx={ctx} />
       <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
         <div className="card min-w-0 p-3">
-          {!sel ? <Empty icon="📄" title="टिप्पणी अजून तयार नाही" hint="अभ्यास पूर्ण झाल्यावर येथे दिसेल." /> : (
+          {!sel ? <Empty icon="📄" title="टिप्पणी अजून तयार नाही" hint="प्रक्रिया तयार झाल्यावर येथे दिसेल." /> : (
             <>
               <div className="no-print mb-3 flex flex-wrap items-center gap-2">
                 <span className="truncate font-semibold" title={sel.original_name}>{sel.original_name}</span>
@@ -233,7 +247,7 @@ export function NoteTab({ ctx }: { ctx: CaseCtx }) {
               </ul>
             )}
           </Section>
-          {ctx.canWrite && <Section title="पुन्हा तयार करा"><ReRun ctx={ctx} /></Section>}
+          {ctx.canWrite && !latestFailed(ctx) && <Section title="पुन्हा तयार करा"><ReRun ctx={ctx} /></Section>}
         </div>
       </div>
       <Modal open={!!diff} onClose={() => setDiff(null)} title={`फरक: आवृत्ती ${prev?.version} → ${sel?.version}`} wide>
@@ -293,13 +307,14 @@ export function PackageTab({ ctx }: { ctx: CaseCtx }) {
               <ul className="space-y-2">
                 {grs.map((g, i) => {
                   const p = firstPage(g);
+                  const code = /^\d{16,20}$/.test(textOf(g.code)) ? textOf(g.code) : '';
                   return (
                     <li key={i} className="rounded-lg border border-slate-200 p-2 dark:border-navy-800">
-                      <div className="text-sm font-semibold">{g.title || g.code}</div>
-                      <div className="text-xs text-slate-500">{[g.code, g.date && fmtDate(g.date)].filter(Boolean).join(' • ')}</div>
+                      <div className="break-words text-sm font-semibold">{textOf(g.title) || textOf(g.code) || '—'}</div>
+                      <div className="text-xs text-slate-500">{[textOf(g.code), g.date && fmtDate(textOf(g.date))].filter(Boolean).join(' • ')}</div>
                       <div className="mt-1 flex flex-wrap gap-1">
-                        {p && pkg && <button className="btn-ghost px-2 py-1 text-sm" onClick={() => setJump({ page: p, at: Date.now() })}>पृ. {p} वर जा</button>}
-                        {g.code && /^\d{16,20}$/.test(g.code) && <button className="btn-ghost px-2 py-1 text-sm" onClick={() => void openGr(g.code!)}>मूळ GR</button>}
+                        {p && pkg && <button className="btn-ghost min-h-tap px-2 py-1 text-sm" onClick={() => setJump({ page: p, at: Date.now() })}>पृ. {p} वर जा</button>}
+                        {code && <button className="btn-ghost min-h-tap px-2 py-1 text-sm" onClick={() => void openGr(code)}>मूळ GR</button>}
                       </div>
                     </li>
                   );
@@ -333,7 +348,7 @@ export function StudyTab({ ctx }: { ctx: CaseCtx }) {
     <div>
       <RunBanner ctx={ctx} />
       <div className="card p-3">
-        {!s ? <Empty icon="📘" title="अभ्यास-फाइल अजून तयार नाही" hint="अभ्यास पूर्ण झाल्यावर येथे दिसेल." /> : (
+        {!s ? <Empty icon="📘" title="अभ्यास-फाइल अजून तयार नाही" hint="प्रक्रिया तयार झाल्यावर येथे दिसेल." /> : (
           <>
             <div className="mb-3 flex flex-wrap items-center gap-2">
               <span className="min-w-0 truncate font-semibold" title={s.original_name}>{s.original_name}</span>
@@ -367,6 +382,7 @@ export function LettersTab({ ctx }: { ctx: CaseCtx }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF(s => ({ ...s, [k]: e.target.value }));
   const replies = ofKind(ctx.files, 'reply');
+  const busyRun = runActive(latestRun(ctx.runs));
 
   async function create(e: FormEvent) {
     e.preventDefault();
@@ -424,9 +440,12 @@ export function LettersTab({ ctx }: { ctx: CaseCtx }) {
                   <div className="text-sm text-slate-500">पाठवले {fmtDate(l.sent_date)} • उत्तराची मुदत {fmtDate(l.reply_due)}{l.reply_received_date ? ` • उत्तर ${fmtDate(l.reply_received_date)}` : ''}</div>
                 </div>
                 {ctx.canWrite && !l.reply_received_date && (
-                  <div className="flex flex-wrap gap-2">
-                    <button className="btn-ghost" onClick={() => setReminderFor(l)}>स्मरणपत्र</button>
-                    <button className="btn-ghost" onClick={() => void markReply(l)}>उत्तर प्राप्त</button>
+                  <div className="flex flex-col items-end gap-1">
+                    <div className="flex flex-wrap gap-2">
+                      <button className="btn-ghost" disabled={busyRun} title={busyRun ? 'प्रक्रिया चालू — संपल्यावर वापरा' : undefined} onClick={() => setReminderFor(l)}>स्मरणपत्र</button>
+                      <button className="btn-ghost" onClick={() => void markReply(l)}>उत्तर प्राप्त</button>
+                    </div>
+                    {busyRun && <span className="text-sm text-slate-500 dark:text-slate-400">स्मरणपत्र: प्रक्रिया चालू — संपल्यावर वापरा</span>}
                   </div>
                 )}
               </li>
@@ -456,7 +475,7 @@ export function LettersTab({ ctx }: { ctx: CaseCtx }) {
         )}
         {offerRerun && (
           <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-3 dark:border-blue-900 dark:bg-blue-950/40">
-            <ReRun ctx={ctx} title="उत्तरासह अभ्यास पुन्हा करायचा?" preset="प्राप्त उत्तर (kind reply) विचारात घेऊन अभ्यास व टिप्पणी पुन्हा तयार करा." />
+            <ReRun ctx={ctx} title="प्राप्त उत्तरासह पुन्हा तयार करायचे?" preset="प्राप्त उत्तर (अपलोड केलेले उत्तराचे पत्र) विचारात घेऊन अभ्यास-फाइल व टिप्पणी पुन्हा तयार करा." />
           </div>
         )}
       </Section>
@@ -481,7 +500,7 @@ export function LettersTab({ ctx }: { ctx: CaseCtx }) {
         {reminderFor && (
           <ReRun
             ctx={ctx}
-            title="back-end ला सूचना"
+            title="प्रक्रियेसाठी सूचना"
             preset={`पत्र क्र. ${reminderFor.ref_no || '—'}, दि. ${fmtDate(reminderFor.sent_date)} (${reminderFor.addressed_to || ''}) याचे उत्तर अप्राप्त — स्मरणपत्राचा मसुदा तयार करा.`}
           />
         )}
@@ -511,7 +530,7 @@ export function HistoryTab({ ctx }: { ctx: CaseCtx }) {
     const r = (ctx.runs || []).map(x => ({
       at: x.finished_at || x.started_at || x.created_at,
       key: `r${x.id}`,
-      title: `अभ्यास #${x.id}: ${RUN_STATE_LABEL[x.state]}`,
+      title: `प्रक्रिया क्र. ${x.id}: ${x.state === 'done' ? 'तयार' : RUN_STATE_LABEL[x.state] || x.state}`,
       text: [x.step, x.instructions && `सूचना: ${x.instructions}`].filter(Boolean).join(' • '),
       who: x.created_by ? ctx.members.get(x.created_by) || '' : '',
       tone: runTone(x.state),
