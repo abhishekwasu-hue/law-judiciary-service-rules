@@ -3,7 +3,7 @@ import { sb } from '../lib/supabase';
 import type { Run } from '../lib/types';
 import { RUN_STATE_LABEL, RUN_STEPS, STALE_REASON, isStale, runTone } from '../lib/constants';
 import { asArray, fmtDateTime, textOf } from '../lib/format';
-import { Chip, Progress } from './ui';
+import { Chip, Progress, Spinner } from './ui';
 
 /** Latest runs of a case, kept live through Supabase Realtime (table `runs`). */
 export function useRuns(caseId: number | null) {
@@ -138,17 +138,37 @@ export default function RunProgress({ run }: { run: Run }) {
   const idx = stepIndex(run);
   const stale = isStale(run);
   const failed = run.state === 'failed' || stale;
-  const pct = run.state === 'done' ? 100 : Math.round((idx / (RUN_STEPS.length - 1)) * 100);
+  const active = !failed && (run.state === 'queued' || run.state === 'running');
+  // while active, the bar also fills with elapsed time vs the typical run time (capped at 95 %)
+  const typical = useTypicalRunSeconds();
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!active) return;
+    const t = setInterval(() => setNow(Date.now()), 5000);
+    return () => clearInterval(t);
+  }, [active]);
+  const elapsed = Math.max(0, (now - Date.parse(run.created_at)) / 1000);
+  const stepPct = Math.round((idx / (RUN_STEPS.length - 1)) * 100);
+  const timePct = typical ? Math.min(95, Math.round((elapsed / typical.sec) * 100)) : 0;
+  const pct = run.state === 'done' ? 100 : active ? Math.max(4, stepPct, timePct) : stepPct;
+  // the GitHub runner is still starting / installing tools while the run row says queued
+  const preparing = run.state === 'queued' && !run.step && elapsed > 20;
   return (
     <div className="space-y-3" aria-live="polite">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <Chip tone={stale ? 'red' : runTone(run.state)}>{stale ? 'वेळ संपली' : RUN_STATE_LABEL[run.state] || run.state}</Chip>
+          {active ? (
+            <span className="inline-flex items-center gap-2 rounded-full bg-blue-100 px-3 py-1 text-sm font-bold text-blue-900 dark:bg-blue-900/40 dark:text-blue-100">
+              <Spinner className="h-4 w-4" /> {preparing ? 'तयारी चालू — सर्व्हर सुरू होत आहे' : 'प्रक्रिया चालू'}
+            </span>
+          ) : (
+            <Chip tone={stale ? 'red' : runTone(run.state)}>{stale ? 'वेळ संपली' : RUN_STATE_LABEL[run.state] || run.state}</Chip>
+          )}
           <span className="text-sm text-slate-500 dark:text-slate-400">अभ्यास #{run.id} • {fmtDateTime(run.created_at)}</span>
         </div>
         <RunCost run={run} />
       </div>
-      <Progress pct={failed ? 100 : pct} tone={failed ? 'red' : run.state === 'done' ? 'green' : 'blue'} />
+      <Progress pct={failed ? 100 : pct} tone={failed ? 'red' : run.state === 'done' ? 'green' : 'blue'} active={active} />
       <ol className="grid grid-cols-4 gap-1 text-center text-xs sm:grid-cols-7 sm:text-sm">
         {RUN_STEPS.map((s, i) => {
           const done = i < idx || run.state === 'done';

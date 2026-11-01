@@ -82,11 +82,11 @@ export function Section({ title, right, children, className = '' }: { title: str
   );
 }
 
-export function Progress({ pct, tone = 'blue' }: { pct: number; tone?: 'blue' | 'green' | 'red' }) {
+export function Progress({ pct, tone = 'blue', active = false }: { pct: number; tone?: 'blue' | 'green' | 'red'; active?: boolean }) {
   const c = tone === 'green' ? 'bg-green-600' : tone === 'red' ? 'bg-red-600' : 'bg-blue-600';
   return (
-    <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-navy-800" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
-      <div className={`h-full ${c} transition-all`} style={{ width: `${pct}%` }} />
+    <div className={`${active ? 'h-3' : 'h-2'} w-full overflow-hidden rounded-full bg-slate-200 dark:bg-navy-800`} role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
+      <div className={`h-full ${c} transition-all duration-700 ${active ? 'progress-stripes' : ''}`} style={{ width: `${pct}%` }} />
     </div>
   );
 }
