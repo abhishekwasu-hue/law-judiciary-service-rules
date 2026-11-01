@@ -202,3 +202,17 @@ export default function RunProgress({ run }: { run: Run }) {
     </div>
   );
 }
+
+/** Compact live status of a case's latest run (list rows, global bar). */
+export function RunStateBadge({ run }: { run: Run | undefined }) {
+  if (!run) return <span className="text-sm text-slate-500">—</span>;
+  const stale = isStale(run);
+  if (!stale && (run.state === 'queued' || run.state === 'running'))
+    return (
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-100 px-2.5 py-0.5 text-sm font-bold text-blue-900 dark:bg-blue-900/40 dark:text-blue-100">
+        <Spinner className="h-3.5 w-3.5" /> प्रक्रिया चालू
+      </span>
+    );
+  if (run.state === 'done') return <Chip tone="green">✓ तयार</Chip>;
+  return <Chip tone="red">{stale ? 'वेळ संपली' : 'अयशस्वी'}</Chip>;
+}

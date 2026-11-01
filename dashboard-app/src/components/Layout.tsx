@@ -1,7 +1,33 @@
 import { useEffect, useState } from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import CommandPalette from './CommandPalette';
+import { useData } from '../lib/data';
+import { isStale } from '../lib/constants';
+import { crLabel } from '../lib/format';
+import { Spinner } from './ui';
+import ErrorBoundary from './ErrorBoundary';
+
+/** Global bar on every page: runs still processing, each a link to its case (Abhi 01.11.2026 — progress must not "disappear" when he leaves the page). */
+function ActiveRunsBar() {
+  const { cases, latestRuns } = useData();
+  const active = [...latestRuns.values()].filter(r => (r.state === 'queued' || r.state === 'running') && !isStale(r));
+  if (!active.length) return null;
+  return (
+    <div className="no-print mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-blue-900 dark:border-blue-900 dark:bg-blue-900/30 dark:text-blue-100" role="status">
+      <Spinner className="h-4 w-4" />
+      <span className="font-bold">{active.length} अभ्यास चालू — दुसऱ्या पानावर गेलात तरी काम चालूच राहते</span>
+      {active.map(r => {
+        const c = cases.find(x => x.id === r.case_id);
+        return (
+          <NavLink key={r.id} to={`/cases/${r.case_id}`} className="rounded-md bg-white px-2.5 py-1 text-sm font-semibold text-blue-800 underline-offset-2 hover:underline dark:bg-navy-800 dark:text-blue-200">
+            {c ? crLabel(c) : `प्रकरण #${r.case_id}`} → पाहा
+          </NavLink>
+        );
+      })}
+    </div>
+  );
+}
 
 export function Brand() {
   return (
@@ -116,7 +142,8 @@ export default function Layout() {
           </div>
         </header>
         <main className="mx-auto w-full max-w-7xl px-4 pb-28 pt-4 md:pb-10 md:pt-6">
-          <Outlet />
+          <ActiveRunsBar />
+          <RouteBoundary />
         </main>
         <nav className="no-print fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)] dark:border-navy-800 dark:bg-navy-900 md:hidden" aria-label="मुख्य">
           {NAV.map(i => (
@@ -137,4 +164,9 @@ export default function Layout() {
       <CommandPalette open={palette} onClose={() => setPalette(false)} />
     </div>
   );
+}
+
+function RouteBoundary() {
+  const loc = useLocation();
+  return <ErrorBoundary resetKey={loc.pathname}><Outlet /></ErrorBoundary>;
 }

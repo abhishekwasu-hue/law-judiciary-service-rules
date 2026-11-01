@@ -4,6 +4,7 @@ import { useData, overdueIds } from '../lib/data';
 import { useCanWrite } from '../lib/auth';
 import { CATEGORIES, STAGES, stageTone } from '../lib/constants';
 import { crLabel, fmtDate } from '../lib/format';
+import { RunStateBadge } from '../components/RunProgress';
 import { humanError } from '../lib/api';
 import type { Case } from '../lib/types';
 import { Chip, Empty, SkeletonRows } from '../components/ui';
@@ -28,7 +29,7 @@ function exportCsv(rows: Case[], overdue: Set<number>) {
 }
 
 export default function Cases() {
-  const { cases, letters, loading, error, setStage } = useData();
+  const { cases, letters, loading, error, setStage, latestRuns } = useData();
   const canWrite = useCanWrite();
   const toast = useToast();
   const nav = useNavigate();
@@ -136,14 +137,15 @@ export default function Cases() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-slate-200 dark:border-navy-800">
-                  <th className="th">C R</th><th className="th">विषय</th><th className="th">प्रवर्ग</th><th className="th">कार्यालय</th><th className="th">टप्पा</th><th className="th">मुदत</th>
+                  <th className="th">C R</th><th className="th">स्थिती</th><th className="th">विषय</th><th className="th">प्रवर्ग</th><th className="th">कार्यालय</th><th className="th">टप्पा</th><th className="th">मुदत</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map(c => (
                   <tr key={c.id} className="cursor-pointer border-b border-slate-100 hover:bg-slate-50 dark:border-navy-800/60 dark:hover:bg-navy-800/50" onClick={() => nav(`/cases/${c.id}`)}>
                     <td className="td whitespace-nowrap font-semibold"><Link to={`/cases/${c.id}`} onClick={e => e.stopPropagation()} className="underline-offset-2 hover:underline">{crLabel(c)}</Link>{c.priority === 'तातडीचे' && <span className="ml-1 text-saffron-600" title="तातडीचे">●</span>}</td>
-                    <td className="td max-w-md"><div className="line-clamp-2">{c.subject}</div></td>
+                    <td className="td whitespace-nowrap"><RunStateBadge run={latestRuns.get(c.id)} /></td>
+                    <td className="td max-w-md"><div className="line-clamp-2">{c.subject || <span className="text-slate-500">विषय PDF वरून येईल</span>}</div></td>
                     <td className="td whitespace-nowrap">{c.category}</td>
                     <td className="td">{c.office || '—'}</td>
                     <td className="td"><Chip tone={stageTone(c.stage)}>{c.stage}</Chip></td>
