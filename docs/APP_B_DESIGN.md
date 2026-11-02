@@ -52,6 +52,12 @@ D11. (01.11.2026) **Budget is SOFT** — `budget_usd` (engine default 0.75; Work
     use stored per run (migration 0004).
 D12. (01.11.2026) **Engine speed/quality steps:** page pre-step (tools/prep_pages.py), compact rules tools/ENGINE_BRIEF.md,
     lint before build, verify re-run in the workflow; §4.18 language rule in samples + lint.
+D13. (02.11.2026, Abhi: "Ek tab add karun he application, tyamdhe add kra") **"नस्ती डॅशबोर्ड" tab** — Abhi's
+    नस्ती-स्थिती डॅशबोर्ड (Nasti-Dashboard.apk, Capacitor; its single page assets/public/index.html) copied UNCHANGED to
+    `dashboard-app/public/nasti/index.html` (sha256 fa757418…) and shown at `/nasti` in a full-height iframe
+    (`src/pages/NastiDashboard.tsx`; nav item 📊; phone bottom bar 6 columns). Its data stays in the browser's localStorage
+    (same origin), not in Supabase; Android-only plugins fall back to browser download/share/copy. The static file is served
+    without login (it holds code, no data). Needs a deploy (scripts/deploy.ps1) to go live.
 
 ## Open questions for Abhi (work continues on the defaults)
 Q1. D1/D2 (keys in Cloudflare KV via Settings; setup code read once from the Cloudflare dashboard) — OK?

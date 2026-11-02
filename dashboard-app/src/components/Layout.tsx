@@ -47,6 +47,7 @@ const NAV = [
   { to: '/cases', label: 'प्रकरणे', icon: '🗂️' },
   { to: '/gr', label: 'GR ग्रंथालय', icon: '📚' },
   { to: '/search', label: 'नोंदवही शोध', icon: '🔎' },
+  { to: '/nasti', label: 'नस्ती डॅशबोर्ड', icon: '📊' },
 ];
 
 export function ThemeToggle() {
@@ -174,7 +175,7 @@ export default function Layout() {
           <ActiveRunsBar />
           <RouteBoundary />
         </main>
-        <nav className="no-print fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)] dark:border-navy-800 dark:bg-navy-900 md:hidden" aria-label="मुख्य">
+        <nav className="no-print fixed inset-x-0 bottom-0 z-30 grid grid-cols-6 border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)] dark:border-navy-800 dark:bg-navy-900 md:hidden" aria-label="मुख्य">
           {NAV.map(i => (
             <NavLink
               key={i.to}

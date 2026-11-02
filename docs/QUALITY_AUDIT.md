@@ -128,3 +128,34 @@ cost ~$0.4–0.7). Real floor with the quality rule ≈ $1.0. Setting `model` = 
 $0.5–0.9 but changes the drafting model — only after a side-by-side check against approved notes (Abhi's decision).
 Unverified until a live run: subagent `model` honoured by the pinned CLI 2.1.300 (schema has it), Haiku as
 orchestrator following the routing, real turn counts, part1check false-mismatch rate.
+
+## 7. Re-audit 02.11.2026 (read-only; Worker+Supabase, dashboard-app, engine) — Abhi chooses what to fix
+Tests: worker 5/5 pass; pytest 111 pass (engine_supabase_test.py, test_prep_pages.py not collected by pytest; no workflow runs tests); `tsc` 0 errors, build OK.
+Earlier §1–§3 items now fixed in code: stuck-run sweep + cancelled(), fetch-depth 1, runs_ins/files_ins dropped, bucket whitelist, pkg3 stamps/page-spec/no box, letter margins, verify_outputs hardening, push-loop flag (process-proposal), newest proposal, gr_request retries, cost/turns per run. Still open: service key in the Claude step, sparse pdf/ checkout (Abhi), apt cache, पृ.N vs map.json match, letter_needed vs letter check, gr-request.yml push loop.
+
+| Sev | Where | Problem | Fix | Eff |
+|---|---|---|---|---|
+| H | process-proposal.yml:27-28,69,217-220 | Claude step (skip-permissions, Bash, internet, untrusted PDFs) has SUPABASE_SERVICE_KEY + ANTHROPIC key in env; checkout persists a contents:write GITHUB_TOKEN in .git/config | `persist-credentials: false`; `env -u` Supabase vars for Claude; progress via Worker + run token; commit token fetched after Claude | M |
+| H | engine_supabase.py:597-600 | Opus review gate trusts `review.approved` written by the Haiku orchestrator | require MODEL_REVIEW in modelUsage; reviewer records sha256 of spec/part 0, recomputed | S |
+| H/M | worker.js:316-336; NewProposal.tsx:140-145; CaseTabs.tsx:77-95 | No server check for a run already queued/running → double tap / two tabs = 2 runs, double cost | 409 if an active non-stale run exists; lock button on the API reply | S |
+| M | process-proposal.yml:240; extract_check.py | Final extract check non-fatal (`|| true`); note-body “…” quotes never machine-checked | fail on mismatch; include note-body quotes | M |
+| M | process-proposal.yml:155-230 | part1check run only by the model | re-run in the verify step | S |
+| M | verify_outputs.py:285; engine_supabase.py:177,616 | Upload-prefix regex `^[0-9a-f]{8}-` also strips real names like "20261101-CR130.pdf"; two regexes differ | strip only a known upload prefix; one shared regex | S |
+| M | pkg3.py:81,121 | White stamp box drawn on proposal scan pages too — can hide a bottom-centre page no./remark (§4.13) | no fill on proposal pages / margin strip | S |
+| M | gr-request.yml:21 | Silent push loop (`|| sleep 5`), INDEX.tsv conflicts → GRs lost | copy process-proposal commit block | S |
+| M | verify_outputs.py | status.json letter_needed not checked against the built letter | add check | S |
+| M | worker.js:180-186 | Single-use token is read-then-write on KV (not atomic, eventually consistent) | flag in Postgres with conditional PATCH | M |
+| M | worker.js:369-372 | `/api/search` q passed into GitHub search; `repo:` filters not stripped (scope of OR unverified) | strip qualifiers; drop hits outside github_repo | S |
+| M | worker.js:6,186 | `model_strong`, `effort` read by engine but not settable from Settings | add to PLAIN_KEYS + UI | S |
+| M | engine_supabase.py:325; process-proposal.yml:157 | Code default MODEL = Opus; docs say drafter = Sonnet; live KV value unknown | check Settings; align default/docs | S |
+| M | lib/data.tsx:63-97; RunProgress.tsx | No re-fetch on reconnect/visibility; phone wakes to stale "चालू", outputs hidden | refresh on visibilitychange/online/SUBSCRIBED | S |
+| M | CaseDetail.tsx:44-119 | Old case data not cleared on id change; late response overwrites | reset state; id guard | S |
+| M | CaseDetail.tsx:272 | Edit form reset by Realtime updates while open | reset only on open | XS |
+| M | PdfViewer.tsx:39-66 | Canvases never released → long package can crash phone tab | unobserve/release off-screen | M |
+| M | Layout.tsx:159-171 | Mobile header for owner ~410 px (estimate) | "⋯" menu | S |
+| M | Home.tsx:3; CaseTabs.tsx:2 | Recharts (104 kB gz) loaded statically | lazy charts | S |
+| M | Home.tsx:46,137 | Query errors ignored → "no cases"/"nothing pending" shown on failure | error card | S |
+| L | worker.js | owner by email without email_confirmed_at; duplicate C R race → raw 500, "021"≠"21"; case_id not validated in /api/run, /api/letters; PATCH letters no 404/whitelist/log; decodeURIComponent throw; monthly limit ignores running runs; first-owner insert race; empty required settings accepted | per item | S |
+| L | engine/tools | gr_request code not validated (path); duplicate pkg3 labels; OCR not tied to package sha; tests not in CI; actions not SHA-pinned; curl --retry vs single-use token | per item | S |
+| L | front end | DocxView unsanitised hrefs/w:char; ✕ on uploaded extras; scroll to status; dupId never cleared; reloadLetters refreshes all; chart axis labels clipped on phone; PDF outline open on phone; auth listener dup; ARIA | per item | XS–S |
+Feature ideas (suggestions only): push notification on run end; share PDF from WhatsApp into "नवीन प्रस्ताव"; camera upload of reply; one-click download of all three files; selectable/searchable PDF text; tap पृ.N → package page; reply-due reminders; outgoing-letter register; "मंजूर आवृत्ती" mark + senior remarks.
