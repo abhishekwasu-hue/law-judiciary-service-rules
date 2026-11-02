@@ -67,3 +67,18 @@ Same steps with Claude (engine provider empty) give the baseline.
   Test B will show it in numbers.
 - Free tiers are still not for real proposals (Gemini terms: no confidential data). A good score here is about ability,
   not permission.
+
+## R5 — local Ollama (Gemma 4) vs tesseract, Study part 1 (02.11.2026)
+Machine: 4 CPU, no GPU, Ollama 0.40.13. Set: tests/benchmark_set (8 public GR pages + 3 dummy pages, 11 pages). Chart: docs/ai-benchmark/ollama_gemma4_vs_tesseract.png.
+
+| Engine | Number recall | Date recall | Word recall | CER | Invented numbers/page | s/page |
+|---|---|---|---|---|---|---|
+| gemma4:e2b (thinking off) | 33.2% | 50.0% | 33.5% | 66.1% | 1.36 | 94 |
+| gemma4:e4b (thinking off) | 32.4% | 21.4% | 38.8% | 61.1% | 2.0 | 201 |
+| tesseract -l mar | 76.1% | 85.7% | 98.7% | 16.0% | 4.45 | 1.1 |
+| tesseract -l mar+eng | 74.3% | 85.7% | 98.3% | 14.9% | 0.45 | 1.9 |
+
+- e2b with thinking on (app default; 3 pages only): numbers 64.0%, words 68.4%, CER 31.7%, ~611 s/page (one page 1372 s > the app's 300 s limit).
+- The GR-page word key favours tesseract (it counts words tesseract also reads); on the 3 dummy pages (exact key) e2b: words 76.1% / CER 13.2% vs tesseract 98.7% / 7.4%.
+- Not tested: gemma4 12b/26b/31b, GPU machines. CPU was shared with other jobs at times.
+- Result on this hardware: Ollama (Gemma 4 small) is not usable for Study part 1.
