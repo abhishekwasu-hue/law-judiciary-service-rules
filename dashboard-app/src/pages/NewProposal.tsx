@@ -77,6 +77,14 @@ export default function NewProposal() {
   const running = (pendingRun !== null && run?.id !== pendingRun) || (!!run && (run.state === 'queued' || run.state === 'running') && !isStale(run));
   const failed = !!run && !done && !running;
 
+  // scroll to the status panel after it has rendered (created / ups set), not before
+  const wantScroll = useRef(false);
+  useEffect(() => {
+    if (!wantScroll.current || !statusRef.current) return;
+    wantScroll.current = false;
+    statusRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [created, ups.length]);
+
   if (!canWrite) return <div className="card p-6 text-center">आपल्याला फक्त वाचण्याची परवानगी आहे.</div>;
 
   async function pickProposal(files: File[]) {
@@ -114,8 +122,8 @@ export default function NewProposal() {
     } catch {
       /* spend check unavailable: the Worker still enforces the limit on /api/run */
     }
-    // show the status panel (top of the page) right away — Abhi's request 01.11.2026
-    requestAnimationFrame(() => statusRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    // show the status panel (top of the page) once it is rendered — Abhi's request 01.11.2026 (effect below)
+    wantScroll.current = true;
     try {
       let c = created;
       if (!c) {
@@ -124,12 +132,14 @@ export default function NewProposal() {
           body: Object.fromEntries(Object.entries({ cr_no: f.cr_no.trim(), cr_year: f.cr_year.trim() ? Number(f.cr_year) : '', file_no: f.file_no.trim(), subject: f.subject.trim(), category: f.category, priority: f.priority }).filter(([, v]) => v !== '')),
         });
         setCreated(c);
+        setDupId(null);
       }
       const list: Up[] = [{ file: proposal, kind: 'proposal', pct: 0, state: 'wait' }, ...extras.map(x => ({ file: x, kind: 'extra_doc' as const, pct: 0, state: 'wait' as const }))];
-      const prev = ups;
-      setUps(list.map((u, i) => (prev[i]?.state === 'ok' && prev[i].file === u.file ? prev[i] : u)));
+      // a retry skips files already uploaded — matched by the File object itself, not by list position
+      const prevOk = (u: Up) => ups.find(p => p.state === 'ok' && p.file === u.file && p.kind === u.kind);
+      setUps(list.map(u => prevOk(u) ?? u));
       for (let i = 0; i < list.length; i++) {
-        if (prev[i]?.state === 'ok' && prev[i].file === list[i].file) continue; // retry skips finished files
+        if (prevOk(list[i])) continue;
         setUps(s => s.map((u, j) => (j === i ? { ...u, state: 'up' } : u)));
         try {
           await uploadFile(c.id, list[i].kind, list[i].file, pct => setUps(s => s.map((u, j) => (j === i ? { ...u, pct } : u))));
@@ -172,6 +182,7 @@ export default function NewProposal() {
     setCreated(null);
     setRunErr('');
     setPendingRun(null);
+    setDupId(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
   return (
@@ -236,7 +247,7 @@ export default function NewProposal() {
                 {extras.map((x, i) => (
                   <li key={i} className="flex items-center justify-between gap-2 rounded-lg bg-slate-100 px-3 py-1 dark:bg-navy-800">
                     <span className="truncate" title={x.name}>{x.name} <span className="text-sm text-slate-500">({fmtBytes(x.size)})</span></span>
-                    {!busy && <button type="button" className="btn-ghost min-w-tap px-2" onClick={() => setExtras(s => s.filter((_, j) => j !== i))} aria-label="काढा">✕</button>}
+                    {!busy && !locked && <button type="button" className="btn-ghost min-w-tap px-2" onClick={() => setExtras(s => s.filter((_, j) => j !== i))} aria-label="काढा">✕</button>}
                   </li>
                 ))}
               </ul>

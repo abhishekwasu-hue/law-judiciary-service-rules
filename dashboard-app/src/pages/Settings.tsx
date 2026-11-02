@@ -16,6 +16,8 @@ const PLAIN: { k: string; label: string; hint?: string; num?: boolean; max?: num
   { k: 'model', label: 'मुख्य मॉडेल (model)', hint: 'मसुदा (तथ्ये, नोंद, पत्र, GR) — उदा. claude-sonnet-…', ai: true, ph: 'उदा. claude-sonnet-…' },
   { k: 'model_review', label: 'अंतिम पडताळणी मॉडेल (model_review)', hint: 'नोंद, पत्र व ब्रीफिंगची अंतिम तपासणी व मंजुरी — सर्वात सक्षम मॉडेल ठेवा; रिकामे = डीफॉल्ट', ai: true, ph: 'उदा. claude-opus-…' },
   { k: 'model_light', label: 'स्वस्त मॉडेल (model_light)', hint: 'Study भाग 1–7, संबंधित माहिती व यांत्रिक काम — स्वस्त मॉडेल; रिकामे = डीफॉल्ट', ai: true, ph: 'उदा. claude-haiku-…' },
+  { k: 'model_strong', label: 'उच्च-स्तर मॉडेल (model_strong)', hint: 'ऐच्छिक — मुख्य मॉडेलच्या वर एकदिशा उन्नयन (escalation); रिकामे / none = बंद', ai: true, ph: 'रिकामे = बंद' },
+  { k: 'effort', label: 'विचार-पातळी (effort)', hint: 'रिकामे = medium', ai: true, choices: [['', 'रिकामे (medium)'], ['low', 'low'], ['medium', 'medium'], ['high', 'high'], ['xhigh', 'xhigh'], ['max', 'max']] },
   { k: 'budget_usd', label: 'कमाल खर्च ($) (budget_usd)', hint: 'प्रत्येक प्रस्तावासाठी अपेक्षित कमाल खर्च ($). ओलांडल्यास फक्त सूचना येते — काम थांबत नाही, दर्जा घटत नाही. रिकामे = 0.75', num: true, max: 20, ai: true, ph: 'उदा. 1.5' },
   // other AI providers (Abhi 02.11.2026 — docs/AI_PROVIDERS_RESEARCH.md: A = Study भाग 1 on Gemini, C = fallback)
   { k: 'part1_provider', label: 'Study भाग 1 कोणाकडून (part1_provider)', hint: 'Gemini निवडल्यास भाग 1 Gemini करते; प्रत्येक आकडा/दिनांक/नाव मुख्य मॉडेलच्या वाचनाशी यंत्राने जुळवला जातो', alt: true, choices: [['', 'Claude (डीफॉल्ट)'], ['gemini', 'Gemini']] },

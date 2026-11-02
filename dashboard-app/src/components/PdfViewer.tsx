@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { PDFDocumentProxy } from 'pdfjs-dist';
+import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist';
 import { fileBytes, humanError } from '../lib/api';
 import { openPdf } from '../lib/pdf';
 import { Skeleton } from './ui';
@@ -27,19 +27,29 @@ async function resolveOutline(doc: PDFDocumentProxy): Promise<OutlineNode[]> {
   return walk(raw);
 }
 
-function Page({ doc, n, width }: { doc: PDFDocumentProxy; n: number; width: number }) {
+/** Render a page when it is within NEAR px of the scroller view; free its canvas when it is beyond FAR px (long packages on phones). */
+const NEAR = '600px';
+const FAR = '2400px';
+
+function Page({ doc, n, width, root }: { doc: PDFDocumentProxy; n: number; width: number; root: HTMLElement | null }) {
   const holder = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
+  const pageRef = useRef<PDFPageProxy | null>(null);
   const [visible, setVisible] = useState(false);
   const [ratio, setRatio] = useState(1.414);
 
   useEffect(() => {
     const el = holder.current;
     if (!el) return;
-    const io = new IntersectionObserver(es => es.some(e => e.isIntersecting) && setVisible(true), { rootMargin: '600px' });
-    io.observe(el);
-    return () => io.disconnect();
-  }, []);
+    const near = new IntersectionObserver(es => es.some(e => e.isIntersecting) && setVisible(true), { root, rootMargin: NEAR });
+    const far = new IntersectionObserver(es => es.every(e => !e.isIntersecting) && setVisible(false), { root, rootMargin: FAR });
+    near.observe(el);
+    far.observe(el);
+    return () => {
+      near.disconnect();
+      far.disconnect();
+    };
+  }, [root]);
 
   useEffect(() => {
     if (!visible || !width) return;
@@ -47,6 +57,8 @@ function Page({ doc, n, width }: { doc: PDFDocumentProxy; n: number; width: numb
     let task: { cancel: () => void; promise: Promise<unknown> } | null = null;
     (async () => {
       const page = await doc.getPage(n);
+      if (cancelled) return;
+      pageRef.current = page;
       const base = page.getViewport({ scale: 1 });
       setRatio(base.height / base.width);
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -58,12 +70,24 @@ function Page({ doc, n, width }: { doc: PDFDocumentProxy; n: number; width: numb
       // Default annotation mode draws existing annotations (the yellow highlights) onto the canvas.
       task = page.render({ canvasContext: c.getContext('2d')!, viewport: vp });
       await task.promise.catch(() => {});
-    })();
+    })().catch(() => undefined);
     return () => {
       cancelled = true;
       task?.cancel();
     };
   }, [visible, width, doc, n]);
+
+  // far off-screen: drop the bitmap (width/height 0 frees canvas memory) and the page's cached data
+  useEffect(() => {
+    if (visible) return;
+    const c = canvas.current;
+    if (c && c.width) {
+      c.width = 0;
+      c.height = 0;
+    }
+    pageRef.current?.cleanup();
+    pageRef.current = null;
+  }, [visible]);
 
   return (
     <div ref={holder} data-page={n} className="relative mx-auto bg-white shadow" style={{ width, height: width * ratio }}>
@@ -93,9 +117,15 @@ export default function PdfViewer({ fileId, url, jumpTo }: { fileId?: number; ur
   const [outline, setOutline] = useState<OutlineNode[]>([]);
   const [err, setErr] = useState('');
   const [width, setWidth] = useState(0);
-  const [showOutline, setShowOutline] = useState(true);
+  // bookmarks panel: closed by default on phones (it covers the page there)
+  const [showOutline, setShowOutline] = useState(() => typeof window === 'undefined' || window.innerWidth >= 768);
   const [pageInput, setPageInput] = useState('');
-  const scroller = useRef<HTMLDivElement>(null);
+  const scroller = useRef<HTMLDivElement | null>(null);
+  const [scrollEl, setScrollEl] = useState<HTMLDivElement | null>(null);
+  const setScroller = useCallback((el: HTMLDivElement | null) => {
+    scroller.current = el;
+    setScrollEl(el);
+  }, []);
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -173,9 +203,9 @@ export default function PdfViewer({ fileId, url, jumpTo }: { fileId?: number; ur
             <Outline nodes={outline} go={p => { go(p); if (window.innerWidth < 768) setShowOutline(false); }} />
           </nav>
         )}
-        <div ref={scroller} className="relative h-[75vh] min-w-0 flex-1 overflow-auto rounded-lg bg-slate-200 p-2 dark:bg-navy-950">
+        <div ref={setScroller} className="relative h-[75vh] min-w-0 flex-1 overflow-auto rounded-lg bg-slate-200 p-2 dark:bg-navy-950">
           <div className="flex flex-col gap-3">
-            {width > 0 && Array.from({ length: doc.numPages }, (_, i) => <Page key={i} doc={doc} n={i + 1} width={width} />)}
+            {width > 0 && Array.from({ length: doc.numPages }, (_, i) => <Page key={i} doc={doc} n={i + 1} width={width} root={scrollEl} />)}
           </div>
         </div>
       </div>

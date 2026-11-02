@@ -14,6 +14,7 @@ const stateText = (s: string) => STATE_TEXT[s] || RUN_STATE_LABEL[s] || s;
 export function useRuns(caseId: number | null) {
   const [runs, setRuns] = useState<Run[] | null>(null);
   useEffect(() => {
+    setRuns(null); // never show the previous case's runs
     if (!caseId) return;
     let alive = true;
     const load = () =>
@@ -22,21 +23,33 @@ export function useRuns(caseId: number | null) {
         .select('*')
         .eq('case_id', caseId)
         .order('created_at', { ascending: false })
-        .then(({ data }) => alive && setRuns((data as Run[]) || []));
+        .then(({ data, error }) => {
+          // a failed re-read keeps what is shown (first read: empty list, as before)
+          if (alive) setRuns(s => (error ? s ?? [] : (data as Run[]) || []));
+        });
     void load();
+    // Realtime does not replay missed events → re-read on tab return, reconnect and (re)subscribe
+    const onVisible = () => document.visibilityState === 'visible' && void load();
+    const onOnline = () => void load();
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('online', onOnline);
     const ch = sb()
       .channel(`runs-${caseId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'runs', filter: `case_id=eq.${caseId}` }, p => {
         const row = p.new as Run;
-        if (!row?.id) return;
+        if (!alive || !row?.id) return;
         setRuns(s => {
           const list = s || [];
           return list.some(r => r.id === row.id) ? list.map(r => (r.id === row.id ? row : r)) : [row, ...list];
         });
       })
-      .subscribe();
+      .subscribe(status => {
+        if (status === 'SUBSCRIBED') void load();
+      });
     return () => {
       alive = false;
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('online', onOnline);
       void sb().removeChannel(ch);
     };
   }, [caseId]);

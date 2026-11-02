@@ -17,6 +17,30 @@ function errText(e: unknown): string {
   return /[ऀ-ॿ]/.test(h) ? h : 'फाइल उघडता आली नाही — पुन्हा लोड करा किंवा डाउनलोड करून पाहा.';
 }
 
+const BAD_URL = /^\s*(javascript|data|vbscript):/i;
+const URL_ATTRS = ['href', 'xlink:href', 'src', 'action', 'formaction', 'srcdoc'];
+/** A crafted DOCX must not run code in the app: drop active elements, on* handlers and javascript:/data: links.
+ *  Images keep their data: src (docx-preview embeds pictures as base64 data URLs). */
+export function sanitizeDocx(root: HTMLElement) {
+  root.querySelectorAll('script, iframe, frame, object, embed, base, meta, link, form, input, button, textarea, select').forEach(el => el.remove());
+  root.querySelectorAll('*').forEach(el => {
+    for (const a of Array.from(el.attributes)) {
+      const name = a.name.toLowerCase();
+      if (name.startsWith('on')) el.removeAttribute(a.name);
+      else if (URL_ATTRS.includes(name) && BAD_URL.test(a.value)) {
+        // pictures: <img src> and VML-as-SVG <image href> carry data:image/… (not executable there)
+        const pic = (name === 'src' && el.tagName === 'IMG') || (name !== 'src' && el.tagName.toLowerCase() === 'image');
+        const imgData = pic && /^\s*data:image\//i.test(a.value);
+        if (!imgData) el.removeAttribute(a.name);
+      }
+    }
+    if (el.tagName === 'A') {
+      el.setAttribute('rel', 'noopener noreferrer');
+      el.setAttribute('target', '_blank');
+    }
+  });
+}
+
 /** Read-only DOCX preview (docx-preview). The stored file itself is never changed. */
 export default function DocxView({ fileId }: { fileId: number }) {
   const host = useRef<HTMLDivElement>(null);
@@ -31,9 +55,13 @@ export default function DocxView({ fileId }: { fileId: number }) {
       try {
         const [{ data }, m] = await Promise.all([fileBytes(fileId), docxLib()]);
         if (!alive || !host.current) return;
-        host.current.replaceChildren();
-        await m.renderAsync(data, host.current, undefined, { className: 'docx', inWrapper: true, breakPages: true, ignoreLastRenderedPageBreak: true, experimental: false, useBase64URL: true });
-        if (alive) setState('ok');
+        // render off-document, clean, then attach (nothing from the file reaches the page unchecked)
+        const tmp = document.createElement('div');
+        await m.renderAsync(data, tmp, undefined, { className: 'docx', inWrapper: true, breakPages: true, ignoreLastRenderedPageBreak: true, experimental: false, useBase64URL: true });
+        sanitizeDocx(tmp);
+        if (!alive || !host.current) return;
+        host.current.replaceChildren(...Array.from(tmp.childNodes));
+        setState('ok');
       } catch (e) {
         if (alive) {
           setErr(errText(e));
