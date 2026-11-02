@@ -2,7 +2,7 @@
 
 Owner: Abhi, Section Officer (कार्यासन अधिकारी), Law & Judiciary Department, Desk-6 (कार्यासन-6), Govt of Maharashtra.
 When he sends a proposal PDF, do ALL steps below without asking. He must never have to explain this again.
-The rules are in INSTRUCTIONS.md §4 (items 1–17); this file is the order of work + the tools. If anything here conflicts with
+The rules are in INSTRUCTIONS.md §4 (items 1–26); this file is the order of work + the tools. If anything here conflicts with
 INSTRUCTIONS.md, INSTRUCTIONS.md wins. Reply to him in Marathi, few words.
 
 The quality standard = the approved notes in `samples/specs/` (C R 66, 122, 128, 130, 131, 133 of 2026). Match them.
@@ -46,7 +46,7 @@ Trigger: Abhi says "प्रस्ताव कक्षातील नवी�
    - **Helper:** add `code …` / `search …` / `dept …` lines to `tools/gr-request.txt` and run `python3 tools/gr_request.py`. Run it locally if the session has internet; otherwise push the file and the GitHub Action does it. Files land in `pdf/gr/` + `INDEX.tsv`.
    - **Rule books:** official site `finance.maharashtra.gov.in` → Publications/Handbook. MCS (Pay) Rules 1981 is already in `pdf/01-mcs-pay-rules-1981/`.
    - **Court orders:** official sites only (api.sci.gov.in, bombayhighcourt.nic.in). Never third-party sites.
-   - **Mirror gaps:** the archive.org mirror lacks many 2026 and some older Law & Judiciary GRs, and the GR site's search has a captcha. If a GR is still not found, ask Abhi for its सांकेतांक in ONE line and continue with everything else.
+   - **Mirror gaps:** the archive.org mirror lacks many 2026 and some older Law & Judiciary GRs, and the GR site's search has a captcha. If a GR is still not found, ask Abhi for its सांकेतांक in ONE line and continue with everything else. (Automatic engine run, App B: no interaction — the question goes into status.json `warnings` + Study part 4 instead; tools/ENGINE_PROMPT.md rule 2.)
 4. Read the GR page images before quoting. Quote verbatim, with GR no., date, page and para.
 5. Precedents: grep `/tmp/old/index.tsv` and the texts for the subject. Look for earlier Finance/GAD opinions on the same point, and for an earlier file of the same employee. Old-case names and internal ids (z6_0235…) never go into the note.
 
@@ -76,7 +76,7 @@ Copy the structure of the nearest sample in `samples/specs/` and fill your facts
 - **Signers** (`note.signers`, in order): का. अ. (श्रीम. कऱ्हाडे) / अ.स. (श्री. वडनेरकर) / उ.वि.स. नि. उ.स. (श्री. बोंद्रे) / प्र.स. व वि.प. (श्री. खटी). Add "अ.मु.स. (वित्त)" only when the file goes to Finance.
 - **`related`** ("संबंधित माहिती (संदर्भासाठी)"): verbatim extracts. Each source ends with exactly "(पॅकेज PDF पृ. N)" (several pages: "(पॅकेज PDF पृ. N-M)" / "(पॅकेज PDF पृ. N,M)"), or "(पॅकेज PDF मध्ये नाही)" when the page is not in the package (01.11.2026 सुसंगती). No repo paths (register/, service-rules/, pdf/ …) and no internal ids in `related`.
 - **Letter (`letter`):**
-  - `ref_no`: "संकिर्ण-2026/<file no>/प्र.क्र.<n>/का.6"; `date`: "__.__.2026".
+  - `ref_no`: "संकिर्ण-<year>/<file no>/प्र.क्र.<n>/का.6" (e.g. "संकिर्ण-2026/…"; year = the year of the file no. on the निर्देशपत्र, never copied from a sample); `date`: "__.__.<current year>".
   - `to`; `subject`; `refs` ("आपले पत्र क्र. …, दि. …").
   - `intro`: "उपरोक्त विषयाबाबत संदर्भाधीन पत्रास अनुसरून आपणांस कळविण्यात येते की, सदर प्रकरणी पुढील कार्यवाहीसाठी खालील माहिती … उपलब्ध करून देण्यात यावी, ही विनंती:-"
   - `points`: an empty table or a few short points.
@@ -93,7 +93,7 @@ Both are optional keys of the same spec.json; engine detail: tools/ENGINE_PROMPT
   - Note (B9): para 1 "<सहायक सरकारी वकील, …> यांच्या पृ.N/प.वि. वरील दि. __ रोजीच्या पत्रास अनुसरून सादर."; then
     "पार्श्वभूमी थोडक्यात खालीलप्रमाणे आहे:-" and numbered facts with पृ.N/प.वि.
   - Facts suffice → spec `parawise` (English; B8; Rules 1984 Rule 58(3) every point, Rule 58(4) Note (ii) elaborate
-    facts + documents enclosed, recommendation oppose / not oppose) → `python3 tools/build_parawise.py spec.json <outdir>
+    facts + documents enclosed, recommendation oppose / not oppose — from the record only, the one exception to "no opinion"; no record basis → "____" + warning) → `python3 tools/build_parawise.py spec.json <outdir>
     <PREFIX>` → `<PREFIX>_Parawise.docx`; letter to the GP/AGP forwarding it.
   - Essential facts missing → information letter first (§4.15).
   - Rule 58(4): to the GP within two weeks of receipt / before the date in the notice; the hearing date goes in Study part 0.
