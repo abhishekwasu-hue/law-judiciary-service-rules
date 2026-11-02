@@ -43,8 +43,8 @@ From INSTRUCTIONS.md [I§.n], PROPOSAL_SOP.md [SOP step], tools/PROPOSAL_PROMPT.
 ## 3. Note (टिप्पणी) [SOP4]
 - [I4.3] Desk sample format (note of C R 66-2025, letter with letterhead logo); ready-made; only the proposal's
   facts and the precedents' language; no extra information.
-- Para 1: "<authority> यांच्या पृ.__/प.वि. वरील दि. __ रोजीच्या पत्रास अनुसरुन सादर." (or "…पत्रासोबत प्राप्त …
-  पत्रास अनुसरुन सादर."). Short numbered paras. Facts/posts/periods/amounts in TABLES:
+- Para 1: "<authority> यांच्या पृ.__/प.वि. वरील दि. __ रोजीच्या पत्रास अनुसरून सादर." (or "…पत्रासोबत प्राप्त …
+  पत्रास अनुसरून सादर."). Short numbered paras. Facts/posts/periods/amounts in TABLES:
   `{"table": [[...],[...]], "bold_last": true}` in note.paras. GR text verbatim in “ ” + "(पृ.N/प.वि.)". Earlier
   record of the same matter = a fact with its reference.
 - Page refs: only "पृ.N/प.वि.", N = page of the returned PDF (proposal 1..n, then GR pages; from <pdf>.map.json).
@@ -70,7 +70,7 @@ From INSTRUCTIONS.md [I§.n], PROPOSAL_SOP.md [SOP step], tools/PROPOSAL_PROMPT.
 
 ## 4. Letter [SOP4][I4.5][I4.10]
 - ref_no "संकिर्ण-2026/<file no>/प्र.क्र.<n>/का.6"; date "__.__.2026"; to; subject; refs ("आपले पत्र क्र. …, दि. …").
-- intro: "उपरोक्त विषयाबाबत संदर्भाधीन पत्रास अनुसरुन आपणांस कळविण्यात येते की, सदर प्रकरणी पुढील कार्यवाहीसाठी
+- intro: "उपरोक्त विषयाबाबत संदर्भाधीन पत्रास अनुसरून आपणांस कळविण्यात येते की, सदर प्रकरणी पुढील कार्यवाहीसाठी
   खालील माहिती … उपलब्ध करून देण्यात यावी, ही विनंती:-"; points = empty table or a few short points (essential only,
   official language of earlier files, tables where needed [I4.15]).
 - [I4.20] Letter table = data to fill in only (dates, figures, periods, yes/no, numbers). Documents (प्रत /
@@ -81,6 +81,39 @@ From INSTRUCTIONS.md [I§.n], PROPOSAL_SOP.md [SOP step], tools/PROPOSAL_PROMPT.
 - The tool adds, never hand-write: विषय and संदर्भ bold + centre [I4.10]; "आपला," (never "आपली"), then
   "( राजेश वडनेरकर )" / "अवर सचिव ,महाराष्ट्र शासन", then "प्रत : निवड नस्ती"; letterhead
   "दूरध्वनी क्र. :- ०२२-२२793230   Email ID :- lnjd.desk6-mh@mah.gov.in" [I4.5].
+
+## Marathi language rules [I4.25]
+Own text of note/letter only; “…” quotes and `related` extracts stay verbatim, never "corrected" [I1.1].
+Sources: GR22 = मराठी भाषा विभाग GR कपासू-2020/प्र.क्र.56/भाषा-2, दि. 10.11.2022; C18 = परिपत्रक
+मभावा-2018/प्र.क्र.47/भाषा-2, दि. 07.05.2018; R = शासनमान्य शुद्धलेखन नियम (text: GADT परिशिष्ट 1 = नियम 1–14;
+15–18: docs/STYLE_RESEARCH_LANG.md §5.2); GADT = सा.प्र.वि. "टिप्पणी लेखन व पत्रव्यवहार" (book p.); GADM =
+कार्यालयीन कार्यपद्धती नियमपुस्तिका (मराठी) परि.; RP = राजभाषा परिचय, भाषा संचालनालय 1988 (book p.).
+- Anusvara: R1–2 only where pronounced [GADT p.54]; R3 plural oblique and respectful plural:
+  "आपणांस", "यांना", "यांचे" (not "आपणास") [GADT p.55]; R4 none otherwise.
+- ऱ्हस्व-दीर्घ: R5 "पद्धती", "बुद्धी"; compound first member short: "मंत्रिमंडळ" [GADT p.55–56, 65]; R7 "न्यायाधीश",
+  "अधीक्षक", "परीक्षा", "निरीक्षक" [GADT p.56, 64–65]; R8 verb -ऊन: "करून", "अनुसरून"; "प्रारूप", "स्वरूप"
+  [R8, §5.2].
+- R10 "कोणता", "एखादा"; R12 "करण्यासाठी", "करण्याबाबत" (not "करणेसाठी/करणेबाबत") [GADT p.58]; R14 "कदाचित";
+  abbreviations without halant: "एम.ए.", "पीएच.डी." [R14, §5.2]; R16 "राहणे", "पाहणे"; R17 "इत्यादी" [§5.2].
+- Common errors [GADT p.63–65]: "वरिष्ठ", "कनिष्ठ", "जादा" (not "ज्यादा"), "तात्कालिक", "उद्धृत", "कलम 3 अनुसार".
+- Conjuncts [GR22 परिशिष्ट दोन p.17–18]: "द्ध" never "ध्द" ("पद्धत", "शुद्धिपत्रक"); "द्य"; "कऱ्हाडे".
+- Punctuation [GR22 परिशिष्ट तीन p.20–21]: space after an abbreviation dot (अ.क्र. 23): "दि. 17.09.2026", "क्र. 108"; no space around "-"
+  (अ.क्र. 7) or in file nos.; ":-" never ".:-". GR अ.क्र. 6 puts a space before ":"; the approved form "उपलब्ध नाही:-"
+  [I4.19] stays until Abhi decides. Exemptions: [I4.19].
+- Words [C18 p.3 सूचना 4–5, प्रपत्र 1 p.7]: Marathi initials ("ह. ना. आपटे", not "एच. एन. आपटे") and designations;
+  कोश terms, not English words; "Act" = "अधिनियम", "Rules" = "नियम", "Regulations" = "विनियम" [GADT p.61]; no literal
+  English idioms ("In this connection it may be stated that") [GADT 3.5(3) p.7, 4.13(13) p.11].
+- Grammar: one प्रयोग per sentence: "<authority> यांनी … सादर केला आहे." or "… सादर करण्यात आला आहे.", never
+  "शासनाने … मान्यता देण्यात आली" [GADT p.58, 60–61; RP p.190–192]. Passive/विध्यर्थ verb agrees with the object:
+  "माहिती … देण्यात यावी", "कागदपत्रे … यावीत"; several objects -> the last [GADT p.61; RP p.176–177].
+- Noting [GADT 4.14 p.12–13; GADM 26(4) p.11]: paper and its reference -> issue -> rule/GR and earlier decisions ->
+  financial burden -> missing information -> proposal. Numbered short paras, one point each; simple sentences, one
+  idea each; no "या संबंधात", "असे म्हणता येईल की", "हे नमूद करता येईल की" [GADM 26(7)–(8) p.11]. Suggest, never
+  opine [GADM 26(5)]; no ornate/vague words [GADT 4.16(2) p.13]; big figures in tables [GADT 4.13(14) p.12].
+- Drafting: clear, brief, no repetition [GADM 51(1) p.21]; subject in every letter incl. reminders [GADM 53(3) p.22];
+  information asked as numbered points / a form [GADT 11.1(12) p.28]. Persons and officers in respectful plural:
+  "यांनी", "त्यांचे", never "त्याने/तिचे" [R3].
+- Checks: tools/lint_spec.py, tools/verify_outputs.py.
 
 ## 5. Outputs and tools
 - [I4.12] Three files: <PREFIX>_Study.docx, <PREFIX>_Note_and_Letter.docx (letter if needed), package PDF.
