@@ -188,9 +188,14 @@ jobs:
           export MODEL MODEL_LIGHT MODEL_REVIEW MODEL_STRONG
           python3 tools/engine_supabase.py agents /tmp/work/agents.json
           python3 - <<'PY'
-          import ast, io
+          import ast, io, os
           out = io.open("/tmp/work/TOOL_DOCS.md", "w", encoding="utf-8")
-          for t in ("mkdocs", "build_note_letter", "build_study", "pkg3", "highlight", "lint_spec", "verify_outputs", "extract_check", "oldcases_text"):
+          # build_order / build_parawise / lint_order / lint_parawise (02.11.2026: optional order-draft and court outputs) are
+          # skipped when absent, so a checkout without them still runs
+          for t in ("mkdocs", "build_note_letter", "build_study", "pkg3", "highlight", "lint_spec", "verify_outputs", "extract_check", "oldcases_text",
+                    "build_order", "lint_order", "build_parawise", "lint_parawise"):
+              if not os.path.exists(f"tools/{t}.py"):
+                  continue
               d = ast.get_docstring(ast.parse(io.open(f"tools/{t}.py", encoding="utf-8").read())) or ""
               out.write("### tools/" + t + ".py" + chr(10) + d + chr(10) + chr(10))
           PY

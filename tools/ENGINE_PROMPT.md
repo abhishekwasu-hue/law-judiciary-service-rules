@@ -66,7 +66,8 @@ Expected cost per typical proposal (15 pages, 3 GRs; estimate, not yet measured 
    /tmp/work/enclosures.json (pkg3 format; marks = exact text lines unique on the page), /tmp/work/spec.json (note +
    letter, `related` = []; पृ.N computed from the package order: proposal pages 1..n, then the enclosure pages in
    order), /tmp/work/study_part0.json (part 0 as a build_study part), /tmp/work/status_core.json (summary,
-   letter_needed, essential_points, grs_attached, grs_missing, case) and /tmp/work/related_plan.md (which GR/rule/
+   letter_needed, essential_points, grs_attached, grs_missing, case) — in spec.json also `parawise` / `order` when
+   the brief's court / order-draft rules call for them — and /tmp/work/related_plan.md (which GR/rule/
    precedent paras the note's `related` should carry, with file + page; no quotes needed). List unclear pages in
    facts.json `unclear`."
    facts.json = `{"pages": n, "facts": [{"page": N, "document": "...", "items": [{"what": "...", "value": "<as on
@@ -90,7 +91,8 @@ Expected cost per typical proposal (15 pages, 3 GRs; estimate, not yet measured 
    xlog.json entries to `model_log`. UNVERIFIABLE lines are not failures (logged by the workflow). The workflow
    repeats this check on the delivered files (also the note body's “…” quotes, as warnings): a MISMATCH in `related`
    / Study part 3 then FAILS the case, so never stop before EXTRACTS OK.
-6. lint -> build_note_letter -> build_study -> verify (rule 6) until LINT OK / ALL OK.
+6. lint -> build_note_letter [-> build_parawise / build_order when spec has `parawise` / `order`] -> build_study ->
+   verify (rule 6) until LINT OK / ALL OK.
 7. D-final -> `reviewer` (ONE Agent call): "Read the brief, /tmp/work/facts.json, /tmp/work/spec.json,
    /tmp/work/study_part0.json; LOOK at the page images WORKDIR/pages/p-NN.png. Check and correct per your
    definition; write /tmp/work/review.json." If `changes` > 0: copy the corrected part 0 / note / letter text into
@@ -138,6 +140,51 @@ the run variables. The reviewer's corrections go to status.json `review.correcti
   Read the tool .py files or the full rule files, except a grep of one exact item on a real doubt.
 - Never Read the same file twice. Give subagents file paths, never paste file contents into the delegation.
 
+## Court cases and order drafts — two optional outputs (02.11.2026; docs/COURT_AND_ORDERS_RESEARCH.md B1–B10)
+Abhi, 02.11.2026: "court case aslyas parawise tayar krne note ani letter tayar krne"; "shasan nirnayacha masuda tayar
+kne, adhisuchna, dhynapan tayar krne". Both live in the SAME spec.json as the note (the `drafter` writes them in D1, the
+`reviewer` checks them and its spec hash covers them). Builders: `python3 tools/build_parawise.py spec.json OUTDIR PREFIX`
+-> `OUTDIR/<PREFIX>_Parawise.docx`; `python3 tools/build_order.py spec.json OUTDIR PREFIX` -> `OUTDIR/<PREFIX>_Order_Draft.docx`
+(spec format: their docstrings in TOOL_DOCS). `tools/lint_spec.py` lints the `order` / `parawise` keys too (it calls
+tools/lint_order.py / tools/lint_parawise.py); build them in step 6 after build_note_letter, before verify.
+
+**Court mode** (the proposal is a court matter: a notice/letter of a Government Pleader / AGP / सरकारी वकील, the High
+Court or MAT about a writ petition (रिट याचिका), O.A. (मूळ अर्ज), contempt (अवमान याचिका), SLP — look for these words
+on the page images):
+- Note (B9, Section's contempt file): para 1 "<सहायक सरकारी वकील, मा. उच्च न्यायालय, …> यांच्या पृ.N/प.वि. वरील दि. __
+  रोजीच्या पत्रास अनुसरून सादर."; then "पार्श्वभूमी थोडक्यात खालीलप्रमाणे आहे:-" and numbered facts with पृ.N/प.वि.
+  (court order, GRs, earlier opinions, earlier letters); the hearing date as stated in the notice.
+- Facts suffice -> spec `parawise` (English; B8; Rules for the Conduct of the Legal Affairs of Government 1984,
+  Rule 58(3): a parawise report on ALL points of the petition; Rule 58(4) Note (ii): never cryptic "denied" /
+  "not admitted" — elaborate factual position with rule/GR/order references, copies of those documents listed as
+  enclosed; Rule 58(4)(a): recommendation oppose / not oppose with the reason from the record) + a letter to the
+  GP/AGP forwarding it (to = the GP/AGP as in the notice; intro "उपरोक्त विषयाबाबत संदर्भाधीन पत्रास अनुसरून आपणांस
+  कळविण्यात येते की, सदर याचिकेतील परिच्छेदनिहाय अभिप्राय (इंग्रजी) व संबंधित शासन निर्णयांच्या प्रती सोबत
+  पाठविण्यात येत आहेत. … , ही विनंती."; copy to the RLA / JS-DS of L&J (Nagpur/Aurangabad bench) only where Rule 58(4)
+  applies). Last para (lint form (a)): "सबब, रिट याचिका क्र. ____ मधील परिच्छेदनिहाय अभिप्राय (इंग्रजी) व ते <सहायक
+  सरकारी वकील> यांना पाठविण्याबाबतच्या पत्राचे प्रारूप पृ.      /प.वि. वर मान्यतेस्तव सादर. मान्य झाल्यास पत्र
+  निर्गमित करण्यात येईल."
+- Essential facts missing (§4.15) -> NO `parawise`; the information-letter first (to the HC / District Court as usual).
+- Time limit: Rule 58(4) — papers to the GP within two weeks of receipt, in any case before the date in the notice.
+  Study part 0 (अ)/(आ) states the hearing date and that limit; (ऐ) the action.
+- Signers: the §4.6 chain (B10, Abhi to confirm).
+
+**Order drafts** (B7) — spec `order` (type gr / corrigendum / circular / memo / notification) ONLY when the record shows
+the decision or concurrence is in hand (Finance / GAD concurrence received, approval given, a reply that completes the
+case) or `instructions` asks for it. Otherwise no `order` (a Finance/GAD note or a letter instead — Step 3). GR for
+general orders; ज्ञापन for a sanction to named/limited officers (GADT 12.10, 12.12); शुद्धिपत्रक to correct an issued
+order; अधिसूचना for statutory notifications (B6: Marathi + English). Concurrence para with the Finance/GAD reference as
+in the record (R3). The note's last para then (lint form (c), R3 (c)): "सबब, … <शासन निर्णयाचे / ज्ञापनाचे /
+शुद्धिपत्रकाचे / परिपत्रकाचे / अधिसूचनेचे> प्रारूप पृ.      /प.वि. वर मान्यतेस्तव सादर." (notification in two languages: "… अधिसूचनेची मराठी व इंग्रजी
+प्रारूपे पृ.      /प.वि. वर मान्यतेस्तव सादर."; optionally "मान्य झाल्यास
+… निर्गमित करण्यात येईल."); no "अ.मु.स. (वित्त)" unless the file goes to Finance.
+
+**Never stop for missing order / court details** (as rule 5 for the C R no.): unknown petition no., date, GP name,
+संकेतांक, Gazette part, notification signer -> "____"; log them in Study part 4 / 7 and status.json `warnings`.
+status.json `outputs_extra` lists what was built, e.g. `[{"kind": "parawise", "file": "<PREFIX>_Parawise.docx"},
+{"kind": "order_draft", "file": "<PREFIX>_Order_Draft.docx"}]` (`[]` / absent = none). The workflow uploads the files
+(kinds "parawise", "order_draft") and verify_outputs.py checks them (fonts, ids, repo paths, पृ. ranges).
+
 ## Lint before building
 Before every build run `python3 tools/lint_spec.py spec.json --study study.json --pages <package pages>` (docstring in
 tools/lint_spec.py; same checks as verify_outputs.py) and fix every line it prints until "LINT OK".
@@ -182,11 +229,12 @@ Step 0 is done by the workflow:
    .map.json and LibreOffice previews:
    - `OUTDIR/<PREFIX>_Study.docx` (part 0 briefing + parts 1–7),
    - `OUTDIR/<PREFIX>_Note_and_Letter.docx`,
+   - optional: `OUTDIR/<PREFIX>_Order_Draft.docx`, `OUTDIR/<PREFIX>_Parawise.docx` (section "Court cases and order drafts"),
    - the package PDF under the ORIGINAL proposal file name = `proposal_original_name` exactly (INSTRUCTIONS §4.16;
      strip only a random upload prefix like `11ae057d-`). Never invent a new name such as `<PREFIX>_Proposal_with_GRs.pdf`
      — but when the original name itself looks machine-made (e.g. the uploaded file really is `CR66_Proposal_with_GRs.pdf`
      or `..._0001.pdf`), keep it exactly as uploaded; never "correct" it.
-   Exactly one .pdf in OUTDIR besides `*_Note_and_Letter.pdf` / `*_Study.pdf` previews.
+   Exactly one .pdf in OUTDIR besides `*_Note_and_Letter.pdf` / `*_Study.pdf` / `*_Order_Draft.pdf` / `*_Parawise.pdf` previews.
 6. Verify (SOP Step 7): `python3 tools/verify_outputs.py OUTDIR <PREFIX> "OUTDIR/<original name>" <proposal pages> --original-name "<proposal_original_name>"`
    must print ALL OK; fix and re-run until it does. The second read of every number and date in the note, letter
    and Study part 0 against the page images is the `reviewer`'s final review (Order step 7).
@@ -207,11 +255,13 @@ Step 0 is done by the workflow:
  "prefix": "CR130_2026",
  "package_pdf": "<the package PDF file name in OUTDIR = proposal_original_name>",
  "proposal_pages": 7,
+ "outputs_extra": [],
  "model_log": [{"task": "तथ्ये, नोंद, पत्र, भाग 0", "from": "", "to": "<MODEL>", "reason": "मसुदा"}],
  "review": {"approved": true, "changes": 1, "corrections": ["<Marathi: what the reviewer changed>"]},
  "case": {"cr_no": "130", "cr_year": 2026, "file_no": "संकीर्ण-2026/979/प्र.क्र.130/का.6", "subject": "<as on the निर्देशपत्र>",
           "category": "<one of: वेतननिश्चिती, भत्ते, निवृत्तीवेतन, जुनी पेन्शन, विशेष वेतन, विमा/GPF, सेवा, न्यायिक वेतन, वैद्यकीय, इतर>"}}
 ```
+   `outputs_extra` = the optional files built (section "Court cases and order drafts"), `[]` when none.
    `prefix`, `package_pdf`, `proposal_pages` = exactly the PREFIX, package file name and proposal page count you gave
    verify_outputs.py (rule 6); the workflow re-runs it with these.
    If the case cannot be completed, write `{"state": "failed", "summary": "<reason>", "model_log": [...]}` instead. "Cannot be

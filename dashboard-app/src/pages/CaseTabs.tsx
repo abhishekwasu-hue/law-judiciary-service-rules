@@ -1,6 +1,6 @@
 import { lazy, Suspense, useMemo, useRef, useState, type FormEvent } from 'react';
 import { ApiError, api, downloadFile, humanError, uploadFile } from '../lib/api';
-import { ACTION_LABEL, FILE_KIND_LABEL, LETTER_STATUSES, RUN_STATE_LABEL, TONE_HEX, runActive, runTone } from '../lib/constants';
+import { ACTION_LABEL, EXTRA_OUTPUT_KINDS, FILE_KIND_LABEL, LETTER_STATUSES, RUN_STATE_LABEL, TONE_HEX, runActive, runTone } from '../lib/constants';
 import { asArray, daysBetween, fmtDate, fmtDateTime, textOf, todayISO } from '../lib/format';
 import { diffLines, type DiffLine } from '../lib/diff';
 import type { CaseFile, Letter, Run } from '../lib/types';
@@ -182,6 +182,32 @@ export function BriefingTab({ ctx }: { ctx: CaseCtx }) {
 }
 
 // ---------------- टिप्पणी व पत्र ----------------
+/** Optional outputs (शासन आदेश-मसुदा, परिच्छेदनिहाय अभिप्राय): latest version of each kind, view + download. */
+function ExtraOutputs({ ctx }: { ctx: CaseCtx }) {
+  const items = EXTRA_OUTPUT_KINDS.map(k => ofKind(ctx.files, k)[0]).filter((f): f is CaseFile => !!f);
+  const [view, setView] = useState<CaseFile | null>(null);
+  if (items.length === 0) return null;
+  return (
+    <Section title="इतर मसुदे">
+      <ul className="space-y-2">
+        {items.map(f => (
+          <li key={f.id} className="rounded-lg border border-slate-200 p-2 dark:border-navy-800">
+            <div className="text-sm font-semibold">{FILE_KIND_LABEL[f.kind]}</div>
+            <div className="truncate text-xs text-slate-500" title={f.original_name}>{f.original_name} • आवृत्ती {f.version}</div>
+            <div className="mt-1 flex flex-wrap gap-1">
+              <button className="btn-ghost min-h-tap px-2 py-1 text-sm" onClick={() => setView(f)}>पाहा</button>
+              <DownloadBtn f={f} />
+            </div>
+          </li>
+        ))}
+      </ul>
+      <Modal open={!!view} onClose={() => setView(null)} title={view ? FILE_KIND_LABEL[view.kind] : ''} wide>
+        {view && <DocxView fileId={view.id} />}
+      </Modal>
+    </Section>
+  );
+}
+
 export function NoteTab({ ctx }: { ctx: CaseCtx }) {
   const versions = ofKind(ctx.files, 'note_letter');
   const [selId, setSelId] = useState<number | null>(null);
@@ -244,6 +270,7 @@ export function NoteTab({ ctx }: { ctx: CaseCtx }) {
               </ul>
             )}
           </Section>
+          <ExtraOutputs ctx={ctx} />
           {ctx.canWrite && !latestFailed(ctx) && <Section title="पुन्हा तयार करा"><ReRun ctx={ctx} /></Section>}
         </div>
       </div>

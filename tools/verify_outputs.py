@@ -33,6 +33,10 @@ Checks
   - "आपला," present, signature "आपली," absent ("आपली पत्रे" in संदर्भ is allowed); lines "( राजेश वडनेरकर )", "अवर सचिव ,महाराष्ट्र शासन", "प्रत : निवड नस्ती"
  status.json (when <outdir>/status.json exists): `letter_needed` is true/false and true <=> a letter is present
  Study: headings भाग 0 … भाग 7
+ Optional outputs (02.11.2026; only when the file exists — absent = no line, ALL OK unaffected):
+  <PREFIX>_Order_Draft.docx (शासन आदेश-मसुदा) and <PREFIX>_Parawise.docx (परिच्छेदनिहाय अभिप्राय, English):
+  fonts (four rFonts = DVOT-SurekhMR incl. headers/footers), no internal ids, no repo paths, पृ. references within
+  1..package pages (text inside “ ” skipped)
  Package PDF:
   - file name is the original proposal name (not *_Proposal_with_GRs.pdf); with --original-name NAME: the file name must
     equal NAME minus a random upload prefix like "11ae057d-" (engine_supabase.strip_upload_prefix: 8 hex characters
@@ -128,6 +132,19 @@ def font_problems(d, label):
     return [f"{label}: {bad} text runs without {FONT} on all four rFonts attributes"] if bad else []
 
 
+
+
+# optional outputs (02.11.2026, docs/COURT_AND_ORDERS_RESEARCH.md B7–B9): file suffix -> label in the check lines
+EXTRA_DOCS = (("_Order_Draft.docx", "Order_Draft"), ("_Parawise.docx", "Parawise"))
+
+
+def doc_text(d):
+    """All text of a document: body blocks (paragraphs, tables) + headers/footers."""
+    parts = [b["text"] for b in blocks_of(d)]
+    for part in d.part.package.iter_parts():
+        if re.search(r"/word/(header|footer)\d*\.xml$", str(part.partname)):
+            parts.append(el_text(part.element))
+    return "\n".join(parts)
 
 
 def p_centred(p):
@@ -314,6 +331,21 @@ def main(argv):
             for line in ("( राजेश वडनेरकर )", "अवर सचिव ,महाराष्ट्र शासन", "प्रत : निवड नस्ती"):
                 if line not in lt: en.append(f"line '{line}' missing")
             check("letter ending (§4.5)", en)
+
+    # ---------------- optional outputs (order draft, parawise) ----------------
+    for suffix, label in EXTRA_DOCS:
+        fx = os.path.join(out, f"{pre}{suffix}")
+        if not os.path.exists(fx):
+            continue
+        try:
+            X = docx.Document(fx)
+        except Exception as e:
+            check(f"{label} opens", [f"{fx}: {e}"]); continue
+        xt = doc_text(X)
+        check(f"{label} fonts", font_problems(X, label))
+        check(f"{label} internal ids", [f"internal id {x}" for x in id_hits(xt)])
+        check(f"{label} repo paths", [f"repo path/word '{x}'" for x in repo_hits(xt)])
+        check(f"{label} पृ. references", ref_problems(xt, N, label, skip_quotes=True))
 
     # ---------------- Package PDF ----------------
     if P is not None:

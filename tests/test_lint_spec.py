@@ -59,6 +59,8 @@ class LintSpec(unittest.TestCase):
     def test_all_samples_lint_ok(self):
         self.assertGreaterEqual(len(SPECS), 6)
         for p in SPECS:
+            if "note" not in raw_load(p):   # 02.11.2026: order-only examples (ORDER_*) — tools/lint_order.py, tests/test_build_order.py
+                continue
             with self.subTest(spec=os.path.basename(p)):
                 self.assertEqual(L.lint_spec(raw_load(p)), [])
                 self.assertEqual(L.lint_warnings(raw_load(p)), [])   # approved samples: no WARN-level finding
@@ -502,6 +504,87 @@ class LintCli(unittest.TestCase):
         os.remove(out)
         r = run([os.path.join(TOOLS, "build_study.py"), p, out], env=dict(ENV, STUDY_ALLOW_MISSING_PART1="1"))
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr); self.assertTrue(os.path.exists(out))
+
+
+class LintOrderParawise(unittest.TestCase):
+    """02.11.2026: order-draft last para (docs/COURT_AND_ORDERS_RESEARCH.md R3 (c), B7) and the lazy hooks to
+    tools/lint_order.py / tools/lint_parawise.py for the optional spec keys "order" / "parawise"."""
+    def setUp(self):
+        self.s122 = load(CR122)
+
+    def with_last(self, txt):
+        s = copy.deepcopy(self.s122)
+        s["note"]["paras"][max(i for i, x in enumerate(s["note"]["paras"]) if isinstance(x, str))] = txt
+        return s
+
+    def test_order_draft_last_para_forms(self):
+        for kind in ("शासन निर्णयाचे प्रारूप", "शुद्धिपत्रकाचे प्रारूप", "शासन शुद्धिपत्रकाचे प्रारूप", "परिपत्रकाचे प्रारूप",
+                     "ज्ञापनाचे प्रारूप", "अधिसूचनेचे प्रारूप", "अधिसूचनेची मराठी व इंग्रजी प्रारूपे"):
+            for tail in ("", " मान्य झाल्यास निर्गमित करण्यात येईल.", " मान्य झाल्यास शासन निर्णय निर्गमित करण्यात येईल."):
+                t = f"सबब, वित्त विभागाच्या उपरोक्त अभिप्रायानुसार {kind} पृ.      /प.वि. वर मान्यतेस्तव सादर.{tail}"
+                self.assertEqual(L.lint_spec(self.with_last(t)), [], t)
+
+    def test_order_draft_last_para_still_strict(self):
+        for t in ("सबब, प्रारूप पृ.  /प.वि. वर मान्यतेस्तव सादर.", "सबब, शासन निर्णयाचे प्रारूप सादर.",
+                  "सबब, शासन निर्णयाचे प्रारुप पृ.  /प.वि. वर मान्यतेस्तव सादर.",
+                  "सबब, अधिसूचनेची प्रारूपे पृ.  /प.वि. वर मान्यतेस्तव सादर.",
+                  "सबब, शासन निर्णयाचे प्रारूप पृ.  /प.वि. वर सादर.",
+                  "सबब, शासन निर्णयाचे प्रारूप पृ.  /प.वि. वर मान्यतेस्तव सादर. कृपया पाहावे."):
+            self.assertTrue(any("last para" in p for p in L.lint_spec(self.with_last(t))), t)
+
+    def test_existing_forms_unchanged(self):
+        for p in SPECS:
+            if os.path.basename(p).startswith("CR"):
+                self.assertEqual(L.lint_spec(load(p)), [], p)
+
+    def test_extras_absent_keys(self):
+        self.assertEqual(L.lint_extras(self.s122), ([], []))
+
+    def test_extras_missing_module_is_warning(self):
+        s = copy.deepcopy(self.s122); s["order"] = {"type": "gr"}
+        old = L.EXTRA_LINTS
+        try:
+            L.EXTRA_LINTS = (("order", "no_such_lint_module_xyz", ()),)
+            probs, warns = L.lint_extras(s)
+        finally:
+            L.EXTRA_LINTS = old
+        self.assertEqual(probs, [])
+        self.assertTrue(any("not available" in w for w in warns), warns)
+
+    def test_extras_called_with_problems_and_warnings(self):
+        import types
+        mod = types.ModuleType("fake_lint_xyz")
+        mod.fake_lint_xyz = lambda spec: ["order.title: problem"]
+        mod.fake_warn_xyz = lambda spec: ["order.title: warn"]
+        sys.modules["fake_lint_xyz"] = mod
+        old = L.EXTRA_LINTS
+        try:
+            L.EXTRA_LINTS = (("order", "fake_lint_xyz", ("fake_warn_xyz",)),)
+            s = copy.deepcopy(self.s122); s["order"] = {"type": "gr"}
+            self.assertEqual(L.lint_extras(s), (["order.title: problem"], ["order.title: warn"]))
+            mod.fake_lint_xyz = lambda spec: 1 / 0
+            probs, _ = L.lint_extras(s)
+            self.assertTrue(any("crashed" in p for p in probs), probs)
+        finally:
+            L.EXTRA_LINTS = old
+            sys.modules.pop("fake_lint_xyz", None)
+
+    def test_cli_runs_extra_lint(self):
+        d = tempfile.mkdtemp()
+        try:
+            s = copy.deepcopy(self.s122); s["parawise"] = {"rows": []}
+            sp = os.path.join(d, "spec.json")
+            with open(sp, "w", encoding="utf-8") as f:
+                json.dump(s, f, ensure_ascii=False)
+            r = run([os.path.join(TOOLS, "lint_spec.py"), sp])
+            # with tools/lint_parawise.py present its lines (if any) are added; absent -> one WARN, exit 0
+            if not os.path.exists(os.path.join(TOOLS, "lint_parawise.py")):
+                self.assertEqual(r.returncode, 0, r.stdout)
+                self.assertIn("WARN parawise", r.stdout)
+            self.assertIn(r.returncode, (0, 1), r.stdout + r.stderr)
+            self.assertNotIn("Traceback", r.stderr)
+        finally:
+            shutil.rmtree(d, ignore_errors=True)
 
 
 if __name__ == "__main__":

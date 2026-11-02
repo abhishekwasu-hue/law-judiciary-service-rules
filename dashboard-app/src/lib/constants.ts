@@ -72,7 +72,11 @@ export const RUN_STEPS: { key: string; label: string }[] = [
 export const FILE_KIND_LABEL: Record<string, string> = {
   proposal: 'प्रस्ताव', extra_doc: 'इतर कागदपत्र', study: 'अभ्यास', note_letter: 'टिप्पणी व पत्र',
   package_pdf: 'GR सह प्रस्ताव', gr: 'GR', reply: 'उत्तर',
+  order_draft: 'शासन आदेश-मसुदा', parawise: 'परिच्छेदनिहाय अभिप्राय (इंग्रजी)',
 };
+
+/** Optional engine outputs (02.11.2026, migration 0006): shown with the note when the engine produced them. */
+export const EXTRA_OUTPUT_KINDS = ['order_draft', 'parawise'] as const;
 
 export const ACTION_LABEL: Record<string, string> = {
   case_created: 'प्रकरण नोंदवले', file_uploaded: 'फाइल अपलोड', run_started: 'अभ्यास सुरू',

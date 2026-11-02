@@ -388,6 +388,57 @@ class VerifyOutputs(unittest.TestCase):
         rc, out = self.run_verify(self.good)
         self.assertNotIn("WARN:", out)
 
+    # ---- optional outputs (02.11.2026): <PREFIX>_Order_Draft.docx / <PREFIX>_Parawise.docx ----
+    def test_extras_absent_no_lines(self):
+        rc, out = self.run_verify(self.good)
+        self.assertEqual(rc, 0, out)
+        self.assertNotIn("Order_Draft", out); self.assertNotIn("Parawise", out)
+
+    def test_extras_good(self):
+        d = self.case("x_good")
+        make_extra(os.path.join(d, f"{PRE}_Order_Draft.docx"), ["शासन निर्णय", "वाचा :- (पृ.17/प.वि.)"], header="क्रमांक ____")
+        make_extra(os.path.join(d, f"{PRE}_Parawise.docx"), ["Para 1: The averments are factually correct (पृ.3/प.वि.)."])
+        rc, out = self.run_verify(d)
+        self.assertEqual(rc, 0, out)
+        for ln in ("OK: Order_Draft fonts", "OK: Order_Draft internal ids", "OK: Order_Draft repo paths",
+                   "OK: Order_Draft पृ. references", "OK: Parawise fonts", "OK: Parawise पृ. references"):
+            self.assertIn(ln, out)
+
+    def test_extras_font(self):
+        d = self.case("x_font")
+        make_extra(os.path.join(d, f"{PRE}_Parawise.docx"), ["Para 1"], font=False)
+        self.must_fail(d, "Parawise fonts")
+
+    def test_extras_header_font(self):
+        d = self.case("x_hfont")
+        make_extra(os.path.join(d, f"{PRE}_Order_Draft.docx"), ["शासन निर्णय"], header="क्रमांक", header_font=False)
+        self.must_fail(d, "Order_Draft fonts")
+
+    def test_extras_id_path_ref(self):
+        d = self.case("x_bad")
+        make_extra(os.path.join(d, f"{PRE}_Order_Draft.docx"), ["स्रोत z6_0235", "register/PAY-01", "(पृ.99/प.वि.)"])
+        self.must_fail(d, "Order_Draft internal ids")
+        self.must_fail(d, "Order_Draft repo paths")
+        self.must_fail(d, "Order_Draft पृ. references")
+
+
+def make_extra(path, paras, font=True, header=None, header_font=True):
+    """A small Word file like build_order / build_parawise output: every run with DVOT-SurekhMR on all four rFonts."""
+    def setf(run, ok):
+        rpr = run._element.get_or_add_rPr()
+        fo = rpr.find(qn("w:rFonts"))
+        if fo is None:
+            fo = rpr.makeelement(qn("w:rFonts"), {}); rpr.append(fo)
+        for a in ("ascii", "hAnsi", "cs", "eastAsia"):
+            fo.set(qn("w:" + a), "DVOT-SurekhMR" if ok else "Calibri")
+    d = docx.Document()
+    for t in paras:
+        setf(d.add_paragraph().add_run(t), font)
+    if header:
+        hp = d.sections[0].header.paragraphs[0]
+        setf(hp.add_run(header), header_font)
+    d.save(path)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -13,6 +13,11 @@ Commands:
                       *_Note_and_Letter.pdf are ignored) -> bucket outputs/<case>/<kind>/v<n>/file<ext> (ASCII key:
                       Storage refuses non-ASCII keys; the real name only in case_files.original_name), case_files rows,
                       runs done + summary fields, cases.stage "मसुदा तयार", activity run_done. Incomplete -> fail.
+                      Optional outputs (02.11.2026, docs/COURT_AND_ORDERS_RESEARCH.md B7–B9): *_Order_Draft.docx ->
+                      kind "order_draft", *_Parawise.docx -> kind "parawise" (same ASCII key style), uploaded when
+                      present (status.json `outputs_extra` = ["order_draft", "parawise"] or [{"kind", "file"}]: a
+                      listed kind whose file is absent -> warning); absence is fine; more than one of a kind, or a refused upload (enum value missing until
+                      migration 0006 is applied) -> a runs.warnings line, never a failure.
   claude_result <claude.json> [<stderr file>] [<exit code>] [--part1 <part1.json>] [--wall <seconds>] [--status <status.json>]
                       Claude Code `--output-format json` result(s) -> runs.cost_usd and num_turns = SUM of the main run
                       and the parallel Study-part-1 run (--part1, if its JSON exists); duration_s = --wall (wall clock
@@ -217,7 +222,66 @@ def strip_upload_prefix(n):
 
 def package_pdfs(out):
     return [p for p in glob.glob(os.path.join(out, "*.pdf"))
-            if not re.search(r"_(Study|Note_and_Letter|Note|Letter)\.pdf$", p)]
+            if not re.search(r"_(Study|Note_and_Letter|Note|Letter|Order_Draft|Parawise)\.pdf$", p)]  # previews
+
+
+# optional outputs (02.11.2026): kind -> (file suffix, Marathi label for warnings)
+EXTRA_OUTPUTS = (("order_draft", "_Order_Draft.docx", "शासन आदेश-मसुदा"),
+                 ("parawise", "_Parawise.docx", "परिच्छेदनिहाय अभिप्राय"))
+
+
+def upload_output(kind, p):
+    name = os.path.basename(p)
+    prev = rest("GET", f"case_files?case_id=eq.{CASE}&kind=eq.{kind}&select=version&order=version.desc&limit=1") or []
+    ver = prev[0]["version"] + 1 if prev else 1
+    path = f"{CASE}/{kind}/v{ver}/{storage_name(name)}"  # ASCII object key; real name in original_name
+    ctype = MIME.get(os.path.splitext(name)[1].lower()) or mimetypes.guess_type(name)[0] or "application/octet-stream"
+    http("POST", f"{BASE}/storage/v1/object/outputs/{enc(path)}", open(p, "rb").read(),
+         {"Content-Type": ctype, "x-upsert": "true"})
+    try:
+        rest("POST", "case_files", {"case_id": int(CASE), "kind": kind, "storage_path": f"outputs/{path}",
+                                    "original_name": name, "version": ver, "uploaded_by": None}, "return=minimal")
+    except Exception:
+        try:  # no row -> remove the orphan object (best effort; e.g. enum value missing before migration 0006)
+            http("DELETE", f"{BASE}/storage/v1/object/outputs/{enc(path)}")
+        except Exception:
+            pass
+        raise
+    return {"kind": kind, "name": name, "version": ver}
+
+
+def listed_extras(st):
+    """status.json `outputs_extra`: ["order_draft", "parawise"] or [{"kind": ..., "file": "<PREFIX>_Order_Draft.docx"}]."""
+    v = st.get("outputs_extra") if isinstance(st, dict) else None
+    out = {}
+    for x in v if isinstance(v, list) else []:
+        if isinstance(x, str):
+            out[x] = None
+        elif isinstance(x, dict) and isinstance(x.get("kind"), str):
+            out[x["kind"]] = x.get("file") or x.get("name")
+    return out
+
+
+def upload_extras(out, st=None):
+    """Optional outputs: uploaded when present; every problem is a warning (returned), never a failure."""
+    done, warns = [], []
+    listed = listed_extras(st)
+    for kind, suffix, label in EXTRA_OUTPUTS:
+        found = sorted(glob.glob(os.path.join(out, "*" + suffix)))
+        want = listed.get(kind)
+        if want and os.path.basename(str(want)) in {os.path.basename(f) for f in found}:
+            found = [os.path.join(out, os.path.basename(str(want)))] + [f for f in found if os.path.basename(f) != os.path.basename(str(want))]
+        if not found:
+            if kind in listed:
+                warns.append(f"{label}: status.json मध्ये नोंद आहे पण *{suffix} फाइल नाही")
+            continue
+        if len(found) > 1:
+            warns.append(f"{label}: {len(found)} फाइल सापडल्या — {os.path.basename(found[0])} जतन केली")
+        try:
+            done.append(upload_output(kind, found[0]))
+        except Exception as e:
+            warns.append(f"{label} जतन झाला नाही (Supabase migration 0006 लागू आहे का?) — {str(e)[:160]}")
+    return done, warns
 
 
 def cmd_finish(out):
@@ -242,16 +306,9 @@ def cmd_finish(out):
         return cmd_fail("आउटपुट अपूर्ण — " + "; ".join(probs))
     uploaded = []
     for kind, p in (("study", study[0]), ("note_letter", nl[0]), ("package_pdf", pdfs[0])):
-        name = os.path.basename(p)
-        prev = rest("GET", f"case_files?case_id=eq.{CASE}&kind=eq.{kind}&select=version&order=version.desc&limit=1") or []
-        ver = prev[0]["version"] + 1 if prev else 1
-        path = f"{CASE}/{kind}/v{ver}/{storage_name(name)}"  # ASCII object key; real name in original_name
-        ctype = MIME.get(os.path.splitext(name)[1].lower()) or mimetypes.guess_type(name)[0] or "application/octet-stream"
-        http("POST", f"{BASE}/storage/v1/object/outputs/{enc(path)}", open(p, "rb").read(),
-             {"Content-Type": ctype, "x-upsert": "true"})
-        rest("POST", "case_files", {"case_id": int(CASE), "kind": kind, "storage_path": f"outputs/{path}",
-                                    "original_name": name, "version": ver, "uploaded_by": None}, "return=minimal")
-        uploaded.append({"kind": kind, "name": name, "version": ver})
+        uploaded.append(upload_output(kind, p))
+    extra, extra_warn = upload_extras(out, st)
+    uploaded += extra
     lst = lambda k: st.get(k) if isinstance(st.get(k), list) else []
     patch_run({"state": "done", "finished_at": now(), "step": "तयार", "summary": st.get("summary") or "",
                "letter_needed": bool(st.get("letter_needed")), "essential_points": lst("essential_points"),
@@ -259,6 +316,7 @@ def cmd_finish(out):
     rest("PATCH", f"cases?id=eq.{CASE}", {"stage": "मसुदा तयार"}, "return=minimal")
     fill_case(st.get("case"))
     sw = [str(x).strip()[:300] for x in lst("warnings") if str(x).strip()]  # engine notes for Abhi (e.g. C R not found)
+    sw += [w[:300] for w in extra_warn]
     if sw:
         try:
             add_warnings(sw)
@@ -560,7 +618,7 @@ REVIEW = (" You are the final approver. LOOK at the proposal page images (WORKDI
           "a cross-check) for every number, date, name and amount used in the note, the letter and Study part 0. Check "
           "rule compliance (INSTRUCTIONS §4 incl. §4.18; the lint_spec rules), that the letter-or-not decision follows "
           "PROPOSAL_SOP Step 3 / INSTRUCTIONS §4.15, and the official language. Correct /tmp/work/spec.json (note + "
-          "letter; not `related`) and /tmp/work/study_part0.json directly with MINIMAL edits (never restyle approved "
+          "letter, and `order` / `parawise` when present; not `related`) and /tmp/work/study_part0.json directly with MINIMAL edits (never restyle approved "
           "wording). Write /tmp/work/review.json = {\"approved\": true|false, \"changes\": N, \"corrections\": "
           "[\"<Marathi: what changed>\"], \"reason\": \"<Marathi, only when not approved>\"}. approved=false only "
           "when the case cannot be made correct by small edits. LAST, after all your edits: put the sha256 of the files you "
@@ -584,7 +642,8 @@ def agents_json(conf, brief="tools/ENGINE_BRIEF.md"):
     out = {"drafter": {
         "description": "Drafter. Read facts/numbers/dates/names/handwriting/stamps from the proposal page images; "
                        "letter-or-not decision; GR selection for the note body and the enclosures; note body and "
-                       "letter spec; Study part 0; extracts and Study part 1 pages that failed their check; content "
+                       "letter spec; the optional spec `order` (order draft) / `parawise` (court remarks, English) "
+                       "per the brief's court and order-draft rules; Study part 0; extracts and Study part 1 pages that failed their check; content "
                        "fixes that lint/verify still reports after 2 mechanical attempts.",
         "prompt": base, "model": conf["MODEL"]}}
     if conf.get("MODEL_STRONG"):

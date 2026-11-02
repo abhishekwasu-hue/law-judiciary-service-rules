@@ -87,6 +87,24 @@ Copy the structure of the nearest sample in `samples/specs/` and fill your facts
   - The tool adds the subject/reference block (bold, centred), "आपला," + signature and "प्रत : निवड नस्ती".
 - **Build:** `python3 tools/build_note_letter.py spec.json <outdir> <PREFIX>`. This writes `<PREFIX>_Note_and_Letter.docx` + a PDF preview. LOOK at the preview pages.
 
+## Step 4b — Court cases and order drafts (02.11.2026; research + decisions B1–B10: docs/COURT_AND_ORDERS_RESEARCH.md)
+Both are optional keys of the same spec.json; engine detail: tools/ENGINE_PROMPT.md "Court cases and order drafts".
+- **Court cases** (GP/AGP/High Court/MAT notice on a writ petition, O.A., contempt, SLP):
+  - Note (B9): para 1 "<सहायक सरकारी वकील, …> यांच्या पृ.N/प.वि. वरील दि. __ रोजीच्या पत्रास अनुसरून सादर."; then
+    "पार्श्वभूमी थोडक्यात खालीलप्रमाणे आहे:-" and numbered facts with पृ.N/प.वि.
+  - Facts suffice → spec `parawise` (English; B8; Rules 1984 Rule 58(3) every point, Rule 58(4) Note (ii) elaborate
+    facts + documents enclosed, recommendation oppose / not oppose) → `python3 tools/build_parawise.py spec.json <outdir>
+    <PREFIX>` → `<PREFIX>_Parawise.docx`; letter to the GP/AGP forwarding it.
+  - Essential facts missing → information letter first (§4.15).
+  - Rule 58(4): to the GP within two weeks of receipt / before the date in the notice; the hearing date goes in Study part 0.
+- **Order drafts** (B7: only when the decision / Finance-GAD concurrence is on record, or Abhi asks): spec `order`
+  (gr / corrigendum / circular / memo / notification) → `python3 tools/build_order.py spec.json <outdir> <PREFIX>` →
+  `<PREFIX>_Order_Draft.docx`. Note's last para: "सबब, … शासन निर्णयाचे (ज्ञापनाचे / शुद्धिपत्रकाचे / परिपत्रकाचे /
+  अधिसूचनेचे) प्रारूप पृ.      /प.वि. वर मान्यतेस्तव सादर."
+- Unknown details (petition no., date, संकेतांक, Gazette part) → "____"; never stop.
+- Checks: `tools/lint_spec.py` (calls tools/lint_order.py / tools/lint_parawise.py), `tools/verify_outputs.py` (fonts,
+  ids, repo paths, पृ. ranges of both files). App: kinds `order_draft` / `parawise` (Supabase migration 0006).
+
 ## Step 5 — Build the returned proposal PDF (GR सह प्रस्ताव)
 1. Choose only the relevant pages of each GR/rule/order: page 1 (title, number, date) + the pages with the quoted paras.
 2. Write `enclosures.json` (see the `tools/pkg3.py` docstring). Marks = exact text-layer line strings that occur only once on the page.

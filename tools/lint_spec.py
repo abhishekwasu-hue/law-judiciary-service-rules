@@ -15,9 +15,14 @@ Rules (spec.json)
   - पृ. references: same accepted forms as verify_outputs ("पृ.N/प.वि.", "पृ. N / प.वि.", lists, ranges, Devanagari
     digits, blank "पृ.      /प.वि."); "“…”" quotes are skipped in related; page range 1..N only with --pages N
   - note.first ends with "सादर."
-  - last note para (note.closing if not blank, else the last text item of note.paras) is one of the two SOP forms:
+  - last note para (note.closing if not blank, else the last text item of note.paras) is one of the SOP forms:
     "सबब, … पत्राचे प्रारूप पृ.  /प.वि. वर मान्यतेस्तव सादर. मान्य झाल्यास पत्र निर्गमित करण्यात येईल." or
-    "सबब, … वित्त विभागाच्या मान्यतेस्तव सादर करण्यात येत आहे."
+    "सबब, … वित्त विभागाच्या मान्यतेस्तव सादर करण्यात येत आहे." or (order draft, 02.11.2026, docs/COURT_AND_ORDERS_RESEARCH.md
+    R3 (c), B7) "सबब, … <शासन निर्णयाचे / शुद्धिपत्रकाचे / परिपत्रकाचे / ज्ञापनाचे / अधिसूचनेचे / आदेशाचे> प्रारूप पृ.  /प.वि. वर
+    मान्यतेस्तव सादर." or "सबब, … अधिसूचनेची मराठी व इंग्रजी प्रारूपे पृ.  /प.वि. वर मान्यतेस्तव सादर." (optionally "… मान्य झाल्यास … निर्गमित करण्यात येईल.")
+  - spec "order" / "parawise" (optional, 02.11.2026): CLI only — tools/lint_order.py lint_order(spec) /
+    tools/lint_parawise.py lint_parawise(spec) are imported lazily and their lines added; a missing module is a
+    "WARN" line, never an error (lint_extras)
   - note.signers == INSTRUCTIONS §4.6 chain (+ "अ.मु.स. (वित्त)" last); "अ.मु.स. (वित्त)" present <=> last para has
     "वित्त विभागाच्या मान्यतेस्तव"
   - §4.19 (text outside quotes; note body, letter, related heading/source — not the verbatim related text): no '.:-'
@@ -74,6 +79,13 @@ LH_EMAIL = "lnjd.desk6-mh@mah.gov.in"
 LAST_LETTER_RE = re.compile(r"^सबब\s*,.*पत्राचे\s+प्रारूप\s+पृ\.[^/]{0,40}/\s*प\.वि\.\s*वर\s+मान्यतेस्तव\s+सादर\s*\.\s*"
                             r"मान्य\s+झाल्यास\s+पत्र\s+निर्गमित\s+करण्यात\s+येईल\s*\.$", re.S)
 LAST_FIN_RE = re.compile(r"^सबब\s*,.*वित्त\s+विभागाच्या\s+मान्यतेस्तव\s+सादर\s+करण्यात\s+येत\s+आहे\s*\.$", re.S)
+# order draft on the file (02.11.2026; R3 (c): "…शासन निर्णयाचे प्रारुप पृ.  /प.वि.वर मान्यतेस्तव सादर.")
+# "अधिसूचनेची मराठी व इंग्रजी प्रारूपे" = B6 notification (Marathi + English text)
+ORDER_DRAFT_KINDS = (r"(?:(?:शासन\s+)?(?:निर्णयाचे|शुद्धिपत्रकाचे|परिपत्रकाचे|ज्ञापनाचे|अधिसूचनेचे|आदेशाचे)\s+प्रारूप"
+                     r"|अधिसूचनेची\s+मराठी\s+व\s+इंग्रजी\s+प्रारूपे)")
+LAST_ORDER_RE = re.compile(rf"^सबब\s*,.*{ORDER_DRAFT_KINDS}\s+पृ\.[^/]{{0,40}}/\s*प\.वि\.\s*वर\s+मान्यतेस्तव\s+सादर"
+                           r"(?:\s+करण्यात\s+येत\s+आहे)?\s*\.(?:\s*मान्य\s+झाल्यास\s+[^.]{0,120}निर्गमित\s+करण्यात\s+येईल\s*\.)?$", re.S)
+LAST_FORMS = (LAST_LETTER_RE, LAST_FIN_RE, LAST_ORDER_RE)
 INTRO_START = "उपरोक्त विषयाबाबत संदर्भाधीन"
 INTRO_HAS = "आपणांस कळविण्यात येते की,"
 MISSING_HEAD = "प्रस्तावासोबत खालील माहिती उपलब्ध नाही"  # missing-information para (PROPOSAL_SOP Step 4)
@@ -395,9 +407,10 @@ def lint_spec(spec, pages=None):
         idx = [i for i, x in enumerate(paras) if isinstance(x, str)]
         lpath, last = (f"note.paras[{idx[-1]}]", paras[idx[-1]]) if idx else ("note.paras", "")
     lastn = ns(last)
-    if not (LAST_LETTER_RE.match(lastn) or LAST_FIN_RE.match(lastn)):
+    if not any(r.match(lastn) for r in LAST_FORMS):
         P.append(f"{lpath}: last para — not one of the SOP forms ('सबब, … पत्राचे प्रारूप पृ.  /प.वि. वर मान्यतेस्तव सादर. "
-                 f"मान्य झाल्यास पत्र निर्गमित करण्यात येईल.' / 'सबब, … वित्त विभागाच्या मान्यतेस्तव सादर करण्यात येत आहे.')")
+                 f"मान्य झाल्यास पत्र निर्गमित करण्यात येईल.' / 'सबब, … वित्त विभागाच्या मान्यतेस्तव सादर करण्यात येत आहे.' / "
+                 f"'सबब, … शासन निर्णयाचे प्रारूप पृ.  /प.वि. वर मान्यतेस्तव सादर.')")
 
     # signers + Finance
     sg = n.get("signers")
@@ -488,6 +501,54 @@ def lint_study(study, pages=None, allow_missing_part1=False):
     return P
 
 
+# spec key -> tools/<module>.py, error function, optional WARN-level function names
+EXTRA_LINTS = (("order", "lint_order", ("lint_order_warnings", "warnings_order")),
+               ("parawise", "lint_parawise", ("warnings_parawise", "lint_parawise_warnings")))
+_IN_EXTRA = []
+
+
+def lint_extras(spec):
+    """(problems, warnings) of tools/lint_order.py / tools/lint_parawise.py for the optional spec keys "order" /
+    "parawise". Imported lazily: a missing module or a crash is a warning, never an error. Re-entry guard (a module
+    that calls lint_spec back must not loop)."""
+    probs, warns = [], []
+    if not isinstance(spec, dict) or _IN_EXTRA:
+        return probs, warns
+    import importlib
+    import os
+    here = os.path.dirname(os.path.abspath(__file__))
+    if here not in sys.path:
+        sys.path.insert(0, here)
+    _IN_EXTRA.append(1)
+    try:
+        for key, mod, wnames in EXTRA_LINTS:
+            if spec.get(key) in (None, "", [], {}):
+                continue
+            try:
+                module = importlib.import_module(mod)
+                fn = getattr(module, mod)
+            except Exception as e:
+                warns.append(f"{key}: tools/{mod}.py not available — '{key}' not linted ({str(e)[:80]})"); continue
+            try:
+                res = fn(spec)
+            except Exception as e:
+                probs.append(f"{key}: {mod} — crashed: {str(e)[:160]}"); continue
+            if isinstance(res, tuple) and len(res) == 2 and all(isinstance(x, (list, tuple)) for x in res):
+                res, w = res; warns += [str(x) for x in w]
+            if isinstance(res, str):
+                res = [res]
+            probs += [str(x) for x in (res or [])]
+            wf = next((getattr(module, n) for n in wnames if callable(getattr(module, n, None))), None)
+            if wf is not None:
+                try:
+                    warns += [str(x) for x in (wf(spec) or [])]
+                except Exception as e:
+                    warns.append(f"{key}: {wf.__name__} — crashed: {str(e)[:120]}")
+    finally:
+        _IN_EXTRA.pop()
+    return probs, warns
+
+
 def load(path):
     with open(path, encoding="utf-8-sig") as f:
         return json.load(f)
@@ -514,7 +575,12 @@ def main(argv):
             warns = lint_warnings(load(spec_path))
         except Exception:
             warns = []   # the JSON error is reported below
-    for path, fn in ((spec_path if spec_path != "-" else None, lambda o: lint_spec(o, pages)),
+    def spec_lint(o):
+        p = lint_spec(o, pages)
+        xp, xw = lint_extras(o)
+        warns.extend(xw)
+        return p + xp
+    for path, fn in ((spec_path if spec_path != "-" else None, spec_lint),
                      (study_path, lambda o: lint_study(o, pages, allow1))):
         if path is None:
             continue

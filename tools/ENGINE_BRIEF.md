@@ -57,6 +57,7 @@ From INSTRUCTIONS.md [I§.n], PROPOSAL_SOP.md [SOP step], tools/PROPOSAL_PROMPT.
   (a) "सबब, उपरोक्त माहिती तक्त्याच्या स्वरूपात … कळविण्याबाबतच्या पत्राचे प्रारूप पृ.      /प.वि. वर मान्यतेस्तव
   सादर. मान्य झाल्यास पत्र निर्गमित करण्यात येईल."
   (b) "सबब, … प्रस्ताव वित्त विभागाच्या मान्यतेस्तव सादर करण्यात येत आहे."
+  (c) order draft only: section 4b.
 - [I4.6] note.signers in order, all LEFT, normal page (no mirror): का. अ. (श्रीम. कऱ्हाडे) / अ.स. (श्री. वडनेरकर)
   / उ.वि.स. नि. उ.स. (श्री. बोंद्रे) / प्र.स. व वि.प. (श्री. खटी); then "अ.मु.स. (वित्त)" ONLY when the file goes
   to Finance (last para (b)); otherwise never.
@@ -115,8 +116,23 @@ Sources: GR22 = मराठी भाषा विभाग GR कपासू-
   "यांनी", "त्यांचे", never "त्याने/तिचे" [R3].
 - Checks: tools/lint_spec.py, tools/verify_outputs.py.
 
+## 4b. Court cases and order drafts [SOP4b] (docs/COURT_AND_ORDERS_RESEARCH.md B7–B10; ENGINE_PROMPT section)
+- Court matter (GP/AGP/HC/MAT notice: रिट याचिका, मूळ अर्ज/O.A., अवमान याचिका, SLP): note para 1 "<सहायक सरकारी वकील,
+  …> यांच्या पृ.N/प.वि. वरील दि. __ रोजीच्या पत्रास अनुसरून सादर.", "पार्श्वभूमी थोडक्यात खालीलप्रमाणे आहे:-" + numbered
+  facts (B9). Facts suffice -> spec `parawise` (English; Rule 58(3) every point; Rule 58(4) Note (ii) elaborate facts with
+  rule/GR refs, never "denied"/"not admitted" alone, documents enclosed; recommendation oppose / not oppose) + letter to
+  the GP/AGP forwarding it. Essential facts missing -> info-letter first [I4.15], no `parawise`. Rule 58(4): to the GP
+  within two weeks / before the notice date — hearing date in Study part 0. Signers [I4.6] (B10).
+- Order draft: spec `order` (gr / corrigendum / circular / memo / notification) ONLY when the record shows the decision
+  or concurrence in hand, or the instruction asks (B7). Last para (c): "सबब, … शासन निर्णयाचे (ज्ञापनाचे /
+  शुद्धिपत्रकाचे / परिपत्रकाचे / अधिसूचनेचे) प्रारूप पृ.      /प.वि. वर मान्यतेस्तव सादर." (notification: "अधिसूचनेची मराठी व इंग्रजी
+  प्रारूपे पृ. …")
+- Missing petition no./date/संकेतांक etc. -> "____" + `warnings`; never stop. Build: tools/build_parawise.py,
+  tools/build_order.py (lint_spec.py lints both keys). status.json `outputs_extra`.
+
 ## 5. Outputs and tools
-- [I4.12] Three files: <PREFIX>_Study.docx, <PREFIX>_Note_and_Letter.docx (letter if needed), package PDF.
+- [I4.12] Three files: <PREFIX>_Study.docx, <PREFIX>_Note_and_Letter.docx (letter if needed), package PDF;
+  optional <PREFIX>_Parawise.docx / <PREFIX>_Order_Draft.docx (section 4b).
 - [I4.1] One Word file: note, then the letter on a new page with letterhead:
   `python3 tools/build_note_letter.py spec.json OUTDIR PREFIX` (look at its PDF preview).
 - [I4.2] Font DVOT-SurekhMR in every Word file (ascii/hAnsi/cs/eastAsia); builders set it, never override.

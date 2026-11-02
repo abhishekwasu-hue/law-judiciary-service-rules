@@ -25,6 +25,7 @@ STORE = {f"proposals/7/proposal/v1/{PROP}": b"%PDF old", "proposals/7/proposal/v
          "proposals/7/reply/v1/उत्तर.pdf": b"%PDF reply"}
 LOG = []
 WSTEPS = []
+REJECT_KINDS = set()   # case_files kinds the mock DB refuses (enum value not yet added: migration 0006 not applied)
 
 
 def match(rows, q):
@@ -59,19 +60,23 @@ class H(BaseHTTPRequestHandler):
             key = path[len("/storage/v1/object/"):]
             if self.command == "GET":
                 return self.send(200, raw=STORE[key]) if key in STORE else self.send(404, {"error": "nf"})
+            if self.command == "DELETE":
+                STORE.pop(key, None); return self.send(200, {"ok": True})
             STORE[key] = body; return self.send(200, {"Key": key})
         if path.startswith("/rest/v1/"):
             t = path[len("/rest/v1/"):]; rows = DB[t]
             if self.command == "GET": return self.send(200, match(rows, q))
             data = json.loads(body)
             if self.command == "POST":
+                if t == "case_files" and data.get("kind") in REJECT_KINDS:
+                    return self.send(400, {"code": "22P02", "message": f'invalid input value for enum file_kind: "{data["kind"]}"'})
                 data["id"] = len(rows) + 100; data.setdefault("created_at", "8"); rows.append(data); return self.send(201)
             if self.command == "PATCH":
                 for r in match(rows, q): r.update(data)
                 return self.send(204)
         self.send(400, {"error": "route"})
 
-    do_GET = do_POST = do_PATCH = handle_any
+    do_GET = do_POST = do_PATCH = do_DELETE = handle_any
 
 
 def run(*args, **extra):
@@ -293,6 +298,35 @@ json.dump({"state": "done", "summary": "s"}, open(os.path.join(out3, "status.jso
 run_row.update(state="running")
 r = run("finish", out3)
 check(r.returncode == 1 and "मूळ प्रस्ताव" in run_row["step"], "finish: package named after the OLD proposal is refused")
+
+# --- optional outputs (02.11.2026): *_Order_Draft.docx -> order_draft, *_Parawise.docx -> parawise; previews ignored
+out4 = os.path.join(tmp, "out4"); os.makedirs(out4)
+for n in ("CR130_2026_Study.docx", "CR130_2026_Note_and_Letter.docx", NEWP, "CR130_2026_Order_Draft.docx",
+          "CR130_2026_Order_Draft.pdf", "CR130_2026_Parawise.docx", "CR130_2026_Parawise.pdf"):
+    open(os.path.join(out4, n), "wb").write(b"x" + n.encode())
+json.dump({"state": "done", "summary": "s", "outputs_extra": ["order_draft", {"kind": "parawise", "file": "CR130_2026_Parawise.docx"}]},
+          open(os.path.join(out4, "status.json"), "w", encoding="utf-8"), ensure_ascii=False)
+run_row.update(state="running", warnings=[]); LOG.clear()
+r = run("finish", out4)
+check(r.returncode == 0 and run_row["state"] == "done", f"finish extras: exit 0, done ({r.stderr[:300]})")
+ups = sorted(l["path"] for l in LOG if l["m"] == "POST" and l["path"].startswith("/storage/v1/object/"))
+check("/storage/v1/object/outputs/7/order_draft/v1/file.docx" in ups and "/storage/v1/object/outputs/7/parawise/v1/file.docx" in ups
+      and len(ups) == 5 and all(u.isascii() for u in ups), f"finish extras: order_draft + parawise uploaded, ASCII keys, previews not a package ({ups})")
+rows = {f["kind"]: f for f in DB["case_files"] if f["kind"] in ("order_draft", "parawise")}
+check(rows["order_draft"]["original_name"] == "CR130_2026_Order_Draft.docx" and rows["parawise"]["original_name"] == "CR130_2026_Parawise.docx"
+      and rows["parawise"]["storage_path"] == "outputs/7/parawise/v1/file.docx", "finish extras: case_files rows, original names kept")
+check(not run_row["warnings"], f"finish extras: no warning ({run_row['warnings']})")
+# migration 0006 not applied -> the enum refuses the kind: warning only, the three main outputs stored
+os.remove(os.path.join(out4, "CR130_2026_Parawise.docx"))
+REJECT_KINDS.add("order_draft"); run_row.update(state="running", warnings=[]); n_files = len(DB["case_files"])
+r = run("finish", out4)
+check(r.returncode == 0 and run_row["state"] == "done", f"finish extras, enum missing: still done ({r.stderr[:300]})")
+check(len(DB["case_files"]) == n_files + 3, "finish extras, enum missing: the three main outputs stored")
+check(any("शासन आदेश-मसुदा जतन झाला नाही" in w and "0006" in w for w in run_row["warnings"])
+      and any("परिच्छेदनिहाय अभिप्राय" in w and "फाइल नाही" in w for w in run_row["warnings"]),
+      f"finish extras: refused upload + listed-but-absent file -> warnings ({run_row['warnings']})")
+check("outputs/7/order_draft/v2/file.docx" not in STORE, "finish extras, enum missing: orphan Storage object removed")
+REJECT_KINDS.clear()
 
 # --- model tiers + soft budget: config parsing (local command, no Supabase env), agents JSON, part1check, "मॉडेल: " lines
 sys.path.insert(0, os.path.join(ROOT, "tools"))
