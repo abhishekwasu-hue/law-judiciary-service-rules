@@ -1,0 +1,127 @@
+{
+ "pages": [
+  {
+   "id": "gr-01",
+   "kind": "gr",
+   "pdf_sha256": "d51e6f8916b9f1c1b1702fce018fcf0ad662ef9318984724d7855c0ca35adb97",
+   "confirmed_words": 280,
+   "source": "pdf/03-industries-labour/ind_it-itites-policy-2023_gr_20230627.pdf",
+   "page": 1,
+   "table": false,
+   "common_word_rate": 0.174,
+   "ocr_agreement": 0.695
+  },
+  {
+   "id": "gr-02",
+   "kind": "gr",
+   "pdf_sha256": "a9f55aeeb699ddae4b90d2dd9dfbb7f9c93479537e604ab1b535a9efdead64f8",
+   "confirmed_words": 175,
+   "source": "pdf/public-works/GR_202312181818179518_Posting_Jr_Engineer_Civil_in_lien_18-12-2023.pdf",
+   "page": 1,
+   "table": false,
+   "common_word_rate": 0.141,
+   "ocr_agreement": 0.703
+  },
+  {
+   "id": "gr-03",
+   "kind": "gr",
+   "pdf_sha256": "0b591a25e11882e7f26bbb7ffc53686a3535900f0180fd146a7c6a69dd4d2c16",
+   "confirmed_words": 141,
+   "source": "pdf/02-cooperation-textiles/coop_gr_ots-urban-credit-societies-extension_20240701.pdf",
+   "page": 2,
+   "table": false,
+   "common_word_rate": 0.182,
+   "ocr_agreement": 0.662
+  },
+  {
+   "id": "gr-04",
+   "kind": "gr",
+   "pdf_sha256": "324afccf2ca6be80cd3ff8b76e94159a92134f074191f387a675faecb01c61c3",
+   "confirmed_words": 159,
+   "source": "pdf/31-reservation-in-promotion-gr-2004-and-gr-07-05-2021/8ed3821c6bb8f4802e1ddc4ed2a3578b.pdf",
+   "page": 5,
+   "table": false,
+   "common_word_rate": 0.216,
+   "ocr_agreement": 0.729
+  },
+  {
+   "id": "gr-05",
+   "kind": "gr",
+   "pdf_sha256": "d64dc4451c9eee15fa8ed9ddcee71e47558f8c59f4ce5b044c09a37a84d0bf53",
+   "confirmed_words": 131,
+   "source": "pdf/social-justice-tribal-minority-obc/202403121207365224.pdf",
+   "page": 3,
+   "table": false,
+   "common_word_rate": 0.234,
+   "ocr_agreement": 0.682
+  },
+  {
+   "id": "gr-06",
+   "kind": "gr",
+   "pdf_sha256": "aa20e7d78975b5d199963abbd591e3db93788603cdac1b32ec5397eaf17575f6",
+   "confirmed_words": 227,
+   "source": "pdf/04-food-civil-supplies/nfsa-allocation_Apr-Jun2023.pdf",
+   "page": 1,
+   "table": false,
+   "common_word_rate": 0.148,
+   "ocr_agreement": 0.915
+  },
+  {
+   "id": "gr-07",
+   "kind": "gr",
+   "pdf_sha256": "a9e336395a18019e47303b2ff9fc7a31dda552a877b8e59ba3b604e704200ee5",
+   "confirmed_words": 157,
+   "source": "pdf/medical-health/202204121133085013.pdf",
+   "page": 3,
+   "table": false,
+   "common_word_rate": 0.149,
+   "ocr_agreement": 0.695
+  },
+  {
+   "id": "gr-08",
+   "kind": "gr",
+   "pdf_sha256": "f2b0ceb3ad7623de82ffb3f7a65a2668499a03d5f188a1052d13a08b42c2ecb9",
+   "confirmed_words": 128,
+   "source": "pdf/women-child/202406281814018230.pdf",
+   "page": 6,
+   "table": true,
+   "common_word_rate": 0.132,
+   "ocr_agreement": 0.674
+  },
+  {
+   "id": "dummy-01",
+   "kind": "dummy",
+   "source": "dummy_proposal/dummy_proposal.pdf",
+   "page": 1,
+   "table": false,
+   "common_word_rate": null,
+   "ocr_agreement": null
+  },
+  {
+   "id": "dummy-02",
+   "kind": "dummy",
+   "source": "dummy_proposal/dummy_proposal.pdf",
+   "page": 2,
+   "table": false,
+   "common_word_rate": null,
+   "ocr_agreement": null
+  },
+  {
+   "id": "dummy-03",
+   "kind": "dummy",
+   "source": "dummy_proposal/dummy_proposal.pdf",
+   "page": 3,
+   "table": true,
+   "common_word_rate": null,
+   "ocr_agreement": null
+  }
+ ],
+ "settings": {
+  "dpi": 110,
+  "n_gr": 8,
+  "ocr_check": true,
+  "min_ocr_agreement": 0.65,
+  "max_impossible_rate": 0.005,
+  "min_common_word_rate": 0.12
+ }
+}
