@@ -62,7 +62,7 @@ Trigger: Abhi says "प्रस्ताव कक्षातील नवी�
 Copy the structure of the nearest sample in `samples/specs/` and fill your facts. Rules:
 - **Language (INSTRUCTIONS §4.18, 01.11.2026):** short sentences, one point each, clear subject (who did what); "श्रीमती" (not "सौ."), one space after "श्री."/"श्रीमती"; the person's name as found in the proposal — the Marathi-initials form (e.g. "ह. ना. आपटे") if the proposal has it, otherwise exactly as written there; missing-information list as a table; letter: no "तात्काळ", request form "…उपलब्ध करून देण्यात यावी, ही विनंती." Quotes stay verbatim. lint_spec.py checks this.
 - **Marathi forms (INSTRUCTIONS §4.19, 01.11.2026; Marathi Language Dept GR कपासू-2020/प्र.क्र.56/भाषा-2, दि. 10.11.2022):** outside “…” quotes — a space after an abbreviation dot in running text ("दि. 17.09.2026", "क्र. 108", "प्र. क्र. 21/2024"); ":-" never ".:-"; "करून" not "करुन", "प्रारूप" not "प्रारुप". Left exactly: quotes and related extracts, "पृ.N/प.वि." / "पॅकेज PDF पृ. N", file/letter nos. and any token with '/' or '-' ("संकिर्ण-2026/226/प्र.क्र.131/का.6"), the signer chain, date digits, decimals, GR codes. lint_spec.py and verify_outputs.py check this.
-- **Para 1:** "<authority> यांच्या पृ.__/प.वि. वरील दि. __ रोजीच्या पत्रास अनुसरुन सादर." (or "…पत्रासोबत प्राप्त … पत्रास अनुसरुन सादर.")
+- **Para 1:** "<authority> यांच्या पृ.__/प.वि. वरील दि. __ रोजीच्या पत्रास अनुसरून सादर." (or "…पत्रासोबत प्राप्त … पत्रास अनुसरून सादर.")
 - **Body:** short numbered paras.
   - Facts, posts, periods and amounts go in TABLES: a `{"table": [[...],[...]], "bold_last": true}` item in `note.paras`.
   - GR/rule text verbatim in “ ” with "(पृ.N/प.वि.)".
@@ -78,7 +78,7 @@ Copy the structure of the nearest sample in `samples/specs/` and fill your facts
 - **Letter (`letter`):**
   - `ref_no`: "संकिर्ण-2026/<file no>/प्र.क्र.<n>/का.6"; `date`: "__.__.2026".
   - `to`; `subject`; `refs` ("आपले पत्र क्र. …, दि. …").
-  - `intro`: "उपरोक्त विषयाबाबत संदर्भाधीन पत्रास अनुसरुन आपणांस कळविण्यात येते की, सदर प्रकरणी पुढील कार्यवाहीसाठी खालील माहिती … उपलब्ध करून देण्यात यावी, ही विनंती:-"
+  - `intro`: "उपरोक्त विषयाबाबत संदर्भाधीन पत्रास अनुसरून आपणांस कळविण्यात येते की, सदर प्रकरणी पुढील कार्यवाहीसाठी खालील माहिती … उपलब्ध करून देण्यात यावी, ही विनंती:-"
   - `points`: an empty table or a few short points.
   - **Table = data only (INSTRUCTIONS §4.20, 02.11.2026):** the table asks only for data to fill in (dates, figures, periods, yes/no, numbers). Documents (copy of an order, report, certificate — "प्रत", "प्रमाणपत्र", "अहवाल") go after the table: a point "	तसेच, खालील कागदपत्रे उपलब्ध करून देण्यात यावीत, ही विनंती:-" then numbered points "1)	… आदेशाची प्रत;". A row mixing both is split (data in the table, the document in the list). Model: CR131 sample. lint_spec.py checks this.
   - **Reminder (INSTRUCTIONS §4.21, 02.11.2026):** `letter.reminder: N` prints "स्मरणपत्र-N" above the क्रमांक line; same file no.; refs[0] "या कार्यासनाचे समक्रमांकाचे पत्र दि. __"; intro "… संदर्भाधीन पत्रान्वये मागविण्यात आलेली माहिती अद्याप अप्राप्त आहे. सदर माहिती लवकरात लवकर शासनास उपलब्ध करून देण्यात यावी, ही विनंती."
