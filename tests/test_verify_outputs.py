@@ -29,6 +29,9 @@ FONTFILE = next((f for f in FONTS if os.path.exists(f)), None)
 ENV = dict(os.environ, PYTHONIOENCODING="utf-8", LINT_SKIP="1")
 
 
+sys.path.insert(0, TOOLS)
+import lint_spec as L  # noqa: E402
+
 def py(*args):
     return subprocess.run([sys.executable, *args], capture_output=True, text=True, encoding="utf-8", env=ENV)
 
@@ -353,6 +356,38 @@ class VerifyOutputs(unittest.TestCase):
         rc, out = self.run_verify(d)
         self.assertEqual(rc, 0, out)
         self.assertIn("ALL OK", out)
+
+    # ---- 02.11.2026: "अनुसरुन" error; WARN level never FAIL ----
+    def test_anusarun_in_note_fails(self):
+        d = self.case("anus_note")
+        build_note(self.spec_with(lambda s: s["note"].__setitem__("first", s["note"]["first"].replace("अनुसरून", "अनुसरुन"))), d)
+        self.must_fail(d, "note: शुद्धलेखन — 'अनुसरुन'")
+
+    def test_anusarun_in_letter_fails(self):
+        d = self.case("anus_letter")
+        build_note(self.intro_with("अनुसरून", "अनुसरुन"), d)
+        self.must_fail(d, "letter: शुद्धलेखन — 'अनुसरुन'")
+
+    def test_warn_not_fail(self):
+        d = self.case("warn")
+        s = self.intro_with("सदर प्रकरणी", "सदर प्रकरणी आपणास")
+        s["note"]["paras"][0] += " अर्ज करणेसाठी त्याने सादर केला. “देणेबाबत तिने”"
+        s["letter"]["subject"] = s["letter"]["subject"].rstrip(".") + " मिळणेबाबत."
+        build_note(s, d)
+        rc, out = self.run_verify(d)
+        self.assertEqual(rc, 0, out)
+        self.assertIn("ALL OK", out)
+        self.assertNotIn("FAIL:", out)
+        warns = [ln for ln in out.splitlines() if ln.startswith("WARN:")]
+        for needle in ("note: शुद्धलेखन नियम 12 — 'करणेसाठी'", "note: शुद्धलेखन नियम 3 (आदरार्थी) — अधिकारी/व्यक्तीसाठी 'त्याने'",
+                       "letter: शुद्धलेखन नियम 1–4 (अनुस्वार, आदरार्थी) — 'आपणास'", "letter: शुद्धलेखन नियम 12 — 'मिळणेबाबत'"):
+            self.assertTrue(any(needle in w for w in warns), f"{needle}:\n{out}")
+        self.assertFalse(any("देणेबाबत" in w or "'तिने'" in w for w in warns), out)   # quoted text exempt
+
+    def test_good_has_no_warn(self):
+        rc, out = self.run_verify(self.good)
+        self.assertNotIn("WARN:", out)
+
 
 if __name__ == "__main__":
     unittest.main()

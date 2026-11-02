@@ -23,9 +23,13 @@ ENV = dict(os.environ, PYTHONIOENCODING="utf-8")
 ENV.pop("LINT_SKIP", None); ENV.pop("STUDY_ALLOW_MISSING_PART1", None)
 
 
-def load(p):
+def raw_load(p):
     with open(p, encoding="utf-8-sig") as f:
         return json.load(f)
+
+
+def load(p):
+    return raw_load(p)
 
 
 def run(args, env=ENV):
@@ -56,10 +60,11 @@ class LintSpec(unittest.TestCase):
         self.assertGreaterEqual(len(SPECS), 6)
         for p in SPECS:
             with self.subTest(spec=os.path.basename(p)):
-                self.assertEqual(L.lint_spec(load(p)), [])
+                self.assertEqual(L.lint_spec(raw_load(p)), [])
+                self.assertEqual(L.lint_warnings(raw_load(p)), [])   # approved samples: no WARN-level finding
                 r = run([os.path.join(TOOLS, "lint_spec.py"), p])
                 self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
-                self.assertEqual(r.stdout.strip(), "LINT OK")
+                self.assertEqual(r.stdout.strip().splitlines(), ["LINT OK"])
 
     # ---- §4.18 language (01.11.2026) ----
     def test_sau_not_shrimati(self):
@@ -213,8 +218,10 @@ class LintSpec(unittest.TestCase):
 
     def test_mixed_points_render_in_order(self):
         import docx
-        s131 = next(p for p in SPECS if os.path.basename(p).startswith("CR131_"))
         out = tempfile.mkdtemp(prefix="cr131_")
+        s131 = os.path.join(out, "cr131.json")
+        with open(s131, "w", encoding="utf-8") as f:
+            json.dump(load(next(p for p in SPECS if os.path.basename(p).startswith("CR131_"))), f, ensure_ascii=False)
         try:
             r = run([os.path.join(TOOLS, "build_note_letter.py"), s131, out, "T131"])
             self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
@@ -348,6 +355,93 @@ class LintSpec(unittest.TestCase):
         self.assertTrue(any(p.startswith("study.parts[2].heading") for p in L.lint_study(st)))
 
 
+class LintSpelling(unittest.TestCase):
+    """02.11.2026: error level 'ध्द' / 'करुन' / 'प्रारुप' / 'अनुसरुन'; WARN level L11–L14 (STYLE_RESEARCH_LANG §5.2)."""
+    @classmethod
+    def setUpClass(cls):
+        cls.s122 = load(CR122)
+
+    def spec(self, para=None, intro=None, subject=None, related_text=None, related_heading=None):
+        s = copy.deepcopy(self.s122)
+        if para is not None: s["note"]["paras"][0] += para
+        if intro is not None: s["letter"]["intro"] = s["letter"]["intro"].replace("सदर प्रकरणी", "सदर प्रकरणी " + intro)
+        if subject is not None: s["letter"]["subject"] = subject
+        if related_text is not None: s["related"][0]["text"] = [related_text]
+        if related_heading is not None: s["related"][0]["heading"] += related_heading
+        return s
+
+    def errs(self, s, needle):
+        return [p for p in L.lint_spec(s) if needle in p]
+
+    def warns(self, s, needle=""):
+        return [p for p in L.lint_warnings(s) if needle in p]
+
+    # ---- ERROR level ----
+    def test_errors_all_four(self):
+        for bad, good, needle in (("शुध्द", "शुद्ध", "'ध्द'"), ("करुन", "करून", "'करुन'"), ("प्रारुप", "प्रारूप", "'प्रारुप'"),
+                                  ("अनुसरुन", "अनुसरून", "'अनुसरुन'")):
+            with self.subTest(word=bad):
+                self.assertTrue([p for p in self.errs(self.spec(para=f" {bad}"), needle) if p.startswith("note.paras[0]:")])
+                self.assertTrue([p for p in self.errs(self.spec(intro=bad), needle) if p.startswith("letter.intro:")])
+                self.assertFalse(self.errs(self.spec(para=f" {good}", intro=good), needle))
+                self.assertFalse(self.errs(self.spec(para=f" “{bad}”", intro=f"“{bad}”"), needle))   # quotes exempt
+
+    def test_anusarun_error(self):
+        s = self.spec(para=" पत्रास अनुसरुन सादर.")
+        self.assertIn("note.paras[0]: शुद्धलेखन — 'अनुसरुन' ऐवजी 'अनुसरून' (§4.19)", L.lint_spec(s))
+        self.assertEqual(L.fix_lang("पत्रास अनुसरुन “अनुसरुन”"), "पत्रास अनुसरून “अनुसरुन”")
+
+    def test_anusarun_quoted_and_related_text_exempt(self):
+        s = self.spec(para=" “पत्रास अनुसरुन सादर”", related_text="“…पत्रास अनुसरुन…” अनुसरुन")
+        self.assertFalse(self.errs(s, "'अनुसरुन'"))
+        s = self.spec(related_heading=" — पत्रास अनुसरुन")   # related heading is the Section's own text: checked
+        self.assertTrue([p for p in self.errs(s, "'अनुसरुन'") if p.startswith("related[0].heading")])
+
+    # ---- WARN level ----
+    def test_l11_rule12(self):
+        for w, fx in (("करणेसाठी", "करण्यासाठी"), ("देणेबाबत", "देण्याबाबत"), ("पाठविणेकरिता", "पाठविण्याकरिता")):
+            with self.subTest(word=w):
+                self.assertEqual(self.warns(self.spec(para=f" अर्ज {w} सादर.")),
+                                 [f"note.paras[0]: शुद्धलेखन नियम 12 — '{w}' ऐवजी '{fx}' (प्रस्तावातील विषय-रूप असले तरी "
+                                  f"सूचना) (STYLE_RESEARCH_LANG §5.2)"])
+                self.assertFalse(self.warns(self.spec(para=f" अर्ज {fx} सादर.")))
+        self.assertTrue(self.warns(self.spec(subject="वेतननिश्चिती मिळणेबाबत."), "letter.subject: शुद्धलेखन नियम 12"))
+        self.assertFalse(self.warns(self.spec(para=" देणे व घेणे बाबत")))
+
+    def test_l12_rule14(self):
+        self.assertTrue(self.warns(self.spec(para=" श्री. ____, एम्.ए., पीएच्.डी."), "'एम्.' ऐवजी 'एम.'"))
+        self.assertTrue(self.warns(self.spec(para=" बी्.कॉम"), "नियम 14"))
+        self.assertFalse(self.warns(self.spec(para=" श्री. ____, एम.ए., पीएच.डी., क्र. 108, दि. 17.09.2026")))
+
+    def test_l13_rule3(self):
+        for w, fx in (("त्याने", "त्यांनी"), ("तिने", "त्यांनी"), ("त्याचे", "त्यांचे"), ("तिला", "त्यांना"),
+                      ("त्याच्या", "त्यांच्या")):
+            with self.subTest(word=w):
+                self.assertTrue(self.warns(self.spec(para=f" {w} अर्ज केला."), f"'{w}' ऐवजी '{fx}'"))
+        self.assertFalse(self.warns(self.spec(para=" त्यांनी अर्ज केला; त्यांच्या सेवेचा; त्याच्यासाठी नाही")))
+
+    def test_l14_anusvar(self):
+        self.assertTrue(self.warns(self.spec(intro="आपणास"), "'आपणास' ऐवजी 'आपणांस'"))
+        self.assertTrue(self.warns(self.spec(para=" श्री. ____ यांनां कळविले."), "'यांनां' ऐवजी 'यांना'"))
+        self.assertFalse(self.warns(self.spec(para=" श्री. ____ यांना आपणांस कळविले.")))
+
+    def test_warn_quotes_related_exempt(self):
+        s = self.spec(para=" “करणेसाठी त्याने आपणास एम्.ए.”", related_text="करणेबाबत त्याने आपणास",
+                      related_heading=" — लागू करणेबाबत (जसाच्या तसा)")
+        self.assertEqual(L.lint_warnings(s), [])
+
+    def test_warnings_are_not_errors(self):
+        s = self.spec(para=" करणेसाठी त्याने आपणास एम्.ए.")
+        self.assertEqual(L.lint_spec(s), L.lint_spec(self.s122))
+        self.assertEqual(len(L.lint_warnings(s)), 4)
+
+    def test_fix_warn(self):
+        t = "अर्ज करणेसाठी त्याने आपणास यांनां एम्.ए. “करणेबाबत त्याने”"
+        self.assertEqual(L.fix_warn(t), "अर्ज करण्यासाठी त्यांनी आपणांस यांना एम.ए. “करणेबाबत त्याने”")
+        self.assertEqual(L.warn_hits(L.fix_warn(t)), [])
+        self.assertEqual(L.warn_hits("“करणेबाबत त्याने”"), [])
+
+
 class LintCli(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.mkdtemp()
@@ -369,11 +463,26 @@ class LintCli(unittest.TestCase):
         self.assertIn("note.paras[0]: banned word", r.stdout)
         self.assertIn("note.signers: signer chain", r.stdout)
 
+    def test_cli_warn_exit_0(self):
+        s = load(CR122); s["note"]["paras"][0] += " अर्ज करणेसाठी सादर."
+        r = run([os.path.join(TOOLS, "lint_spec.py"), self.dump(s, "w.json")])
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertIn("WARN note.paras[0]: शुद्धलेखन नियम 12 — 'करणेसाठी' ऐवजी 'करण्यासाठी'", r.stdout)
+        self.assertEqual(r.stdout.strip().splitlines()[-1], "LINT OK")
+        s["note"]["signers"].pop()   # an error + a warning -> exit 1, both printed
+        r = run([os.path.join(TOOLS, "lint_spec.py"), self.dump(s, "w2.json")])
+        self.assertEqual(r.returncode, 1); self.assertIn("WARN note.paras[0]", r.stdout); self.assertNotIn("LINT OK", r.stdout)
+
+    def test_cli_anusarun_exit_1(self):
+        s = load(CR122); s["note"]["paras"][0] += " पत्रास अनुसरुन सादर."
+        r = run([os.path.join(TOOLS, "lint_spec.py"), self.dump(s, "a.json")])
+        self.assertEqual(r.returncode, 1); self.assertIn("note.paras[0]: शुद्धलेखन — 'अनुसरुन'", r.stdout)
+
     def test_cli_study(self):
-        p = self.dump(study(skip=(1,)), "st.json")
-        r = run([os.path.join(TOOLS, "lint_spec.py"), CR122, "--study", p])
+        p = self.dump(study(skip=(1,)), "st.json"); cr122 = self.dump(load(CR122), "cr122.json")
+        r = run([os.path.join(TOOLS, "lint_spec.py"), cr122, "--study", p])
         self.assertEqual(r.returncode, 1); self.assertIn("भाग 1 missing", r.stdout)
-        r = run([os.path.join(TOOLS, "lint_spec.py"), CR122, "--study", p, "--allow-missing-part1"])
+        r = run([os.path.join(TOOLS, "lint_spec.py"), cr122, "--study", p, "--allow-missing-part1"])
         self.assertEqual(r.returncode, 0, r.stdout); self.assertIn("LINT OK", r.stdout)
 
     def test_build_note_letter_stops_on_lint(self):

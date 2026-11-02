@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """verify_outputs.py <outdir> <PREFIX> "<package pdf>" <proposal pages> [--original-name NAME]
 Quality gate for one proposal's three outputs (PROPOSAL_SOP.md Step 7; rules INSTRUCTIONS.md §4).
-Prints one line per check ("OK: ..." / "FAIL: ...") and "ALL OK" only when every check passes; exit code 1 otherwise.
+Prints one line per check ("OK: ..." / "FAIL: ...", plus "WARN: ..." lines that never fail) and "ALL OK" only when
+every check passes; exit code 1 otherwise.
 Rule constants / regexes / shared checks: tools/lint_spec.py (same rules as the pre-build lint).
 Windows: `py tools/verify_outputs.py ...`; runner: `python3 tools/verify_outputs.py ...`.
 
@@ -13,12 +14,15 @@ Checks
   - पृ. references "पृ.N/प.वि." (also "पृ. N / प.वि.", lists 5,7, ranges 5-7 / 5 ते 7, Devanagari digits) and
     "पॅकेज PDF पृ. N": every N with 1 <= N <= package pages; a पृ.…/प.वि. that cannot be parsed fails.
     Text inside “ ” is skipped in the "संबंधित माहिती" part and in the Study (verbatim quotes of old files carry their own page nos.)
+ Note body and letter, WARN only (lint_spec.warn_hits, outside quotes; printed "WARN: …", never FAIL, ALL OK unaffected):
+  शुद्धलेखन नियम 12 '…णेसाठी/…णेबाबत/…णेकरिता', नियम 14 halant before an abbreviation dot, नियम 3 'त्याने/तिने…',
+  नियम 1–4 'आपणास' / 'यांनां'
  Note (start of Note_and_Letter up to "संबंधित माहिती (संदर्भासाठी)" or the letter):
   - signer chain = INSTRUCTIONS §4.6 names in order, "अ.मु.स. (वित्त)" last
   - "अ.मु.स. (वित्त)" present  <=>  last numbered para contains "वित्त विभागाच्या मान्यतेस्तव"
  Note body and letter: no "पॅकेज PDF" (allowed only in "संबंधित माहिती" and the Study); no BANNED word
  Note body and letter (§4.18, text outside “…” quotes only): no 'सौ.'; 'श्री.' followed by a space; letter: no 'तात्काळ'
- Note body and letter (§4.19, outside quotes, lint_spec.lang_hits): no '.:-', no 'करुन' / 'प्रारुप', a space after
+ Note body and letter (§4.19, outside quotes, lint_spec.lang_hits): no '.:-', no 'करुन' / 'प्रारुप' / 'अनुसरुन', a space after
   'दि.' / 'क्र.' / 'प्र. क्र.' in running text (file nos. / codes with '/' or '-' skipped); missing-info para 'नाही:-'
  Note_and_Letter (whole file): no repo paths (register/, service-rules/, precedent-library/, pdf/, repo, रेपो)
  Letter (when present: a "प्रति," or "क्रमांक :-" paragraph):
@@ -56,7 +60,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 # shared rule definitions — ONE copy, in tools/lint_spec.py (pre-build lint uses the same rules)
 from lint_spec import (AMS, BANNED, FIN, ID_RE, LH_EMAIL, RELATED, REF_NO, REPO_RE, REQUEST,  # noqa: E402,F401
                        MISSING_FORM, MISSING_HEAD, SIGNERS, banned_hits, finance_problems, heading_problems, id_hits,
-                       lang_hits, ma_hits, ns, num, part_no, ref_problems, repo_hits, signer_problems, style_hits, unquoted)
+                       lang_hits, ma_hits, ns, num, part_no, ref_problems, repo_hits, signer_problems, style_hits, unquoted,
+                       warn_hits)
 INTRO_HEAD = "उपरोक्त विषयाबाबत"  # letter intro paragraph (lint_spec.INTRO_START begins with it)
 from engine_supabase import strip_upload_prefix  # noqa: E402 — the ONE upload-prefix rule (§4.16)
 
@@ -75,6 +80,11 @@ def check(name, problems):
 
 
 
+
+
+def warn(msg):
+    """WARN-level finding: printed as "WARN: …", does not count as a FAIL (ALL OK still possible)."""
+    print(f"WARN: {msg}")
 
 
 def el_text(el):
@@ -226,6 +236,10 @@ def main(argv):
                and re.sub(r"^[0-9०-९]+\.\s*", "", ns(unquoted(b["text"]))).startswith(MISSING_HEAD)
                and not re.sub(r"^[0-9०-९]+\.\s*", "", ns(b["text"])).startswith(MISSING_HEAD + ":-")]
         check("official Marathi §4.19 (note body, letter)", lg)
+        # WARN level (lint_spec.warn_hits: शुद्धलेखन नियम 1–4, 3, 12, 14) — printed, never a FAIL
+        for where, t in (("note", note_txt), ("letter", letter_txt)):
+            for x in warn_hits(t):
+                warn(f"{where}: {x}")
 
         # signer chain + Finance
         ne = [b for b in bl[:note_end] if b["kind"] == "p" and ns(b["text"])]

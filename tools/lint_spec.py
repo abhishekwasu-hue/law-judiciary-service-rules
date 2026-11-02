@@ -4,6 +4,7 @@ Pre-build lint: checks spec.json (note/letter, format: tools/mkdocs.py docstring
 docstring) against the rules that tools/verify_outputs.py checks on the built files (PROPOSAL_SOP.md Step 4,
 INSTRUCTIONS.md §4), so problems are fixed before building. spec.json may be "-" to lint only --study.
 Prints one line per problem "<JSON path>: <rule> — <detail>"; "LINT OK" and exit 0 when there is none, exit 1 otherwise.
+Warnings (WARN level, below) are printed as "WARN <JSON path>: <message>" and never change the exit code.
 Windows: `py tools/lint_spec.py ...`; runner: `python3 tools/lint_spec.py ...`.
 
 Rules (spec.json)
@@ -20,7 +21,7 @@ Rules (spec.json)
   - note.signers == INSTRUCTIONS §4.6 chain (+ "अ.मु.स. (वित्त)" last); "अ.मु.स. (वित्त)" present <=> last para has
     "वित्त विभागाच्या मान्यतेस्तव"
   - §4.19 (text outside quotes; note body, letter, related heading/source — not the verbatim related text): no '.:-'
-    (use ':-'), 'करून' not 'करुन', 'प्रारूप' not 'प्रारुप', one space after 'दि.' / 'क्र.' / 'प्र. क्र.' in running text
+    (use ':-'), 'करून' not 'करुन', 'प्रारूप' not 'प्रारुप', 'अनुसरून' not 'अनुसरुन', one space after 'दि.' / 'क्र.' / 'प्र. क्र.' in running text
     (file/letter nos. and other tokens with '/' or '-' left exactly); missing-info para starts
     "प्रस्तावासोबत खालील माहिती उपलब्ध नाही:-"
   - letter (when present): ref_no संकिर्ण-<year>/<file no>/प्र.क्र.<n>/का.6; to, subject, refs present; intro starts
@@ -36,6 +37,14 @@ Rules (spec.json)
     न्यायमूर्ती / प्रशासकीय न्यायाधीश, and before उच्च न्यायालय… (the court itself; an office designation
     "उच्च न्यायालय (… शाखा)" excepted)
   - §4.24 "शुद्धिपत्रक" (not शुध्दिपत्रक / शुद्धीपत्रक / शुद्धपत्रक)
+  - "ध्द" -> "द्ध" (error; मराठी भाषा विभाग GR दि. 10.11.2022)
+WARN level (spec.json; note body and letter, text outside quotes; related and signers not checked; warn_hits / fix_warn;
+  शुद्धलेखनाचे 18 नियम, docs/STYLE_RESEARCH_LANG.md §5.2; numbered after the §3 proposals L1–L10):
+  - L11 नियम 12: "…णेसाठी / …णेबाबत / …णेकरिता" -> "…ण्यासाठी / …ण्याबाबत / …ण्याकरिता" (also a letter subject taken
+    from the proposal, e.g. "मिळणेबाबत" — warning only)
+  - L12 नियम 14: halant before an abbreviation dot ("एम्.ए.", "पीएच्.डी.") -> "एम.ए.", "पीएच.डी."
+  - L13 नियम 3 (आदरार्थी): त्याने/तिने -> त्यांनी, त्याचे/तिचे -> त्यांचे, त्याला/तिला -> त्यांना, त्याच्या/तिच्या -> त्यांच्या
+  - L14 नियम 1–4 (अनुस्वार): "आपणास" -> "आपणांस"; "यांनां" / "यानां" -> "यांना"
 Rules (study.json): parts with headings भाग 0 … भाग 7 (--allow-missing-part1: भाग 1 may be absent); no internal ids;
   पृ. references as above ("“…”" skipped).
 The constants and check functions below are the ONE definition shared with tools/verify_outputs.py."""
@@ -146,7 +155,8 @@ def style_hits(text, letter=False):
 # INSTRUCTIONS §4.19 (01.11.2026) — मराठी भाषा विभाग GR कपासू-2020/प्र.क्र.56/भाषा-2, दि. 10.11.2022 (परिशिष्ट तीन,
 # अ.क्र. 23: संक्षेपचिन्हानंतर जागा). Applied to text outside “…” quotes only; one definition for lint, verify and the
 # sample normaliser (fix_lang).
-SPELL_419 = {"करुन": "करून", "प्रारुप": "प्रारूप"}
+# "अनुसरून" — शुद्धलेखन नियम 8 (धातूचे -ऊन रूप; docs/STYLE_RESEARCH_LANG.md §5.2), 02.11.2026
+SPELL_419 = {"करुन": "करून", "प्रारुप": "प्रारूप", "अनुसरुन": "अनुसरून"}
 COLON_DASH_RE = re.compile(r"(?<!प\.वि)(?<!क्र)(?<!दि)\.:-")   # ".:-" -> ":-" (abbreviation dots such as प.वि. kept)
 ABBR_PREFIXES = ("प्र.क्र.", "क्र.", "दि.")                         # running-text abbreviations that take a space
 CODE_RE = re.compile(r"/|[0-9A-Za-zऀ-ॿ_]-[0-9A-Za-zऀ-ॿ_]")      # file/letter nos., codes: left exactly
@@ -197,6 +207,53 @@ def lang_hits(text):
     hits = abbr_hits(text)
     if hits: out.append(f"संक्षेपचिन्हानंतर एक जागा — 'दि. 17.09.2026', 'क्र. 108', 'प्र. क्र.' (§4.19): {hits[:3]}")
     return out
+
+
+# WARN level (02.11.2026): शुद्धलेखनाचे 18 नियम (महामंडळ; शासन मान्यता 1962/1972; docs/STYLE_RESEARCH_LANG.md §5.2).
+# Warnings are printed as "WARN <path>: …" and never fail lint or verify. Scope: note body and letter, text outside quotes
+# (related — GR titles and extracts — and the signer chain are not checked). Numbered after the §3 proposals L1–L10.
+DEV = "\u0900-\u097f"
+_SRC = "(STYLE_RESEARCH_LANG §5.2)"
+WARN_RULES = [
+    # (id, regex, fix(match) -> replacement, message(match))
+    ("L11", re.compile(rf"(?<![{DEV}])([{DEV}]*?)णे(साठी|बाबत|करिता)"),
+     lambda mt: mt.group(1) + "ण्या" + mt.group(2),
+     lambda mt, fx: f"शुद्धलेखन नियम 12 — '{mt.group(0)}' ऐवजी '{fx}' (प्रस्तावातील विषय-रूप असले तरी सूचना) {_SRC}"),
+    ("L12", re.compile(rf"(?<![{DEV}])([{DEV}]*?[{DEV}])\u094d\."),   # consonant (or a stray vowel sign, "बी्.") + halant + "."
+     lambda mt: mt.group(1) + ".",
+     lambda mt, fx: f"शुद्धलेखन नियम 14 — इंग्रजी शब्द/पदवीच्या संक्षेपात पाय मोडका नको: '{mt.group(0)}' ऐवजी '{fx}' (उदा. एम.ए., पीएच.डी.) {_SRC}"),
+    ("L13", re.compile(rf"(?<![{DEV}])(त्याने|तिने|त्याचे|तिचे|त्याला|तिला|त्याच्या|तिच्या)(?![{DEV}])"),
+     lambda mt: {"त्याने": "त्यांनी", "तिने": "त्यांनी", "त्याचे": "त्यांचे", "तिचे": "त्यांचे", "त्याला": "त्यांना",
+                 "तिला": "त्यांना", "त्याच्या": "त्यांच्या", "तिच्या": "त्यांच्या"}[mt.group(1)],
+     lambda mt, fx: f"शुद्धलेखन नियम 3 (आदरार्थी) — अधिकारी/व्यक्तीसाठी '{mt.group(0)}' ऐवजी '{fx}' {_SRC}"),
+    ("L14", re.compile(rf"(?<![{DEV}])(आपणास|यांनां|यानां)(?![{DEV}])"),
+     lambda mt: {"आपणास": "आपणांस", "यांनां": "यांना", "यानां": "यांना"}[mt.group(1)],
+     lambda mt, fx: f"शुद्धलेखन नियम 1–4 (अनुस्वार, आदरार्थी) — '{mt.group(0)}' ऐवजी '{fx}' {_SRC}"),
+]
+
+
+def warn_hits(text):
+    """WARN-level messages for text outside “…” / "…" quotes (one per distinct word and rule)."""
+    t = unquoted(text); out = []
+    for _, rx, fix, msg in WARN_RULES:
+        for mt in rx.finditer(t):
+            m_ = msg(mt, fix(mt))
+            if m_ not in out:
+                out.append(m_)
+    return out
+
+
+def fix_warn(text):
+    """text with the WARN-level forms applied outside “…” / "…" quotes (quoted extracts unchanged)."""
+    def fix(t):
+        for _, rx, f, _m in WARN_RULES:
+            t = rx.sub(f, t)
+        return t
+    out, pos = [], 0
+    for mt in QUOTE_RE.finditer(text):
+        out += [fix(text[pos:mt.start()]), mt.group(0)]; pos = mt.end()
+    out.append(fix(text[pos:]))
+    return "".join(out)
 
 
 # INSTRUCTIONS §4.23 (Abhi, 02.11.2026): "मा." before the High Court and judges (Section practice; docs/STYLE_RESEARCH_LETTERS.md F10)
@@ -401,6 +458,17 @@ def lint_spec(spec, pages=None):
     return P
 
 
+def lint_warnings(spec):
+    """WARN-level findings "<JSON path>: <message>" (note body and letter outside quotes); never errors."""
+    if not isinstance(spec, dict) or not isinstance(spec.get("note"), dict):
+        return []
+    n = spec["note"]
+    body = [x for k in ("first", "paras", "sub", "closing") if k in n for x in strings(n[k], f"note.{k}")]
+    L = spec.get("letter")
+    letter = list(strings(L, "letter")) if L else []
+    return [f"{path}: {m}" for path, t in body + letter for m in warn_hits(t)]
+
+
 def lint_study(study, pages=None, allow_missing_part1=False):
     P = []
     if not isinstance(study, dict) or not isinstance(study.get("parts"), list):
@@ -440,7 +508,12 @@ def main(argv):
         print(__doc__); return 2
     if spec_path is None:
         print(__doc__); return 2
-    probs = []
+    probs = []; warns = []
+    if spec_path not in (None, "-"):
+        try:
+            warns = lint_warnings(load(spec_path))
+        except Exception:
+            warns = []   # the JSON error is reported below
     for path, fn in ((spec_path if spec_path != "-" else None, lambda o: lint_spec(o, pages)),
                      (study_path, lambda o: lint_study(o, pages, allow1))):
         if path is None:
@@ -452,6 +525,8 @@ def main(argv):
         probs += fn(obj)
     for p in probs:
         print(p)
+    for w in warns:
+        print("WARN " + w)
     if not probs:
         print("LINT OK")
     return 1 if probs else 0
