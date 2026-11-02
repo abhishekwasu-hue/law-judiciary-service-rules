@@ -1,6 +1,6 @@
 # PROPOSAL_DESK.md — "प्रस्ताव कक्ष" claude.ai page (build prompt A)
 
-- Page: https://claude.ai/artifact/RYzwfiGwJpbVxyD5C2rCy2 (private to Abhi). Source: `desk/proposal-desk.html`.
+- Page: https://claude.ai/artifact/8cJP8wz6j5tYM5kRHK1rVx (private to Abhi). Source: `desk/proposal-desk.html`.
   Republish from this file with the Artifact tool (`url` = page link; read it first in a new session).
 - Capabilities: `{"assets": {}, "db": {}, "downloads": true, "user": {"scopes": ["profile"]}}`.
 - Processing procedure: PROPOSAL_SOP.md Step 0b.

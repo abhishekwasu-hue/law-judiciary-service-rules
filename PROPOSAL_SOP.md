@@ -18,7 +18,7 @@ The quality standard = the approved notes in `samples/specs/` (C R 66, 122, 128,
 6. Proposals uploaded in the "प्रस्ताव कक्ष" page: see Step 0b.
 
 ## Step 0b — intake from प्रस्ताव कक्ष
-Page: https://claude.ai/artifact/RYzwfiGwJpbVxyD5C2rCy2 (source `desk/proposal-desk.html`; data model `docs/PROPOSAL_DESK.md`).
+Page: https://claude.ai/artifact/8cJP8wz6j5tYM5kRHK1rVx (source `desk/proposal-desk.html`; data model `docs/PROPOSAL_DESK.md`).
 Trigger: Abhi says "प्रस्ताव कक्षातील नवीन प्रस्ताव तयार कर". Pin every write with `if_version`.
 1. **Find queued cases:** `ArtifactData` `query` collection `cases` where `status == "queued"`; set `status = "processing"`, `stage = "अभ्यास चालू"`.
 2. **Get the inputs:** for each `inputs[]` item, `Artifact` `read` with `url` = page URL and `path` = `asset_id`. Copy the saved file to its ORIGINAL `name` (§4.16). `kind`: proposal / extra / reply (a reply = the office's answer to our letter → next note).
