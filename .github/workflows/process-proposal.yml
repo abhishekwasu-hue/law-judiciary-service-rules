@@ -19,23 +19,46 @@ concurrency:
   cancel-in-progress: false
 env:
   CLAUDE_CODE_VERSION: '2.1.300'   # exact pin (published 14.10.2026); change deliberately
-  # C (fallback provider): LiteLLM gateway, installed only when the fallback is used. Exact version + sha256 of the
-  # manylinux x86_64 wheel (published 14.10.2026; after the 24.03.2026 PyPI incident, which hit 1.82.7/1.82.8 only).
-  LITELLM_VERSION: '1.105.1'
-  LITELLM_WHEEL_SHA256: 'f3d743c2d274c6537f7341213607c927c486676012a9d94412a8a8ccbe2f51f1'
+  # C (fallback provider): LiteLLM gateway, installed only when the fallback is used, from the hash-locked
+  # tools/requirements-litellm.txt (litellm[proxy]==1.105.1 + its whole dependency tree; pip --require-hashes).
   # H1 (QUALITY_AUDIT §7): keys live in this 700 file of the runner user, never in the job env; the Claude step runs as
   # the separate unix user `engine`, which can read neither this file nor the runner's process environments.
   ENGINE_SECRETS: /tmp/engine-secrets/secrets.env
+  # Audit A2 CRITICAL (02.11.2026): every runner-side tool runs from this ROOT-OWNED snapshot of tools/ (made right after
+  # checkout, before `engine` exists), never from the workspace; scripts/engine/ -> /opt/engine-scripts.
+  T: /opt/engine-tools
+  SB: /opt/engine-scripts/sandbox.sh
+  # runner-private files (700 dir made before `engine` exists): Claude results, gateway venv/config/log, fail reason,
+  # the runner's own OCR of the package and the case meta from Supabase. `engine` cannot pre-plant or rewrite them.
+  RP: /tmp/runner-priv
+  # time budget (audit A2/A1 HIGH): job limit, and the minutes kept for verify / runner OCR / extracts / finish / commit
+  JOB_MINUTES: '180'
+  POST_RESERVE_MIN: '20'
 jobs:
   run:
     runs-on: ubuntu-latest
     timeout-minutes: 180
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262   # v4.4.0
+        timeout-minutes: 5
         with: { fetch-depth: 1, persist-credentials: false }   # no GitHub token in .git/config (H1); the commit step authenticates itself
+      - name: Snapshot runner tools (root-owned) + start the clock
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          # job start (minus a minute for queueing/checkout) -> remaining-time budget of the Claude step
+          echo "JOB_T0=$(( $(date +%s) - 60 ))" >> "$GITHUB_ENV"
+          mkdir -m 700 "$RP"
+          sudo rm -rf "$T" /opt/engine-scripts /opt/engine-samples
+          sudo cp -a tools "$T"; sudo cp -a scripts/engine /opt/engine-scripts; sudo cp -a samples /opt/engine-samples
+          sudo find "$T" -name __pycache__ -prune -exec rm -rf {} +
+          sudo chown -R root:root "$T" /opt/engine-scripts /opt/engine-samples
+          sudo chmod -R go-w "$T" /opt/engine-scripts /opt/engine-samples
+          sudo chmod 755 "$SB"
       # Payload is read from the event file (never interpolated into scripts); every value is masked before use.
       # The run token is single use for the config (Worker); it stays valid for /api/engine/fail (no secrets) until expiry.
       - name: Get run config from the Worker (masked)
+        timeout-minutes: 5
         run: |
           set -euo pipefail
           E="$GITHUB_EVENT_PATH"
@@ -52,7 +75,7 @@ jobs:
           # failure); any HTTP status (also 5xx) is final, since a retried request would only get 403
           CODE=000
           for i in 1 2 3; do
-            CODE=$(curl -sS -o /tmp/cfg.json -w '%{http_code}' -H "Authorization: Bearer $TOKEN" \
+            CODE=$(curl -sS -o "$RP/cfg.json" -w '%{http_code}' -H "Authorization: Bearer $TOKEN" \
                    "$WORKER/api/engine/config?run_id=$RUN_ID" || true)
             CODE=${CODE:-000}
             [ "$CODE" != "000" ] && break
@@ -64,77 +87,90 @@ jobs:
               403) R="इंजिन टोकन अमान्य/कालबाह्य — पुन्हा तयार करा." ;;
               *)   R="इंजिनला Worker कडून सेटिंग्ज मिळाल्या नाहीत (HTTP $CODE) — पुन्हा तयार करा." ;;
             esac
-            echo "$R" > /tmp/fail_reason.txt; rm -f /tmp/cfg.json; echo "config: HTTP $CODE"; exit 1
+            echo "$R" > "$RP/fail_reason.txt"; rm -f "$RP/cfg.json"; echo "config: HTTP $CODE"; exit 1
           fi
           PKEYS="gemini_api_key openai_api_key openrouter_api_key groq_api_key mistral_api_key cerebras_api_key cloudflare_api_token ollama_api_key"
           for k in anthropic_api_key supabase_url supabase_service_key $PKEYS model; do
-            V=$(jq -r ".$k // empty" /tmp/cfg.json)
+            V=$(jq -r ".$k // empty" "$RP/cfg.json")
             if [ -n "$V" ]; then echo "::add-mask::$V"; fi
           done
-          A=$(jq -r '.anthropic_api_key // empty' /tmp/cfg.json)
-          U=$(jq -r '.supabase_url // empty' /tmp/cfg.json)
-          S=$(jq -r '.supabase_service_key // empty' /tmp/cfg.json)
+          A=$(jq -r '.anthropic_api_key // empty' "$RP/cfg.json")
+          U=$(jq -r '.supabase_url // empty' "$RP/cfg.json")
+          S=$(jq -r '.supabase_service_key // empty' "$RP/cfg.json")
           PSEC=""   # other providers' keys (sent by the Worker only for a chosen provider) as KEY=VALUE lines
-          for k in $PKEYS; do V=$(jq -r ".$k // empty" /tmp/cfg.json); [ -n "$V" ] && PSEC+="$(echo "$k" | tr '[:lower:]' '[:upper:]')=$V"$'\n'; done
+          for k in $PKEYS; do V=$(jq -r ".$k // empty" "$RP/cfg.json"); [ -n "$V" ] && PSEC+="$(echo "$k" | tr '[:lower:]' '[:upper:]')=$V"$'\n'; done
           # non-secret settings: model tiers + soft budget (engine_supabase.py config; invalid/missing -> defaults)
-          python3 tools/engine_supabase.py config /tmp/cfg.json > /tmp/engine_conf.env || : > /tmp/engine_conf.env
-          rm -f /tmp/cfg.json
-          EP=$(sed -n 's/^ENGINE_PROVIDER=//p' /tmp/engine_conf.env)   # another provider runs the engine -> no Anthropic key needed
+          python3 "$T/engine_supabase.py" config "$RP/cfg.json" > "$RP/engine_conf.env" || : > "$RP/engine_conf.env"
+          rm -f "$RP/cfg.json"
+          EP=$(sed -n 's/^ENGINE_PROVIDER=//p' "$RP/engine_conf.env")   # another provider runs the engine -> no Anthropic key needed
           if { [ -z "$A" ] && [ -z "$EP" ]; } || [ -z "$U" ] || [ -z "$S" ]; then
-            echo "सेटिंग्ज अपूर्ण — Settings मधील AI key (Anthropic किंवा निवडलेला AI) व Supabase तपासा, नंतर पुन्हा तयार करा." > /tmp/fail_reason.txt
+            echo "सेटिंग्ज अपूर्ण — Settings मधील AI key (Anthropic किंवा निवडलेला AI) व Supabase तपासा, नंतर पुन्हा तयार करा." > "$RP/fail_reason.txt"
             echo "config incomplete (Settings)"; exit 1
           fi
           # secrets: only into the runner's 700 file (read by engine_supabase.py and by the steps that need them)
           ( umask 077; mkdir -p "$(dirname "$ENGINE_SECRETS")"; chmod 700 "$(dirname "$ENGINE_SECRETS")"
             { echo "ANTHROPIC_API_KEY=$A"; echo "SUPABASE_URL=$U"; echo "SUPABASE_SERVICE_KEY=$S"
               printf '%s' "$PSEC"; } > "$ENGINE_SECRETS" )
-          grep -E '^(MODEL|MODEL_LIGHT|MODEL_REVIEW|MODEL_STRONG|EFFORT|BUDGET_USD|ENGINE_PROVIDER|ENGINE_MODEL|ENGINE_MODEL_LIGHT|PART1_PROVIDER|PART1_MODEL|GEMINI_MODEL|FALLBACK_PROVIDER|FALLBACK_MODEL|FALLBACK_MODEL_LIGHT|CLOUDFLARE_ACCOUNT_ID|OLLAMA_BASE_URL)=[][A-Za-z0-9._:@/-]*$' /tmp/engine_conf.env >> "$GITHUB_ENV" || true
-          rm -f /tmp/engine_conf.env
+          grep -E '^(MODEL|MODEL_LIGHT|MODEL_REVIEW|MODEL_STRONG|EFFORT|BUDGET_USD|ENGINE_PROVIDER|ENGINE_MODEL|ENGINE_MODEL_LIGHT|PART1_PROVIDER|PART1_MODEL|GEMINI_MODEL|FALLBACK_PROVIDER|FALLBACK_MODEL|FALLBACK_MODEL_LIGHT|CLOUDFLARE_ACCOUNT_ID|OLLAMA_BASE_URL)=[][A-Za-z0-9._:@/-]*$' "$RP/engine_conf.env" >> "$GITHUB_ENV" || true
+          rm -f "$RP/engine_conf.env"
       - name: Record log URL
-        run: python3 tools/engine_supabase.py log_url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" || true
+        timeout-minutes: 2
+        run: python3 "$T/engine_supabase.py" log_url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" || true
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065   # v5.6.0
+        timeout-minutes: 10
         with:
           python-version: '3.12'
           cache: pip
           cache-dependency-path: tools/requirements-engine.txt
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020   # v4.4.0
+        timeout-minutes: 10
         with:
           node-version: '20'
           cache: npm
           cache-dependency-path: .github/workflows/process-proposal.yml   # global install, version pinned in this file
       - name: Install tools
+        timeout-minutes: 20
         run: |
           set -euo pipefail
-          trap 'echo "साधने install झाली नाहीत (apt/pip/npm) — पुन्हा तयार करा." > /tmp/fail_reason.txt' ERR
+          trap 'echo "साधने install झाली नाहीत (apt/pip/npm) — पुन्हा तयार करा." > "$RP/fail_reason.txt"' ERR
           sudo apt-get update -y
           sudo apt-get install -y poppler-utils tesseract-ocr tesseract-ocr-mar libreoffice-writer fonts-freefont-ttf
-          pip install -r tools/requirements-engine.txt
+          pip install -r "$T/requirements-engine.txt"
           npm install -g "@anthropic-ai/claude-code@$CLAUDE_CODE_VERSION"
+      # an encrypted / non-PDF proposal fails here with a Marathi reason (exit 1) -> no paid model call follows
+      # case meta (original name from Supabase, page count of the fetched proposal) is taken here, before `engine` exists;
+      # verify uses it (--case-meta) instead of the engine-writable /tmp/case/case.json (audit A2 MED)
       - name: Fetch case files from Supabase
-        run: python3 tools/engine_supabase.py fetch /tmp/case
+        timeout-minutes: 10
+        run: |
+          set -euo pipefail
+          python3 "$T/engine_supabase.py" fetch /tmp/case
+          python3 "$T/engine_supabase.py" case_meta "$RP/runner-case.json" /tmp/case || { rm -f "$RP/runner-case.json"; echo "case_meta failed"; }
       # Page PNGs (110 dpi) + text layer + tesseract OCR before Claude (QUALITY_AUDIT §5 item 1). Non-fatal: without them
       # Claude renders the pages itself. The model still looks at every image; text/OCR are only a cross-check.
       - name: Prepare page images (prep_pages.py)
+        timeout-minutes: 25
         run: |
           set -uo pipefail
           P=$(python3 -c 'import json; c = json.load(open("/tmp/case/case.json", encoding="utf-8")); print(next(f["local_path"] for f in c["inputs"] if f["kind"] == "proposal"))') || P=""
-          if [ -z "$P" ] || ! python3 tools/prep_pages.py "/tmp/case/$P" /tmp/case/pages; then
+          if [ -z "$P" ] || ! timeout 20m python3 "$T/prep_pages.py" "/tmp/case/$P" /tmp/case/pages; then
             rm -rf /tmp/case/pages
-            python3 tools/engine_supabase.py warn "प्रस्तावाची पान-प्रतिमा आधी तयार झाली नाही (prep_pages) — इंजिन स्वतः तयार करेल" || true
+            python3 "$T/engine_supabase.py" warn "प्रस्तावाची पान-प्रतिमा आधी तयार झाली नाही (prep_pages) — इंजिन स्वतः तयार करेल" || true
           fi
           n=0
           for f in /tmp/case/in/reply/*.pdf; do
             [ -f "$f" ] || continue
             n=$((n + 1))
-            python3 tools/prep_pages.py "$f" "/tmp/case/pages_reply_$n" || rm -rf "/tmp/case/pages_reply_$n"
+            timeout 5m python3 "$T/prep_pages.py" "$f" "/tmp/case/pages_reply_$n" || rm -rf "/tmp/case/pages_reply_$n"
           done
           exit 0
       # SOP Step 0.4 + INSTRUCTIONS §7.1 for the engine: old-case text corpus and the precedent library (non-fatal).
       - name: Prepare precedent sources
+        timeout-minutes: 10
         run: |
           set -uo pipefail
-          python3 tools/oldcases_text.py /tmp/old || python3 tools/engine_supabase.py warn "जुन्या प्रकरणांचा मजकूर-संग्रह (/tmp/old) तयार झाला नाही" || true
-          python3 - <<'PY' || python3 tools/engine_supabase.py warn "पूर्वोदाहरण-ग्रंथालय (/tmp/precedent) उघडले नाही" || true
+          python3 "$T/oldcases_text.py" /tmp/old || python3 "$T/engine_supabase.py" warn "जुन्या प्रकरणांचा मजकूर-संग्रह (/tmp/old) तयार झाला नाही" || true
+          python3 - <<'PY' || python3 "$T/engine_supabase.py" warn "पूर्वोदाहरण-ग्रंथालय (/tmp/precedent) उघडले नाही" || true
           import os, zipfile
           dst = "/tmp/precedent"; n = 0
           with zipfile.ZipFile("precedent-library/Precedent-Library.zip") as z:
@@ -151,21 +187,25 @@ jobs:
       # CLAUDE.md is moved aside for this step only: it would auto-load OWNER_RULES (trading/apps/diet) and HANDOVER
       # (session to-dos, SOP Step 0b/8 commit work) into every turn. ENGINE_PROMPT names exactly what to read instead;
       # running from the repo root keeps every tool's relative path (tools/, pdf/, सन*.zip) working. Restored before commit.
-      # H1 (QUALITY_AUDIT §7): Claude reads untrusted PDFs with Bash + internet, so it runs as the separate unix user
-      # `engine` (no sudo) on a bind mount of the repo (/srv/engine) with an explicit env: the Anthropic key, run ids, the
-      # run token (only good for /api/engine/step|fail of THIS run) and the model names — no Supabase key, no GitHub
-      # token (checkout without persisted credentials). Progress goes through the Worker. Ownership is given back after.
+      # H1 (QUALITY_AUDIT §7) + audit A2 CRITICAL (02.11.2026): Claude reads untrusted PDFs with Bash + internet, so it runs
+      # as the separate unix user `engine` (no sudo) on a READ-ONLY bind mount of the repo (/srv/engine; scripts/engine/
+      # sandbox.sh up). Only pdf/gr/ and tools/gr-request*.txt are writable, as engine-owned copies in /srv/engine-rw that
+      # are checked and copied back after the run (sandbox.sh down: SIGKILL every `engine` process, umount — fails loudly
+      # when busy). `git status` must then show changes only there; anything else is restored with a warning
+      # (sandbox.sh check). The explicit env of `engine`: the Anthropic key, run ids, the run token (only good for
+      # /api/engine/step|fail of THIS run) and the model names — no Supabase key, no GitHub token.
       # Study part 1 (page-wise Marathi rendering, the largest single output) runs in PARALLEL (QUALITY_AUDIT §5 item 3):
       # A (Abhi 02.11.2026): PART1_PROVIDER = another provider -> tools/part1_vision.py (runner user, that provider's key;
       # Gemini native or an OpenAI-compatible chat API with the page image); otherwise a second headless Claude run
       # (tools/ENGINE_PART1_PROMPT.md) on MODEL_LIGHT. Either way the main run inserts it only when part1check matches the
       # drafter's facts (else the drafter redoes those pages); the verify step re-checks it.
       # The step waits for the background run (stopped once the main run has ended) before recording the result.
-      # cost/turns = sum of both runs; duration = wall clock of this step (the runs overlap).
+      # cost/turns = sum of the runs; duration = wall clock of this step (the runs overlap).
       # C (Abhi 02.11.2026): when the main run fails on the PROVIDER side (credit, key, overloaded, API/connection error;
       # engine_supabase.py fallback_ok) and a fallback provider is set, the whole main run is repeated through a local
       # LiteLLM gateway (runner user; the provider key never reaches `engine`) that routes every Claude model name to the
-      # fallback provider. The case then carries a warning; all gates (lint, extract_check, reviewer, verify) still apply.
+      # fallback provider — only when at least 30 minutes remain (job budget), else a warning. The case then carries a
+      # warning; all gates (lint, extract_check, reviewer, verify) still apply.
       # Model tiers (Abhi 01.11.2026; table in tools/ENGINE_PROMPT.md): the orchestrating session runs on MODEL_LIGHT
       # (mechanical work); `drafter` on MODEL (facts from page images, letter decision, GR choice for the note, note +
       # letter, Study part 0); `study_writer` / `related_writer` on MODEL_LIGHT (Study parts 2-4, 7, 5-6 copied; note
@@ -173,20 +213,26 @@ jobs:
       # MODEL_REVIEW (Opus-class) = final check + approval (/tmp/work/review.json with hashes; checked by the verify step);
       # `drafter_strong` on MODEL_STRONG only when configured (--agents, pinned CLI: per-agent `model`). Budget is SOFT:
       # no CLI cap; claude_result adds "खर्च-मर्यादा ओलांडली — दर्जा राखण्यासाठी" when the total is over BUDGET_USD.
+      # Time budget: main run = min(150 min, time left - POST_RESERVE_MIN); the step's own limit is only a backstop.
       - name: Process the proposal (Claude Code headless)
+        timeout-minutes: 170
         run: |
           set -uo pipefail
+          ES() { python3 "$T/engine_supabase.py" "$@"; }
           sec() { sed -n "s/^$1=//p" "$ENGINE_SECRETS" | head -n 1; }
+          [ -x "$SB" ] && [ -f "$T/engine_supabase.py" ] || { echo "no root-owned tool snapshot"; exit 1; }
           mkdir -p /tmp/out /tmp/work
-          chmod 1777 /tmp/work   # shared scratch: `engine` (Claude) and the runner (Gemini part 1, results)
+          chmod 1777 /tmp/work   # shared scratch: `engine` (Claude) and the runner (Gemini part 1)
           rm -f /tmp/work/study_part1.* /tmp/work/part1*
-          mv CLAUDE.md /tmp/CLAUDE.md.repo
-          T0=$(date +%s)
+          mv CLAUDE.md "$RP/CLAUDE.md.repo"
+          T0=$(date +%s); echo "$T0" > "$RP/claude.t0"
+          DEADLINE=$(( JOB_T0 + JOB_MINUTES * 60 - POST_RESERVE_MIN * 60 ))   # the Claude step must end by then
+          left() { echo $(( DEADLINE - $(date +%s) )); }
           : "${MODEL:=claude-opus-5-5}" "${MODEL_LIGHT:=claude-haiku-5-5}" "${MODEL_REVIEW:=claude-opus-5-5}" "${MODEL_STRONG:=}" "${EFFORT:=medium}"
           : "${PART1_PROVIDER:=claude}" "${PART1_MODEL:=}" "${FALLBACK_PROVIDER:=}" "${FALLBACK_MODEL:=}" "${FALLBACK_MODEL_LIGHT:=}"
           : "${ENGINE_PROVIDER:=}" "${ENGINE_MODEL:=}" "${ENGINE_MODEL_LIGHT:=}" "${CLOUDFLARE_ACCOUNT_ID:=}" "${OLLAMA_BASE_URL:=}"
           export MODEL MODEL_LIGHT MODEL_REVIEW MODEL_STRONG
-          python3 tools/engine_supabase.py agents /tmp/work/agents.json
+          ES agents /tmp/work/agents.json
           python3 - <<'PY'
           import ast, io, os
           out = io.open("/tmp/work/TOOL_DOCS.md", "w", encoding="utf-8")
@@ -200,11 +246,14 @@ jobs:
               out.write("### tools/" + t + ".py" + chr(10) + d + chr(10) + chr(10))
           PY
 
-          # ---- H1: the `engine` user and its view of the repo ----
+          # ---- H1: the `engine` user and its READ-ONLY view of the repo (writable: pdf/gr, tools/gr-request*.txt) ----
           ME="$(id -u):$(id -g)"
-          id engine >/dev/null 2>&1 || sudo useradd -m -s /bin/bash engine
-          sudo mkdir -p /srv/engine && sudo mount --bind "$GITHUB_WORKSPACE" /srv/engine
-          OWNED=("$GITHUB_WORKSPACE" /tmp/case /tmp/out)
+          if ! "$SB" up "$GITHUB_WORKSPACE" /srv/engine /srv/engine-rw; then
+            "$SB" down "$GITHUB_WORKSPACE" /srv/engine /srv/engine-rw || true
+            mv "$RP/CLAUDE.md.repo" CLAUDE.md
+            ES fail "इंजिनचे सुरक्षित वातावरण (read-only repo) तयार झाले नाही — पुन्हा तयार करा."; exit 1
+          fi
+          OWNED=(/tmp/case /tmp/out)
           for d in /tmp/old /tmp/precedent; do [ -e "$d" ] && OWNED+=("$d"); done
           sudo chown -R engine:engine "${OWNED[@]}"
           AK=$(sec ANTHROPIC_API_KEY)
@@ -216,7 +265,7 @@ jobs:
           INDIR=(bash -c 'cd /srv/engine && exec "$@"' _)
           MARGS=(--model "$MODEL_LIGHT" --effort "$EFFORT")
 
-          # ---- other AI providers: LiteLLM gateway (runner user; keys never reach `engine`) ----
+          # ---- other AI providers: LiteLLM gateway (runner user, files in $RP; keys never reach `engine`) ----
           # ENGINE_PROVIDER runs the whole engine through it; FALLBACK_PROVIDER takes over when the main run fails on the
           # provider side; every Claude model name is routed to the chosen provider's models (engine_supabase.py
           # litellm_config); tools/litellm_cost.py records the real cost per answer.
@@ -224,24 +273,22 @@ jobs:
           pkey() { case "$1" in cloudflare) echo CLOUDFLARE_API_TOKEN ;; *) echo "$(echo "$1" | tr '[:lower:]' '[:upper:]')_API_KEY" ;; esac; }
           gw_stop() { if [ -n "$GW_PID" ]; then kill "$GW_PID" 2>/dev/null; wait "$GW_PID" 2>/dev/null; GW_PID=""; fi; }
           gw_install() {
-            [ -x /tmp/litellm-venv/bin/litellm ] && return 0
-            python3 -m venv /tmp/litellm-venv && pip download -q --no-deps --only-binary=:all: -d /tmp/litellm-dl "litellm==$LITELLM_VERSION" \
-              && W=$(ls /tmp/litellm-dl/litellm-"$LITELLM_VERSION"-*manylinux_2_28_x86_64.whl) \
-              && echo "$LITELLM_WHEEL_SHA256  $W" | sha256sum -c - \
-              && /tmp/litellm-venv/bin/pip install -q "$W[proxy]"
+            [ -x "$RP/litellm-venv/bin/litellm" ] && return 0
+            python3 -m venv "$RP/litellm-venv" \
+              && "$RP/litellm-venv/bin/pip" install -q --require-hashes --no-deps --only-binary=:all: -r "$T/requirements-litellm.txt"
           }
           gw_start() {  # gw_start <provider> <main model> <light model> -> 0 when the proxy answers on 127.0.0.1:4000
             gw_stop
             gw_install || return 1
-            mkdir -p /tmp/litellm && cp tools/litellm_cost.py /tmp/litellm/ \
-              && python3 tools/engine_supabase.py litellm_config /tmp/litellm/litellm.yaml "$1" "$2" "$3" || return 1
+            mkdir -p "$RP/litellm" && cp "$T/litellm_cost.py" "$RP/litellm/" \
+              && ES litellm_config "$RP/litellm/litellm.yaml" "$1" "$2" "$3" || return 1
             MK="sk-local-$(head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n')"
             echo "::add-mask::$MK"
             local K; K=$(pkey "$1")
-            ( export LITELLM_MASTER_KEY="$MK" LITELLM_COST_FILE=/tmp/litellm_cost.jsonl CLOUDFLARE_ACCOUNT_ID="${CLOUDFLARE_ACCOUNT_ID:-}" OLLAMA_BASE_URL="${OLLAMA_BASE_URL:-}"
+            ( export LITELLM_MASTER_KEY="$MK" LITELLM_COST_FILE="$RP/litellm_cost.jsonl" CLOUDFLARE_ACCOUNT_ID="${CLOUDFLARE_ACCOUNT_ID:-}" OLLAMA_BASE_URL="${OLLAMA_BASE_URL:-}"
               V="$(sec "$K")"; [ -n "$V" ] && export "$K=$V"
               [ "$1" = cloudflare ] && export CLOUDFLARE_API_KEY="$V"
-              exec /tmp/litellm-venv/bin/litellm --config /tmp/litellm/litellm.yaml --host 127.0.0.1 --port 4000 ) >> /tmp/litellm.log 2>&1 &
+              exec "$RP/litellm-venv/bin/litellm" --config "$RP/litellm/litellm.yaml" --host 127.0.0.1 --port 4000 ) >> "$RP/litellm.log" 2>&1 &
             GW_PID=$!
             for i in $(seq 1 60); do curl -sf -o /dev/null http://127.0.0.1:4000/health/liveliness && return 0; sleep 2; done
             return 1
@@ -251,17 +298,26 @@ jobs:
             if gw_start "$ENGINE_PROVIDER" "$ENGINE_MODEL" "$ENGINE_MODEL_LIGHT"; then
               AUTH=(ANTHROPIC_BASE_URL=http://127.0.0.1:4000 ANTHROPIC_AUTH_TOKEN="$MK"); ENG_USED="$ENGINE_PROVIDER"
             elif [ -n "$AK" ]; then
-              echo "engine gateway ($ENGINE_PROVIDER) did not start -> Claude"; tail -n 20 /tmp/litellm.log 2>/dev/null || true
-              python3 tools/engine_supabase.py warn "मुख्य AI ($ENGINE_PROVIDER) सुरू झाले नाही — अभ्यास Claude ने केला." || true
+              echo "engine gateway ($ENGINE_PROVIDER) did not start -> Claude"; tail -n 20 "$RP/litellm.log" 2>/dev/null || true
+              ES warn "मुख्य AI ($ENGINE_PROVIDER) सुरू झाले नाही — अभ्यास Claude ने केला." || true
             else
-              tail -n 20 /tmp/litellm.log 2>/dev/null || true
-              echo "मुख्य AI ($ENGINE_PROVIDER) सुरू झाले नाही — Settings मधील त्याची key / मॉडेल-नाव तपासा, नंतर पुन्हा तयार करा." > /tmp/fail_reason.txt
+              tail -n 20 "$RP/litellm.log" 2>/dev/null || true
+              echo "मुख्य AI ($ENGINE_PROVIDER) सुरू झाले नाही — Settings मधील त्याची key / मॉडेल-नाव तपासा, नंतर पुन्हा तयार करा." > "$RP/fail_reason.txt"
               SKIP_MAIN=1
             fi
           fi
 
+          # ---- time for the main run: min(150 min, time left before the post-step reserve) ----
+          MAIN_S=$(left); [ "$MAIN_S" -gt 9000 ] && MAIN_S=9000
+          if [ -z "$SKIP_MAIN" ] && [ "$MAIN_S" -lt 600 ]; then
+            echo "तयारीत वेळ संपला — अभ्यासासाठी 10 मिनिटेही उरली नाहीत; पुन्हा तयार करा." > "$RP/fail_reason.txt"
+            SKIP_MAIN=1
+          fi
+          echo "time left for the Claude step: $(( $(left) / 60 )) min; main run limit $(( MAIN_S / 60 )) min"
+
           # ---- Study part 1 in parallel (A: another provider via tools/part1_vision.py, else the Claude helper) ----
           P1_PID=""
+          P1_S=$(( MAIN_S < 6000 ? MAIN_S : 6000 ))
           if [ -s /tmp/case/pages/pages.json ] && [ -z "$SKIP_MAIN" ]; then
             P1_PROMPT="$(cat tools/ENGINE_PART1_PROMPT.md)
 
@@ -273,13 +329,13 @@ jobs:
               if [ "$PART1_PROVIDER" != "claude" ]; then
                 K=$(pkey "$PART1_PROVIDER")
                 env "$K=$(sec "$K")" CLOUDFLARE_ACCOUNT_ID="${CLOUDFLARE_ACCOUNT_ID:-}" OLLAMA_BASE_URL="${OLLAMA_BASE_URL:-}" PART1_MODEL="${PART1_MODEL:-}" \
-                  timeout -k 30 60m python3 tools/part1_vision.py /tmp/case/pages /tmp/work --provider "$PART1_PROVIDER" \
+                  timeout -k 30 "$(( P1_S < 3600 ? P1_S : 3600 ))s" python3 "$T/part1_vision.py" /tmp/case/pages /tmp/work --provider "$PART1_PROVIDER" \
                   > /tmp/work/part1.log 2> /tmp/work/part1.err &
               else
-                timeout -k 60 100m "${ERUN[@]}" "${AUTH[@]}" "${INDIR[@]}" claude -p "$P1_PROMPT" --dangerously-skip-permissions \
-                  --max-turns 120 --tools "Bash,Read,Write" --output-format json "${MARGS[@]}" > /tmp/work/part1_result.json 2> /tmp/work/part1.err &
+                timeout -k 60 "${P1_S}s" "${ERUN[@]}" "${AUTH[@]}" "${INDIR[@]}" claude -p "$P1_PROMPT" --dangerously-skip-permissions \
+                  --max-turns 120 --tools "Bash,Read,Write" --output-format json "${MARGS[@]}" > "$RP/part1_result.json" 2> /tmp/work/part1.err &
               fi
-              echo $! > /tmp/work/part1.pid
+              echo $! > "$RP/part1.pid"
               wait $! || rc1=$?
               if [ -e /tmp/work/study_part1.done ] && ! python3 - <<'PY'
           import json, sys
@@ -323,92 +379,173 @@ jobs:
           ARGS=(-p "$PROMPT" --dangerously-skip-permissions --max-turns 400 --output-format json
                 --agents /tmp/work/agents.json --tools "Bash,Read,Write,Edit,Glob,Grep,Agent" "${MARGS[@]}")
           rc=0
+          : > "$RP/claude.json"; : > "$RP/claude.err"
           if [ -z "$SKIP_MAIN" ]; then
-            timeout -k 60 150m "${ERUN[@]}" "${AUTH[@]}" "${INDIR[@]}" claude "${ARGS[@]}" > /tmp/claude.json 2> /tmp/claude.err || rc=$?
-            echo "main run (${ENG_USED:-claude}) exit $rc"; tail -n 20 /tmp/claude.err || true
+            touch "$RP/claude.started"   # "Record failure" stores the cost (--killed) if this step is cancelled
+            timeout -k 60 "${MAIN_S}s" "${ERUN[@]}" "${AUTH[@]}" "${INDIR[@]}" claude "${ARGS[@]}" > "$RP/claude.json" 2> "$RP/claude.err" || rc=$?
+            echo "main run (${ENG_USED:-claude}) exit $rc"; tail -n 20 "$RP/claude.err" || true
           else
-            rc=1; : > /tmp/claude.json; : > /tmp/claude.err
+            rc=1
           fi
 
-          # ---- C: fallback provider when the main run failed on the provider side ----
+          # ---- C: fallback provider when the main run failed on the provider side (only with >= 30 min left) ----
+          FIRST_ARGS=()
           if [ -z "$SKIP_MAIN" ] && [ -n "$FALLBACK_PROVIDER" ] && [ "$FALLBACK_PROVIDER" != "$ENG_USED" ] \
-             && python3 tools/engine_supabase.py fallback_ok /tmp/claude.json /tmp/claude.err "$rc"; then
-            echo "main run failed on the provider side -> fallback $FALLBACK_PROVIDER ($FALLBACK_MODEL / $FALLBACK_MODEL_LIGHT)"
-            cp /tmp/claude.json /tmp/claude.first.json 2>/dev/null || true; cp /tmp/claude.err /tmp/claude.first.err 2>/dev/null || true
-            if gw_start "$FALLBACK_PROVIDER" "$FALLBACK_MODEL" "$FALLBACK_MODEL_LIGHT"; then
-              # start the main run again from a clean slate (keep only part 1 and the run set-up files)
-              sudo find /tmp/out -mindepth 1 -delete
-              find /tmp/work -mindepth 1 -maxdepth 1 ! -name 'study_part1.*' ! -name 'part1*' ! -name agents.json ! -name TOOL_DOCS.md -exec sudo rm -rf {} +
-              rm -f /tmp/litellm_cost.jsonl   # cost of the fallback run only (the failed run is in claude.first.json)
-              rc=0
-              timeout -k 60 150m "${ERUN[@]}" ANTHROPIC_BASE_URL=http://127.0.0.1:4000 ANTHROPIC_AUTH_TOKEN="$MK" \
-                "${INDIR[@]}" claude "${ARGS[@]}" > /tmp/claude.json 2> /tmp/claude.err || rc=$?
-              echo "fallback run exit $rc"; tail -n 20 /tmp/claude.err || true
-              FB_USED="$FALLBACK_PROVIDER"
+             && ES fallback_ok "$RP/claude.json" "$RP/claude.err" "$rc"; then
+            FB_S=$(( $(left) - 300 )); [ "$FB_S" -gt 9000 ] && FB_S=9000   # 5 min safety margin
+            if [ "$FB_S" -lt 1800 ]; then
+              echo "fallback skipped: only $(( FB_S / 60 )) min left"
+              ES warn "राखीव AI ($FALLBACK_PROVIDER) वापरले नाही — मुख्य AI अयशस्वी झाल्यावर अभ्यासासाठी 30 मिनिटांपेक्षा कमी वेळ उरला होता; पुन्हा तयार करा." || true
             else
-              echo "fallback gateway could not start"; tail -n 20 /tmp/litellm.log 2>/dev/null || true
-              python3 tools/engine_supabase.py warn "राखीव AI ($FALLBACK_PROVIDER) सुरू झाले नाही — मुख्य AI ची त्रुटी कायम." || true
+              echo "main run failed on the provider side -> fallback $FALLBACK_PROVIDER ($FALLBACK_MODEL / $FALLBACK_MODEL_LIGHT), limit $(( FB_S / 60 )) min"
+              cp "$RP/claude.json" "$RP/claude.first.json" 2>/dev/null || true; cp "$RP/claude.err" "$RP/claude.first.err" 2>/dev/null || true
+              FIRST_ARGS=(--first "$RP/claude.first.json")   # the failed first run is paid for too (claude_result adds it)
+              if gw_start "$FALLBACK_PROVIDER" "$FALLBACK_MODEL" "$FALLBACK_MODEL_LIGHT"; then
+                # start the main run again from a clean slate (keep only part 1 and the run set-up files)
+                sudo find /tmp/out -mindepth 1 -delete
+                find /tmp/work -mindepth 1 -maxdepth 1 ! -name 'study_part1.*' ! -name 'part1*' ! -name agents.json ! -name TOOL_DOCS.md -exec sudo rm -rf {} +
+                rm -f "$RP/litellm_cost.jsonl"   # cost of the fallback run only (the failed run is in claude.first.json)
+                rc=0
+                timeout -k 60 "${FB_S}s" "${ERUN[@]}" ANTHROPIC_BASE_URL=http://127.0.0.1:4000 ANTHROPIC_AUTH_TOKEN="$MK" \
+                  "${INDIR[@]}" claude "${ARGS[@]}" > "$RP/claude.json" 2> "$RP/claude.err" || rc=$?
+                echo "fallback run exit $rc"; tail -n 20 "$RP/claude.err" || true
+                FB_USED="$FALLBACK_PROVIDER"
+              else
+                echo "fallback gateway could not start"; tail -n 20 "$RP/litellm.log" 2>/dev/null || true
+                ES warn "राखीव AI ($FALLBACK_PROVIDER) सुरू झाले नाही — मुख्य AI ची त्रुटी कायम." || true
+              fi
             fi
           fi
-          gw_stop
 
+          # ---- stop part 1 (TERM, then SIGKILL of every `engine` process after 60 s) ----
           P1_ARGS=()
           if [ -n "$P1_PID" ]; then
             if kill -0 "$P1_PID" 2>/dev/null; then
               echo "main run ended; stopping the part-1 run"
-              [ -s /tmp/work/part1.pid ] && kill -TERM "$(cat /tmp/work/part1.pid)" 2>/dev/null
+              [ -s "$RP/part1.pid" ] && kill -TERM "$(cat "$RP/part1.pid")" 2>/dev/null
+              for i in $(seq 1 60); do kill -0 "$P1_PID" 2>/dev/null || break; sleep 1; done
+              if kill -0 "$P1_PID" 2>/dev/null; then
+                sudo pkill -KILL -u engine 2>/dev/null || true
+                [ -s "$RP/part1.pid" ] && kill -KILL "$(cat "$RP/part1.pid")" 2>/dev/null
+              fi
             fi
             wait "$P1_PID" || true
-            # a Claude helper that went through the gateway is already in the gateway cost file
-            if [ "$PART1_PROVIDER" != "claude" ] || [ -z "$ENG_USED" ]; then P1_ARGS=(--part1 /tmp/work/part1_result.json); fi
+            # part-1 output: the Claude helper's result is in $RP; part1_vision.py writes its own into /tmp/work
+            P1F="$RP/part1_result.json"; [ "$PART1_PROVIDER" != "claude" ] && P1F=/tmp/work/part1_result.json
+            P1_ARGS=(--part1 "$P1F")
+            # a Claude helper that went through the engine gateway is already in the gateway cost file
+            if [ "$PART1_PROVIDER" = "claude" ] && [ -n "$ENG_USED" ]; then P1_ARGS+=(--part1-no-cost); fi
             tail -n 5 /tmp/work/part1.err || true
           fi
+          gw_stop
           T1=$(date +%s)
-          # ownership back to the runner (verify / finish / commit), then the repo file
+
+          # ---- H1: kill every `engine` process, unmount, copy back checked GR files, check the workspace ----
+          DOWN_OK=1
+          "$SB" down "$GITHUB_WORKSPACE" /srv/engine /srv/engine-rw || DOWN_OK=""
+          mv "$RP/CLAUDE.md.repo" CLAUDE.md
+          CHECK_RC=0; "$SB" check "$GITHUB_WORKSPACE" > "$RP/check.txt" || CHECK_RC=$?
+          cat "$RP/check.txt"
+          if [ "$CHECK_RC" = 3 ]; then
+            V=$(grep '^VIOLATION ' "$RP/check.txt" | head -n 5 | cut -c11- | tr '\n' ' ')
+            ES warn "सुरक्षा: इंजिनने रेपोतील परवानगी नसलेल्या फाइल बदलल्या — मूळ स्थितीत परत आणल्या ($V)" || true
+            "$SB" check "$GITHUB_WORKSPACE" || DOWN_OK=""
+          elif [ "$CHECK_RC" != 0 ]; then DOWN_OK=""; fi
+          "$SB" scrub /tmp/out /tmp/work /tmp/case
           sudo chown -R "$ME" "${OWNED[@]}" /tmp/work
-          sudo umount /srv/engine || true
-          mv /tmp/CLAUDE.md.repo CLAUDE.md
           if [ -n "$SKIP_MAIN" ]; then
-            python3 tools/engine_supabase.py fail "$(cat /tmp/fail_reason.txt)"; exit 1
+            ES fail "$(cat "$RP/fail_reason.txt")"; exit 1
           fi
           GW_ARGS=()
           USED="${FB_USED:-$ENG_USED}"
           if [ -n "$USED" ]; then
-            touch /tmp/litellm_cost.jsonl   # no successful answer = $0 (not Claude Code's Claude-priced estimate)
-            GW_ARGS=(--gateway-cost /tmp/litellm_cost.jsonl --gateway-provider "$USED")
+            touch "$RP/litellm_cost.jsonl"   # no successful answer = $0 (not Claude Code's Claude-priced estimate)
+            GW_ARGS=(--gateway-cost "$RP/litellm_cost.jsonl" --gateway-provider "$USED")
             if [ -n "$FB_USED" ]; then W="राखीव AI ($FB_USED: $FALLBACK_MODEL / $FALLBACK_MODEL_LIGHT) ने अभ्यास केला — मुख्य AI उपलब्ध नव्हते."
             else W="मुख्य अभ्यास $ENG_USED ($ENGINE_MODEL / $ENGINE_MODEL_LIGHT) ने केला — Claude ने नव्हे."; fi
-            python3 tools/engine_supabase.py warn "$W सर्व तपासण्या लागू; दर्जा काळजीपूर्वक पाहा; गोपनीयता-अटी: Settings मधील तक्ता." || true
+            ES warn "$W सर्व तपासण्या लागू; दर्जा काळजीपूर्वक पाहा; गोपनीयता-अटी: Settings मधील तक्ता." || true
           fi
-          python3 tools/engine_supabase.py claude_result /tmp/claude.json /tmp/claude.err "$rc" "${P1_ARGS[@]}" "${GW_ARGS[@]}" --wall "$((T1 - T0))" \
-            --status /tmp/out/status.json
-      # H2: the reviewer's own /tmp/work/review.json (hashes of the approved spec / part 0) and the CLI's modelUsage
-      # (MODEL_REVIEW really ran) are checked before verify_outputs runs
-      - name: Verify outputs (verify_outputs.py must print ALL OK)
-        run: python3 tools/engine_supabase.py verify /tmp/out /tmp/case --review /tmp/work --claude /tmp/claude.json
-      # final verbatim guard (QUALITY_AUDIT §7 M) on the delivered files: the run loops until EXTRACTS OK, so a MISMATCH
-      # in `related` / Study part 3 here is real -> the case fails (Marathi reason) and this step stops the job before
-      # the upload. Unverifiable extracts and the note body's “…” quotes (new check) are warning lines only.
-      - name: Check extracts (extract_check.py; mismatch fails the case)
-        run: python3 tools/engine_supabase.py extracts /tmp/out /tmp/work/spec.json /tmp/work/study.json /tmp/work/pkgpages
+          KILLED=(); case "$rc" in 124|137|143) KILLED=(--killed) ;; esac   # killed by timeout: no JSON result
+          RRC=0
+          ES claude_result "$RP/claude.json" "$RP/claude.err" "$rc" "${FIRST_ARGS[@]}" "${P1_ARGS[@]}" "${GW_ARGS[@]}" "${KILLED[@]}" \
+            --wall "$((T1 - T0))" --status /tmp/out/status.json || RRC=$?
+          touch "$RP/claude_result.done"
+          if [ -z "$DOWN_OK" ]; then
+            ES fail "इंजिन थांबवून रेपो तपासता आला नाही (umount/कार्यप्रणाली) — निकाल रोखला; पुन्हा तयार करा." || true
+            exit 1
+          fi
+          exit "$RRC"
+      # The runner's OWN OCR of the delivered package (audit A2 MED): the final extract check must not trust page text
+      # written by `engine` (/tmp/work/pkgpages).
+      # Non-fatal: without OCR the scanned pages are only "unverifiable" warnings.
+      - name: Runner OCR of the package
+        timeout-minutes: 12
+        run: |
+          set -uo pipefail
+          PKG=$(python3 -I - <<'PY'
+          import json, os, sys
+          sys.path.insert(0, os.environ["T"])
+          import engine_supabase as E
+          out = "/tmp/out"
+          try: st = json.load(open(os.path.join(out, "status.json"), encoding="utf-8"))
+          except Exception: st = {}
+          p = os.path.join(out, os.path.basename(str(st.get("package_pdf") or ""))) if st.get("package_pdf") else ""
+          if not (p and os.path.isfile(p)):
+              pp = E.package_pdfs(out); p = pp[0] if len(pp) == 1 else ""
+          print(p)
+          PY
+          ) || PKG=""
+          rm -rf "$RP/pkgpages"
+          if [ -n "$PKG" ] && timeout 10m python3 "$T/prep_pages.py" "$PKG" "$RP/pkgpages" --small-dpi 0; then
+            echo "runner OCR: $(ls "$RP/pkgpages" | wc -l) files"
+          else
+            rm -rf "$RP/pkgpages"; echo "runner OCR not made (package: ${PKG:-none})"
+          fi
+          exit 0
+      # Deliver with warnings (audit A1 H): verify / extracts exit 0 with warning lines for SOFT problems and 1 only for
+      # HARD ones (missing outputs, internal ids / repo paths, annotations on proposal pages) -> then the job stops before
+      # the upload. H2: the reviewer's own /tmp/work/review.json (hashes) and the CLI's modelUsage are checked first.
+      - name: Verify outputs (verify_outputs.py)
+        timeout-minutes: 10
+        run: |
+          CM=(); [ -s "$RP/runner-case.json" ] && CM=(--case-meta "$RP/runner-case.json")
+          python3 "$T/engine_supabase.py" verify /tmp/out /tmp/case --review /tmp/work --claude "$RP/claude.json" "${CM[@]}"
+      - name: Check extracts (extract_check.py on the runner's own OCR)
+        timeout-minutes: 10
+        run: |
+          OCR=(); [ -d "$RP/pkgpages" ] && OCR=("$RP/pkgpages")
+          python3 "$T/engine_supabase.py" extracts /tmp/out /tmp/work/spec.json /tmp/work/study.json "${OCR[@]}"
       - name: Upload outputs and finish
-        run: python3 tools/engine_supabase.py finish /tmp/out
+        timeout-minutes: 10
+        run: python3 "$T/engine_supabase.py" finish /tmp/out
       - name: Record failure
         if: failure() || cancelled()
+        timeout-minutes: 5
         env:
           JOB_STATUS: ${{ job.status }}
         run: |
           set -u
+          ESP="$T/engine_supabase.py"; [ -f "$ESP" ] || ESP=tools/engine_supabase.py   # no snapshot = engine never ran
           R=""
-          if [ -s /tmp/fail_reason.txt ]; then R=$(head -c 600 /tmp/fail_reason.txt); fi
+          if [ -s "$RP/fail_reason.txt" ]; then R=$(head -c 600 "$RP/fail_reason.txt"); fi
           if [ -z "$R" ]; then
             if [ "$JOB_STATUS" = "cancelled" ]; then R="अभ्यास थांबवला गेला / वेळ संपली — पुन्हा तयार करा."
             else R="इंजिन अयशस्वी — पुन्हा तयार करा."; fi
           fi
+          # the Claude step was cancelled before claude_result: store the cost (estimate when no JSON result, --killed)
+          if [ -e "$RP/claude.started" ] && [ ! -e "$RP/claude_result.done" ] && [ -s "$ENGINE_SECRETS" ]; then
+            sudo pkill -KILL -u engine 2>/dev/null || true
+            F=(); [ -s "$RP/claude.first.json" ] && F=(--first "$RP/claude.first.json")
+            P=(); [ -s "$RP/part1_result.json" ] && P=(--part1 "$RP/part1_result.json")
+            W=0; [ -s "$RP/claude.t0" ] && W=$(( $(date +%s) - $(cat "$RP/claude.t0") ))
+            python3 "$ESP" claude_result "$RP/claude.json" "$RP/claude.err" 143 "${F[@]}" "${P[@]}" --killed \
+              --wall "$W" --status /tmp/out/status.json || true
+            touch "$RP/claude_result.done"
+          fi
           # 1) with the Supabase key from the secrets file (keeps an earlier, more specific reason); 2) always also via the
           #    Worker + run token (works when the config step failed; changes nothing if the run is already failed)
           if [ -s "$ENGINE_SECRETS" ]; then
-            python3 tools/engine_supabase.py fail "$R" || true
+            python3 "$ESP" fail "$R" || true
           fi
           if [ -n "${RUN_TOKEN:-}" ] && [ -n "${WORKER:-}" ] && [ -n "${RUN_ID:-}" ]; then
             jq -n --arg r "$R" --argjson id "$RUN_ID" '{run_id: $id, reason: $r}' |
@@ -416,38 +553,45 @@ jobs:
                    --data-binary @- "$WORKER/api/engine/fail" || echo "could not reach the Worker"
           fi
           exit 0
-      # New GRs (pdf/gr + the request list with retry counters). Shallow clone: our ONE commit is replayed onto the
-      # fetched tip (rebase --onto); INDEX.tsv / gr-request.txt merge by union (concurrent runs both append).
+      # New GRs (pdf/gr + the request lists). Shallow clone: our ONE commit is replayed onto the fetched tip
+      # (rebase --onto); INDEX.tsv / gr-request*.txt merge by union (concurrent runs both append). git runs without hooks
+      # or fsmonitor; the token reaches git only through an env-based credential helper (never argv / .git/config).
       # A failed push does not change the case result; it is recorded as a warning on the run and fails this job.
       - name: Commit new GRs (pdf/gr only)
         if: always()
+        timeout-minutes: 10
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}   # this step only (checkout keeps no credentials — H1)
         run: |
           set -u
-          # a cancelled Claude step can leave the repo owned by `engine` and still bind-mounted
-          sudo umount /srv/engine 2>/dev/null || true
-          sudo chown -R "$(id -u):$(id -g)" "$GITHUB_WORKSPACE" 2>/dev/null || true
-          [ -f /tmp/CLAUDE.md.repo ] && mv /tmp/CLAUDE.md.repo CLAUDE.md
-          AUTH="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
-          G=(git -c "http.https://github.com/.extraheader=$AUTH")
-          git config user.name github-actions; git config user.email actions@github.com
-          printf 'pdf/gr/INDEX.tsv merge=union\ntools/gr-request.txt merge=union\n' >> .git/info/attributes
-          git add -- pdf/gr tools/gr-request.txt
-          git diff --cached --quiet && exit 0
-          git commit -q -m "GR fetched by engine (case ${CASE_ID:-?})" || exit 0
+          ESP="$T/engine_supabase.py"; [ -f "$ESP" ] || ESP=tools/engine_supabase.py
+          # a cancelled Claude step can leave `engine` processes and the read-only mount behind
+          if [ -x "$SB" ]; then
+            "$SB" down "$GITHUB_WORKSPACE" /srv/engine /srv/engine-rw || { echo "::error::sandbox down failed"; exit 1; }
+          fi
+          [ -f "$RP/CLAUDE.md.repo" ] && mv "$RP/CLAUDE.md.repo" CLAUDE.md
+          if [ -x "$SB" ]; then
+            "$SB" check "$GITHUB_WORKSPACE" || "$SB" check "$GITHUB_WORKSPACE" || { echo "::error::workspace not clean"; exit 1; }
+          fi
+          G=(git -c core.hooksPath=/dev/null -c core.fsmonitor= -c user.name=github-actions -c user.email=actions@github.com
+             -c credential.helper= -c 'credential.helper=!f() { test "$1" = get || exit 0; echo username=x-access-token; echo "password=$GH_TOKEN"; }; f')
+          printf '%s merge=union\n' pdf/gr/INDEX.tsv tools/gr-request.txt tools/gr-request-done.txt >> .git/info/attributes
+          PATHS=(pdf/gr); for f in tools/gr-request.txt tools/gr-request-done.txt; do [ -e "$f" ] || git ls-files --error-unmatch "$f" >/dev/null 2>&1 && PATHS+=("$f"); done
+          "${G[@]}" add -A -- "${PATHS[@]}"
+          "${G[@]}" diff --cached --quiet && exit 0
+          "${G[@]}" commit -q -m "GR fetched by engine (case ${CASE_ID:-?})" || exit 0
           ok=0
           for i in 1 2 3; do
             if "${G[@]}" fetch -q --depth 1 origin "$GITHUB_REF_NAME" &&
-               git rebase -q --autostash --onto FETCH_HEAD HEAD~1 &&
+               "${G[@]}" rebase -q --autostash --onto FETCH_HEAD HEAD~1 &&
                "${G[@]}" push -q origin "HEAD:$GITHUB_REF_NAME"; then ok=1; break; fi
-            git rebase --abort 2>/dev/null || true
+            "${G[@]}" rebase --abort 2>/dev/null || true
             sleep 5
           done
           if [ "$ok" != 1 ]; then
             echo "::error::new GRs were NOT pushed to $GITHUB_REF_NAME"
             if [ -s "$ENGINE_SECRETS" ]; then
-              python3 tools/engine_supabase.py warn "नवीन GR रेपोमध्ये जतन झाले नाहीत (push अयशस्वी) — पुढच्या अभ्यासात पुन्हा उतरवले जातील." || true
+              python3 "$ESP" warn "नवीन GR रेपोमध्ये जतन झाले नाहीत (push अयशस्वी) — पुढच्या अभ्यासात पुन्हा उतरवले जातील." || true
             fi
             exit 1
           fi

@@ -3,12 +3,19 @@ on:
   workflow_dispatch:
 permissions:
   contents: write
+concurrency:
+  group: retry-failed
+  cancel-in-progress: false
 jobs:
   retry:
     runs-on: ubuntu-latest
+    timeout-minutes: 180
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262   # v4.4.0
+        timeout-minutes: 5
+        with: { fetch-depth: 1, persist-credentials: false }   # the commit step authenticates itself
       - name: Retry failed PDFs with browser headers, Wayback Machine and archive.org mirrors
+        timeout-minutes: 160
         run: |
           set -u
           UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
@@ -31,9 +38,29 @@ jobs:
             if [ $got = 1 ]; then ok=$((ok+1)); else fail=$((fail+1)); echo "$url" >> pdf/STILL_FAILED.txt; fi
           done < pdf-list.tsv
           echo "recovered=$ok still_failed=$fail"
+      # Same commit block as gr-request.yml: ONE commit replayed onto the fetched tip, 3 tries; no hooks/fsmonitor; the
+      # token only via an env-based credential helper. A failed push fails this job.
       - name: Commit
+        timeout-minutes: 10
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}   # this step only (checkout keeps no credentials)
         run: |
-          git config user.name "github-actions"; git config user.email "actions@github.com"
-          git add pdf
-          git commit -m "Recover failed PDFs via mirrors" || echo "nothing"
-          git push
+          set -u
+          G=(git -c core.hooksPath=/dev/null -c core.fsmonitor= -c user.name=github-actions -c user.email=actions@github.com
+             -c credential.helper= -c 'credential.helper=!f() { test "$1" = get || exit 0; echo username=x-access-token; echo "password=$GH_TOKEN"; }; f')
+          "${G[@]}" add -A -- pdf
+          "${G[@]}" diff --cached --quiet && { echo "nothing to commit"; exit 0; }
+          "${G[@]}" commit -q -m "Recover failed PDFs via mirrors" || exit 0
+          ok=0
+          for i in 1 2 3; do
+            if "${G[@]}" fetch -q --depth 1 origin "$GITHUB_REF_NAME" &&
+               "${G[@]}" rebase -q --autostash --onto FETCH_HEAD HEAD~1 &&
+               "${G[@]}" push -q origin "HEAD:$GITHUB_REF_NAME"; then ok=1; break; fi
+            "${G[@]}" rebase --abort 2>/dev/null || true
+            sleep 5
+          done
+          if [ "$ok" != 1 ]; then
+            echo "::error::recovered PDFs were NOT pushed to $GITHUB_REF_NAME"
+            exit 1
+          fi
+          echo "pushed: $(git log -1 --format=%h)"

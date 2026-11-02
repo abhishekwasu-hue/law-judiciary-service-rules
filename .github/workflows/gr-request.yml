@@ -14,29 +14,34 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262   # v4.4.0
+        timeout-minutes: 5
         with: { fetch-depth: 1, persist-credentials: false }   # the commit step authenticates itself
-      - run: python3 tools/gr_request.py
+      - name: Fetch requested GRs
+        timeout-minutes: 20
+        run: python3 tools/gr_request.py
       # Same commit block as process-proposal.yml: our ONE commit is replayed onto the fetched tip (rebase --onto);
-      # pdf/gr/INDEX.tsv and tools/gr-request.txt merge by union (an engine run may append at the same time).
+      # pdf/gr/INDEX.tsv and tools/gr-request*.txt (pending + done lists) merge by union (an engine run may append at the
+      # same time). git runs without hooks/fsmonitor; the token reaches git only via an env-based credential helper.
       # A failed push fails this job (no silent loss of fetched GRs).
       - name: Commit fetched GRs
+        timeout-minutes: 5
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}   # this step only (checkout keeps no credentials)
         run: |
           set -u
-          AUTH="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
-          G=(git -c "http.https://github.com/.extraheader=$AUTH")
-          git config user.name github-actions; git config user.email actions@github.com
-          printf 'pdf/gr/INDEX.tsv merge=union\ntools/gr-request.txt merge=union\n' >> .git/info/attributes
-          git add -- pdf/gr tools/gr-request.txt
-          git diff --cached --quiet && exit 0
-          git commit -q -m "GR request: fetched" || exit 0
+          G=(git -c core.hooksPath=/dev/null -c core.fsmonitor= -c user.name=github-actions -c user.email=actions@github.com
+             -c credential.helper= -c 'credential.helper=!f() { test "$1" = get || exit 0; echo username=x-access-token; echo "password=$GH_TOKEN"; }; f')
+          printf '%s merge=union\n' pdf/gr/INDEX.tsv tools/gr-request.txt tools/gr-request-done.txt >> .git/info/attributes
+          PATHS=(pdf/gr); for f in tools/gr-request.txt tools/gr-request-done.txt; do [ -e "$f" ] || git ls-files --error-unmatch "$f" >/dev/null 2>&1 && PATHS+=("$f"); done
+          "${G[@]}" add -A -- "${PATHS[@]}"
+          "${G[@]}" diff --cached --quiet && exit 0
+          "${G[@]}" commit -q -m "GR request: fetched" || exit 0
           ok=0
           for i in 1 2 3; do
             if "${G[@]}" fetch -q --depth 1 origin "$GITHUB_REF_NAME" &&
-               git rebase -q --autostash --onto FETCH_HEAD HEAD~1 &&
+               "${G[@]}" rebase -q --autostash --onto FETCH_HEAD HEAD~1 &&
                "${G[@]}" push -q origin "HEAD:$GITHUB_REF_NAME"; then ok=1; break; fi
-            git rebase --abort 2>/dev/null || true
+            "${G[@]}" rebase --abort 2>/dev/null || true
             sleep 5
           done
           if [ "$ok" != 1 ]; then
