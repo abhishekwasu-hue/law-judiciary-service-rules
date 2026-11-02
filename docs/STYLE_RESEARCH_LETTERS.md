@@ -126,3 +126,6 @@ The regexes were tested on all 5 sample letters. Only L3 hits (CR133). Running L
 2. Medium: F5 (CR133 "कै. " fix + L3 + a one-word addition to §4.18); F11 sample addressee consistency.
 3. After decision: F6 reminders (tool + lint + rule), F7 copies, F10 "मा." (L4).
 4. Low / no change: F8, F9, F12.
+
+## 6. Decisions (Abhi, 02.11.2026)
+F6 स्मरणपत्र — होय (INSTRUCTIONS §4.21); F7 प्रत-ओळ — होय (§4.22); F10 "मा." — होय: judges and the court in own text, addressee block and office designation "उच्च न्यायालय (… शाखा)" excepted (§4.23); LANG F5 "शुद्धिपत्रक" — होय (§4.24). Built: tools/mkdocs.py (reminder, copies), tools/lint_spec.py, tools/verify_outputs.py ("मा."), samples CR66/122/128/130/131 updated.

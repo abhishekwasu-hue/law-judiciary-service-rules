@@ -75,6 +75,9 @@ From INSTRUCTIONS.md [I§.n], PROPOSAL_SOP.md [SOP step], tools/PROPOSAL_PROMPT.
   official language of earlier files, tables where needed [I4.15]).
 - [I4.20] Letter table = data to fill in only (dates, figures, periods, yes/no, numbers). Documents (प्रत /
   प्रमाणपत्र / अहवाल) after the table: point "	तसेच, खालील कागदपत्रे उपलब्ध करून देण्यात यावीत, ही विनंती:-", then "1)	…" items; split mixed rows. Model: CR131.
+- [I4.21] Reminder: `letter.reminder: N` (refs/intro: lint msg). [I4.22] To the HC with info from a District Judge →
+  `letter.copies` (lint msg). [I4.23] "मा." before उच्च न्यायालय / न्यायमूर्ती / प्रशासकीय न्यायाधीश in own text (not
+  letter.to, "उच्च न्यायालय (… शाखा)", quotes). [I4.24] "शुद्धिपत्रक". Models: CR122, CR130.
 - The tool adds, never hand-write: विषय and संदर्भ bold + centre [I4.10]; "आपला," (never "आपली"), then
   "( राजेश वडनेरकर )" / "अवर सचिव ,महाराष्ट्र शासन", then "प्रत : निवड नस्ती"; letterhead
   "दूरध्वनी क्र. :- ०२२-२२793230   Email ID :- lnjd.desk6-mh@mah.gov.in" [I4.5].

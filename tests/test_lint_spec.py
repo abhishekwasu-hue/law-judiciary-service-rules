@@ -152,6 +152,47 @@ class LintSpec(unittest.TestCase):
                                         "“दि.01.01.2020 करुन.:-” क्र.बी-4/36/2010 (पृ.6/प.वि.):-")
         self.assertEqual(L.lang_hits(L.fix_lang(t)), [])
 
+    # ---- §4.21–§4.24 (Abhi, 02.11.2026) ----
+    def test_reminder(self):
+        s = load(CR122)
+        s["letter"]["reminder"] = 1
+        P = L.lint_spec(s)
+        self.assertTrue(any("स्मरणपत्र (§4.21)" in p and p.startswith("letter.refs[0]") for p in P), P)
+        self.assertTrue(any("स्मरणपत्र (§4.21)" in p and p.startswith("letter.intro") for p in P), P)
+        s["letter"]["refs"] = ["या कार्यासनाचे समक्रमांकाचे पत्र दि. 20.10.2026"]
+        s["letter"]["intro"] = ("उपरोक्त विषयाबाबत संदर्भाधीन पत्रास अनुसरून आपणांस कळविण्यात येते की, संदर्भाधीन पत्रान्वये मागविण्यात "
+                                "आलेली माहिती अद्याप अप्राप्त आहे. सदर माहिती लवकरात लवकर शासनास उपलब्ध करून देण्यात यावी, ही विनंती.")
+        s["letter"]["points"] = []
+        self.assertEqual([p for p in L.lint_spec(s) if "§4.21" in p], [])
+
+    def test_copy_line_via_high_court(self):
+        s = load(CR122)
+        self.assertEqual([p for p in L.lint_spec(s) if "§4.22" in p], [], "approved sample has the copy line")
+        s["letter"].pop("copies")
+        P = [p for p in L.lint_spec(s) if "§4.22" in p]
+        self.assertEqual(len(P), 1); self.assertIn("जिल्हा व सत्र न्यायालय, औरंगाबाद यांना आवश्यक कार्यवाहीसाठी", P[0])
+        s["letter"]["to"] = ["प्रमुख जिल्हा व सत्र न्यायाधीश,", "जिल्हा व सत्र न्यायालय,", "औरंगाबाद."]
+        self.assertEqual([p for p in L.lint_spec(s) if "§4.22" in p], [], "direct letter to the District Judge: no copy line")
+
+    def test_ma_rule(self):
+        cases = {"उच्च न्यायालयाच्या पत्रानुसार": True, "मा. उच्च न्यायालयाच्या": False, "मा.उच्च न्यायालय, मुंबई": False,
+                 "प्रबंधक, उच्च न्यायालय (अपील शाखा), मुंबई": False, "मुख्य न्यायमूर्ती यांनी": True, "मा. मुख्य न्यायमूर्ती": False,
+                 "न्यायमूर्ती श्री. अ": True, "“उच्च न्यायालयाने”": False, "प्रशासकीय न्यायाधीश समिती": True,
+                 "मा. मुंबई उच्च न्यायालयाच्या": False}
+        for t, bad in cases.items():
+            self.assertEqual(bool(L.ma_hits(t)), bad, t)
+            self.assertEqual(L.ma_hits(L.fix_ma(t)), [], t)
+        self.assertEqual(L.fix_ma("मुंबई उच्च न्यायालयाच्या संघटनेने"), "मा. मुंबई उच्च न्यायालयाच्या संघटनेने")
+        s = load(CR122)
+        s["note"]["paras"].insert(0, "उच्च न्यायालयाच्या दि. 01.01.2026 च्या पत्रानुसार माहिती प्राप्त आहे.")
+        self.assertTrue(any("§4.23" in p and p.startswith("note.paras[0]") for p in L.lint_spec(s)))
+        self.assertEqual([p for p in L.lint_spec(load(CR122)) if p.startswith("letter.to") and "§4.23" in p], [], "addressee block excepted")
+
+    def test_shuddhipatrak(self):
+        self.assertTrue(any("§4.24" in m for m in L.style_hits("शासन शुद्धीपत्रकानुसार")))
+        self.assertFalse(any("§4.24" in m for m in L.style_hits("शासन शुद्धिपत्रकानुसार")))
+        self.assertFalse(any("§4.24" in m for m in L.style_hits("“शासन शुद्धीपत्रक”")), "quotes verbatim")
+
     # ---- §4.20 letter table = data only (02.11.2026) ----
     def test_doc_in_letter_table(self):
         s131 = load(next(p for p in SPECS if os.path.basename(p).startswith("CR131_")))

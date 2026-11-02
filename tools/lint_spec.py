@@ -27,6 +27,15 @@ Rules (spec.json)
     "उपरोक्त विषयाबाबत संदर्भाधीन", contains "आपणांस कळविण्यात येते की," and ends with ":-" when there are points
   - §4.20: no document (प्रत / प्रमाणपत्र / अहवाल) in a data row of a letter.points table (outside quotes); documents go
     after the table as a numbered list introduced by DOC_INTRO
+  - §4.21 स्मरणपत्र (letter.reminder): refs[0] has "या कार्यासनाचे समक्रमांकाचे पत्र", intro has "अद्याप अप्राप्त" and
+    "ही विनंती"
+  - §4.22 letter to the High Court that asks information from a District Judge ("प्रमुख जिल्हा व सत्र न्यायाधीश, <place>
+    यांच्याकडून"): letter.copies has "प्रमुख जिल्हा व सत्र न्यायाधीश, जिल्हा व सत्र न्यायालय, <place> यांना आवश्यक
+    कार्यवाहीसाठी"
+  - §4.23 "मा." (note body and letter outside quotes; not the addressee block letter.to): before मुख्य न्यायमूर्ती /
+    न्यायमूर्ती / प्रशासकीय न्यायाधीश, and before उच्च न्यायालय… (the court itself; an office designation
+    "उच्च न्यायालय (… शाखा)" excepted)
+  - §4.24 "शुद्धिपत्रक" (not शुध्दिपत्रक / शुद्धीपत्रक / शुद्धपत्रक)
 Rules (study.json): parts with headings भाग 0 … भाग 7 (--allow-missing-part1: भाग 1 may be absent); no internal ids;
   पृ. references as above ("“…”" skipped).
 The constants and check functions below are the ONE definition shared with tools/verify_outputs.py."""
@@ -114,6 +123,7 @@ STYLE_RULES = [
     # मराठी भाषा विभाग GR कपासू-2020/प्र.क्र.56/भाषा-2, दि.10.11.2022 (docs/STYLE_RESEARCH_LANG.md)
     (re.compile(r"ध्द"), "शुद्धलेखन — 'ध्द' ऐवजी 'द्ध' (मराठी भाषा विभाग GR दि.10.11.2022)"),
     (re.compile(r"(?<![ऀ-ॿ])श्री\.(?=[^\s(])"), "आदरार्थी उल्लेख — 'श्री.' नंतर एक जागा; नाव प्रस्तावात आहे तसे (§4.18)"),
+    (re.compile(r"शुद्धीपत्र|शुद्धपत्र|शुध्दिपत्र|शुध्दीपत्र"), "शुद्धलेखन — 'शुद्धिपत्रक' (§4.24)"),
 ]
 LETTER_STYLE_RULES = [
     # GAD टिप्पणी लेखन व पत्रव्यवहार 12.3: letters to courts in "विशेष सौजन्यपूर्वक भाषा" (docs/STYLE_RESEARCH_LETTERS.md)
@@ -189,6 +199,47 @@ def lang_hits(text):
     return out
 
 
+# INSTRUCTIONS §4.23 (Abhi, 02.11.2026): "मा." before the High Court and judges (Section practice; docs/STYLE_RESEARCH_LETTERS.md F10)
+MA_JUDGE_RE = re.compile(r"मुख्य\s+न्यायमूर्ती|(?<!मुख्य )(?<!मुख्य)न्यायमूर्ती|प्रशासकीय\s+न्यायाधीश")
+MA_COURT_RE = re.compile(r"(?<![ऀ-ॿ])(?:मुंबई\s+)?उच्च\s+न्यायालय(?!\s*\()")   # "मा. मुंबई उच्च न्यायालय"   # "उच्च न्यायालय (अपील शाखा)" = office designation: excepted
+MA_BEFORE = re.compile(r"मा\.\s?$")
+
+
+def _ma_spans(t, court=True):
+    rxs = (MA_JUDGE_RE, MA_COURT_RE) if court else (MA_JUDGE_RE,)
+    return sorted((m.start(), m.group(0)) for rx in rxs for m in rx.finditer(t) if not MA_BEFORE.search(t[max(0, m.start() - 4):m.start()]))
+
+
+def ma_hits(text, court=True):
+    """§4.23: occurrences outside quotes without "मा." before them."""
+    hits = [w for _, w in _ma_spans(unquoted(text), court)]
+    return [f"आदरार्थी उल्लेख — 'मा. {sorted(set(hits))[0]}' (मा. उच्च न्यायालय / मा. न्यायमूर्ती; §4.23)"] if hits else []
+
+
+def fix_ma(text, court=True):
+    """text with "मा. " inserted where §4.23 needs it (outside quotes)."""
+    def fix(t):
+        for pos, _ in reversed(_ma_spans(t, court)):
+            t = t[:pos] + "मा. " + t[pos:]
+        return t
+    out, pos = [], 0
+    for mt in QUOTE_RE.finditer(text):
+        out += [fix(text[pos:mt.start()]), mt.group(0)]; pos = mt.end()
+    out.append(fix(text[pos:]))
+    return "".join(out)
+
+
+# §4.21 स्मरणपत्र / §4.22 copy to the District Judge when the letter goes through the High Court
+REMINDER_REF = "या कार्यासनाचे समक्रमांकाचे पत्र"
+REMINDER_HAS = "अद्याप अप्राप्त"
+DJ_FROM_RE = re.compile(r"प्रमुख\s+जिल्हा\s+व\s+सत्र\s+न्यायाधीश\s*,\s*([^\s,]+)\s+यांच्याकडून")
+COPY_END = "यांना आवश्यक कार्यवाहीसाठी"
+
+
+def dj_copy(place):
+    return f"प्रमुख जिल्हा व सत्र न्यायाधीश, जिल्हा व सत्र न्यायालय, {place} {COPY_END}"
+
+
 def banned_hits(text):
     return [w for w in BANNED if w in text]
 
@@ -258,6 +309,8 @@ def lint_spec(spec, pages=None):
         P += [f"{path}: {m}" for m in style_hits(t)]
     for path, t in letter:
         P += [f"{path}: {m}" for m in style_hits(t, letter=True)]
+    for path, t in body + [(pth, t) for pth, t in letter if not pth.startswith("letter.to")]:
+        P += [f"{path}: {m}" for m in ma_hits(t)]
     rel_own = [(pth, t) for pth, t in related if not re.search(r"\.text(\[|$)", pth)]  # extracts (.text) are verbatim
     for path, t in body + letter + rel_own:
         P += [f"{path}: {m}" for m in lang_hits(t)]
@@ -324,6 +377,20 @@ def lint_spec(spec, pages=None):
                 P.append(f"letter.intro: पत्राची भाषा — माहिती मागताना '…, {REQUEST}.' अशी विनंतीपूर्वक मांडणी हवी (§4.18)")
             if L.get("points") and not it.endswith(":-"):
                 P.append("letter.intro: intro wording — must end with ':-' before the points")
+        # §4.21 स्मरणपत्र
+        if L.get("reminder"):
+            r0 = (L.get("refs") or [""])[0] if isinstance(L.get("refs"), list) else ""
+            if REMINDER_REF not in ns(str(r0)):
+                P.append(f"letter.refs[0]: स्मरणपत्र (§4.21) — संदर्भ '{REMINDER_REF} दि. __'")
+            if isinstance(intro, str) and (REMINDER_HAS not in intro or REQUEST not in intro):
+                P.append(f"letter.intro: स्मरणपत्र (§4.21) — '… माहिती {REMINDER_HAS} आहे. … {REQUEST}.'")
+        # §4.22 via the High Court, information from a District Judge -> copy line
+        to_txt = " ".join(x for x in (L.get("to") or []) if isinstance(x, str))
+        if "उच्च न्यायालय" in to_txt:
+            copies = [ns(x) for x in (L.get("copies") or []) if isinstance(x, str)]
+            for place in {m.group(1) for path, t in letter for m in DJ_FROM_RE.finditer(ns(unquoted(t)))}:
+                if not any(place in c and c.endswith(COPY_END) for c in copies):
+                    P.append(f"letter.copies: प्रत (§4.22) — '{dj_copy(place)}'")
         pts = L.get("points") if isinstance(L.get("points"), list) else []
         for i, pt in enumerate(pts):
             if isinstance(pt, dict) and isinstance(pt.get("table"), list):
