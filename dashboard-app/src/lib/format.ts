@@ -51,6 +51,23 @@ export function textOf(v: unknown): string {
 }
 export const asArray = (v: unknown): unknown[] => (Array.isArray(v) ? v : v == null ? [] : [v]);
 
+/** Failure reason for display: old rows start with "status.json state = 'failed': " (engine before 02.11.2026) and
+ *  old dispatch failures hold raw GitHub text — both shown as clean Marathi. */
+export function cleanReason(s: string | null | undefined): string {
+  const t = String(s ?? '').replace(/^status\.json state = '?\w+'?:\s*/, '').trim();
+  if (/^dispatch \d+/.test(t)) return 'GitHub जोडणी अयशस्वी (token तपासा — सेटिंग्ज) — पुन्हा तयार करा';
+  return t;
+}
+
+/** Run warnings that mean the outputs were NOT fully checked (engine contract 02.11.2026) — shown in a red card. */
+export const CRITICAL_WARNING_PREFIXES = ['पडताळणी अपूर्ण — ', 'अंतिम पडताळणी (Opus) मान्यता नाही — '];
+export const isCriticalWarning = (w: string) => CRITICAL_WARNING_PREFIXES.some(p => w.trim().startsWith(p.trim()));
+/** Warning texts of a run (model-routing lines "मॉडेल:" excluded). */
+export function runWarningTexts(warnings: unknown): string[] {
+  return asArray(warnings).map(textOf).map(x => x.trim()).filter(x => x && !x.startsWith('मॉडेल:'));
+}
+export const criticalWarnings = (warnings: unknown) => runWarningTexts(warnings).filter(isCriticalWarning);
+
 /** "CR131_2026_Note_and_Letter.docx" → "C R 131/2026" (engine output names carry the C R). */
 export function crFromFileName(name: string | null | undefined): string | null {
   const m = /^CR(\d+)_(\d{4})_/.exec(name || '');

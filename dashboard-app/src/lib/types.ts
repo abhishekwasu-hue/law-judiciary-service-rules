@@ -18,6 +18,8 @@ export interface Run {
   grs_missing: unknown; created_by: string | null; created_at: string;
   // migration 20261101000004_reliability.sql (numeric may arrive as string)
   cost_usd?: number | string | null; num_turns?: number | null; duration_s?: number | string | null; warnings?: unknown;
+  // migration 20261102000007_run_last_step.sql: last progress text before the run ended (red marker of a failed run)
+  last_step?: string | null;
 }
 export interface Letter {
   id: number; case_id: number; ref_no: string | null; addressed_to: string | null; sent_date: string | null;

@@ -4,12 +4,12 @@ import { sb } from '../lib/supabase';
 import { useData, overdueIds } from '../lib/data';
 import { useCanWrite } from '../lib/auth';
 import { CATEGORIES, PRIORITIES, STAGES, stageTone } from '../lib/constants';
-import { caseSubject, caseTitle, fmtDate } from '../lib/format';
-import { humanError } from '../lib/api';
+import { caseSubject, crFromFileName, crLabel, fmtDate } from '../lib/format';
+import { ApiError, api, humanError } from '../lib/api';
 import type { Activity, Case, CaseFile, Letter, Member } from '../lib/types';
 import { Chip, Empty, Field, Modal, Skeleton, Spinner } from '../components/ui';
 import { useToast } from '../components/Toast';
-import { useRuns } from '../components/RunProgress';
+import { CriticalWarnings, useRuns } from '../components/RunProgress';
 import { BriefingTab, HistoryTab, LettersTab, NoteTab, PackageTab, StudyTab } from './CaseTabs';
 
 const TABS = [
@@ -192,6 +192,11 @@ export default function CaseDetail() {
   }
 
   const ctx: CaseCtx = { c, files, letters, activity, members, runs, reloadFiles, reloadLetters, reloadActivity, canWrite };
+  // Title: C R of the case; else the C R in an output file name, marked as such — but not when the engine reported
+  // that C R as a duplicate of another case (two cases would show the same heading, A3 audit)
+  const hasDupNotice = activity.some(a => a.action === 'case_cr_duplicate');
+  const fileCr = !c.cr_no && !hasDupNotice ? crFromFileName(files.find(f => /^CR\d+_\d{4}_/.test(f.original_name))?.original_name) : null;
+  const title = c.cr_no ? crLabel(c) : fileCr || `प्रकरण #${c.id}`;
   return (
     <div className="space-y-4">
       <div className="no-print">
@@ -205,7 +210,7 @@ export default function CaseDetail() {
         return (
           <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-amber-900 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-100" role="alert">
             <div className="font-bold">PDF वरून C R {det.cr} सापडला, पण तो आधीच प्रकरण #{det.existing_id} मध्ये आहे.</div>
-            <div className="mt-1 text-sm">एकच प्रकरण ठेवायचे असल्यास दुसऱ्याचा टप्पा “बंद” करा.</div>
+            <div className="mt-1 text-sm">एकच प्रकरण ठेवायचे असल्यास दुसऱ्याचा टप्पा “बंद” करा. योग्य C R माहीत असल्यास “✎ तपशील” मध्ये भरा.</div>
             {det.existing_id && <Link className="btn-ghost mt-2 inline-flex" to={`/cases/${det.existing_id}`}>प्रकरण #{det.existing_id} उघडा →</Link>}
           </div>
         );
@@ -214,7 +219,7 @@ export default function CaseDetail() {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-2xl font-bold">{caseTitle(c, files.find(f => /^CR\d+_\d{4}_/.test(f.original_name))?.original_name)}</h1>
+              <h1 className="text-2xl font-bold">{title}{fileCr && <span className="ml-2 align-middle text-sm font-normal text-slate-500 dark:text-slate-400">(फाइलनावावरून)</span>}</h1>
               <Chip tone={stageTone(c.stage)}>{c.stage}</Chip>
               {c.priority === 'तातडीचे' && <Chip tone="amber">तातडीचे</Chip>}
               {overdue.has(c.id) && <Chip tone="red">मुदत संपली</Chip>}
@@ -243,6 +248,8 @@ export default function CaseDetail() {
           ))}
         </dl>
       </header>
+
+      <CriticalWarnings run={runs?.find(r => r.state === 'done')} />
 
       {loadErr && (
         <div className="no-print flex flex-wrap items-center justify-between gap-3 rounded-lg bg-red-100 p-3 font-semibold text-red-900 dark:bg-red-900/40 dark:text-red-100" role="alert">
@@ -288,34 +295,54 @@ export default function CaseDetail() {
 function EditCase({ open, onClose, c, onSaved }: { open: boolean; onClose: () => void; c: Case; onSaved: (c: Case) => void }) {
   const toast = useToast();
   const pick = (x: Case) => ({
+    cr_no: x.cr_no || '', cr_year: x.cr_year ? String(x.cr_year) : '',
     file_no: x.file_no || '', subject: x.subject, category: x.category, priority: x.priority, employee_name: x.employee_name || '', post: x.post || '',
     office: x.office || '', received_from: x.received_from || '', received_via: x.received_via || '', inward_date: x.inward_date || '', due_date: x.due_date || '',
   });
   const [f, setF] = useState(pick(c));
   const [busy, setBusy] = useState(false);
+  const [dupId, setDupId] = useState<number | null>(null);
+  const [err, setErr] = useState('');
   // reset from `c` only when the modal opens (false → true); a Realtime update must not wipe what is being typed
   const wasOpen = useRef(false);
   useEffect(() => {
-    if (open && !wasOpen.current) setF(pick(c));
+    if (open && !wasOpen.current) { setF(pick(c)); setDupId(null); setErr(''); }
     wasOpen.current = open;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
   const set = (k: keyof ReturnType<typeof pick>) => (e: { target: { value: string } }) => setF(s => ({ ...s, [k]: e.target.value }));
 
+  const setDigits = (k: 'cr_no' | 'cr_year', max: number) => (e: { target: { value: string } }) =>
+    setF(s => ({ ...s, [k]: e.target.value.replace(/\D/g, '').slice(0, max) }));
+
+  // through the Worker (PATCH /api/cases/:id): C R / वर्ष get the same checks as a new case (digits, duplicate ignoring
+  // leading zeros → link to the other case)
   async function save(e: FormEvent) {
     e.preventDefault();
+    setDupId(null);
+    setErr('');
+    if (f.cr_year && !/^\d{4}$/.test(f.cr_year)) return setErr('वर्ष 4 अंकी लिहा (उदा. 2026)');
+    if (!!f.cr_no !== !!f.cr_year) return setErr('C R क्र. व वर्ष दोन्ही भरा (किंवा दोन्ही रिकामे ठेवा)');
     setBusy(true);
-    const row = Object.fromEntries(Object.entries(f).map(([k, v]) => [k, v === '' && k !== 'subject' ? null : v]));
-    const { data, error } = await sb().from('cases').update(row).eq('id', c.id).select().single();
-    setBusy(false);
-    if (error) return toast(humanError(error.message), 'err');
-    onSaved(data as Case);
-    toast('जतन केले');
-    onClose();
+    try {
+      const row = await api<Case>(`/api/cases/${c.id}`, { method: 'PATCH', body: f });
+      onSaved(row);
+      toast('जतन केले');
+      onClose();
+    } catch (x) {
+      if (x instanceof ApiError && x.message === 'duplicate_cr') setDupId(Number((x.data as { existing_id?: number } | undefined)?.existing_id) || null);
+      setErr(humanError(x));
+    } finally {
+      setBusy(false);
+    }
   }
   return (
     <Modal open={open} onClose={onClose} title="प्रकरणाचा तपशील" wide>
       <form onSubmit={save} className="grid gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-2 gap-3 sm:col-span-2">
+          <Field label="C R क्र."><input className="input" inputMode="numeric" placeholder="उदा. 128" value={f.cr_no} onChange={setDigits('cr_no', 6)} /></Field>
+          <Field label="वर्ष"><input className="input" inputMode="numeric" maxLength={4} placeholder="उदा. 2026" value={f.cr_year} onChange={setDigits('cr_year', 4)} /></Field>
+        </div>
         <div className="sm:col-span-2"><Field label="विषय"><textarea className="input" value={f.subject ?? ''} onChange={set('subject')} /></Field></div>
         <Field label="नस्ती क्र."><input className="input" value={f.file_no} onChange={set('file_no')} /></Field>
         <Field label="प्रवर्ग"><select className="input" value={f.category} onChange={set('category')}>{CATEGORIES.map(x => <option key={x}>{x}</option>)}</select></Field>
@@ -331,6 +358,12 @@ function EditCase({ open, onClose, c, onSaved }: { open: boolean; onClose: () =>
         </Field>
         <Field label="आवक दिनांक"><input className="input" type="date" value={f.inward_date} onChange={set('inward_date')} /></Field>
         <Field label="मुदत"><input className="input" type="date" value={f.due_date} onChange={set('due_date')} /></Field>
+        {err && (
+          <div className="rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-red-900 dark:border-red-800 dark:bg-red-900/30 dark:text-red-100 sm:col-span-2" role="alert">
+            <div className="font-semibold">{err}</div>
+            {dupId && <Link className="btn-ghost mt-2 inline-flex" to={`/cases/${dupId}`} onClick={onClose}>प्रकरण #{dupId} उघडा →</Link>}
+          </div>
+        )}
         <div className="flex justify-end gap-2 sm:col-span-2">
           <button type="button" className="btn-ghost" onClick={onClose}>रद्द</button>
           <button className="btn-primary" disabled={busy}>{busy && <Spinner />} जतन करा</button>

@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { api, humanError } from '../lib/api';
+import { SETTING_LABEL, api, humanError } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { sb } from '../lib/supabase';
 import type { Member } from '../lib/types';
@@ -59,6 +59,26 @@ const SECRET: { k: string; label: string; hint: string; alt?: boolean }[] = [
   { k: 'cloudflare_api_token', label: 'Cloudflare API token (Workers AI)', hint: 'Workers AI परवानगी असलेला token', alt: true },
   { k: 'ollama_api_key', label: 'Ollama key (ऐच्छिक)', hint: 'सर्व्हरवर key ठेवली असल्यासच', alt: true },
 ];
+// Same rules as the Worker's Settings PUT (cloudflare/worker.js) — checked here first, field named in Marathi
+const MODEL_NAME = /^[A-Za-z0-9][A-Za-z0-9._:@/-]{1,99}$/;
+const MODEL_KEYS = ['gemini_model', 'part1_model', 'fallback_model', 'fallback_model_light', 'engine_model', 'engine_model_light'];
+const REQUIRED = ['supabase_url', 'supabase_anon_key', 'owner_email'];
+const CLEAR = '__clear__'; // Worker: deletes the key
+const UNCLEARABLE = ['supabase_service_key'];
+export function checkSettings(v: Record<string, string>): string | null {
+  const t = (k: string) => (v[k] ?? '').trim();
+  const L = (k: string) => SETTING_LABEL[k] || k;
+  for (const k of REQUIRED) if (k in v && !t(k)) return `${L(k)}: रिकामे ठेवता येत नाही`;
+  if (t('budget_usd') && !(Number(t('budget_usd')) > 0 && Number(t('budget_usd')) <= 20)) return `${L('budget_usd')}: 0 पेक्षा जास्त व 20 पर्यंतची संख्या लिहा`;
+  if (t('monthly_budget_usd') && !(Number(t('monthly_budget_usd')) > 0 && Number(t('monthly_budget_usd')) <= 1000)) return `${L('monthly_budget_usd')}: 0 पेक्षा जास्त व 1000 पर्यंतची संख्या लिहा (रिकामे = $20)`;
+  if (t('cloudflare_account_id') && !/^[0-9a-f]{32}$/.test(t('cloudflare_account_id'))) return `${L('cloudflare_account_id')}: नेमकी 32 अक्षरे (0-9, a-f) लिहा`;
+  if (t('ollama_base_url') && !/^https?:\/\/[A-Za-z0-9.-]+(:\d+)?(\/[A-Za-z0-9._~/-]*)?$/.test(t('ollama_base_url'))) return `${L('ollama_base_url')}: http:// किंवा https:// ने सुरू होणारा पत्ता लिहा (उदा. https://host:11434)`;
+  for (const k of MODEL_KEYS) if (t(k) && !MODEL_NAME.test(t(k))) return `${L(k)}: योग्य मॉडेल-नाव लिहा (अक्षरे, अंक, . _ : @ / - ; जागा नाही)`;
+  const ms = t('model_strong');
+  if (ms && ms.toLowerCase() !== 'none' && !MODEL_NAME.test(ms)) return `${L('model_strong')}: योग्य मॉडेल-नाव (अक्षरे, अंक, . _ : @ / - ; जागा नाही) किंवा none लिहा`;
+  return null;
+}
+
 const ROLE_LABEL: Record<string, string> = { owner: 'मालक', staff: 'कार्यासन कर्मचारी', senior: 'वरिष्ठ (फक्त वाचन)' };
 
 export default function Settings() {
@@ -70,12 +90,15 @@ export default function Settings() {
   const [members, setMembers] = useState<Member[] | null>(null);
   const [inv, setInv] = useState({ email: '', role: 'staff' });
   const [invBusy, setInvBusy] = useState(false);
+  const [clear, setClear] = useState<Set<string>>(new Set()); // secret keys marked "काढा"
+  const [formErr, setFormErr] = useState('');
 
   const load = async () => {
     try {
       const s = await api<Record<string, string>>('/api/settings');
       setCur(s);
       setEdit(Object.fromEntries(PLAIN.map(p => [p.k, s[p.k] || ''])));
+      setClear(new Set());
     } catch (e) {
       toast(humanError(e), 'err');
     }
@@ -99,32 +122,40 @@ export default function Settings() {
       ) : <input className="input font-mono" {...(p.num ? { type: 'number', inputMode: 'decimal' as const, min: 0.01, max: p.max, step: 0.01 } : {})} placeholder={p.ph} value={edit[p.k] ?? ''} onChange={e => setEdit(s => ({ ...s, [p.k]: e.target.value }))} />}
     </Field>
   );
-  const secretField = (s: (typeof SECRET)[number]) => (
-    <Field
-      key={s.k}
-      label={s.label}
-      hint={<>{s.hint} • {cur?.[s.k] ? <>सध्या: <span className="font-mono">{cur[s.k]}</span> — बदलायची असल्यासच टाइप करा</> : <Chip tone="amber">भरलेली नाही</Chip>}</>}
-    >
-      <input className="input font-mono" type="password" autoComplete="off" placeholder={cur?.[s.k] || ''} value={edit[s.k] ?? ''} onChange={e => setEdit(x => ({ ...x, [s.k]: e.target.value }))} />
-    </Field>
-  );
+  const toggleClear = (k: string) => setClear(x => { const n = new Set(x); if (n.has(k)) n.delete(k); else n.add(k); return n; });
+  const secretField = (s: (typeof SECRET)[number]) => {
+    const marked = clear.has(s.k);
+    return (
+      <Field
+        key={s.k}
+        label={s.label}
+        hint={<>{s.hint} • {marked ? <Chip tone="red">जतन केल्यावर की काढली जाईल</Chip> : cur?.[s.k] ? <>सध्या: <span className="font-mono">{cur[s.k]}</span> — बदलायची असल्यासच टाइप करा</> : <Chip tone="amber">भरलेली नाही</Chip>}</>}
+      >
+        <div className="flex gap-2">
+          <input className="input min-w-0 flex-1 font-mono" type="password" autoComplete="off" disabled={marked} placeholder={cur?.[s.k] || ''} value={edit[s.k] ?? ''} onChange={e => setEdit(x => ({ ...x, [s.k]: e.target.value }))} />
+          {cur?.[s.k] && !UNCLEARABLE.includes(s.k) && (
+            <button type="button" className={marked ? 'btn-primary shrink-0 px-3' : 'btn-ghost shrink-0 px-3'} aria-pressed={marked} onClick={() => toggleClear(s.k)} title="ही की सेटिंग्जमधून काढा">
+              {marked ? '↺ ठेवा' : 'key काढा'}
+            </button>
+          )}
+        </div>
+      </Field>
+    );
+  };
 
   async function save(e: FormEvent) {
     e.preventDefault();
+    setFormErr('');
     setBusy(true);
     try {
-      // Plain values are sent as typed; a secret is sent only if a new value was typed (empty = unchanged).
+      // Plain values are sent as typed; a secret is sent only if a new value was typed (empty = unchanged) or "काढा".
       const body: Record<string, string> = {};
       for (const p of PLAIN) if (cur && edit[p.k] !== (cur[p.k] || '')) body[p.k] = edit[p.k] ?? '';
-      for (const s of SECRET) if (edit[s.k]) body[s.k] = edit[s.k];
-      const bu = (edit.budget_usd ?? '').trim();
-      if (bu && !(Number(bu) > 0 && Number(bu) <= 20)) {
-        toast('कमाल खर्च: 0 पेक्षा जास्त व 20 पर्यंतची संख्या लिहा', 'err');
-        return;
-      }
-      const mb = (edit.monthly_budget_usd ?? '').trim();
-      if (mb && !(Number(mb) > 0 && Number(mb) <= 1000)) {
-        toast('मासिक कमाल खर्च: 0 पेक्षा जास्त व 1000 पर्यंतची संख्या लिहा (रिकामे = $20)', 'err');
+      for (const s of SECRET) if (clear.has(s.k)) body[s.k] = CLEAR; else if (edit[s.k]) body[s.k] = edit[s.k];
+      const bad = checkSettings(body);
+      if (bad) {
+        setFormErr(bad);
+        toast(bad, 'err');
         return;
       }
       if (!Object.keys(body).length) {
@@ -135,6 +166,7 @@ export default function Settings() {
       toast('सेटिंग्ज जतन');
       await load();
     } catch (x) {
+      setFormErr(humanError(x));
       toast(humanError(x), 'err');
     } finally {
       setBusy(false);
@@ -146,8 +178,8 @@ export default function Settings() {
     if (!/^\S+@\S+\.\S+$/.test(inv.email.trim())) return toast('योग्य ई-मेल लिहा', 'err');
     setInvBusy(true);
     try {
-      await api('/api/members', { body: { email: inv.email.trim(), role: inv.role } });
-      toast('आमंत्रण पाठवले');
+      const r = await api<{ existing?: boolean }>('/api/members', { body: { email: inv.email.trim(), role: inv.role } });
+      toast(r?.existing ? 'सदस्य जोडला (या ई-मेलचे खाते आधीच आहे — थेट लॉगिन करता येईल)' : 'आमंत्रण पाठवले');
       setInv({ email: '', role: inv.role });
       await load();
     } catch (x) {
@@ -208,6 +240,7 @@ export default function Settings() {
                 {SECRET.filter(s => s.alt).map(secretField)}
               </div>
             </fieldset>
+            {formErr && <div className="break-words rounded-lg border border-red-300 bg-red-50 px-3 py-2 font-semibold text-red-900 dark:border-red-800 dark:bg-red-900/30 dark:text-red-100" role="alert">{formErr}</div>}
             <button className="btn-primary" disabled={busy}>{busy && <Spinner />} जतन करा</button>
           </form>
         )}

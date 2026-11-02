@@ -25,7 +25,9 @@ export const MARATHI: [RegExp, string][] = [
   [/bad token/i, 'प्रक्रियेची परवानगी संपली — पुन्हा तयार करा'],
   [/file over 50 MB|\b413\b/i, 'फाइल 50 MB पेक्षा मोठी आहे — लहान फाइल निवडा'],
   [/upload the proposal PDF first/i, 'आधी प्रस्ताव PDF अपलोड करा'],
-  [/Settings: GitHub repo\/token and Anthropic key needed/i, 'सेटिंग्जमध्ये GitHub repo/token व Anthropic key भरा'],
+  [/^Settings: GitHub repo\/token/i, 'सेटिंग्जमध्ये GitHub repo/token व AI key (Anthropic किंवा निवडलेल्या AI ची) भरा'],
+  [/^invite_failed$/, 'आमंत्रण पाठवता आले नाही — ई-मेल तपासून पुन्हा प्रयत्न करा'],
+  [/^nothing to change$/, 'काहीही बदल नाही'],
   [/duplicate key|23505/i, 'हा C R क्रमांक/वर्ष आधीच नोंदवलेला आहे'],
   [/cr_no: digits only/i, 'C R क्रमांकात फक्त अंक लिहा'],
   [/cr_year/i, 'वर्ष 4 अंकी लिहा (उदा. 2026)'],
@@ -39,9 +41,45 @@ export const MARATHI: [RegExp, string][] = [
   [/Failed to fetch|NetworkError|Load failed|network|नेटवर्क त्रुटी/i, 'इंटरनेट/नेटवर्क संपर्क तुटला — जोडणी तपासून पुन्हा प्रयत्न करा'],
 ];
 const GENERIC = 'तांत्रिक त्रुटी — पुन्हा प्रयत्न करा';
+export const DISPATCH_REASON = 'GitHub जोडणी अयशस्वी (token तपासा — सेटिंग्ज) — पुन्हा तयार करा';
+
+/** Settings keys → Marathi field names (Worker validation errors "<key>: <rule>" / "<key> required"). */
+export const SETTING_LABEL: Record<string, string> = {
+  owner_email: 'मालकाचा ई-मेल', supabase_url: 'Supabase URL', supabase_anon_key: 'Supabase anon key', supabase_service_key: 'Supabase service_role key',
+  github_repo: 'GitHub repo', github_branch: 'GitHub branch', github_token: 'GitHub token', anthropic_api_key: 'Anthropic API key',
+  model: 'मुख्य मॉडेल', model_light: 'स्वस्त मॉडेल', model_review: 'अंतिम पडताळणी मॉडेल', model_strong: 'उच्च-स्तर मॉडेल', effort: 'विचार-पातळी',
+  budget_usd: 'कमाल खर्च ($)', monthly_budget_usd: 'मासिक कमाल खर्च ($)',
+  engine_provider: 'मुख्य अभ्यास कोणाकडून', engine_model: 'मुख्य — मॉडेल', engine_model_light: 'मुख्य — स्वस्त मॉडेल',
+  fallback_provider: 'राखीव AI', fallback_model: 'राखीव — मॉडेल', fallback_model_light: 'राखीव — स्वस्त मॉडेल',
+  part1_provider: 'Study भाग 1 कोणाकडून', part1_model: 'भाग 1 — मॉडेल', gemini_model: 'Gemini मॉडेल',
+  cloudflare_account_id: 'Cloudflare account id', ollama_base_url: 'Ollama पत्ता',
+  gemini_api_key: 'Google Gemini API key', openai_api_key: 'OpenAI API key', openrouter_api_key: 'OpenRouter API key', groq_api_key: 'Groq API key',
+  mistral_api_key: 'Mistral API key', cerebras_api_key: 'Cerebras API key', cloudflare_api_token: 'Cloudflare API token', ollama_api_key: 'Ollama key',
+};
+/** Worker rule text → what to type (same rules as the Settings page's own checks). */
+export const SETTING_RULE: [RegExp, string][] = [
+  [/^positive number <= 20$/, '0 पेक्षा जास्त व 20 पर्यंतची संख्या लिहा'],
+  [/^positive number <= 1000$/, '0 पेक्षा जास्त व 1000 पर्यंतची संख्या लिहा (रिकामे = $20)'],
+  [/^one of .* or empty$/, 'यादीतील पर्याय निवडा किंवा रिकामे ठेवा'],
+  [/^32 hex characters$/, 'नेमकी 32 अक्षरे (0-9, a-f) लिहा'],
+  [/^http\(s\)/, 'http:// किंवा https:// ने सुरू होणारा पत्ता लिहा (उदा. https://host:11434)'],
+  [/^model name or none$/, 'योग्य मॉडेल-नाव (अक्षरे, अंक, . _ : @ / - ; जागा नाही) किंवा none लिहा'],
+  [/^model name$/, 'योग्य मॉडेल-नाव लिहा (अक्षरे, अंक, . _ : @ / - ; जागा नाही)'],
+  [/^cannot clear$/, 'ही की काढता येत नाही'],
+];
+function settingError(msg: string): string | null {
+  const req = /^([a-z0-9_]+) required$/.exec(msg);
+  if (req && SETTING_LABEL[req[1]]) return `${SETTING_LABEL[req[1]]}: रिकामे ठेवता येत नाही`;
+  const m = /^([a-z0-9_]+): (.+)$/.exec(msg);
+  if (!m || !SETTING_LABEL[m[1]]) return null;
+  const rule = SETTING_RULE.find(([re]) => re.test(m[2]));
+  return `${SETTING_LABEL[m[1]]}: ${rule ? rule[1] : 'मूल्य योग्य नाही'}`;
+}
 
 // ---------- monthly spend limit (Worker GET /api/spend; POST /api/run → 402 monthly_budget_reached) ----------
-export interface Spend { month: string; spent_usd: number; limit_usd: number; runs: number }
+export interface Spend { month: string; spent_usd: number; limit_usd: number; runs: number; reserved_usd?: number; active_runs?: number }
+/** Same test as the Worker's /api/run (402): this month's spend + active runs at their estimate reach the limit. */
+export const spendBlocked = (s: Spend) => s.spent_usd + (Number(s.reserved_usd) || 0) >= s.limit_usd;
 export const getSpend = () => api<Spend>('/api/spend');
 export const fmtUsd = (n: number) => `$${(Math.round(n * 100) / 100).toFixed(2)}`;
 export const budgetReachedText = (limit: number | null) =>
@@ -57,6 +95,13 @@ export function humanError(e: unknown): string {
     return budgetReachedText(Number.isFinite(lim) ? lim : null);
   }
   if (msg === 'run_active') return 'या प्रकरणाची प्रक्रिया आधीच चालू आहे — ती संपेपर्यंत थांबा';
+  if (msg === 'dispatch_failed') return DISPATCH_REASON;
+  if (msg === 'duplicate_cr') {
+    const id = e instanceof ApiError ? Number((e.data as { existing_id?: unknown } | undefined)?.existing_id) : NaN;
+    return `हा C R क्र. / वर्ष आधीच प्रकरण #${Number.isFinite(id) ? id : '?'} मध्ये आहे`;
+  }
+  const se = settingError(msg);
+  if (se) return se;
   for (const [re, mr] of MARATHI) if (re.test(msg)) return mr;
   if (looksMarathi(msg)) return msg;
   return GENERIC;

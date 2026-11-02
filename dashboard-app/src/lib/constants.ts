@@ -79,6 +79,16 @@ export const FILE_KIND_LABEL: Record<string, string> = {
 export const EXTRA_OUTPUT_KINDS = ['order_draft', 'parawise'] as const;
 
 export const ACTION_LABEL: Record<string, string> = {
-  case_created: 'प्रकरण नोंदवले', file_uploaded: 'फाइल अपलोड', run_started: 'अभ्यास सुरू',
-  stage_changed: 'टप्पा बदलला', letter_saved: 'पत्र नोंदवले', run_done: 'अभ्यास पूर्ण', run_failed: 'अभ्यास अयशस्वी', run_warning: 'अभ्यास-सूचना',
+  case_created: 'प्रकरण नोंदवले', case_updated: 'तपशील बदलला', file_uploaded: 'फाइल अपलोड', run_started: 'अभ्यास सुरू',
+  stage_changed: 'टप्पा बदलला', letter_saved: 'पत्र नोंदवले', letter_updated: 'पत्राची नोंद बदलली', letter_reply_received: 'पत्राचे उत्तर प्राप्त',
+  run_done: 'अभ्यास पूर्ण', run_failed: 'अभ्यास अयशस्वी', run_warning: 'अभ्यास-सूचना',
+  case_cr_duplicate: 'C R आधीच दुसऱ्या प्रकरणात', case_filled_from_pdf: 'तपशील PDF वरून भरला', case_fill_skipped: 'PDF वरून तपशील भरता आला नाही',
+};
+
+/** Marathi names of case / letter fields (History details, Settings errors). */
+export const FIELD_LABEL: Record<string, string> = {
+  cr_no: 'C R क्र.', cr_year: 'वर्ष', cr: 'C R', file_no: 'नस्ती क्र.', subject: 'विषय', category: 'प्रवर्ग', priority: 'प्राधान्य',
+  employee_name: 'कर्मचारी', post: 'पद', office: 'कार्यालय', received_from: 'कोणाकडून प्राप्त', received_via: 'मार्ग',
+  inward_date: 'आवक दिनांक', due_date: 'मुदत', ref_no: 'पत्र क्र.', addressed_to: 'कोणाला', sent_date: 'पाठवल्याचा दिनांक',
+  reply_due: 'उत्तराची मुदत', reply_received_date: 'उत्तर प्राप्त दिनांक', status: 'स्थिती', stage: 'टप्पा',
 };

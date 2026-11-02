@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type DragEvent, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { ApiError, api, budgetReachedText, fmtUsd, getSpend, humanError, uploadFile, type Spend } from '../lib/api';
+import { ApiError, api, budgetReachedText, fmtUsd, getSpend, humanError, spendBlocked, uploadFile, type Spend } from '../lib/api';
 import { useAuth, useCanWrite } from '../lib/auth';
 import { CATEGORIES, PRIORITIES, isStale } from '../lib/constants';
 import { crLabel, fmtBytes } from '../lib/format';
@@ -47,7 +47,8 @@ export default function NewProposal() {
   useEffect(() => {
     if (canWrite) void getSpend().then(setSpend, () => setSpend(null));
   }, [canWrite]);
-  const overBudget = !!spend && spend.spent_usd >= spend.limit_usd;
+  // same test as the Worker: spend + active runs at their estimate (reserved_usd)
+  const overBudget = !!spend && spendBlocked(spend);
   const [proposal, setProposal] = useState<File | null>(null);
   const [extras, setExtras] = useState<File[]>([]);
   const [f, setF] = useState({ cr_no: '', cr_year: '', file_no: '', subject: '', category: '', priority: 'सामान्य', instructions: '' });
@@ -89,7 +90,10 @@ export default function NewProposal() {
 
   async function pickProposal(files: File[]) {
     const p = files.find(x => x.type === 'application/pdf' || /\.pdf$/i.test(x.name));
-    if (!p) return toast('प्रस्ताव PDF असावा', 'err');
+    if (!p) {
+      const photo = files.some(x => /^image\//.test(x.type) || /\.(jpe?g|png|heic|webp)$/i.test(x.name));
+      return toast(photo ? 'फोटो असल्यास आधी PDF करा (फोनवर: Scan / Print → PDF म्हणून जतन) व तो PDF निवडा' : 'प्रस्ताव PDF असावा', 'err');
+    }
     if (p.size > MAX) return toast('फाइल 50 MB पेक्षा मोठी', 'err');
     setProposal(p);
     if (!f.subject) {
@@ -114,7 +118,7 @@ export default function NewProposal() {
     try {
       const sp = await getSpend();
       setSpend(sp);
-      if (sp.spent_usd >= sp.limit_usd) {
+      if (spendBlocked(sp)) {
         toast(budgetReachedText(sp.limit_usd), 'err');
         setBusy(false);
         return; // nothing uploaded
@@ -198,7 +202,7 @@ export default function NewProposal() {
       {overBudget && spend && (
         <div className="rounded-lg border border-red-300 bg-red-50 px-4 py-3 text-red-900 dark:border-red-800 dark:bg-red-900/30 dark:text-red-100" role="alert">
           <div className="font-bold">{isOwner ? budgetReachedText(spend.limit_usd) : `या महिन्याची खर्च-मर्यादा (${fmtUsd(spend.limit_usd)}) संपली — मालकाने सेटिंग्जमध्ये मर्यादा वाढवावी`}</div>
-          <div className="mt-1 text-sm">या महिन्याचा खर्च {fmtUsd(spend.spent_usd)} / {fmtUsd(spend.limit_usd)} • नवीन प्रक्रिया सुरू होणार नाही; चालू प्रक्रिया पूर्ण होतील.</div>
+          <div className="mt-1 text-sm">या महिन्याचा खर्च {fmtUsd(spend.spent_usd)}{spend.reserved_usd ? ` + चालू प्रक्रिया (अंदाजे) ${fmtUsd(spend.reserved_usd)}` : ''} / {fmtUsd(spend.limit_usd)} • नवीन प्रक्रिया सुरू होणार नाही; चालू प्रक्रिया पूर्ण होतील.</div>
           {isOwner && <Link className="btn-primary mt-2 inline-flex" to="/settings">सेटिंग्ज उघडा →</Link>}
         </div>
       )}
@@ -239,7 +243,7 @@ export default function NewProposal() {
                 {!locked && <button type="button" className="btn-ghost min-w-tap px-2" onClick={() => setProposal(null)} aria-label="काढा">✕</button>}
               </div>
             ) : (
-              <DropZone label="प्रस्ताव PDF येथे ओढा" hint="एकच PDF • कमाल 50 MB • फाइलनाव जसेच्या तसे राहील" accept="application/pdf,.pdf" onFiles={pickProposal} />
+              <DropZone label="प्रस्ताव PDF येथे ओढा" hint="एकच PDF • कमाल 50 MB • फाइलनाव जसेच्या तसे राहील • फोटो असल्यास आधी PDF करा" accept="application/pdf,.pdf" onFiles={pickProposal} />
             )}
             <DropZone label="इतर कागदपत्रे (ऐच्छिक)" hint="PDF / Word / प्रतिमा" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" multiple onFiles={addExtras} />
             {extras.length > 0 && (
@@ -265,7 +269,7 @@ export default function NewProposal() {
         <Section title="तपशील">
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
-              <Field label="C R क्र."><input className="input" inputMode="numeric" placeholder="PDF वरून (उदा. 128/2026)" disabled={locked} value={f.cr_no} onChange={setCr} /></Field>
+              <Field label="C R क्र."><input className="input" inputMode="numeric" placeholder="उदा. 128" disabled={locked} value={f.cr_no} onChange={setCr} /></Field>
               <Field label="वर्ष"><input ref={yearRef} className="input" inputMode="numeric" maxLength={4} placeholder="PDF वरून" disabled={locked} value={f.cr_year} onChange={setYear} /></Field>
             </div>
             <Field label="नस्ती क्र. (निर्देशपत्र)"><input className="input" placeholder="संकीर्ण-2026/___/प्र.क्र.___/का.6" disabled={locked} value={f.file_no} onChange={set('file_no')} /></Field>

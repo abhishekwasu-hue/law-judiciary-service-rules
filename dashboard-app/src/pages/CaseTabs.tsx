@@ -1,9 +1,9 @@
 import { lazy, Suspense, useMemo, useRef, useState, type FormEvent } from 'react';
 import { ApiError, api, downloadFile, humanError, uploadFile } from '../lib/api';
-import { ACTION_LABEL, EXTRA_OUTPUT_KINDS, FILE_KIND_LABEL, LETTER_STATUSES, RUN_STATE_LABEL, TONE_HEX, runActive, runTone } from '../lib/constants';
-import { asArray, daysBetween, fmtDate, fmtDateTime, textOf, todayISO } from '../lib/format';
+import { ACTION_LABEL, EXTRA_OUTPUT_KINDS, FIELD_LABEL, FILE_KIND_LABEL, LETTER_STATUSES, RUN_STATE_LABEL, TONE_HEX, runActive, runTone } from '../lib/constants';
+import { asArray, cleanReason, daysBetween, fmtDate, fmtDateTime, isCriticalWarning, textOf, todayISO } from '../lib/format';
 import { diffLines, type DiffLine } from '../lib/diff';
-import type { CaseFile, Letter, Run } from '../lib/types';
+import type { Activity, CaseFile, Letter, Run } from '../lib/types';
 import { Chip, Empty, Field, Modal, Section, Skeleton, SkeletonRows, Spinner } from '../components/ui';
 import { useToast } from '../components/Toast';
 import RunProgress, { RunCost, RunWarnings } from '../components/RunProgress';
@@ -14,7 +14,10 @@ import type { CaseCtx } from './CaseDetail';
 // Recharts loads only with this chart (not with the case page).
 const StageDaysChart = lazy(() => import('../components/Charts').then(m => ({ default: m.StageDaysChart })));
 
-const ofKind = (files: CaseFile[], kind: string) => files.filter(f => f.kind === kind).sort((a, b) => b.version - a.version || (a.created_at < b.created_at ? 1 : -1));
+// newest upload first (created_at): `version` counts per original_name, so a corrected file under a new name is v1 (A3 audit;
+// the engine also takes the newest proposal by created_at)
+const ofKind = (files: CaseFile[], kind: string) =>
+  files.filter(f => f.kind === kind).sort((a, b) => (a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : b.version - a.version));
 const latestRun = (runs: Run[] | null) => runs?.[0];
 const latestDone = (runs: Run[] | null) => runs?.find(r => r.state === 'done');
 
@@ -143,7 +146,7 @@ export function BriefingTab({ ctx }: { ctx: CaseCtx }) {
               <div className="mt-2">{run.letter_needed == null ? '—' : run.letter_needed ? <Chip tone="amber">आवश्यक</Chip> : <Chip tone="green">आवश्यक नाही</Chip>}</div>
               <div className="mt-3 text-sm text-slate-500">प्रक्रिया तयार: {fmtDateTime(run.finished_at)}</div>
               <RunCost run={run} />
-              <div className="mt-2"><RunWarnings run={run} /></div>
+              <div className="mt-2"><RunWarnings run={run} withCritical={false} /></div>
             </div>
           </div>
           {points.length > 0 && (
@@ -185,6 +188,10 @@ export function BriefingTab({ ctx }: { ctx: CaseCtx }) {
 /** Optional outputs (शासन आदेश-मसुदा, परिच्छेदनिहाय अभिप्राय): latest version of each kind, view + download. */
 function ExtraOutputs({ ctx }: { ctx: CaseCtx }) {
   const items = EXTRA_OUTPUT_KINDS.map(k => ofKind(ctx.files, k)[0]).filter((f): f is CaseFile => !!f);
+  // made by the latest finished run = stored after that run started; older ones are labelled (they may be stale)
+  const last = latestDone(ctx.runs);
+  const since = last ? last.started_at || last.created_at : null;
+  const current = (f: CaseFile) => !!since && f.created_at >= since;
   const [view, setView] = useState<CaseFile | null>(null);
   if (items.length === 0) return null;
   return (
@@ -192,7 +199,7 @@ function ExtraOutputs({ ctx }: { ctx: CaseCtx }) {
       <ul className="space-y-2">
         {items.map(f => (
           <li key={f.id} className="rounded-lg border border-slate-200 p-2 dark:border-navy-800">
-            <div className="text-sm font-semibold">{FILE_KIND_LABEL[f.kind]}</div>
+            <div className="flex flex-wrap items-center gap-2 text-sm font-semibold">{FILE_KIND_LABEL[f.kind]}{!current(f) && <Chip tone="amber">मागील प्रक्रियेतील</Chip>}</div>
             <div className="truncate text-xs text-slate-500" title={f.original_name}>{f.original_name} • आवृत्ती {f.version}</div>
             <div className="mt-1 flex flex-wrap gap-1">
               <button className="btn-ghost min-h-tap px-2 py-1 text-sm" onClick={() => setView(f)}>पाहा</button>
@@ -217,7 +224,7 @@ export function NoteTab({ ctx }: { ctx: CaseCtx }) {
   const sel = versions.find(v => v.id === selId) || versions[0];
   const run = latestDone(ctx.runs);
   const points = asArray(run?.essential_points);
-  const prev = sel ? versions.find(v => v.version < sel.version || (v.version === sel.version && v.created_at < sel.created_at)) : undefined;
+  const prev = sel ? versions[versions.findIndex(v => v.id === sel.id) + 1] : undefined; // the one stored before (list is newest first)
 
   async function showDiff() {
     if (!sel || !prev) return;
@@ -296,6 +303,7 @@ export function PackageTab({ ctx }: { ctx: CaseCtx }) {
   const [jump, setJump] = useState<{ page: number; at: number } | undefined>();
   const grs = asArray(latestDone(ctx.runs)?.grs_attached).map(grItem);
   const inputs = ctx.files.filter(f => f.kind === 'proposal' || f.kind === 'extra_doc' || f.kind === 'reply');
+  const multiProposal = ctx.files.filter(f => f.kind === 'proposal').length > 1;
 
   async function openGr(code: string) {
     const w = window.open('', '_blank');
@@ -352,7 +360,7 @@ export function PackageTab({ ctx }: { ctx: CaseCtx }) {
                 <li key={f.id} className="flex items-center justify-between gap-2">
                   <div className="min-w-0">
                     <div className="truncate text-sm font-semibold" title={f.original_name}>{f.original_name}</div>
-                    <div className="text-xs text-slate-500">{FILE_KIND_LABEL[f.kind]} • v{f.version}</div>
+                    <div className="text-xs text-slate-500">{FILE_KIND_LABEL[f.kind]} • v{f.version} • {fmtDateTime(f.created_at)}{multiProposal && proposal?.id === f.id ? ' • प्रक्रियेसाठी वापरला जाणारा (नवीनतम)' : ''}</div>
                   </div>
                   <DownloadBtn f={f} label="" />
                 </li>
@@ -439,8 +447,8 @@ export function LettersTab({ ctx }: { ctx: CaseCtx }) {
       await uploadFile(ctx.c.id, 'reply', file, setUpPct);
       toast('उत्तर अपलोड; टप्पा "माहिती प्राप्त"');
       setOfferRerun(true);
-      await ctx.reloadFiles();
-      await ctx.reloadActivity();
+      // the Worker may have marked the pending letter "उत्तर प्राप्त"
+      await Promise.all([ctx.reloadFiles(), ctx.reloadLetters(), ctx.reloadActivity()]);
     } catch (x) {
       toast(humanError(x), 'err');
     } finally {
@@ -534,28 +542,59 @@ export function LettersTab({ ctx }: { ctx: CaseCtx }) {
 }
 
 // ---------------- इतिहास ----------------
+const isDate = (v: unknown) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v);
+/** Field list in Marathi ("पत्र क्र.: … • पाठवल्याचा दिनांक: 02.11.2026"); unknown / technical keys are left out. */
+function fieldsText(d: Record<string, unknown> | null | undefined, skip: string[] = []): string {
+  return Object.entries(d || {})
+    .filter(([k, v]) => FIELD_LABEL[k] && !skip.includes(k) && v != null && v !== '')
+    .map(([k, v]) => `${FIELD_LABEL[k]}: ${k === 'received_via' ? (v === 'High Court' ? 'उच्च न्यायालयामार्फत' : v === 'direct' ? 'थेट' : textOf(v)) : isDate(v) ? fmtDate(String(v)) : textOf(v)}`)
+    .join(' • ');
+}
+/** Marathi text of one activity row (A3 audit: no raw keys such as "letter_id: 3 • date: …"). */
+export function activityText(x: Activity): string {
+  const d = (x.detail || {}) as Record<string, unknown>;
+  const run = d.run_id != null ? `प्रक्रिया क्र. ${textOf(d.run_id)}` : '';
+  switch (x.action) {
+    case 'stage_changed': return `${textOf(d.from)} → ${textOf(d.to)}`;
+    case 'file_uploaded': return `${FILE_KIND_LABEL[String(d.kind)] || textOf(d.kind)}: ${textOf(d.name)} (आवृत्ती ${textOf(d.version)})`;
+    case 'run_started': return [run, d.instructions ? `सूचना: ${textOf(d.instructions)}` : ''].filter(Boolean).join(' • ');
+    case 'run_done': {
+      const files = asArray(d.files).map(f => (f && typeof f === 'object' ? textOf((f as { name?: unknown }).name) : textOf(f))).filter(Boolean);
+      return [run, files.length ? `फाइल: ${files.join(', ')}` : ''].filter(Boolean).join(' • ');
+    }
+    case 'run_failed': return [run, cleanReason(textOf(d.reason))].filter(Boolean).join(' • ');
+    case 'run_warning': return [run, textOf(d.warning)].filter(Boolean).join(' • ');
+    case 'case_created': return d.cr ? `C R ${textOf(d.cr)}` : '';
+    case 'case_updated': {
+      const f = asArray(d.fields).map(k => FIELD_LABEL[String(k)]).filter(Boolean);
+      return [d.cr !== undefined ? `C R: ${textOf(d.cr) || '—'}` : '', f.length ? `बदललेले: ${f.join(', ')}` : ''].filter(Boolean).join(' • ');
+    }
+    case 'case_cr_duplicate': return `PDF वरील C R ${textOf(d.cr)} आधीच प्रकरण #${textOf(d.existing_id)} मध्ये आहे`;
+    case 'case_filled_from_pdf': return fieldsText(d.fields as Record<string, unknown>);
+    case 'case_fill_skipped': return fieldsText(d.fields as Record<string, unknown>); // technical reason not shown
+    case 'letter_reply_received': return `उत्तर दि. ${fmtDate(textOf(d.date))}`;
+    case 'letter_saved': return fieldsText(d, ['case_id']);
+    case 'letter_updated': return fieldsText(d);
+    default: return fieldsText(d);
+  }
+}
+
 export function HistoryTab({ ctx }: { ctx: CaseCtx }) {
   const items = useMemo(() => {
     const a = ctx.activity.map(x => ({
       at: x.at,
       key: `a${x.id}`,
-      title: ACTION_LABEL[x.action] || x.action,
-      text:
-        x.action === 'stage_changed'
-          ? `${textOf(x.detail?.from)} → ${textOf(x.detail?.to)}`
-          : x.action === 'file_uploaded'
-            ? `${FILE_KIND_LABEL[String(x.detail?.kind)] || textOf(x.detail?.kind)}: ${textOf(x.detail?.name)} (v${textOf(x.detail?.version)})`
-            : x.action === 'run_started'
-              ? textOf(x.detail?.instructions) || ''
-              : textOf(x.detail),
+      title: ACTION_LABEL[x.action] || 'इतर नोंद',
+      text: activityText(x),
       who: x.actor ? ctx.members.get(x.actor) || '' : 'प्रणाली',
-      tone: x.action === 'stage_changed' ? ('navy' as const) : ('slate' as const),
+      tone: x.action === 'stage_changed' ? ('navy' as const) : x.action === 'run_failed' ? ('red' as const)
+        : x.action === 'run_warning' && isCriticalWarning(textOf(x.detail?.warning)) ? ('red' as const) : ('slate' as const),
     }));
     const r = (ctx.runs || []).map(x => ({
       at: x.finished_at || x.started_at || x.created_at,
       key: `r${x.id}`,
       title: `प्रक्रिया क्र. ${x.id}: ${x.state === 'done' ? 'तयार' : RUN_STATE_LABEL[x.state] || x.state}`,
-      text: [x.step, x.instructions && `सूचना: ${x.instructions}`].filter(Boolean).join(' • '),
+      text: [x.state === 'failed' ? cleanReason(x.step) : x.step, x.instructions && `सूचना: ${x.instructions}`].filter(Boolean).join(' • '),
       who: x.created_by ? ctx.members.get(x.created_by) || '' : '',
       tone: runTone(x.state),
     }));
@@ -564,16 +603,16 @@ export function HistoryTab({ ctx }: { ctx: CaseCtx }) {
 
   if (!items.length) return <div className="card"><Empty icon="🕘" title="इतिहास नाही" /></div>;
   return (
-    <div className="card p-4">
+    <div className="card min-w-0 overflow-hidden p-4">
       <ol className="relative ml-2 border-l-2 border-slate-200 dark:border-navy-800">
         {items.map(i => (
-          <li key={i.key} className="mb-4 ml-4">
+          <li key={i.key} className="mb-4 ml-4 min-w-0">
             <span className="absolute -left-[7px] mt-2 h-3 w-3 rounded-full" style={{ background: TONE_HEX[i.tone] }} aria-hidden="true" />
-            <div className="flex flex-wrap items-baseline gap-2">
+            <div className="flex min-w-0 flex-wrap items-baseline gap-x-2">
               <span className="font-semibold">{i.title}</span>
-              <span className="text-sm text-slate-500">{fmtDateTime(i.at)}{i.who ? ` • ${i.who}` : ''}</span>
+              <span className="min-w-0 break-words text-sm text-slate-500 [overflow-wrap:anywhere]">{fmtDateTime(i.at)}{i.who ? ` • ${i.who}` : ''}</span>
             </div>
-            {i.text && <div className="text-slate-700 dark:text-slate-300">{i.text}</div>}
+            {i.text && <div className="break-words text-slate-700 [overflow-wrap:anywhere] dark:text-slate-300">{i.text}</div>}
           </li>
         ))}
       </ol>

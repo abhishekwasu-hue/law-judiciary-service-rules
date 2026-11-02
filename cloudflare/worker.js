@@ -36,6 +36,13 @@ const SIGN_BUCKETS = ['proposals', 'outputs', 'gr-library'];
 const RUN_TOKEN_TTL = 4 * 3600;                 // > job timeout (180 min) + queue time
 const STALE_MS = 3.5 * 3600 * 1000;             // queued/running longer than this = stuck (job timeout 180 min)
 const STALE_REASON = 'वेळ संपली — पुन्हा तयार करा';
+// dispatch to GitHub failed (A3 audit): the run row and the user see only this; the raw GitHub text stays in activity
+const DISPATCH_REASON = 'GitHub जोडणी अयशस्वी (token तपासा — सेटिंग्ज) — पुन्हा तयार करा';
+// Settings PUT: this value deletes a secret key (Settings "key काढा"); the Supabase service key can never be cleared
+const CLEAR = '__clear__';
+const UNCLEARABLE = ['supabase_service_key'];
+// case fields the app may set (POST create, PATCH edit)
+const CASE_FIELDS = ['cr_no', 'cr_year', 'file_no', 'subject', 'category', 'priority', 'employee_name', 'post', 'office', 'received_from', 'received_via', 'inward_date', 'due_date'];
 
 // PostgREST error: the browser gets only "db <status>" (no table/column text); code/detail stay for the Worker's own checks.
 class DbError extends Error {
@@ -73,7 +80,12 @@ function sb(cfg) {
     },
     async upload(bucket, path, body, type) {
       const r = await fetch(`${base}/storage/v1/object/${bucket}/${encodePath(path)}`, { method: 'POST', headers: { ...h, 'content-type': type || 'application/octet-stream', 'x-upsert': 'true' }, body });
-      if (!r.ok) throw new Error(`storage ${r.status}: ${(await r.text()).slice(0, 200)}`);
+      if (!r.ok) {
+        const t = (await r.text()).slice(0, 200);
+        // bucket file_size_limit (50 MB, migration 0001): Supabase answers 413, or 400 with statusCode "413" in the body
+        if (r.status === 413 || /"statusCode"\s*:\s*"?413|exceeded the maximum allowed size|Payload too large/i.test(t)) throw new Error('file over 50 MB');
+        throw new Error(`storage ${r.status}: ${t}`);
+      }
     },
     async sign(bucket, path, download) {
       const r = await fetch(`${base}/storage/v1/object/sign/${bucket}/${encodePath(path)}`, { method: 'POST', headers: { ...h, 'content-type': 'application/json' }, body: JSON.stringify({ expiresIn: 600 }) });
@@ -173,6 +185,33 @@ async function takeConfig(cfg, runId) {
   }
 }
 
+// Duplicate C R: same year and same number ignoring leading zeros ("021" = "21"); cr_no is stored as given.
+// exceptId: the case being edited (PATCH) is not its own duplicate.
+async function findCrDup(db, crNo, crYear, exceptId = null) {
+  if (crNo == null || crNo === '' || crYear == null || crYear === '') return null;
+  const n = String(crNo).trim().replace(/^0+(?=\d)/, '');
+  const dup = await db.rest(`cases?cr_no=match.${encodeURIComponent(`^0*${n}$`)}&cr_year=eq.${encodeURIComponent(crYear)}${exceptId !== null ? `&id=neq.${Number(exceptId)}` : ''}&select=id&order=id.asc&limit=1`);
+  return dup && dup.length ? dup[0].id : null;
+}
+
+// Auth user id for an e-mail (admin API, service role). GoTrue's list has a `filter` (e-mail search); the exact,
+// case-insensitive match is taken. Falls back to scanning a few pages when the filter is not supported.
+async function findAuthUser(base, headers, email) {
+  const want = String(email).trim().toLowerCase();
+  const pick = j => ((j && (j.users || (Array.isArray(j) ? j : []))) || []).find(u => String(u.email || '').toLowerCase() === want);
+  const r = await fetch(`${base}/auth/v1/admin/users?filter=${encodeURIComponent(want)}&per_page=50`, { headers });
+  if (r.ok) { const u = pick(await r.json().catch(() => null)); if (u) return u.id; }
+  for (let page = 1; page <= 5; page++) {
+    const rr = await fetch(`${base}/auth/v1/admin/users?page=${page}&per_page=200`, { headers });
+    if (!rr.ok) return null;
+    const j = await rr.json().catch(() => null);
+    const u = pick(j);
+    if (u) return u.id;
+    if (!j || !(j.users || []).length || (j.users || []).length < 200) return null;
+  }
+  return null;
+}
+
 // ---------- monthly spend (calendar month in India time: IST = UTC+5:30, no DST) ----------
 const IST_MS = 5.5 * 3600 * 1000;
 function istMonth(nowMs = Date.now()) {
@@ -214,11 +253,50 @@ async function monthSpend(cfg) {
     reserved_usd: Math.round(reserved * 10000) / 10000, active_runs: active.length };
 }
 
+// ---------- security headers on HTML (A3 audit: clickjacking) ----------
+// Needs wrangler.toml run_worker_first = true (otherwise static assets bypass the Worker).
+// App pages: inline scripts allowed by their sha256 (computed from the served HTML), Supabase REST/Realtime/Storage
+// in connect-src. The नस्ती page (/nasti/, the owner's own APK page: large inline scripts, eval in its Excel library)
+// gets a looser script policy; same origin as the app, framed only by the app (frame-ancestors 'self').
+const sha256b64 = async text => btoa(String.fromCharCode(...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)))));
+export async function cspFor(html, pathname, supabaseUrl) {
+  const common = ["base-uri 'self'", "object-src 'none'", "frame-ancestors 'self'", "form-action 'self'"];
+  if (pathname.startsWith('/nasti/') || pathname === '/nasti')
+    return ["default-src 'self' data: blob:", "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:", "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' data: blob:", "font-src 'self' data:", "worker-src 'self' blob:", "connect-src 'self' data: blob:", ...common].join('; ');
+  const hashes = [];
+  for (const m of html.matchAll(/<script(\s[^>]*)?>([\s\S]*?)<\/script>/gi)) {
+    if (/\ssrc\s*=/i.test(m[1] || '') || !m[2]) continue;
+    hashes.push(`'sha256-${await sha256b64(m[2])}'`);
+  }
+  let sbOrigin = '';
+  try { if (supabaseUrl) sbOrigin = new URL(supabaseUrl).origin; } catch { /* bad URL in settings */ }
+  // *.supabase.co too: a page loaded before Setup / a Supabase URL change still reaches the new project
+  const sbConn = `${sbOrigin ? ` ${sbOrigin} ${sbOrigin.replace(/^http/, 'ws')}` : ''} https://*.supabase.co wss://*.supabase.co`;
+  return ["default-src 'self'", `script-src 'self' ${hashes.join(' ')}`.trim(), "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "font-src 'self' data: blob: https://fonts.gstatic.com", `img-src 'self' data: blob:${sbOrigin ? ' ' + sbOrigin : ''} https://*.supabase.co`,
+    `connect-src 'self'${sbConn}`, "worker-src 'self' blob:", "frame-src 'self'", "manifest-src 'self'", ...common].join('; ');
+}
+async function withSecurityHeaders(res, url, env) {
+  const type = res.headers.get('content-type') || '';
+  if (!/text\/html/i.test(type)) return res;
+  const html = await res.text();
+  let supabaseUrl = '';
+  try { supabaseUrl = (await env.SETTINGS.get('supabase_url')) || ''; } catch { /* KV unavailable: CSP without Supabase */ }
+  const h = new Headers(res.headers);
+  h.set('content-security-policy', await cspFor(html, url.pathname, supabaseUrl));
+  h.set('x-frame-options', 'SAMEORIGIN');
+  h.set('x-content-type-options', 'nosniff');
+  h.set('referrer-policy', 'same-origin');
+  h.delete('content-length');
+  return new Response(html, { status: res.status, statusText: res.statusText, headers: h });
+}
+
 // ---------- routes ----------
 export default {
   async fetch(req, env) {
     const url = new URL(req.url);
-    if (!url.pathname.startsWith('/api/')) return env.ASSETS.fetch(req);
+    if (!url.pathname.startsWith('/api/')) return withSecurityHeaders(await env.ASSETS.fetch(req), url, env);
     try {
       return await route(req, env, url);
     } catch (e) {
@@ -304,10 +382,10 @@ async function route(req, env, url) {
 
   if (p === '/api/me') return json(user);
 
-  // GET /api/spend (members) → {month, spent_usd, limit_usd (empty setting = 20), runs}: runs.cost_usd this IST calendar month
+  // GET /api/spend (members) → {month, spent_usd, limit_usd (empty setting = 20), runs, reserved_usd (active runs at their estimate), active_runs}: runs.cost_usd this IST calendar month
   if (p === '/api/spend' && M === 'GET') {
-    const { month, spent_usd, limit_usd, runs } = await monthSpend(cfg);
-    return json({ month, spent_usd, limit_usd, runs });
+    const { month, spent_usd, limit_usd, runs, reserved_usd, active_runs } = await monthSpend(cfg);
+    return json({ month, spent_usd, limit_usd, runs, reserved_usd, active_runs });
   }
 
   // POST /api/runs/sweep → runs queued/running for more than 3.5 h are marked failed (called by the app on load)
@@ -354,9 +432,11 @@ async function route(req, env, url) {
     if ('effort' in b && b.effort !== null && String(b.effort).trim() !== '' && !EFFORTS.includes(String(b.effort).trim()))
       return bad(`effort: one of ${EFFORTS.join(', ')} or empty`);
     for (const k of REQUIRED_KEYS) if (k in b && b[k] !== null && String(b[k]).trim() === '') return bad(`${k} required`);
+    for (const k of ALL_KEYS) if (k in b && String(b[k] ?? '').trim() === CLEAR && (!SECRET_KEYS.includes(k) || UNCLEARABLE.includes(k))) return bad(`${k}: cannot clear`);
     for (const k of ALL_KEYS) {
       if (!(k in b) || b[k] === null) continue;
       const v = String(b[k]).trim();
+      if (SECRET_KEYS.includes(k) && v === CLEAR) { await env.SETTINGS.delete(k); continue; } // "key काढा"
       if (SECRET_KEYS.includes(k) && (v === '' || v.startsWith('••••'))) continue; // unchanged secret
       await env.SETTINGS.put(k, v);
     }
@@ -368,11 +448,19 @@ async function route(req, env, url) {
     const { email, role } = await req.json();
     if (!email || !['staff', 'senior'].includes(role)) return bad('email + role (staff|senior) required');
     const base = cfg.supabase_url.replace(/\/$/, '');
-    const r = await fetch(`${base}/auth/v1/invite`, { method: 'POST', headers: { apikey: cfg.supabase_service_key, Authorization: `Bearer ${cfg.supabase_service_key}`, 'content-type': 'application/json' }, body: JSON.stringify({ email }) });
-    const j = await r.json();
-    if (!r.ok) return bad(`invite ${r.status}: ${j.msg || j.message || ''}`, 502);
-    await db.rest('members', { method: 'POST', body: JSON.stringify({ user_id: j.id, email, role }), headers: { Prefer: 'resolution=merge-duplicates' } });
-    return json({ ok: true });
+    const ah = { apikey: cfg.supabase_service_key, Authorization: `Bearer ${cfg.supabase_service_key}`, 'content-type': 'application/json' };
+    const r = await fetch(`${base}/auth/v1/invite`, { method: 'POST', headers: ah, body: JSON.stringify({ email }) });
+    const j = await r.json().catch(() => ({}));
+    let userId = r.ok ? j.id : null, existing = false;
+    // A3 audit: the e-mail already has an auth account (e.g. tried the OTP login before being invited) → Supabase
+    // refuses the invite (422). Find that account with the admin API (service role) and add it as a member.
+    if (!r.ok && (r.status === 422 || /already|registered|exists/i.test(`${j.msg || ''} ${j.message || ''} ${j.error_code || ''}`))) {
+      userId = await findAuthUser(base, ah, email);
+      existing = !!userId;
+    }
+    if (!userId) return json({ error: 'invite_failed', status: r.status }, 502);
+    await db.rest('members', { method: 'POST', body: JSON.stringify({ user_id: userId, email, role }), headers: { Prefer: 'resolution=merge-duplicates' } });
+    return json({ ok: true, existing });
   }
 
   // POST /api/cases {cr_no, cr_year, file_no, subject, category, priority, ...} → case row
@@ -382,15 +470,8 @@ async function route(req, env, url) {
     // all identity fields optional (owner rule 01.11.2026): the engine fills empty ones from the निर्देशपत्र
     if (b.cr_no && !/^\d+$/.test(String(b.cr_no))) return bad('cr_no: digits only');
     if (b.cr_year && !/^\d{4}$/.test(String(b.cr_year))) return bad('cr_year: 4 digits');
-    const allowed = ['cr_no', 'cr_year', 'file_no', 'subject', 'category', 'priority', 'employee_name', 'post', 'office', 'received_from', 'received_via', 'inward_date', 'due_date'];
-    const row = Object.fromEntries(allowed.filter(k => b[k] !== undefined && b[k] !== '').map(k => [k, b[k]]));
-    // duplicate: same year and same number ignoring leading zeros ("021" = "21"); cr_no is stored as given
-    const findDup = async () => {
-      if (!row.cr_no || !row.cr_year) return null;
-      const n = String(row.cr_no).replace(/^0+(?=\d)/, '');
-      const dup = await db.rest(`cases?cr_no=match.${encodeURIComponent(`^0*${n}$`)}&cr_year=eq.${encodeURIComponent(row.cr_year)}&select=id&order=id.asc&limit=1`);
-      return dup && dup.length ? dup[0].id : null;
-    };
+    const row = Object.fromEntries(CASE_FIELDS.filter(k => b[k] !== undefined && b[k] !== '').map(k => [k, b[k]]));
+    const findDup = () => findCrDup(db, row.cr_no, row.cr_year);
     const dupId = await findDup();
     if (dupId !== null) return json({ error: 'duplicate_cr', existing_id: dupId }, 409);
     let c;
@@ -402,6 +483,41 @@ async function route(req, env, url) {
       throw e;
     }
     await log(cfg, c.id, user.id, 'case_created', { cr: c.cr_no ? `${c.cr_no}/${c.cr_year || ''}` : '' });
+    return json(c);
+  }
+
+  // PATCH /api/cases/:id {any of CASE_FIELDS; '' / null = empty} → case row. C R / वर्ष: same rules and duplicate
+  // check as create (digits, leading zeros ignored, 409 duplicate_cr with the other case's id) — A3 audit (EditCase).
+  let m = p.match(/^\/api\/cases\/(\d+)$/);
+  if (m && M === 'PATCH') {
+    if (!canWrite(user)) return bad('read-only', 403);
+    const id = Number(m[1]);
+    const b = await req.json().catch(() => null);
+    if (!b || typeof b !== 'object') return bad('body required');
+    const row = Object.fromEntries(CASE_FIELDS.filter(k => k in b).map(k => [k, b[k] === '' || b[k] === undefined ? null : b[k]]));
+    if (!Object.keys(row).length) return bad('nothing to change');
+    if ('subject' in row && row.subject === null) row.subject = ''; // subject column: empty text, not null (as the app saved it before)
+    if (row.cr_no != null && !/^\d+$/.test(String(row.cr_no).trim())) return bad('cr_no: digits only');
+    if (row.cr_year != null && !/^\d{4}$/.test(String(row.cr_year).trim())) return bad('cr_year: 4 digits');
+    if (row.cr_no != null) row.cr_no = String(row.cr_no).trim();
+    if (row.cr_year != null) row.cr_year = Number(String(row.cr_year).trim());
+    const [cur] = (await db.rest(`cases?id=eq.${id}&select=id,cr_no,cr_year`)) || [];
+    if (!cur) return bad('case not found', 404);
+    const crNo = 'cr_no' in row ? row.cr_no : cur.cr_no, crYear = 'cr_year' in row ? row.cr_year : cur.cr_year;
+    const crChanged = ('cr_no' in row || 'cr_year' in row) && (String(crNo ?? '') !== String(cur.cr_no ?? '') || String(crYear ?? '') !== String(cur.cr_year ?? ''));
+    if (crChanged) {
+      const dupId = await findCrDup(db, crNo, crYear, id);
+      if (dupId !== null) return json({ error: 'duplicate_cr', existing_id: dupId }, 409);
+    }
+    let c;
+    try {
+      [c] = (await db.rest(`cases?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify(row) })) || [];
+    } catch (e) {
+      if (e instanceof DbError && (e.status === 409 || e.code === '23505')) return json({ error: 'duplicate_cr', existing_id: await findCrDup(db, crNo, crYear, id) }, 409);
+      throw e;
+    }
+    if (!c) return bad('case not found', 404);
+    await log(cfg, id, user.id, 'case_updated', { fields: Object.keys(row), ...(crChanged ? { cr: crNo ? `${crNo}/${crYear || ''}` : '' } : {}) });
     return json(c);
   }
 
@@ -424,7 +540,12 @@ async function route(req, env, url) {
     // the real name stays only in case_files.original_name (downloads use it — §4.16).
     const ext = (name.match(/\.[A-Za-z0-9]{1,8}$/) || [''])[0].toLowerCase();
     const path = `${caseId}/${kind}/v${version}-${crypto.randomUUID().slice(0, 8)}/file${ext}`; // unique per upload
-    await db.upload('proposals', path, req.body, req.headers.get('content-type'));
+    try {
+      await db.upload('proposals', path, req.body, req.headers.get('content-type'));
+    } catch (e) {
+      if (String(e.message) === 'file over 50 MB') return bad('file over 50 MB', 413);
+      throw e;
+    }
     const [f] = await db.rest('case_files', { method: 'POST', body: JSON.stringify({ case_id: caseId, kind, storage_path: `proposals/${path}`, original_name: name, version, uploaded_by: user.id }) });
     await log(cfg, caseId, user.id, 'file_uploaded', { kind, name, version });
     let letter_updated = null, pending_letters = 0;
@@ -465,8 +586,10 @@ async function route(req, env, url) {
     try {
       await dispatchRun(env, cfg, run, url.origin);
     } catch (e) {
-      await db.rest(`runs?id=eq.${run.id}`, { method: 'PATCH', body: JSON.stringify({ state: 'failed', step: String(e.message).slice(0, 200) }) });
-      throw e;
+      // A3 audit: the run row (red box, History) gets only the Marathi reason; the raw GitHub text goes to activity
+      await db.rest(`runs?id=eq.${run.id}`, { method: 'PATCH', body: JSON.stringify({ state: 'failed', step: DISPATCH_REASON, finished_at: new Date().toISOString() }) });
+      await log(cfg, case_id, user.id, 'run_failed', { run_id: run.id, reason: DISPATCH_REASON, error: String(e.message || e).slice(0, 300) });
+      return json({ error: 'dispatch_failed', reason: DISPATCH_REASON, run_id: run.id }, 502);
     }
     await db.rest(`cases?id=eq.${case_id}`, { method: 'PATCH', body: JSON.stringify({ stage: 'अभ्यास चालू' }) });
     await log(cfg, case_id, user.id, 'run_started', { run_id: run.id, instructions: instructions || '' });
@@ -474,7 +597,7 @@ async function route(req, env, url) {
   }
 
   // GET /api/files/:id → signed URL (10 min); ?download=1 keeps the original name
-  let m = p.match(/^\/api\/files\/(\d+)$/);
+  m = p.match(/^\/api\/files\/(\d+)$/);
   if (m && M === 'GET') {
     const [f] = await db.rest(`case_files?id=eq.${m[1]}&select=storage_path,original_name`);
     if (!f) return bad('not found', 404);

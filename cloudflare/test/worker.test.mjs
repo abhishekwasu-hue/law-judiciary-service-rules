@@ -23,6 +23,10 @@ let membersInsert = 'ok';         // 'conflict' = a parallel first request alrea
 const cases = [{ id: 40, cr_no: '21', cr_year: 2026 }];
 let caseInsertRace = false;       // true = unique violation on insert although the pre-check found nothing
 let searchItems = [];
+let dispatchFail = false;         // true = GitHub answers 401 Bad credentials
+let storageTooBig = false;        // true = Storage refuses the object (bucket file_size_limit)
+const authUsers = [{ id: 'au-old', email: 'Staff.Old@example.com' }]; // accounts that exist before any invite
+const caseRows = { 40: { id: 40, cr_no: '21', cr_year: 2026, subject: 's' }, 43: { id: 43, cr_no: null, cr_year: null, subject: 's' } };
 const searchUrls = [];
 const letterRows = { 31: { id: 31, case_id: 7 }, 32: { id: 32, case_id: 7 }, 33: { id: 33, case_id: 7 } };
 globalThis.fetch = async (u, opt = {}) => {
@@ -42,6 +46,23 @@ globalThis.fetch = async (u, opt = {}) => {
     if (membersInsert === 'conflict') { members.push(row); return res({ code: '23505', message: 'duplicate key value violates unique constraint "members_pkey"' }, 409); }
     if (members.some(x => x.user_id === row.user_id) && /ignore-duplicates/.test(opt.headers.Prefer)) return res([], 201);
     members.push(row); return res([row], 201);
+  }
+  if (u === `${SB}/auth/v1/invite`) {
+    const { email } = JSON.parse(opt.body);
+    if (authUsers.some(x => x.email.toLowerCase() === email.toLowerCase())) return res({ code: 422, error_code: 'email_exists', msg: 'A user with this email address has already been registered' }, 422);
+    const nu = { id: `au-${authUsers.length + 1}`, email }; authUsers.push(nu); return res(nu);
+  }
+  if (u.startsWith(`${SB}/auth/v1/admin/users?`)) {
+    assert.equal(opt.headers.Authorization, 'Bearer service-secret-1234', 'admin API with the service role');
+    const f = new URL(u).searchParams.get('filter');
+    return res({ users: f ? authUsers.filter(x => x.email.toLowerCase().includes(f)) : authUsers });
+  }
+  if (u.startsWith(`${SB}/rest/v1/cases?id=eq.`) && u.includes('&select=id,cr_no,cr_year')) {
+    const r = caseRows[u.match(/id=eq\.(\d+)/)[1]]; return res(r ? [r] : []);
+  }
+  if (u.startsWith(`${SB}/rest/v1/cases?id=eq.`) && opt.method === 'PATCH' && caseRows[u.match(/id=eq\.(\d+)/)[1]]) {
+    const id = u.match(/id=eq\.(\d+)/)[1];
+    caseRows[id] = { ...caseRows[id], ...JSON.parse(opt.body) }; return res([caseRows[id]]);
   }
   if (u.startsWith(`${SB}/rest/v1/case_files?case_id=eq.7&kind=eq.proposal`)) return res([{ id: 1 }]);
   if (u === `${SB}/rest/v1/runs`) return res([{ id: 55, case_id: 7 }], 201);
@@ -69,7 +90,10 @@ globalThis.fetch = async (u, opt = {}) => {
   if (u.startsWith(`${SB}/rest/v1/case_files?id=eq.2&`)) return res([{ storage_path: 'backups/7/x', original_name: 'x' }]);
   if (u === `${SB}/rest/v1/case_files` && opt.method === 'POST') return res([{ id: 9, ...JSON.parse(opt.body) }], 201);
   if (u.startsWith(`${SB}/storage/v1/object/sign/`)) return res({ signedURL: '/object/sign/x?token=t' });
-  if (u.startsWith(`${SB}/storage/v1/object/`)) { uploads.push(u); return res({ Key: 'k' }); }
+  if (u.startsWith(`${SB}/storage/v1/object/`)) {
+    if (storageTooBig) return res({ statusCode: '413', error: 'Payload too large', message: 'The object exceeded the maximum allowed size' }, 400);
+    uploads.push(u); return res({ Key: 'k' });
+  }
   if (u.startsWith(`${SB}/rest/v1/letters?case_id=eq.7&sent_date=not.is.null&reply_received_date=is.null`)) return res(pendingLetters);
   if (u.startsWith(`${SB}/rest/v1/letters?id=eq.`) && opt.method === 'PATCH') {
     letterPatches.push({ u, body: JSON.parse(opt.body) });
@@ -80,7 +104,8 @@ globalThis.fetch = async (u, opt = {}) => {
   if (u.startsWith(`${SB}/rest/v1/cases?cr_no=match.`)) {
     const re = new RegExp(decodeURIComponent(u.match(/cr_no=match\.([^&]+)/)[1]));
     const y = Number(u.match(/cr_year=eq\.(\d+)/)[1]);
-    return res(cases.filter(c => re.test(c.cr_no) && c.cr_year === y).map(c => ({ id: c.id })));
+    const neq = (u.match(/id=neq\.(\d+)/) || [])[1];
+    return res(cases.filter(c => re.test(c.cr_no) && c.cr_year === y && String(c.id) !== neq).map(c => ({ id: c.id })));
   }
   if (u === `${SB}/rest/v1/cases` && opt.method === 'POST') {
     const row = JSON.parse(opt.body);
@@ -90,10 +115,15 @@ globalThis.fetch = async (u, opt = {}) => {
   if (u.startsWith(`${SB}/rest/v1/cases?id=eq.999`) && opt.method === 'PATCH') return res({ code: '22P02', message: 'invalid input syntax for type bigint: "secret detail"' }, 400);
   if (u.startsWith('https://api.github.com/search/code?')) { searchUrls.push(u); return res({ items: searchItems }); }
   if (u.startsWith(`${SB}/rest/v1/`)) return new Response(null, { status: 204 });
-  if (u.endsWith('/dispatches')) return new Response(null, { status: 204 });
+  if (u.endsWith('/dispatches')) return dispatchFail ? res({ message: 'Bad credentials', documentation_url: 'https://docs.github.com/rest' }, 401) : new Response(null, { status: 204 });
   throw new Error('unexpected fetch ' + u);
 };
-const env = { SETTINGS: kv(), ASSETS: { fetch: async () => new Response('app') } };
+const HTML = '<!doctype html><html><head><script>var t = 1;</script></head><body><script type="module" src="/assets/a.js"></script></body></html>';
+const env = { SETTINGS: kv(), ASSETS: { fetch: async req => {
+  const p = new URL(req.url).pathname;
+  if (p.startsWith('/assets/')) return new Response('js', { headers: { 'content-type': 'text/javascript' } });
+  return new Response(p.startsWith('/nasti/') ? '<html><script>eval("1")</script></html>' : HTML, { headers: { 'content-type': 'text/html; charset=utf-8' } });
+} } };
 const call = (path, opt = {}) => worker.fetch(new Request('https://desk.example' + path, opt), env);
 const body = r => r.json();
 
@@ -248,7 +278,7 @@ test('monthly spend: IST month sum, boundary, 402 block on /api/run', async () =
     spendQueries.length = 0;
     env.SETTINGS.m.set('monthly_budget_usd', '');
     const s = await body(await call('/api/spend', { headers: owner }));
-    assert.deepEqual(s, { month: '2026-11', spent_usd: 1.75, limit_usd: 20, runs: 3 }, 'empty setting = default $20');
+    assert.deepEqual(s, { month: '2026-11', spent_usd: 1.75, limit_usd: 20, runs: 3, reserved_usd: 0, active_runs: 0 }, 'empty setting = default $20');
     const q = decodeURIComponent(spendQueries[0]);
     assert.ok(q.includes('created_at=gte.2026-10-31T18:30:00.000Z'), q);
     assert.ok(q.includes('created_at=lt.2026-11-30T18:30:00.000Z'), q);
@@ -530,10 +560,109 @@ test('monthly limit counts queued/running runs at an estimate', async () => {
     const bud = env.SETTINGS.m.get('budget_usd');
     env.SETTINGS.m.set('budget_usd', '');
     try { assert.equal((await run()).status, 200); } finally { env.SETTINGS.m.set('budget_usd', bud); }
-    // /api/spend keeps its shape
-    assert.deepEqual(Object.keys(await body(await call('/api/spend', { headers: owner }))), ['month', 'spent_usd', 'limit_usd', 'runs']);
+    // /api/spend: reserved_usd / active_runs added (A3 audit: the app checks spent + reserved like the Worker)
+    monthRuns = [{ cost_usd: '1.0', created_at: now, state: 'done' }, { cost_usd: null, created_at: now, state: 'running' }];
+    const sp = await body(await call('/api/spend', { headers: owner }));
+    assert.deepEqual(Object.keys(sp), ['month', 'spent_usd', 'limit_usd', 'runs', 'reserved_usd', 'active_runs']);
+    assert.equal(sp.reserved_usd, 1); assert.equal(sp.active_runs, 1);
   } finally {
     env.SETTINGS.m.set('monthly_budget_usd', '');
     monthRuns = [];
   }
+});
+
+test('dispatch failure: Marathi reason + finished_at on the run, raw GitHub text only in activity', async () => {
+  const owner = { authorization: 'Bearer owner-jwt' };
+  patches.length = 0; acts.length = 0; activeRuns = [];
+  dispatchFail = true;
+  try {
+    const r = await call('/api/run', { method: 'POST', headers: owner, body: JSON.stringify({ case_id: 7 }) });
+    assert.equal(r.status, 502);
+    const j = await r.json();
+    assert.equal(j.error, 'dispatch_failed'); assert.match(j.reason, /GitHub जोडणी अयशस्वी/);
+    assert.ok(!JSON.stringify(j).includes('Bad credentials'), 'raw text not sent to the browser');
+    const pt = patches.find(x => x.u.includes('runs?id=eq.55') && x.body.state === 'failed');
+    assert.ok(pt, 'run marked failed');
+    assert.match(pt.body.step, /^GitHub जोडणी अयशस्वी \(token तपासा — सेटिंग्ज\) — पुन्हा तयार करा$/);
+    assert.ok(pt.body.finished_at, 'finished_at set');
+    const a = acts.find(x => x.action === 'run_failed');
+    assert.equal(a.detail.reason, pt.body.step); assert.match(a.detail.error, /dispatch 401: .*Bad credentials/);
+  } finally { dispatchFail = false; }
+});
+
+test('PATCH /api/cases/:id: C R / वर्ष editable with the create rules and duplicate check', async () => {
+  const owner = { authorization: 'Bearer owner-jwt' };
+  const edit = (id, b, h = owner) => call(`/api/cases/${id}`, { method: 'PATCH', headers: h, body: JSON.stringify(b) });
+  assert.equal((await edit(43, { cr_no: '12a', cr_year: 2026 })).status, 400);
+  assert.deepEqual(await (await edit(43, { cr_no: '12', cr_year: 26 })).json(), { error: 'cr_year: 4 digits' });
+  let r = await edit(43, { cr_no: '0021', cr_year: '2026' });
+  assert.equal(r.status, 409, 'leading zeros ignored');
+  assert.deepEqual(await r.json(), { error: 'duplicate_cr', existing_id: 40 });
+  assert.equal(caseRows[43].cr_no, null, 'nothing saved on a duplicate');
+  acts.length = 0;
+  r = await edit(43, { cr_no: '131', cr_year: '2026', subject: 'नवीन', office: '' });
+  assert.equal(r.status, 200, await r.clone().text());
+  const c = await r.json();
+  assert.equal(c.cr_no, '131'); assert.equal(c.cr_year, 2026); assert.equal(c.office, null, "'' stored as null");
+  assert.equal(acts.at(-1).action, 'case_updated'); assert.equal(acts.at(-1).detail.cr, '131/2026');
+  // the case is not its own duplicate (case 40 = 21/2026 re-saved with another field)
+  cases.push({ id: 43, cr_no: '131', cr_year: 2026 });
+  assert.equal((await edit(40, { cr_no: '21', cr_year: 2026, post: 'लिपिक' })).status, 200);
+  assert.equal((await edit(43, { cr_no: '131', cr_year: 2026, file_no: 'x' })).status, 200);
+  assert.equal((await edit(99, { file_no: 'x' })).status, 404);
+  assert.equal((await edit(43, { file_no: 'x' }, { authorization: 'Bearer stranger-jwt' })).status, 403);
+  assert.equal((await edit(43, {})).status, 400);
+});
+
+test('members: invite, and an e-mail that already has an auth account (422) is added via the admin API', async () => {
+  const owner = { authorization: 'Bearer owner-jwt' };
+  const inv = b => call('/api/members', { method: 'POST', headers: owner, body: JSON.stringify(b) });
+  let r = await inv({ email: 'new@example.com', role: 'staff' });
+  assert.equal(r.status, 200); assert.deepEqual(await r.json(), { ok: true, existing: false });
+  assert.ok(members.some(x => x.email === 'new@example.com' && x.role === 'staff'));
+  r = await inv({ email: 'staff.old@example.com', role: 'senior' });
+  assert.equal(r.status, 200, await r.clone().text());
+  assert.deepEqual(await r.json(), { ok: true, existing: true });
+  const m = members.find(x => x.email === 'staff.old@example.com');
+  assert.equal(m.user_id, 'au-old'); assert.equal(m.role, 'senior');
+  assert.equal((await inv({ email: 'x', role: 'admin' })).status, 400);
+});
+
+test('settings: "__clear__" deletes a secret key; Supabase service key and plain keys cannot be cleared that way', async () => {
+  const owner = { authorization: 'Bearer owner-jwt' };
+  const put = b => call('/api/settings', { method: 'PUT', headers: owner, body: JSON.stringify(b) });
+  env.SETTINGS.m.set('gemini_api_key', 'AIza-old-key');
+  assert.equal((await put({ gemini_api_key: '__clear__' })).status, 200);
+  assert.equal(env.SETTINGS.m.has('gemini_api_key'), false);
+  assert.equal((await body(await call('/api/settings', { headers: owner }))).gemini_api_key, '');
+  let r = await put({ supabase_service_key: '__clear__' });
+  assert.equal(r.status, 400); assert.deepEqual(await r.json(), { error: 'supabase_service_key: cannot clear' });
+  assert.equal(env.SETTINGS.m.get('supabase_service_key'), 'service-secret-1234');
+  assert.equal((await put({ model: '__clear__' })).status, 400);
+});
+
+test('upload: Storage size limit → 413 "file over 50 MB"', async () => {
+  const owner = { authorization: 'Bearer owner-jwt' };
+  storageTooBig = true;
+  try {
+    const r = await call('/api/upload?case_id=7&kind=extra_doc', { method: 'POST', headers: { ...owner, 'x-file-name': 'a.pdf' }, body: 'x' });
+    assert.equal(r.status, 413); assert.deepEqual(await r.json(), { error: 'file over 50 MB' });
+  } finally { storageTooBig = false; }
+});
+
+test('HTML responses carry CSP with frame-ancestors self; नस्ती page keeps its inline/eval scripts; non-HTML untouched', async () => {
+  const r = await call('/cases/7');
+  assert.equal(await r.text(), HTML, 'body unchanged');
+  const csp = r.headers.get('content-security-policy');
+  assert.match(csp, /frame-ancestors 'self'/); assert.equal(r.headers.get('x-frame-options'), 'SAMEORIGIN');
+  const { createHash } = await import('node:crypto');
+  const h = createHash('sha256').update('var t = 1;').digest('base64');
+  assert.ok(csp.includes(`script-src 'self' 'sha256-${h}'`), csp);
+  assert.ok(!/script-src[^;]*unsafe/.test(csp), 'no unsafe-inline / eval for the app');
+  assert.ok(csp.includes(`connect-src 'self' ${SB} wss://sb.example`), csp);
+  assert.match(csp, /frame-src 'self'/);
+  const n = await call('/nasti/');
+  const ncsp = n.headers.get('content-security-policy');
+  assert.match(ncsp, /script-src 'self' 'unsafe-inline' 'unsafe-eval'/); assert.match(ncsp, /frame-ancestors 'self'/);
+  assert.equal((await call('/assets/a.js')).headers.get('content-security-policy'), null);
 });

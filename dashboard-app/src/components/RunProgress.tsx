@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { sb } from '../lib/supabase';
 import type { Run } from '../lib/types';
 import { RUN_STATE_LABEL, RUN_STEPS, STALE_REASON, isStale, runTone } from '../lib/constants';
-import { asArray, fmtDateTime, textOf } from '../lib/format';
+import { asArray, cleanReason, criticalWarnings, fmtDateTime, isCriticalWarning, textOf } from '../lib/format';
 import { useAuth } from '../lib/auth';
 import { Chip, Progress, Spinner } from './ui';
 
@@ -56,11 +56,20 @@ export function useRuns(caseId: number | null) {
   return runs;
 }
 
+const findStep = (text: string | null | undefined) => {
+  const s = (text || '').toLowerCase();
+  return s ? RUN_STEPS.findIndex(x => s.includes(x.key.toLowerCase())) : -1;
+};
+/** Step of the progress row. A failed run's `step` is the failure reason, so its step comes from `last_step`
+ *  (migration 0007); without it: never started = "रांगेत" (e.g. GitHub dispatch failed), started = unknown (-1, no red mark). */
 function stepIndex(r: Run): number {
   if (r.state === 'done') return RUN_STEPS.length - 1;
+  if (r.state === 'failed') {
+    if (r.last_step) { const i = findStep(r.last_step); return i < 0 ? 1 : i; }
+    return r.started_at ? -1 : 0;
+  }
   if (r.state === 'queued' && !r.step) return 0;
-  const s = (r.step || '').toLowerCase();
-  const i = RUN_STEPS.findIndex(x => s.includes(x.key.toLowerCase()));
+  const i = findStep(r.step);
   return i < 0 ? (r.state === 'running' ? 1 : 0) : i;
 }
 
@@ -159,19 +168,37 @@ export function RunEta({ run }: { run: Run }) {
 /** Engine model-routing lines in `runs.warnings` start with this prefix (not real warnings). */
 const MODEL_PREFIX = 'मॉडेल:';
 
-export function RunWarnings({ run }: { run: Run }) {
+/** "पडताळणी अपूर्ण — …" / "अंतिम पडताळणी (Opus) मान्यता नाही — …": the run is done but its outputs were not fully
+ *  checked — a red card above the downloads (case page) and in the run progress (engine contract 02.11.2026). */
+export function CriticalWarnings({ run, className = '' }: { run: Run | undefined; className?: string }) {
+  const w = run ? criticalWarnings(run.warnings) : [];
+  if (!w.length) return null;
+  return (
+    <div className={`rounded-lg border-2 border-red-400 bg-red-50 px-3 py-2 text-red-900 dark:border-red-700 dark:bg-red-950/50 dark:text-red-100 ${className}`} role="alert">
+      <div className="font-bold">⚠ फाइल तयार, पण तपासणी पूर्ण नाही — वापरण्यापूर्वी स्वतः तपासा</div>
+      <ul className="mt-1 list-disc space-y-1 break-words pl-5 [overflow-wrap:anywhere]">
+        {w.map((x, i) => <li key={i}>{x}</li>)}
+      </ul>
+    </div>
+  );
+}
+
+/** Plain warnings (amber) + the owner's model list. `withCritical`: also the red card (off where the page shows it already). */
+export function RunWarnings({ run, withCritical = true }: { run: Run; withCritical?: boolean }) {
   const { me } = useAuth();
   const all = asArray(run.warnings).map(textOf).map(x => x.trim()).filter(Boolean);
   const models = all.filter(x => x.startsWith(MODEL_PREFIX)).map(x => x.slice(MODEL_PREFIX.length).trim());
-  const w = all.filter(x => !x.startsWith(MODEL_PREFIX));
+  const w = all.filter(x => !x.startsWith(MODEL_PREFIX) && !isCriticalWarning(x));
   // model-routing list: owner-only, never printed
   const showModels = me?.role === 'owner' && models.length > 0;
-  if (!w.length && !showModels) return null;
+  const crit = withCritical && criticalWarnings(run.warnings).length > 0;
+  if (!w.length && !showModels && !crit) return null;
   return (
     <>
+      {withCritical && <CriticalWarnings run={run} />}
       {w.length > 0 && (
         <ul className="space-y-1 rounded-lg bg-amber-100 px-3 py-2 text-sm text-amber-900 dark:bg-amber-900/40 dark:text-amber-100">
-          {w.map((x, i) => <li key={i}>⚠ {x}</li>)}
+          {w.map((x, i) => <li key={i} className="break-words [overflow-wrap:anywhere]">⚠ {x}</li>)}
         </ul>
       )}
       {showModels && (
@@ -221,10 +248,11 @@ export default function RunProgress({ run, retryHint }: { run: Run; retryHint?: 
         </div>
         <RunCost run={run} />
       </div>
+      <CriticalWarnings run={run} />
       <Progress pct={failed ? 100 : pct} tone={failed ? 'red' : run.state === 'done' ? 'green' : 'blue'} active={active} label={`प्रक्रिया क्र. ${run.id} — ${stale ? 'वेळ संपली' : stateText(run.state)}`} />
       <ol className="grid grid-cols-4 gap-1 text-center text-xs sm:grid-cols-7 sm:text-sm">
         {RUN_STEPS.map((s, i) => {
-          const done = i < idx || run.state === 'done';
+          const done = i < idx || run.state === 'done' || (idx < 0 && i === 0);
           const cur = i === idx && run.state !== 'done' && !failed;
           return (
             <li
@@ -246,12 +274,12 @@ export default function RunProgress({ run, retryHint }: { run: Run; retryHint?: 
       {!failed && (run.state === 'queued' || run.state === 'running') && <RunEta run={run} />}
       {failed && (
         <div className="rounded-lg bg-red-100 px-3 py-2 text-red-900 dark:bg-red-900/40 dark:text-red-100" role="alert">
-          <div className="font-semibold">प्रक्रिया अयशस्वी</div>
-          <div className="mt-1 whitespace-pre-wrap break-words">{stale ? STALE_REASON : run.step || 'कारण उपलब्ध नाही'}</div>
+          <div className="font-semibold">प्रक्रिया अयशस्वी{!stale && idx >= 0 && run.state === 'failed' ? ` — टप्पा: ${RUN_STEPS[idx].label}` : ''}</div>
+          <div className="mt-1 whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{stale ? STALE_REASON : cleanReason(run.step) || 'कारण उपलब्ध नाही'}</div>
           {retryHint && <div className="mt-1 text-sm">{retryHint}</div>}
         </div>
       )}
-      <RunWarnings run={run} />
+      <RunWarnings run={run} withCritical={false} />
     </div>
   );
 }
@@ -266,6 +294,6 @@ export function RunStateBadge({ run }: { run: Run | undefined }) {
         <Spinner className="h-3.5 w-3.5" /> प्रक्रिया चालू
       </span>
     );
-  if (run.state === 'done') return <Chip tone="green">✓ तयार</Chip>;
+  if (run.state === 'done') return criticalWarnings(run.warnings).length ? <Chip tone="amber">⚠ तयार — तपासणी अपूर्ण</Chip> : <Chip tone="green">✓ तयार</Chip>;
   return <Chip tone="red">{stale ? 'वेळ संपली' : 'अयशस्वी'}</Chip>;
 }
