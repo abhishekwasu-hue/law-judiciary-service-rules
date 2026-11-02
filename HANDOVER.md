@@ -24,7 +24,7 @@
 2. **App A desk page** (claude.ai artifact) — Abhi decides: keep RYzwfiGwJpbVxyD5C2rCy2 or 8cJP8wz6j5tYM5kRHK1rVx, or retire App A (App B is live). If kept: Abhi checks the three downloads on TEST-1, then Claude deletes TEST-1 (cases/TEST-1, outputs/TEST-1__*, assets bdb3fa89612a93be3a0df53ac37f98e9, cfa33bb4f301bb18e77e27aa9eb41fd6).
 3. **Pack 3 decisions still open (Abhi)** — docs/QUALITY_AUDIT.md: which pdf/ folders the engine needs (sparse checkout); approve-before-save rule for samples/specs; App A keep/retire (item 2).
 4. **First live run with the cost tiers** — confirm cost (run's "मॉडेल: खर्च" line), routing (drafter used for quality-critical work) and part1check mismatch rate.
-5. **Style research** — letter/lang decisions F6, F7, F10, F5 done 02.11.2026 (§4.21–4.24); F8 (आपला विश्वासू) and F9 (महोदया) stay as they are (defaults).
+5. **Style research** — letter/lang decisions F6, F7, F10, F5 done 02.11.2026 (§4.21–4.24); F8 (आपला विश्वासू) and F9 (महोदया) stay as they are (defaults). Also 02.11.2026: grammar/शुद्धलेखन research added (STYLE_RESEARCH_LANG.md §5; PDFs in pdf/09-marathi-grammar-shuddhalekhan/). Open for Abhi: "अनुसरुन"→"अनुसरून" in SOP/samples (rule 8.9), lint L11. Run Actions → "Download extra PDFs" for the 4 URLs the sandbox could not reach (pdf-list-extra.tsv, folder 09).
 6. Study part 0 (§4.17) for C R 130, 131, 133 — only if Abhi asks.
 
 ## Network notes
