@@ -1,4 +1,5 @@
 """tools/ai_benchmark.py against local mocks (OpenAI-compatible, Gemini-shaped, Anthropic-shaped). No network, no key."""
+import importlib.util
 import json, os, subprocess, sys, threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -171,7 +172,8 @@ def test_run_four_providers(tmp_path):
     assert len(seen) == 9  # 2 pages x 4 runs + one retried 429
     md = (out / "results.md").read_text(encoding="utf-8")
     assert "| gemini:gemini-2.5-flash | 2/2 / 2 | 100.0% |" in md and "mistral" in md
-    assert (out / "results.png").stat().st_size > 10000
+    if importlib.util.find_spec("matplotlib"):  # optional: CI has no matplotlib, the tool then skips the chart
+        assert (out / "results.png").stat().st_size > 10000
     assert (out / "raw" / "groq_qwen3.8-27b" / "p1.txt").read_text(encoding="utf-8").endswith("क्र. 777")
 
 
