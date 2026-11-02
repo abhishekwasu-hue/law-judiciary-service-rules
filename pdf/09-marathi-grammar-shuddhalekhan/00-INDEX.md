@@ -21,7 +21,9 @@
 - `pdf/08-gad-office-procedure/GAD_Noting-and-Correspondence-in-Mantralaya-English.pdf`.
 - `pdf/05-planning-marathi-it/act_maharashtra-official-languages-act-1964_a/_b.pdf` — महाराष्ट्र राजभाषा अधिनियम, 1964.
 
-## ब. GitHub Action ने उतरवायचे (sandbox मधून marathi.gov.in / rmvs.marathi.gov.in / web.archive.org पोहोचत नाहीत) — `pdf-list-extra.tsv` मध्ये नोंदवले; Actions → **Download extra PDFs** चालवल्यावर याच फोल्डरमध्ये येतील (अयशस्वी → `pdf/FAILED-extra.txt`)
+## ब. GitHub Action (Download extra PDFs, 02.11.2026 रात्री 10:04 चालवले) — `pdf-list-extra.tsv`
+
+मिळाले: `gr_shasan-shabdakosh-bhag-1_20210810.pdf` (मराठी भाषा विभाग परिपत्रक दि. 10.08.2021, Wayback). **मिळाले नाहीत** (GitHub runner वरूनही; marathi.gov.in व rmvs.marathi.gov.in संकेतस्थळे बंद/उत्तर नाही; `pdf/FAILED-extra.txt`): खालील पहिले तीन — संकेतस्थळ चालू झाल्यावर Action पुन्हा चालवावे किंवा Abhi च्या फोनवरून उतरवावे.
 
 | फाइल (अपेक्षित) | दस्तऐवज | URL |
 |---|---|---|
