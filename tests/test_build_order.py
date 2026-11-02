@@ -264,3 +264,26 @@ def test_lint_order_ma_and_dhd_exemptions():
     s["order"]["preamble"] = ["प्रशासकीय न्यायमूर्ती समितीने शुध्द प्रत सादर केली आहे."]
     P = lint_order.lint_order(s)
     assert any("§4.23" in p for p in P) and any("ध्द" in p for p in P)
+
+
+# ---- C27 (02.11.2026): no package / warning / AI word in the order draft; blank metadata ----
+@pytest.mark.parametrize("w", ["पॅकेज", "इशारा", "पडताळणी अपूर्ण", "मागवावे", "अस्पष्ट", "टीप :", "TODO", "warning",
+                               "AI", "Claude", "मॉडेल", "स्वयंचलित", "engine", "generated", "GPT"])
+def test_lint_draft_words(w):
+    s = sample("gr"); s["order"]["preamble"] = [f"प्रस्ताव प्राप्त झाला आहे {w}."]
+    assert "draft word" in probs(s)
+    if w != "पॅकेज":   # "पॅकेज" is an error even inside quotes
+        s = sample("gr"); s["order"]["preamble"] = [f"“{w}” असे पत्रात नमूद आहे."]
+        assert "draft word" not in probs(s)
+    s = sample("notification"); s["order"]["english"]["operative"].append(f"Note {w} here.")
+    assert "draft word" in probs(s)
+
+
+@pytest.mark.parametrize("t", TYPES)
+def test_built_metadata_blank(built, t, tmp_path):
+    sys.path.insert(0, TOOLS)
+    import clean_meta
+    cp = built[t].core_properties
+    assert (cp.author, cp.last_modified_by, cp.title, cp.subject, cp.keywords, cp.comments, cp.category) == ("",) * 7
+    p = tmp_path / "x.docx"; built[t].save(str(p)); clean_meta.clean_docx(str(p))
+    assert clean_meta.docx_meta_problems(str(p)) == []

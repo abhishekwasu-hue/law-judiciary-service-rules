@@ -50,6 +50,7 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH as WA
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
+from clean_meta import clean_docx  # noqa: E402 — C27 §4
 from mkdocs import FONT, setfont, fix_styles, nomirror, add_table, LET_T  # noqa: E402
 
 TYPES = ("gr", "corrigendum", "circular", "memo", "notification")
@@ -239,7 +240,7 @@ def build(o, out):
     copies_block(D, COPIES_HEAD[t], o.get("copies"))
     if t == "notification" and isinstance(o.get("english"), dict):
         english_block(D, o["english"])
-    D.d.save(out)
+    D.d.save(out); clean_docx(out, o.get("doc_author"))
 
 
 def english_block(D, e):
@@ -318,7 +319,7 @@ def main(spec_path, outdir, pre, do_lint=True):
         print(f"order.type must be one of {TYPES}", file=sys.stderr); return 1
     os.makedirs(outdir, exist_ok=True)
     out = os.path.join(outdir, f"{pre}_Order_Draft.docx")
-    build(o, out)
+    build(dict(o, doc_author=o.get("doc_author") or spec.get("doc_author")), out)
     bad = bad_font_runs(out)
     print(out, o["type"], "bad-font runs:", bad)
     pdf = preview(out, outdir)

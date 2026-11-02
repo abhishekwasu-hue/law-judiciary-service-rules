@@ -22,6 +22,8 @@ Errors
   - recommendation not "oppose" / "not oppose" / "____"; recommendation_reason empty (not required with "____")
   - background / enclosures not a list of str; verification not a bool
   - internal ids / repo paths anywhere (lint_spec.id_hits / repo_hits)
+  - C27 (02.11.2026): "पॅकेज" anywhere; outside quotes "package PDF", "warning", "TODO", the other warning / working words
+    and the AI words (lint_spec.draft_word_hits)
 Warnings
   - recommendation "____" (blank: no basis in the record — the Section fills it; Rule 58(4)(a) still applies)
   - Devanagari outside “…” / "…" quotes (the parawise text is English; names/designations in quotes are fine)
@@ -124,6 +126,9 @@ def lint_parawise(spec):
     for path, t in _strings(pw):
         for x in lint_spec.id_hits(t): P.append(f"{path}: internal id — '{x}'")
         for x in lint_spec.repo_hits(t): P.append(f"{path}: repo path/word — '{x}'")
+        # C27 (02.11.2026): no "package PDF" / "पॅकेज", "warning", "TODO" or AI word (outside quotes)
+        for w in lint_spec.draft_word_hits(t):
+            P.append(f"{path}: draft word — '{w}' — no package / warning / working / AI word in the draft (C27)")
     return P
 
 

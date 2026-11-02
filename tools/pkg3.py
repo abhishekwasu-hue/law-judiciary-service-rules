@@ -10,7 +10,7 @@ Proposal returned WITH its GRs (Abhi's standing rule, INSTRUCTIONS.md §4.7, §4
   - marking: quoted text highlighted in yellow ONLY (search on the text layer). Never boxes. Pages whose text layer cannot be
     searched (scanned GR, legacy/garbled font, repeated strings): use tools/highlight.py on the finished package.
   - writes <out>.map.json : {label: {"first_page": N, "pages": [..]}, "marks": [one record per mark, with "hits"]}
-    -> cite "(पॅकेज PDF पृ. N)" in the note's संबंधित माहिती
+    -> cite "(पृ.N/प.वि.)" in the note's संबंधित माहिती and "(पॅकेज PDF पृ. N)" in the Study (INSTRUCTIONS §4.27)
 
 enclosures.json:
 [ {"path": "pdf/xx/GR-2019.pdf", "pages": "1-3,7", "label": "वित्त विभाग GR दि. 01.03.2019",
@@ -31,6 +31,8 @@ Needs: pip install pymupdf --break-system-packages. Stamp font: FreeSerif (runne
 """
 import sys, json, os
 import pymupdf as fitz
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from clean_meta import clean_pdf  # noqa: E402 — C27 §4: blank PDF metadata / annotation author
 
 FONTFILES = [
     "/usr/share/fonts/truetype/freefont/FreeSerif.ttf",
@@ -187,7 +189,7 @@ def main(prop, js, out, also=()):
     for i, pg in enumerate(dst, 1):
         stamp_page(pg, i, tot, ff, fo, proposal=i <= nprop)
     missing = [i for i, pg in enumerate(dst, 1) if stamp_text(i, tot) not in read_stamp(pg)]
-    dst.set_toc(toc); dst.save(out, garbage=3, deflate=True)
+    dst.set_toc(toc); clean_pdf(dst); dst.save(out, garbage=3, deflate=True)
     mp["marks"] = report
     json.dump(mp, open(out + ".map.json", "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     print(out, tot, "pages;", sum(1 for r in report if r["status"] == "highlighted"), "marks highlighted;",

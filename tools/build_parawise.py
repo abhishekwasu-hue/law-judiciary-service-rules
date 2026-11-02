@@ -48,6 +48,7 @@ from docx.shared import Cm, Pt
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
+from clean_meta import clean_docx  # noqa: E402 — C27 §4: blank core/app properties
 FONT = "DVOT-SurekhMR"
 TITLE = "PARAWISE REMARKS OF RESPONDENT NO. {n} ({dept})"
 HEAD = ["Para No.", "Averments in the petition (in brief)", "Remarks of the Department"]
@@ -231,7 +232,7 @@ def build(spec, out):
     st = d.settings.element
     for e in st.findall(qn("w:mirrorMargins")):
         st.remove(e)
-    d.save(out)
+    d.save(out); clean_docx(out, spec.get("doc_author"))
 
 
 def bad_font_runs(d):

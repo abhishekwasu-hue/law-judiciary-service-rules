@@ -14,6 +14,7 @@ spec.json:
    "signers": ["का. अ. (श्रीम. कऱ्हाडे)", "अ.स. (श्री. वडनेरकर)", "उ.वि.स. नि. उ.स. (श्री. बोंद्रे)", "प्र.स. व वि.प. (श्री. खटी)"]
               # add "अ.मु.स. (वित्त)" only when the file goes to Finance (INSTRUCTIONS §4.6)
  },
+ "doc_author": "<name>",   # optional — Word author / last-modified-by (else env DOC_AUTHOR, else empty); tools/clean_meta.py
  "related": [ {"heading": "<GR/नियम/पूर्वोदाहरण शीर्षक>", "text": ["<जसाच्या तसा उतारा परिच्छेद>", "..."], "source": "<क्रमांक, दिनांक, पृ., परि.>"} ],   # शेवटी 'संबंधित माहिती'
  "letter": {   # optional — omit when no letter is needed (note only)
    "ref_no": "संकिर्ण-2026/प्र.क्र.116/का.6", "date": "__.__.2026",
@@ -30,9 +31,12 @@ spec.json:
                       # asking information from a District Judge)
  }
 }"""
+import re
 import sys, json, copy, os
 import docx
 from docx.oxml.ns import qn
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from clean_meta import clean_docx  # noqa: E402 — C27 §4: blank core/app properties
 
 FONT = "DVOT-SurekhMR"
 T = os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates")
@@ -154,8 +158,10 @@ def build_note(spec, out):
             for tx in it.get("text", []):
                 add(body, sect, numbered, d, f"\t{tx}", left=Cm(0.8))
             if it.get("source"):
-                add(body, sect, numbered, d, f"\t(स्रोत: {it['source']})", left=Cm(0.8))
-    nomirror(d); d.save(out)
+                # "… (पृ.9-10/प.वि.)" prints as "(स्रोत: …, पृ.9-10/प.वि.)" — no doubled ")" (verify reverses it)
+                src = re.sub(r"\s*\((पृ\.[^()]*?/\s*प\.वि\.)\)\s*$", r", \1", it["source"])
+                add(body, sect, numbered, d, f"\t(स्रोत: {src})", left=Cm(0.8))
+    nomirror(d); d.save(out); clean_docx(out, spec.get("doc_author"))
 
 def build_letter(spec, out):
     from docx.shared import Cm
@@ -210,7 +216,7 @@ def build_letter(spec, out):
     for cp in L.get("copies") or []:  # §4.22
         if isinstance(cp, str) and cp.strip(): add(body, sect, P[17], d, "प्रत : " + cp.strip())
     add(body, sect, P[17], d, "प्रत : निवड नस्ती")
-    nomirror(d); d.save(out)
+    nomirror(d); d.save(out); clean_docx(out, spec.get("doc_author"))
 
 if __name__ == "__main__":
     spec = json.load(open(sys.argv[1], encoding="utf-8-sig")); od, pre = sys.argv[2], sys.argv[3]

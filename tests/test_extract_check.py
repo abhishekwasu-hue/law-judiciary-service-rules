@@ -51,7 +51,7 @@ class ExtractCheck(unittest.TestCase):
         d.save(cls.pdf); d.close()
 
     def spec(self, text, pages="2"):
-        return {"related": [{"heading": "वित्त विभाग शासन निर्णय", "text": text, "source": f"दि.31.10.2005, परि.2 (पॅकेज PDF पृ. {pages})"}]}
+        return {"related": [{"heading": "वित्त विभाग शासन निर्णय", "text": text, "source": f"दि. 31.10.2005, परि. 2 (पृ.{pages}/प.वि.)"}]}
 
     def run_check(self, spec=None, study=None, **kw):
         return xc.check(self.pdf, spec, study, no_ocr=True, **kw)
@@ -164,6 +164,24 @@ class ExtractCheck(unittest.TestCase):
         r = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "extract_check.py"), self.pdf, "--spec", sp, "--no-ocr"],
                            capture_output=True, text=True, encoding="utf-8", env=dict(os.environ, PYTHONIOENCODING="utf-8"))
         self.assertEqual(r.returncode, 0); self.assertIn("EXTRACTS OK (checked 1, unverifiable 0)", r.stdout)
+
+    def test_related_marker_forms(self):
+        """C27 (02.11.2026): the note's related source cites "(पृ.N/प.वि.)"; the older "(पॅकेज PDF पृ. N)" is still read;
+        no marker -> the --extra sources (as "(पॅकेज PDF मध्ये नाही)"); a "पृ.N/प.वि." inside the extract text is ignored."""
+        def sp(src, text=None):
+            return {"related": [{"heading": "वित्त विभाग शासन निर्णय", "text": text or ["“" + GR_LINE + "”"], "source": src}]}
+        for src in ("परि. 2 (पृ.2/प.वि.)", "परि. 2 (पृ.2,5/प.वि.)", "परि. 2 (पृ.२,५/प.वि.)", "परि. 2 (पॅकेज PDF पृ. 2)"):
+            with self.subTest(src=src):
+                r = self.run_check(sp(src))
+                self.assertEqual(r[0]["status"], "ok", r)
+        r = self.run_check(sp("शासन निर्णय दि. 31.10.2005, परि. 2"))
+        self.assertEqual((r[0]["status"], r[0]["pages"]), ("unverifiable", []))
+        ex = os.path.join(self.tmp, "gr_extra"); os.makedirs(ex, exist_ok=True)
+        with io.open(os.path.join(ex, "gr.txt"), "w", encoding="utf-8") as f:
+            f.write(GR_LINE)
+        self.assertEqual(self.run_check(sp("शासन निर्णय दि. 31.10.2005, परि. 2"), extras=[ex])[0]["status"], "ok_extra")
+        r = self.run_check(sp("परि. 2", ["“" + GR_LINE + " (पृ.5/प.वि.)”"]))   # an old file's own page ref inside the quote
+        self.assertEqual(r[0]["pages"], [])
 
     def test_pages_cited(self):
         self.assertEqual(xc.pages_cited("(पॅकेज PDF पृ. 12-14) व (पॅकेज PDF पृ. १६,18)"), [12, 13, 14, 16, 18])

@@ -10,8 +10,15 @@ Windows: `py tools/lint_spec.py ...`; runner: `python3 tools/lint_spec.py ...`.
 Rules (spec.json)
   - no internal file ids (z<digit>_<4 digits>) and no repo paths (register/, service-rules/, precedent-library/, pdf/,
     repo, रेपो) in any note / related / letter text
-  - no BANNED word and no "पॅकेज PDF" in the note body (first, paras, sub, closing) or the letter ("पॅकेज PDF" is allowed
-    in related and the Study)
+  - no BANNED word in the note body (first, paras, sub, closing) or the letter
+  - C27 (02.11.2026): no "पॅकेज" (anywhere, quotes too) and, outside “…” quotes, no warning / working word (DRAFT_WORDS:
+    package PDF, इशारा, पडताळणी अपूर्ण, मागवावे, वाचन अपूर्ण, अस्पष्ट, पडताळलेले नाही, टीप :, warning, TODO) and no AI word
+    (AI_WORDS: AI, Claude, Anthropic, मॉडेल, model, स्वयंचलित, automatic, engine, प्रणालीने तयार, generated, LLM, GPT,
+    Gemini) and no typographic / working tell (TELL_WORDS: em dash "—", arrows "→", web addresses http/www except the
+    official "www.maharashtra.gov.in" line, "छापील पृ.") in the note body, the letter and the related heading/source; the
+    verbatim related "text" only for "पॅकेज PDF".
+    Related source: ends with " (पृ.N/प.वि.)" (N, N-M, N,M; Devanagari digits) or has no page marker
+    (related_source_problems). The Study keeps "(पॅकेज PDF पृ. N)".
   - पृ. references: same accepted forms as verify_outputs ("पृ.N/प.वि.", "पृ. N / प.वि.", lists, ranges, Devanagari
     digits, blank "पृ.      /प.वि."); "“…”" quotes are skipped in related; page range 1..N only with --pages N
   - note.first ends with "सादर."
@@ -50,7 +57,7 @@ Rules (spec.json)
     न्यायमूर्ती / प्रशासकीय न्यायाधीश (one "मा." before the whole phrase: "मा. प्रशासकीय न्यायमूर्ती समिती"; "निवृत्त
     न्यायमूर्ती" not a title), and before उच्च न्यायालय… (the court itself; office designations "उच्च न्यायालय (… शाखा)",
     "उच्च न्यायालय, … शाखा / खंडपीठ …", "<पद>, उच्च न्यायालय" excepted); a doubled "मा." is an error
-  - §4.24 "शुद्धिपत्रक" (not शुध्दिपत्रक / शुद्धीपत्रक / शुद्धपत्रक)
+  - §4.24 "शुद्धिपत्रक" (not शुध्दिपत्रक / शुद्धीपत्रक / शुद्धपत्रक) — also in the related heading/source (outside quotes)
   - "ध्द" -> "द्ध" (error; मराठी भाषा विभाग GR दि. 10.11.2022) — not in a person's name (after श्री. / श्रीमती / कै. /
     डॉ., §4.18 name as in the proposal) and not inside quotes
 WARN level (spec.json; note body and letter, text outside quotes; related and signers not checked; warn_hits / fix_warn;
@@ -79,7 +86,7 @@ ID_RE = re.compile(r"z\d_\d{4}")
 REPO_RE = re.compile(r"(register/|service-rules/|precedent-library/|(?<![A-Za-z])pdf/|(?<![A-Za-z])repo(?![A-Za-z])|रेपो)", re.I)
 D = r"[0-9०-९]+"
 NUMLIST = rf"{D}(?:\s*(?:-|–|ते|,)\s*{D})*"
-REF_LOOSE = re.compile(r"पृ\.([^/\n]{0,40}?)/\s*प\.वि\.")
+REF_LOOSE = re.compile(r"पृ\.((?:(?!पृ\.)[^/\n]){0,40}?)/\s*प\.वि\.")   # inner part never holds another "पृ." (C27: "पृ. 22, नियम … (पृ.31/प.वि.)")
 REF_PKG = re.compile(rf"पॅकेज PDF\s*पृ\.\s*({NUMLIST})")
 REF_NO = re.compile(r"(?:संकिर्ण|संकीर्ण)-[0-9]{4}/(?:[0-9]+|_{2,})/प्र\.क्र\.(?:[0-9]+|_{2,})/का\.6")   # blanks "____" when the C R / file no. is not in the proposal (ENGINE_PROMPT rule 5); both spellings: the file no. is
 # copied as the निर्देशपत्र writes it ("संकीर्ण-2026/979/…" or "संकिर्ण-…") — audit A1, 02.11.2026
@@ -388,6 +395,86 @@ def banned_hits(text):
     return [w for w in BANNED if w in text]
 
 
+# C27 (Abhi, 02.11.2026: "Noting drafting mdhe kontahi ishara, package pdf ase शब्द नकोत"; addendum "वरिष्ठ अधिकाऱ्याला
+# असे वाटू नये, की AI che kam aahe"): no warning / working remark, no package word and no AI / automation word in the
+# drafts (note body, संबंधित माहिती heading/source, letter, order / parawise drafts). The Study and status.json may keep them.
+# "पॅकेज" is an error anywhere in these texts (quotes too; the verbatim related "text" only for "पॅकेज PDF"); the other
+# words only outside “…” verbatim quotes. Unknown value -> "____"; an unavailable source is left out of the note.
+PKG_WORD = "पॅकेज"
+_LAT = r"(?<![A-Za-z])"
+_LAT_END = r"(?![A-Za-z])"
+DRAFT_WORDS = [   # (label, regex) — warning / working remarks (contract C27 §2)
+    ("package PDF", re.compile(r"package\s*PDF", re.I)),
+    ("इशारा", re.compile(r"इशारा")),
+    ("पडताळणी अपूर्ण", re.compile(r"पडताळणी\s+अपूर्ण")),
+    ("मागवावे", re.compile(r"मागवावे")),
+    ("वाचन अपूर्ण", re.compile(r"वाचन\s+अपूर्ण")),
+    ("अस्पष्ट", re.compile(r"अस्पष्ट")),
+    ("पडताळलेले नाही", re.compile(r"पडताळलेले\s+नाही")),
+    ("टीप :", re.compile(r"(?<![ऀ-ॿ])टीप\s*:")),
+    ("warning", re.compile(_LAT + r"warnings?" + _LAT_END, re.I)),
+    ("TODO", re.compile(_LAT + r"TODO" + _LAT_END, re.I)),
+]
+AI_WORDS = [      # (label, regex) — AI / automation words (contract C27 §4)
+    ("AI", re.compile(_LAT + r"A\.?I\.?" + _LAT_END)),
+    ("Claude", re.compile(_LAT + r"Claude", re.I)),
+    ("Anthropic", re.compile(r"Anthropic", re.I)),
+    ("मॉडेल", re.compile(r"मॉडेल")),
+    ("model", re.compile(_LAT + r"models?" + _LAT_END, re.I)),
+    ("स्वयंचलित", re.compile(r"स्वयंचलित")),
+    ("automatic", re.compile(_LAT + r"automatic", re.I)),
+    ("engine", re.compile(_LAT + r"engines?" + _LAT_END, re.I)),
+    ("प्रणालीने तयार", re.compile(r"प्रणालीने\s+तयार")),
+    ("generated", re.compile(_LAT + r"generated" + _LAT_END, re.I)),
+    ("LLM", re.compile(_LAT + r"LLMs?" + _LAT_END)),
+    ("GPT", re.compile(_LAT + r"(?:Chat)?GPT", re.I)),
+    ("Gemini", re.compile(_LAT + r"Gemini" + _LAT_END, re.I)),
+]
+# lead's decision (research AI_TELLS, 02.11.2026): typographic / working tells in own text — the em dash (0 in the office's
+# own notes), arrows, web addresses (the official GR website line "www.maharashtra.gov.in" of an order draft excepted) and
+# the printed-page note "छापील पृ." (a source names the GR page as "पृ. N")
+TELL_WORDS = [
+    ("—", re.compile(r"—")),
+    ("→", re.compile(r"[→⇒➔]")),
+    ("http/www", re.compile(r"https?://|(?<![A-Za-z0-9.])www\.(?!maharashtra\.gov\.in)", re.I)),
+    ("छापील पृ.", re.compile(r"छापील\s+पृ")),
+]
+DRAFT_MSG = "मसुद्यात इशारा / कामाचा शेरा / पॅकेज / AI शब्द नको (C27; अस्पष्ट मूल्य -> '____', उपलब्ध नसलेला स्रोत नोंदीत नाही)"
+
+
+def draft_word_hits(text, quotes=False):
+    """C27 words in a draft text: "पॅकेज" anywhere (quotes too unless quotes=True), the warning / working and AI words
+    outside “…” / "…" quotes. quotes=True: the text is a verbatim extract (related "text") — only "पॅकेज PDF" counts."""
+    t = text or ""
+    if quotes:
+        return [PKG] if PKG in t else []
+    out = [PKG_WORD] if PKG_WORD in t else []
+    u = unquoted(t)
+    out += [lab for lab, rx in DRAFT_WORDS + AI_WORDS + TELL_WORDS if rx.search(u) and lab not in out]
+    return out
+
+
+ai_words_hits = lambda text: [lab for lab, rx in AI_WORDS if rx.search(unquoted(text or ""))]   # noqa: E731 — verify / metadata
+
+# C27 §1: a संबंधित माहिती source ends with " (पृ.N/प.वि.)" (N, N-M, N,M) when its page is in the returned PDF, else it
+# carries no page marker at all
+REL_SRC_END = re.compile(rf"\(\s*पृ\.\s*{NUMLIST}\s*/\s*प\.वि\.\s*\)\s*\.?\s*$")
+
+
+def related_source_problems(source):
+    """C27 §1: page marker form of one related source (problems; [] = ok)."""
+    s = (source or "").strip()
+    marks = list(REF_LOOSE.finditer(unquoted(s)))
+    if not marks and PKG not in s:
+        return []
+    if PKG in s:
+        return ["page marker — '(पॅकेज PDF …)' नको; पानाचा संदर्भ ' (पृ.N/प.वि.)', परत केलेल्या PDF मध्ये पान नसल्यास "
+                "कोणताही पान-संदर्भ नाही (C27)"]
+    if len(marks) > 1 or not REL_SRC_END.search(s):
+        return ["page marker — स्रोताच्या शेवटी फक्त एकदा ' (पृ.N/प.वि.)' (N, N-M, N,M); पान नसल्यास पान-संदर्भ नाही (C27)"]
+    return []
+
+
 def id_hits(text):
     return sorted(set(ID_RE.findall(text)))
 
@@ -456,7 +543,19 @@ def lint_spec(spec, pages=None):
         for x in repo_hits(t): P.append(f"{path}: repo path/word — '{x}'")
     for path, t in body + letter:
         for w in banned_hits(t): P.append(f"{path}: banned word — '{w}'")
-        if PKG in t: P.append(f"{path}: 'पॅकेज PDF' only in संबंधित माहिती — use पृ.N/प.वि.")
+    # C27 (02.11.2026): no warning / working / package / AI word in the drafts — note body, letter, related heading/source
+    # (outside quotes; "पॅकेज" anywhere); the verbatim related "text" only for "पॅकेज PDF"
+    rel_txt = [(pth, t) for pth, t in related if re.search(r"\.text(\[|$)", pth)]
+    for path, t in body + letter + [(pth, t) for pth, t in related if (pth, t) not in rel_txt]:
+        for w in draft_word_hits(t):
+            P.append(f"{path}: draft word — '{w}' — {DRAFT_MSG}")
+    for path, t in rel_txt:
+        for w in draft_word_hits(t, quotes=True):
+            P.append(f"{path}: draft word — '{w}' — {DRAFT_MSG}")
+    # C27 §1: related source ends with " (पृ.N/प.वि.)" or carries no page marker
+    for i, it in enumerate(spec.get("related") or []):
+        if isinstance(it, dict) and isinstance(it.get("source"), str):
+            P += [f"related[{i}].source: {x}" for x in related_source_problems(it["source"])]
     for path, t in body:
         P += [f"{path}: {m}" for m in style_hits(t)]
     for path, t in letter:
@@ -467,6 +566,8 @@ def lint_spec(spec, pages=None):
     rel_own = [(pth, t) for pth, t in related if not re.search(r"\.text(\[|$)", pth)]  # extracts (.text) are verbatim
     for path, t in body + letter + rel_own:
         P += [f"{path}: {m}" for m in lang_hits(t)]
+    for path, t in rel_own:   # §4.24 "शुद्धिपत्रक" also in the related heading/source (own text outside quotes)
+        P += [f"{path}: {msg}" for rx, msg in STYLE_RULES if "4.24" in msg and rx.search(unquoted(t))]
     for path, t in body:
         if ns(unquoted(t)).startswith(MISSING_HEAD) and not ns(t).startswith(MISSING_HEAD + ":-"):
             P.append(f"{path}: missing-info para — form '{MISSING_FORM}' (§4.19)")

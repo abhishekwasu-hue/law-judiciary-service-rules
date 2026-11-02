@@ -29,7 +29,7 @@ Trigger: Abhi says "प्रस्ताव कक्षातील नवी�
 7. **Report** in Marathi, 3–4 lines per case (Step 8.2).
 
 ## Step 1 — Read the proposal (every page, as images)
-1. `pdftoppm -r 110 -png <proposal.pdf> pg/p` and LOOK at every page image. Read stamps, inward nos., handwritten remarks, dates and amounts twice. Unclear → "अस्पष्ट".
+1. `pdftoppm -r 110 -png <proposal.pdf> pg/p` and LOOK at every page image. Read stamps, inward nos., handwritten remarks, dates and amounts twice. Unclear → "अस्पष्ट" in the Study; "____" in the note/letter (§4.27).
 2. Note: निर्देशपत्र (page 1) gives C R no., file no. (e.g. संकीर्ण-2026/**979**/प्र.क्र.130/का.6) and subject. A "पृथक पत्र" sheet is a proposal page too (keep it).
 3. Write a facts list: who sent, through whom (High Court or direct), letter nos./dates with page nos., the demand, the employee/post/dates/amounts, enclosures, and any earlier file of this Section on the same matter (e.g. "स्मरणपत्र क्र. संकिर्ण-2024/प्र.क्र.259/का.6").
 4. Keep the original proposal file name (strip only the random upload prefix like `11ae057d-`). The returned PDF uses this name (§4.16).
@@ -67,14 +67,15 @@ Copy the structure of the nearest sample in `samples/specs/` and fill your facts
   - Facts, posts, periods and amounts go in TABLES: a `{"table": [[...],[...]], "bold_last": true}` item in `note.paras`.
   - GR/rule text verbatim in “ ” with "(पृ.N/प.वि.)".
   - Earlier record of the same matter = stated as a fact with its reference.
-- **Page references:** only "पृ.N/प.वि.", where N = page in the returned PDF (proposal pages 1..n, then the attached GR pages). Never "पॅकेज PDF" in the note body or the letter.
+- **Page references:** only "पृ.N/प.वि.", where N = page in the returned PDF (proposal pages 1..n, then the attached GR pages). Never "पॅकेज PDF" anywhere in the note (body or related) or the letter (INSTRUCTIONS §4.27).
+- **No warnings in the drafts (INSTRUCTIONS §4.27, 02.11.2026):** unclear/unknown value → "____"; a GR/source not available is not mentioned in the note (Study part 4 + `warnings`); discrepancy remarks → Study part 4/7. Outside “…” quotes and related extract text, never: "पॅकेज", "इशारा", "पडताळणी अपूर्ण", "मागवावे", "वाचन अपूर्ण", "अस्पष्ट", "पडताळलेले नाही", own "टीप :", "warning", "TODO". Applies to order/parawise drafts too. "प्रस्तावासोबत खालील माहिती उपलब्ध नाही:- …" is allowed. No trace of AI in the drafts or the returned PDF (Abhi: "वरिष्ठ अधिकाऱ्याला असे वाटू नये, की AI che kam aahe म्हणून"): no "AI", "Claude", "मॉडेल", "स्वयंचलित", "engine", "प्रणालीने तयार" etc. (full list §4.27 (उ)); docx/PDF metadata blank.
 - **Banned words:** no commentary or theory, no arithmetic explanations, no advice. Closed list (checked by `tools/verify_outputs.py` in the note body and the letter; keep both lists identical — 01.11.2026 सुसंगती): "दिसून येते", "असे दिसते", "पडताळणी केली असता", "माझ्या मते", "मला वाटते", "असे वाटते", "ठरवावे", "कदाचित", "बहुधा".
 - **Missing information para:** "प्रस्तावासोबत खालील माहिती उपलब्ध नाही:- (1)…; (2)…".
 - **Last para, one of:**
   - "सबब, उपरोक्त माहिती तक्त्याच्या स्वरूपात … कळविण्याबाबतच्या पत्राचे प्रारूप पृ.      /प.वि. वर मान्यतेस्तव सादर. मान्य झाल्यास पत्र निर्गमित करण्यात येईल."
   - "सबब, … प्रस्ताव वित्त विभागाच्या मान्यतेस्तव सादर करण्यात येत आहे."
 - **Signers** (`note.signers`, in order): का. अ. (श्रीम. कऱ्हाडे) / अ.स. (श्री. वडनेरकर) / उ.वि.स. नि. उ.स. (श्री. बोंद्रे) / प्र.स. व वि.प. (श्री. खटी). Add "अ.मु.स. (वित्त)" only when the file goes to Finance.
-- **`related`** ("संबंधित माहिती (संदर्भासाठी)"): verbatim extracts. Each source ends with exactly "(पॅकेज PDF पृ. N)" (several pages: "(पॅकेज PDF पृ. N-M)" / "(पॅकेज PDF पृ. N,M)"), or "(पॅकेज PDF मध्ये नाही)" when the page is not in the package (01.11.2026 सुसंगती). No repo paths (register/, service-rules/, pdf/ …) and no internal ids in `related`.
+- **`related`** ("संबंधित माहिती (संदर्भासाठी)"): verbatim extracts. Each source ends with " (पृ.N/प.वि.)" (several pages: "(पृ.N-M/प.वि.)" / "(पृ.N,M/प.वि.)") when the page is in the returned PDF; otherwise NO page marker (just GR no./date/page/para). The Study keeps "(पॅकेज PDF पृ. N)" / "(पॅकेज PDF मध्ये नाही)" (INSTRUCTIONS §4.27, 02.11.2026). No repo paths (register/, service-rules/, pdf/ …) and no internal ids in `related`.
 - **Letter (`letter`):**
   - `ref_no`: "संकिर्ण-<year>/<file no>/प्र.क्र.<n>/का.6" (e.g. "संकिर्ण-2026/…"; year = the year of the file no. on the निर्देशपत्र, never copied from a sample); `date`: "__.__.<current year>".
   - `to`; `subject`; `refs` ("आपले पत्र क्र. …, दि. …").
@@ -131,12 +132,12 @@ Both are optional keys of the same spec.json; engine detail: tools/ENGINE_PROMPT
 `python3 tools/verify_outputs.py <outdir> <PREFIX> "<package pdf>" <number of proposal pages>`. It prints one line per check (01.11.2026 सुसंगती; tests: `tests/test_verify_outputs.py`):
 - fonts: ascii/hAnsi/cs/eastAsia = DVOT-SurekhMR on every text run, incl. headers/footers (Study, note, letter);
 - no internal ids (`z<digit>_<4 digits>`) anywhere; no repo paths (register/, service-rules/, precedent-library/, pdf/, repo) in the note/letter;
-- every "पृ.N/प.वि." (also lists 5,7, ranges 5-7 / 5 ते 7, Devanagari digits) and "पॅकेज PDF पृ. N" in note, letter and Study is within 1..package pages;
-- no "पॅकेज PDF" in the note body or the letter; no banned word (Step 4 list) in the note body or the letter;
+- every "पृ.N/प.वि." (also lists 5,7, ranges 5-7 / 5 ते 7, Devanagari digits) in note, letter and Study and "पॅकेज PDF पृ. N" in the Study is within 1..package pages;
+- no "पॅकेज PDF" and no warning word (§4.27 list) anywhere in the note (body + related) or the letter; no banned word (Step 4 list) in the note body or the letter;
 - note signer chain = INSTRUCTIONS §4.6 in order; "अ.मु.स. (वित्त)" present only when the last para contains "वित्त विभागाच्या मान्यतेस्तव";
 - letter: new page/section; ref no. `संकिर्ण-<year>/<file no>/प्र.क्र.<n>/का.6`; e-mail; विषय/संदर्भ bold + centre; "आपला," (no "आपली,"); "( राजेश वडनेरकर )", "अवर सचिव ,महाराष्ट्र शासन", "प्रत : निवड नस्ती";
 - Study headings भाग 0 … भाग 7;
-- package: original file name (not `*_Proposal_with_GRs.pdf`); exactly "पृ. i / N" in the bottom strip of every page; bookmarks; page count = proposal + enclosure pages of `<pdf>.map.json` (no separator pages); no mark "TEXT NOT FOUND"/0 hits; no annotation on proposal pages; only Highlight annotations.
+- package: original file name (not `*_Proposal_with_GRs.pdf`); exactly "पृ. i / N" in the bottom strip of every page; bookmarks; page count = proposal + enclosure pages of `<pdf>.map.json` (no separator pages); no mark "TEXT NOT FOUND"/0 hits; no annotation on proposal pages; only Highlight annotations; docx core properties and PDF metadata blank, no AI/tool names (§4.27).
 
 Then a second read of every number and date against the page images.
 

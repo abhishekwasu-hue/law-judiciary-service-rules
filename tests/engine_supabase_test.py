@@ -610,25 +610,26 @@ if pymupdf and FONTF:
     d.save(os.path.join(ox, PROP)); d.close()
     json.dump({"state": "done", "package_pdf": PROP}, open(os.path.join(ox, "status.json"), "w", encoding="utf-8"))
     spx = os.path.join(tmp, "spec_x.json")
-    json.dump({"related": [{"heading": "GR", "text": ["“" + LINE.replace("नवीन", "जुनी") + "”"], "source": "(पॅकेज PDF पृ. 2)"}]},
+    json.dump({"related": [{"heading": "GR", "text": ["“" + LINE.replace("नवीन", "जुनी") + "”"], "source": "परि. 2 (पृ.2/प.वि.)"}]},
               open(spx, "w", encoding="utf-8"), ensure_ascii=False)
     run_row.update(state="running", step="तपासणी चालू", warnings=[])
     r = run("extracts", ox, spx, os.path.join(tmp, "absent_study.json"))
     check(r.returncode == 0 and run_row["state"] == "running"
           and any(w.startswith("पडताळणी अपूर्ण — उतारे: 1 उतारे") and "related[1]" in w for w in run_row["warnings"]),
           f"extracts: final mismatch in related -> delivered with a 'पडताळणी अपूर्ण' warning ({run_row['warnings']} {r.stderr[:200]})")
-    # the same --extra sources as the in-run check: an extract marked "(पॅकेज PDF मध्ये नाही)" found in register/ = ok
+    # the same --extra sources as the in-run check: a related source with no page marker (C27: page not in the returned
+    # PDF) found in register/ = ok
     regdir = os.path.join(tmp, "reg_x"); os.makedirs(regdir)
     XL = "अतिरिक्त स्रोतातील हा उतारा पडताळणीसाठी पुरेसा लांब आहे असे समजावे."
     open(os.path.join(regdir, "r.md"), "w", encoding="utf-8").write("नोंद: " + XL + "\n")
-    json.dump({"related": [{"heading": "GR", "text": ["“" + XL + "”"], "source": "(पॅकेज PDF मध्ये नाही)"}]},
+    json.dump({"related": [{"heading": "GR", "text": ["“" + XL + "”"], "source": "शासन निर्णय, परि. 2"}]},
               open(spx, "w", encoding="utf-8"), ensure_ascii=False)
     run_row.update(state="running", step="तपासणी चालू", warnings=[])
     r = run("extracts", ox, spx, os.path.join(tmp, "absent_study.json"), "--extra", regdir)
     check(r.returncode == 0 and run_row["warnings"] == [], f"extracts --extra: not-in-package extract found in the extra source ({run_row['warnings']})")
     check(len(es0.extra_sources()) >= 1 and all(os.path.exists(x) for x in es0.extra_sources())
           and any(x.endswith("register") for x in es0.extra_sources()), f"extra_sources: repo register/ (+ service-rules, OLDCASES, PRECEDENT when present) {es0.extra_sources()}")
-    json.dump({"related": [{"heading": "GR", "text": ["“" + LINE + "”"], "source": "(पॅकेज PDF पृ. 2)"}]},
+    json.dump({"related": [{"heading": "GR", "text": ["“" + LINE + "”"], "source": "परि. 2 (पृ.2/प.वि.)"}]},
               open(spx, "w", encoding="utf-8"), ensure_ascii=False)
     run_row.update(state="running", step="तपासणी चालू", warnings=[])
     r = run("extracts", ox, spx, os.path.join(tmp, "absent_study.json"))
@@ -637,7 +638,7 @@ if pymupdf and FONTF:
           f"extracts: all match -> no warning, no scratch file left ({run_row['warnings']})")
     # note body “…” quotes: checked against the cited पृ.N/प.वि. page, WARNING only (new check)
     json.dump({"note": {"first": "पत्रास अनुसरुन सादर.", "paras": ["शासन निर्णयात “" + LINE.replace("नवीन", "जुनी") + "” अशी तरतूद आहे (पृ.2/प.वि.)."]},
-               "related": [{"heading": "GR", "text": ["“" + LINE + "”"], "source": "(पॅकेज PDF पृ. 2)"}]},
+               "related": [{"heading": "GR", "text": ["“" + LINE + "”"], "source": "परि. 2 (पृ.2/प.वि.)"}]},
               open(spx, "w", encoding="utf-8"), ensure_ascii=False)
     r = run("extracts", ox, spx, os.path.join(tmp, "absent_study.json"))
     check(r.returncode == 0 and run_row["state"] == "running" and len(run_row["warnings"]) == 1

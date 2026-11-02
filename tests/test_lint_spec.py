@@ -260,15 +260,81 @@ class LintSpec(unittest.TestCase):
 
     def test_package_pdf_in_note(self):
         self.bad(self.s122, lambda s: s["note"]["paras"].__setitem__(0, s["note"]["paras"][0] + " (पॅकेज PDF पृ. 3)"),
-                 "'पॅकेज PDF'", "note.paras[0]")
+                 "draft word — 'पॅकेज'", "note.paras[0]")
 
     def test_package_pdf_in_letter(self):
         self.bad(self.s122, lambda s: s["letter"].__setitem__("intro", s["letter"]["intro"] + " (पॅकेज PDF पृ. 3)"),
-                 "'पॅकेज PDF'", "letter.intro")
+                 "draft word — 'पॅकेज'", "letter.intro")
 
-    def test_package_pdf_allowed_in_related(self):
-        s = copy.deepcopy(self.s122); s["related"][0]["source"] += " (पॅकेज PDF पृ. 3)"
-        self.assertEqual(L.lint_spec(s), [])
+    # ---- C27 (02.11.2026): no package / warning / AI word in the drafts; related source "(पृ.N/प.वि.)" ----
+    def test_package_marker_in_related_source_fails(self):
+        for marker in (" (पॅकेज PDF पृ. 3)", " (पॅकेज PDF मध्ये नाही)"):
+            with self.subTest(marker=marker):
+                probs = self.bad(self.s122, lambda s: s["related"][0].__setitem__("source", "परिच्छेद 2" + marker),
+                                 "draft word — 'पॅकेज'", "related[0].source")
+                self.assertTrue(any(p.startswith("related[0].source: page marker") for p in probs), probs)
+
+    def test_package_in_related_heading_and_quote_fails(self):
+        self.bad(self.s122, lambda s: s["related"][0].__setitem__("heading", s["related"][0]["heading"] + " (पॅकेज)"),
+                 "draft word — 'पॅकेज'", "related[0].heading")
+        self.bad(self.s122, self.add0(" “पॅकेज PDF”"), "draft word — 'पॅकेज'", "note.paras[0]")   # quotes do not exempt "पॅकेज"
+        self.bad(self.s122, lambda s: s["related"][0]["text"].append("उतारा (पॅकेज PDF पृ. 3)"),
+                 "draft word — 'पॅकेज PDF'", f"related[0].text[{len(self.s122['related'][0]['text'])}]")
+
+    def test_related_source_marker_forms_ok(self):
+        for src in ("दि. 06.11.1982, परि. 2 (पृ.6/प.वि.)", "नियम 13 (ब) (पृ.१७,१८/प.वि.)", "परि. 3 (पृ.6-7/प.वि.)",
+                    "परि. 3 (पृ. 6 / प.वि.).", "शासन निर्णय पृ. 2-3, परि. 4 (पृ.9-10/प.वि.)", "शासन निर्णय दि. 06.11.1982, परि. 2"):
+            with self.subTest(src=src):
+                s = copy.deepcopy(self.s122); s["related"][0]["source"] = src
+                self.assertEqual(L.lint_spec(s, pages=20), [])
+                self.assertEqual(L.related_source_problems(src), [])
+
+    def test_related_source_marker_not_at_end_or_twice(self):
+        for src in ("(पृ.6/प.वि.) परि. 2", "परि. 2, पृ.6/प.वि.", "परि. 2 (पृ.6/प.वि.) (पृ.7/प.वि.)", "परि. 2 (पृ.  /प.वि.)"):
+            with self.subTest(src=src):
+                self.bad(self.s122, lambda s: s["related"][0].__setitem__("source", src), "page marker", "related[0].source")
+
+    def test_related_source_page_range(self):
+        s = copy.deepcopy(self.s122); s["related"][0]["source"] = "परि. 2 (पृ.25/प.वि.)"
+        self.assertTrue(any("related[0].source" in p and "page 25 outside package" in p for p in L.lint_spec(s, pages=20)))
+
+    def test_draft_words_each_fail(self):
+        words = ["इशारा", "पडताळणी अपूर्ण", "मागवावे", "वाचन अपूर्ण", "अस्पष्ट", "पडताळलेले नाही", "टीप : तपासावे",
+                 "टीप:", "warning", "TODO", "package PDF", "AI", "Claude", "Anthropic", "मॉडेल", "model", "स्वयंचलित",
+                 "automatic", "engine", "प्रणालीने तयार", "generated", "LLM", "GPT", "Gemini"]
+        for w in words:
+            with self.subTest(word=w):
+                self.bad(self.s122, self.add0(f" {w} "), "draft word", "note.paras[0]")
+                self.bad(self.s122, lambda s: s["letter"].__setitem__("subject", s["letter"]["subject"] + f" {w}"),
+                         "draft word", "letter.subject")
+                self.bad(self.s122, lambda s: s["related"][0].__setitem__("heading", s["related"][0]["heading"] + f" {w}"),
+                         "draft word", "related[0].heading")
+                self.bad(self.s122, lambda s: s["related"][0].__setitem__("source", f"{w} " + s["related"][0]["source"]),
+                         "draft word", "related[0].source")
+                # verbatim: inside “…” quotes of own text and in the related extract text — exempt
+                q = copy.deepcopy(self.s122); q["note"]["paras"][0] += f" “{w}”"; q["related"][0]["text"].append(f"उतारा {w}")
+                self.assertFalse([p for p in L.lint_spec(q) if "draft word" in p])
+
+    def test_tell_words(self):
+        """lead (AI_TELLS): em dash, arrows, web addresses, "छापील पृ." in own text (not in quotes / extracts)."""
+        for w in ("—", "→", "https://gr.maharashtra.gov.in", "www.example.com", "छापील पृ. 3"):
+            with self.subTest(w=w):
+                self.bad(self.s122, self.add0(f" अ {w} ब"), f"draft word — '", "note.paras[0]")
+                self.bad(self.s122, lambda s: s["related"][0].__setitem__("source", f"परि. 2 {w}"), "draft word", "related[0].source")
+                q = copy.deepcopy(self.s122); q["note"]["paras"][0] += f" “अ {w} ब”"; q["related"][0]["text"].append(f"उतारा {w}")
+                self.assertFalse([p for p in L.lint_spec(q) if "draft word" in p])
+        self.assertEqual(L.draft_word_hits("www.maharashtra.gov.in या संकेतस्थळावर"), [])   # official GR website line
+
+    def test_draft_words_no_false_hits(self):
+        for t in ("AIR 1990 SC 123", "प्रस्तावासोबत खालील माहिती उपलब्ध नाही:-", "MAIN", "remodelled", "टीपणी", "____"):
+            with self.subTest(t=t):
+                self.assertEqual(L.draft_word_hits(t), [])
+
+    def test_shuddhipatrak_in_related_heading(self):
+        self.bad(self.s122, lambda s: s["related"][0].__setitem__("heading", "वित्त विभाग, शासन शुद्धीपत्रक दि. 01.06.2015"),
+                 "शुद्धिपत्रक", "related[0].heading")
+        q = copy.deepcopy(self.s122); q["related"][0]["text"].append("शासन शुध्दीपत्रक (जसाच्या तसा)")
+        self.assertFalse([p for p in L.lint_spec(q) if "§4.24" in p])
 
     def test_unparsed_reference(self):
         self.bad(self.s122, lambda s: s["note"]["paras"].__setitem__(0, s["note"]["paras"][0] + " (पृ.5 व 7/प.वि.)"),

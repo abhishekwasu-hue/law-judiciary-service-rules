@@ -8,9 +8,11 @@ Uses tools/mkdocs.py (Section templates, tables supported) + docxcompose.
 Checks: every text run is DVOT-SurekhMR in all four rFonts attributes (ascii/hAnsi/cs/eastAsia); with a letter, 2 sections
 whose margins equal the two templates. Exit code 1 if a check fails.
 Also writes <outdir>/<PREFIX>_Note_and_Letter.pdf preview if LibreOffice (soffice) is available (warning only if absent/failed)."""
-import os, sys, subprocess, tempfile, shutil, copy
+import os, sys, subprocess, tempfile, shutil, copy, json
 import docx
 from docx.oxml.ns import qn
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from clean_meta import clean_docx  # noqa: E402 — C27 §4: blank core/app properties
 
 FONT = "DVOT-SurekhMR"
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -60,6 +62,11 @@ def main(spec, outdir, pre):
         lp = os.path.join(tmp, f"{pre}_Letter.docx")
         has_letter = os.path.exists(lp)
         (compose(note, docx.Document(lp)) if has_letter else note).save(out)
+        try:
+            author = json.load(open(spec, encoding="utf-8-sig")).get("doc_author")
+        except Exception:
+            author = None
+        clean_docx(out, author)   # C27 §4 (docxcompose / python-docx leave no trace)
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     d = docx.Document(out); ok = True

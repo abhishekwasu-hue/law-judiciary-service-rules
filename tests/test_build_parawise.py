@@ -115,6 +115,15 @@ class TestLintParawise(unittest.TestCase):
         self.assertEqual(len([w for w in W if "Devanagari" in w]), 1, W)
         self.assertEqual(LP.lint_parawise(s), [])   # warning only
 
+    def test_draft_words(self):
+        """C27 (02.11.2026): no "package PDF" / "पॅकेज" / "warning" / "TODO" / AI word in the parawise draft."""
+        for w in ("package PDF", "पॅकेज", "warning", "TODO", "AI", "Claude", "model", "engine", "automatic", "generated"):
+            with self.subTest(word=w):
+                s = copy.deepcopy(self.spec); s["parawise"]["paras"][0]["remarks"] += f" See {w} p. 3."
+                self.assertTrue(any("draft word" in p for p in LP.lint_parawise(s)), w)
+        s = copy.deepcopy(self.spec); s["parawise"]["paras"][0]["remarks"] += " The order reads “warning issued”."
+        self.assertEqual(LP.lint_parawise(s), [])   # inside quotes: verbatim
+
     def test_verification_type(self):
         s = copy.deepcopy(self.spec); s["parawise"]["verification"] = "yes"
         self.assertTrue(any("verification" in p for p in LP.lint_parawise(s)))
@@ -184,6 +193,9 @@ class TestBuildParawise(unittest.TestCase):
             self.assertEqual([c.text for c in t.rows[i].cells], [it["para"], it["averment"], it["remarks"]])
         self.assertTrue(all(r.bold for c in t.rows[0].cells for p in c.paragraphs for r in p.runs))
         self.assertEqual(bad_fonts(d), 0)
+        sys.path.insert(0, TOOLS)
+        import clean_meta
+        self.assertEqual(clean_meta.docx_meta_problems(out), [])   # C27 §4: no python-docx / AI trace
         rf = d.styles["Normal"].element.rPr.rFonts
         self.assertEqual({rf.get(qn("w:" + k)) for k in ("ascii", "hAnsi", "cs", "eastAsia")}, {FONT})
         if shutil.which("soffice"):

@@ -26,6 +26,8 @@ Rules
     copies / addressee: address part; the same "मा." / "ध्द" exemptions as lint_spec: one "मा." before a title phrase,
     "निवृत्त न्यायमूर्ती", office designations "<पद>, उच्च न्यायालय", person names after श्री./श्रीमती/कै./डॉ.). corrections.instead_of / read_as are verbatim text of the original order: not
     checked. The english block is not checked for Marathi rules.
+  - C27 (02.11.2026): lint_spec.draft_word_hits on the own text and the english block — no "पॅकेज", no warning /
+    working word, no AI / automation word (outside “…” quotes)
 WARN: lint_spec.warn_hits on the same own text; gr / memo without a concurrence para (specimen para 3: Finance
 concurrence or delegated powers)."""
 import os, re, sys, json
@@ -160,6 +162,10 @@ def lint_order(spec):
         P += [f"{path}: {m}" for m in lint_spec.style_hits(x)]
         if ma:
             P += [f"{path}: {m}" for m in lint_spec.ma_hits(x)]
+    # C27 (02.11.2026): no warning / working / package / AI word in the draft (own Marathi text and the English block)
+    eng = o.get("english") if isinstance(o.get("english"), dict) else {}
+    for path, x in [(p_, x_) for p_, x_, _ in own_text(o)] + list(lint_spec.strings(eng, "order.english")):
+        P += [f"{path}: draft word — '{w}' — {lint_spec.DRAFT_MSG}" for w in lint_spec.draft_word_hits(x)]
     return P
 
 

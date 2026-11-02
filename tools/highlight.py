@@ -16,6 +16,8 @@ there, so verify_outputs.py no longer reports it. A mark of marks.json may name 
 and/or "text" (then only that record is updated); without them every unplaced record of that page is updated."""
 import sys, json, os, csv, subprocess, tempfile, shutil
 import pymupdf as m
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from clean_meta import clean_pdf  # noqa: E402 — C27 §4: blank PDF metadata / annotation author
 
 
 def add(pg, r):
@@ -91,7 +93,7 @@ def main(pdf, mj):
     if failed:
         print("FAIL (PDF not changed):", failed, file=sys.stderr)
         return 1
-    tmpout = pdf + ".tmp"; d.save(tmpout, garbage=3, deflate=True); d.close(); os.replace(tmpout, pdf)
+    clean_pdf(d); tmpout = pdf + ".tmp"; d.save(tmpout, garbage=3, deflate=True); d.close(); os.replace(tmpout, pdf)
     print("highlights added:", total)
     n_map = update_map(pdf, placed)
     if n_map is not None:

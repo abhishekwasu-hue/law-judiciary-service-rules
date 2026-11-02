@@ -46,7 +46,7 @@ The budget is SOFT: going over it only adds a warning; never skip a check, an es
 | Text layer / OCR read, GR citations list, GR search + fetch (gr_request.py), precedent grep, candidate GR page text | you (MODEL_LIGHT) | finding/fetching only; nothing quoted or decided by you |
 | Facts list from the page IMAGES (numbers, dates, names, stamps, handwriting) | drafter (MODEL) | every page image at 110 dpi; reviewer re-reads |
 | Letter or not; GR choice for the note body + enclosures.json marks; note body + letter (spec without `related`); Study part 0 | drafter (MODEL) | lint; reviewer checks and approves |
-| Note `related` ("संबंधित माहिती (संदर्भासाठी)") — verbatim GR/rule/precedent extracts + source + "(पॅकेज PDF पृ. N)" | related_writer (MODEL_LIGHT) | `extract_check.py`: each extract must occur on its cited package page; mismatches -> drafter |
+| Note `related` ("संबंधित माहिती (संदर्भासाठी)") — verbatim GR/rule/precedent extracts + source + "(पृ.N/प.वि.)" (none when not in the package; §4.27) | related_writer (MODEL_LIGHT) | `extract_check.py`: each extract must occur on its cited package page; mismatches -> drafter |
 | Study parts 2, 3, 4, 7; parts 5–6 = exact copies of the spec's note / letter text (never redrafted) | study_writer (MODEL_LIGHT) | part 3 by `extract_check.py` (mismatches -> drafter); lint; parts 5–6 copied by you from spec |
 | Study part 1 page rendering | helper run (MODEL_LIGHT), then `part1check` vs the drafter's facts | kept only when every number/date/name matches; failing pages -> drafter |
 | Final review: every number/date/name of note, letter, part 0 vs the images; INSTRUCTIONS §4 incl. §4.18; letter-or-not; language; minimal direct corrections | reviewer (MODEL_REVIEW) | 1 review + 1 re-review max; not approved -> delivered with warning (Order step 7) |
@@ -91,10 +91,11 @@ Expected cost per typical proposal (15 pages, 3 GRs; estimate, not yet measured 
 4. In ONE message, two Agent calls (they run in parallel):
    - `related_writer`: "Read the brief, /tmp/work/related_plan.md, /tmp/work/spec.json and OUTDIR/<package> +
      its .map.json. Write /tmp/work/related.json = the spec `related` list (verbatim extracts in “…”, source, each
-     ending "(पॅकेज PDF पृ. N)" or "(पॅकेज PDF मध्ये नाही)")."
+     ending " (पृ.N/प.वि.)" from the map, or with no page marker when the page is not in the package; never
+     "पॅकेज PDF", warnings or remarks — INSTRUCTIONS §4.27)."
    - `study_writer`: "Read the brief, facts.json, spec.json, study_part0.json, candidates.md and the package. Write
      /tmp/work/study_rest.json = parts 2, 3, 4, 7 (build_study parts; part 3 extracts verbatim in “…” with
-     "(पॅकेज PDF पृ. N)")."
+     "(पॅकेज PDF पृ. N)" or "(पॅकेज PDF मध्ये नाही)"; unavailable GRs, discrepancies, cautions in parts 4/7)."
 5. Merge `related.json` into spec.json `related`. Assemble study.json = part 0 + part 1 + parts 2–4 + part 5 (note
    text copied from spec) + part 6 (letter text copied from spec) + part 7. Run
    `python3 tools/extract_check.py "OUTDIR/<package>" --spec /tmp/work/spec.json --study /tmp/work/study.json
@@ -103,7 +104,7 @@ Expected cost per typical proposal (15 pages, 3 GRs; estimate, not yet measured 
    EXTRACTS FAIL -> delegate the MISMATCH units (printed lines) to `drafter` (correct those extracts from the
    page/image; one-way, never back to the cheap tier), merge, re-run; append xlog.json entries to `model_log`. Cap:
    2 drafter rounds (+1 `drafter_strong` if set). Still MISMATCH -> keep the unit unchanged (its source ending stays
-   "(पॅकेज PDF पृ. N)"), warning "पडताळणी अपूर्ण — उतारा मूळ पानाशी जुळला नाही: <where, पृ.>", go on.
+   as written), warning "पडताळणी अपूर्ण — उतारा मूळ पानाशी जुळला नाही: <where, पृ.>", go on.
    UNVERIFIABLE lines are not failures. The workflow repeats this check on the delivered files and reports what is
    left as warnings.
 6. lint -> build_note_letter [-> build_parawise / build_order when spec has `parawise` / `order`] -> build_study ->
@@ -151,7 +152,7 @@ Progress steps (rule 4) as before.
 (a) Facts: a page in facts.json `unclear`, an item `clear:false`, or a handwritten/stamp page whose OCR is empty —
     the drafter already reads every image; if it still reports the page unclear and `drafter_strong` exists,
     delegate ONLY those pages to `drafter_strong` (full image, crop/zoom by rendering at higher dpi with pymupdf).
-    Still unclear -> "अस्पष्ट".
+    Still unclear -> "अस्पष्ट" in the Study, "____" in the note/letter (§4.27).
 (b) lint / verify still failing after 2 fix attempts by you -> `drafter` (give the printed lines + file paths); still
     failing after 2 drafter attempts -> `drafter_strong` if it exists.
 (c) A cheap-tier output fails its check (study_part1.json invalid, part1check MISMATCH, extract_check MISMATCH in
@@ -251,9 +252,13 @@ Step 0 is done by the workflow:
 2. No interaction is possible: never ask questions. Log every doubt (with a provisional default) in Study part 4 and
    part 7, and carry on. "Ask"/"discuss" in any rule file = a `warnings` line + a Study part 4 question. A GR still not
    found after SOP Step 2.3 goes into `grs_missing` (below) + warning "पडताळणी अपूर्ण — GR सापडला नाही: <date, title>
-   (सांकेतांक द्यावा)", and the note/Study say "उपलब्ध नाही — मागवावे".
+   (सांकेतांक द्यावा)", and the Study (part 3/4) says "उपलब्ध नाही — मागवावे"; the note does not mention it (§4.27).
 3. Nothing extra of your own (INSTRUCTIONS §4.13): no boxes, no markings; proposal scan pages unchanged; yellow
    highlights only on the quoted lines of the enclosed GR/rule pages.
+3a. Drafts look hand-made (INSTRUCTIONS §4.27, Abhi 02.11.2026): the note (body + related), letter, order/parawise
+   drafts and the package PDF never carry a warning, a working remark, "पॅकेज PDF", or any mention of AI / model /
+   automation / engine (word list: tools/ENGINE_BRIEF.md [I4.27]); unknown values = "____". Warnings, remarks and
+   unavailable sources go only to the Study (parts 4/7) and status.json `warnings`. Tell every sub-agent this.
 4. Progress — run at each milestone (ignore an error from it, it is only the live status; this step has no Supabase key —
    the command sends the text through the Worker with the run token):
    `python3 tools/engine_supabase.py step "पाने वाचत आहे"` (Step 1), `"GR शोधत आहे"` (Step 2),

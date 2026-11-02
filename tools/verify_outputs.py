@@ -21,7 +21,17 @@ Checks
   - signer chain = INSTRUCTIONS §4.6 names in order, "अ.मु.स. (वित्त)" last
   - "अ.मु.स. (वित्त)" present  <=>  the last numbered para (+ a separate closing line "मान्यतेस्तव सादर.") sends the file
     to Finance / Public Health (lint_spec.finance_route)
- Note body and letter: no "पॅकेज PDF" (allowed only in "संबंधित माहिती" and the Study); no BANNED word
+ Note body and letter: no BANNED word
+ C27 (02.11.2026; all SOFT — delivered with a "पडताळणी अपूर्ण" warning):
+  - no "पॅकेज" anywhere in the Note_and_Letter (संबंधित माहिती too; the Study keeps "पॅकेज PDF पृ. N")
+  - no warning / working / AI word (lint_spec.draft_word_hits: इशारा, पडताळणी अपूर्ण, मागवावे, वाचन अपूर्ण, अस्पष्ट,
+    पडताळलेले नाही, टीप :, warning, TODO, package PDF; AI, Claude, Anthropic, मॉडेल, model, स्वयंचलित, automatic, engine,
+    प्रणालीने तयार, generated, LLM, GPT, Gemini) outside “…” quotes in the note body, the संबंधित माहिती heading (bold
+    numbered line) and "(स्रोत: …)" lines, and the letter; the verbatim extracts are exempt
+  - every "(स्रोत: …)" ends with "(पृ.N/प.वि.)" or carries no page marker (lint_spec.related_source_problems)
+  - metadata (tools/clean_meta.py): Study, Note_and_Letter, Order_Draft, Parawise — core properties blank, app.xml
+    Application without a tool name, no Word comments, no tracked changes; package PDF — Info dictionary blank, no tool
+    name in XMP, no annotation title/subject/content
  Note body and letter (§4.18, text outside “…” quotes only): no 'सौ.'; 'श्री.' followed by a space; letter: no 'तात्काळ'
  Note body and letter (§4.19, outside quotes, lint_spec.lang_hits): no '.:-', no 'करुन' / 'प्रारुप' / 'अनुसरुन', a space after
   'दि.' / 'क्र.' / 'प्र. क्र.' in running text (file nos. / codes with '/' or '-' skipped); missing-info para 'नाही:-'
@@ -38,7 +48,7 @@ Checks
  Optional outputs (02.11.2026; only when the file exists — absent = no line, ALL OK unaffected):
   <PREFIX>_Order_Draft.docx (शासन आदेश-मसुदा) and <PREFIX>_Parawise.docx (परिच्छेदनिहाय अभिप्राय, English):
   fonts (four rFonts = DVOT-SurekhMR incl. headers/footers), no internal ids, no repo paths, पृ. references within
-  1..package pages (text inside “ ” skipped)
+  1..package pages (text inside “ ” skipped); C27: no "पॅकेज" / warning / AI word (outside quotes), metadata blank
  Package PDF:
   - file name is the original proposal name (not *_Proposal_with_GRs.pdf); with --original-name NAME: the file name must
     equal NAME minus a random upload prefix like "11ae057d-" (engine_supabase.strip_upload_prefix: 8 hex characters
@@ -73,8 +83,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from lint_spec import (AMS, BANNED, BARE_CLOSING_RE, FIN, ID_RE, LH_EMAIL, RELATED, REF_NO, REPO_RE, REQUEST,  # noqa: E402,F401
                        MISSING_FORM, MISSING_HEAD, SIGNERS, banned_hits, finance_problems, heading_problems, id_hits,
                        lang_hits, ma_hits, ns, num, part_no, ref_problems, repo_hits, requests_info, signer_problems,
-                       style_hits, unquoted, warn_hits)
+                       style_hits, unquoted, warn_hits, PKG_WORD, draft_word_hits, related_source_problems)
 INTRO_HEAD = "उपरोक्त विषयाबाबत"  # letter intro paragraph (lint_spec.INTRO_START begins with it)
+from clean_meta import docx_meta_problems, pdf_meta_problems  # noqa: E402 — C27 §4 (no tool / AI trace in metadata)
 from engine_supabase import strip_upload_prefix  # noqa: E402 — the ONE upload-prefix rule (§4.16)
 
 results = []
@@ -226,6 +237,7 @@ def main(argv):
             if b["kind"] == "p" and k is not None:
                 have.add(k)
         check("Study headings भाग 0-7", heading_problems(have))
+        check("Study metadata (no tool / AI trace)", docx_meta_problems(fs))
 
     # ---------------- Note and Letter ----------------
     fn = os.path.join(out, f"{pre}_Note_and_Letter.docx")
@@ -260,10 +272,29 @@ def main(argv):
         check("Note_and_Letter पृ. references",
               ref_problems(note_txt, N, "note") + ref_problems(rel_txt, N, "संबंधित माहिती", skip_quotes=True)
               + ref_problems(letter_txt, N, "letter"))
-        pk = []
-        if "पॅकेज PDF" in note_txt: pk.append("note body uses 'पॅकेज PDF' — use पृ.N/प.वि.")
-        if "पॅकेज PDF" in letter_txt: pk.append("letter uses 'पॅकेज PDF'")
-        check("'पॅकेज PDF' only in संबंधित माहिती", pk)
+        # C27 (02.11.2026): no "पॅकेज" anywhere in the Note_and_Letter (संबंधित माहिती too — its sources cite "(पृ.N/प.वि.)")
+        pk = [f"{where}: '{PKG_WORD}' — use पृ.N/प.वि." for where, t in (("note", note_txt), ("संबंधित माहिती", rel_txt),
+                                                                        ("letter", letter_txt)) if PKG_WORD in t]
+        check("no 'पॅकेज' in Note_and_Letter", pk)
+        # C27: warning / working / AI words outside “…” quotes — note body, related heading + source lines, letter
+        # (the verbatim related extracts are exempt)
+        rel_own, rel_src = [], []
+        if rel is not None:
+            for b in bl[rel + 1:rel_end]:
+                if b["kind"] != "p" or not ns(b["text"]):
+                    continue
+                t = ns(b["text"])
+                if t.startswith("(स्रोत:"):
+                    rel_own.append(t); rel_src.append(re.sub(r",\s*(पृ\.[^()]*?/\s*प\.वि\.)$", r" (\1)", re.sub(r"^\(स्रोत:\s*|\)$", "", t)))
+                elif re.match(r"[0-9]+\.", t) and p_bold(Paragraph(b["el"], NL._body)):
+                    rel_own.append(t)
+        check("no warning / working / AI words (note, संबंधित माहिती heading/source, letter)",
+              [f"{where}: '{w}'" for where, t in (("note", note_txt), ("संबंधित माहिती", "\n".join(rel_own)),
+                                                 ("letter", letter_txt))
+               for w in draft_word_hits(t) if w != PKG_WORD])
+        check("संबंधित माहिती source ends with (पृ.N/प.वि.) or no page marker",
+              [f"'{x[:50]}': {p_.split(' — ')[0]}" for x in rel_src for p_ in related_source_problems(x)])
+        check("Note_and_Letter metadata (no tool / AI trace)", docx_meta_problems(fn))
         check("banned words (note body, letter)",
               [f"{where}: '{w}'" for where, t in (("note", note_txt), ("letter", letter_txt)) for w in banned_hits(t)])
 
@@ -377,6 +408,8 @@ def main(argv):
         check(f"{label} internal ids", [f"internal id {x}" for x in id_hits(xt)])
         check(f"{label} repo paths", [f"repo path/word '{x}'" for x in repo_hits(xt)])
         check(f"{label} पृ. references", ref_problems(xt, N, label, skip_quotes=True))
+        check(f"{label} no package / warning / AI words", [f"'{w}'" for w in draft_word_hits(xt)])
+        check(f"{label} metadata (no tool / AI trace)", docx_meta_problems(fx))
 
     # ---------------- Package PDF ----------------
     if P is not None:
@@ -396,6 +429,7 @@ def main(argv):
                 stp.append(f"page {i}")
         check(f"page stamps 'पृ. i / {N}' (bottom strip)", [f"no stamp on {', '.join(stp[:10])}{' …' if len(stp) > 10 else ''}"] if stp else [])
         check("bookmarks", [] if P.get_toc() else ["package has no bookmarks"])
+        check("package PDF metadata (no tool / AI trace)", pdf_meta_problems(P))
         mpath = pkg + ".map.json"
         mp_pr = []
         unmarked = set(range(1, npp + 1))  # pages that must carry no annotation: the proposal (+ reply parts, below)

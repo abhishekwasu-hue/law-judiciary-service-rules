@@ -73,4 +73,7 @@ for i, part in enumerate(spec["parts"]):
             d.add_paragraph()
         elif "image" in blk:
             d.add_picture(blk["image"], width=Cm(blk.get("width_cm", 14)))
-d.save(out); print("ok", out)
+d.save(out)
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from clean_meta import clean_docx  # noqa: E402 — C27 §4: blank core/app properties
+clean_docx(out, spec.get("doc_author")); print("ok", out)

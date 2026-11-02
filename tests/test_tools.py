@@ -143,6 +143,9 @@ class TestPkg3AndHighlight(TmpCase):
         annots = [a.type[1] for pg in d for a in pg.annots()]
         self.assertTrue(annots and set(annots) == {"Highlight"}, annots)
         self.assertEqual([a for pg in d.pages(0, 2) for a in pg.annots()], [])  # nothing on the proposal pages
+        sys.path.insert(0, TOOLS)
+        import clean_meta
+        self.assertEqual(clean_meta.pdf_meta_problems(d), [])   # C27 §4: blank Info / annotation author
 
     def test_bad_page_specs_raise(self):
         sys.path.insert(0, TOOLS)
@@ -215,6 +218,9 @@ class TestPkg3AndHighlight(TmpCase):
         types = [a.type[1] for pg in d for a in pg.annots()]
         self.assertGreater(sum(1 for _ in d[2].annots()), before)
         self.assertEqual(set(types), {"Highlight"})
+        sys.path.insert(0, TOOLS)
+        import clean_meta
+        self.assertEqual(clean_meta.pdf_meta_problems(d), [])   # C27 §4
         d.close()
         # a mark that matches nothing must fail and leave the PDF unchanged
         size = os.path.getsize(out)

@@ -3,7 +3,8 @@
                     [--extra PATH ...] [--json out.json] [--log-out log.json] [--from MODEL] [--to MODEL]
 Verbatim guard (INSTRUCTIONS §1.1) for extracts written on the cheap tier: every quoted extract in the note's
 `related` ("संबंधित माहिती") and in Study part 3 ("भाग 3 — लागू तरतुदी") must occur in the text of the package page
-it cites ("(पॅकेज PDF पृ. N)", "N-M", "N,M").
+it cites: the note's related source "(पृ.N/प.वि.)" (contract C27, 02.11.2026; "N-M", "N,M"; the older "(पॅकेज PDF पृ. N)"
+still read), the Study "(पॅकेज PDF पृ. N)".
 - Unit = one `related` item / one Study part-3 block (para, each bullet, each table row). Extracts = the “…” segments
   of the unit; a `related` text element without “…” counts as a whole extract (when >= 40 characters). Omissions
   ("…", "...", "[…]") split an extract into fragments; each fragment of >= 12 characters is checked.
@@ -18,7 +19,8 @@ it cites ("(पॅकेज PDF पृ. N)", "N-M", "N,M").
   OCR is noisy, so it is compared word by word (a word matches when a page word is >= 75 %
   similar): >= 85 % of the words = ok_ocr; < 60 % on a page whose OCR has >= 40 Devanagari words = mismatch (wrong
   para / paraphrase); anything else, weak OCR, or no OCR at all = "unverifiable" (never a failure).
-- "(पॅकेज PDF मध्ये नाही)" / no page cited: searched in the --extra sources (.pdf text, .txt/.md, .docx text;
+- No page marker (a related source whose page is not in the returned PDF carries none — C27) / "(पॅकेज PDF मध्ये
+  नाही)" (Study) / no page cited: searched in the --extra sources (.pdf text, .txt/.md, .docx text;
   directories recursively) -> ok_extra or mismatch; without --extra -> unverifiable.
 --note-body: also the note body's verbatim “…” quotes (spec note.first + note.paras; pages = the para's "पृ.N/प.वि."
   refs, which cite the returned package) — WARNING only (new check): printed as "WARN MISMATCH …" / "WARN
@@ -107,7 +109,10 @@ def units_related(spec):
             q = QUOTE.findall(t)
             if q: ex += q
             elif len(norm(CITE.sub("", t))) >= MIN_WHOLE: ex.append(CITE.sub("", t))
-        pg = pages_cited(allt)
+        # C27 (02.11.2026): the note's related sources cite the returned PDF as "(पृ.N/प.वि.)" (heading / source only — a
+        # verbatim extract may quote an old file's own "पृ.N/प.वि."); "(पॅकेज PDF पृ. N)" still read (older specs)
+        own = " ".join(str(it.get(k) or "") for k in ("heading", "source"))
+        pg = sorted(set(pages_cited(allt) + note_pages(own)))
         where = f"related[{i + 1}] {str(it.get('heading') or '')[:60]}"
         out.append((where, ex, pg, pg, bool(NOT_IN.search(allt))))
     return out

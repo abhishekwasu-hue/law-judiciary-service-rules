@@ -36,7 +36,21 @@
   Tests: pytest 248 passed; engine_supabase_test ALL PASSED; worker 19/19; all 13 samples LINT OK.
   Owner actions: apply migration 0006 (if not done) and 0007 (optional), deploy, re-run case #7. First live run = test of the sandbox on a real runner.
 
+- 02.11.2026 (Abhi: "Noting drafting mdhe kontahi ishara, package pdf ase शब्द नकोत"; "वरिष्ठ अधिकाऱ्याला असे वाटू नये, की AI che kam aahe"):
+  INSTRUCTIONS §4.27 — drafts (note incl. संबंधित माहिती, letter, order/parawise) carry no warning/working words, no "पॅकेज",
+  no AI words, no "—"/"→"/URLs; related source ends "(पृ.N/प.वि.)" (printed "(स्रोत: …, पृ.N/प.वि.)") or no marker; unknown -> "____";
+  unavailable sources/discrepancies -> Study part 4/7 + warnings. Docx metadata office-like (tools/clean_meta.py: author from
+  doc_author/DOC_AUTHOR, created=modified=build time, revision 1, no stale stats); PDF metadata blank. Research: docs/AI_TELLS.md
+  (77 office notes + 90 letters vs our 6 samples). Evidence: docs/ai-tells-cr131-before-after.png. Tests 293 passed.
+
 ## Pending
+10. **AI-tells decisions (Abhi; provisional default in brackets) — docs/AI_TELLS.md:** (1) Word author name (DOC_AUTHOR) [empty];
+   (2) signer forms "का.अ.(…)" / "अवर सचिव, महाराष्ट्र शासन" as in office files vs §4.5/§4.6 [current]; (3) subject/reference
+   fully bold+centre (§4.10) vs office (label only bold) [current]; (4) "संबंधित माहिती" block + words "स्रोत"/"जसाच्या तसा" (office
+   never uses them) [keep block; drop the two words after decision]; (5) "(1)…; (2)…" lists vs office "."/"," [current];
+   (6) linking words तथापि/त्यानुषंगाने/परंतु [use where fitting, one point per sentence kept].
+   Items removed from samples' notes (still unavailable): CR122 — MCS Pay Rules 1981 rule 11 original, Finance circular 05.12.1985;
+   CR128 — GRs 12.03.2014, 31.03.2018, 14.05.2021, 02.12.2022, 19.04.2022 (सचिव संवर्ग).
 9. **After the audit fix round:** migration 0006/0007, deploy, re-run case #7; watch the first run (sandbox up/down/check lines in the log).
    Deploy from mobile: Actions → "Deploy app" (.github/workflows/deploy-app.yml; needs repo secrets CLOUDFLARE_API_TOKEN + CLOUDFLARE_ACCOUNT_ID — not yet added by Abhi).
    02.11.2026: "Download extra PDFs" re-run — the 4 folder-09 PDFs still fail (archive.org 429, marathi.gov.in DNS from GitHub; archive.org reset from this session) → Abhi gives the PDFs (shabdakosh circular 10.08.2021 first).

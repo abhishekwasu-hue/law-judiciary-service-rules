@@ -9,7 +9,7 @@ content; section 0 wins over every ask / discuss / stop line (no interaction in 
 - Caps per problem: orchestrator 2 + drafter 2 + drafter_strong 1 (if set) attempts; then warning, go on, never loop.
 - "Ask" / "discuss first" ([I3.2], [SOP2] सांकेतांक) = a `warnings` line + a Study part 4 question; work goes on.
 - C R no./year/file no. missing in case.json and on every page -> PREFIX `Case<id>_<year>`, ref_no
-  `संकिर्ण-<year>/____/प्र.क्र.____/का.6`, warning; never a reason to stop, refuse or fail. Unclear page -> "अस्पष्ट".
+  `संकिर्ण-<year>/____/प्र.क्र.____/का.6`, warning; never a reason to stop, refuse or fail. Unclear: [I1.4].
 - Instruction vs a binding rule -> the rule wins in the files; warning "पडताळणी अपूर्ण — सूचना '…' नियम §… मुळे लागू
   केली नाही".
 - Review: 1 review + 1 re-review. The reviewer runs `python3 tools/lint_spec.py /tmp/work/spec.json` to LINT OK
@@ -23,8 +23,8 @@ content; section 0 wins over every ask / discuss / stop line (no interaction in 
 - [I1.2] Every extract carries its source: GR/rule no. + date, page no., para (rule/sub-rule) no.; judgment: court,
   case no., date, para.
 - [I1.3] Only official Govt of India / Maharashtra GRs, rules, court orders; no third-party sources (confidential).
-- [I1.4] Never guess. One form per use: unreadable text on a page -> "अस्पष्ट" (part 1 "[अस्पष्ट]"); a source not
-  readable / not available -> "वाचन अपूर्ण / उपलब्ध नाही"; a GR not found after fetching -> "उपलब्ध नाही — मागवावे".
+- [I1.4] Never guess. In the Study: unreadable text -> "अस्पष्ट" (part 1 "[अस्पष्ट]"); a source not readable / not
+  available -> "वाचन अपूर्ण / उपलब्ध नाही". Drafts: "____" [I4.27].
 - [I3] All government text in Devanagari Marathi (only an affidavit / parawise reply in English). Fewest words.
 - [I5] Precedent library first for the same subject: quote earlier Finance/GAD opinions with ref no./date verbatim;
   never decide "take opinion again / not" yourself; old-case names/diagnoses -> "____".
@@ -39,10 +39,9 @@ content; section 0 wins over every ask / discuss / stop line (no interaction in 
    Finance/GAD opinion, earlier file of the same employee). Read the GR page before quoting; quote verbatim with no., date,
    page, para. Court orders: api.sci.gov.in, bombayhighcourt.nic.in only.
 3. [I4.14] GR missing -> fetch it yourself, without asking: lines `code <सांकेतांक>` / `search <from> <to> <words>` /
-   `dept …` in tools/gr-request.txt, then `python3 tools/gr_request.py` (official URL
-   gr.maharashtra.gov.in/Site/Upload/Government%20Resolutions/Marathi/<code>.pdf; archive.org collection
-   maharashtragr; last 2 code digits = dept: 05 Finance, 12 L&J). Only the GRs needed; add them to the package.
-   Only if still not found: "उपलब्ध नाही — मागवावे", `grs_missing` + warning (its सांकेतांक asked there, section 0).
+   `dept …` in tools/gr-request.txt, then `python3 tools/gr_request.py` (gr.maharashtra.gov.in;
+   archive.org collection maharashtragr; last 2 code digits = dept: 05 Finance, 12 L&J). Only the GRs needed; add them to the package.
+   Still not found: Study "उपलब्ध नाही — मागवावे", `grs_missing` + warning (सांकेतांक asked there); not in the note.
 4. [SOP3][I4.9][I4.15] Letter ONLY if information ESSENTIAL to decide/approve is missing; ask only that, as an
    empty table; nothing supplementary or "nice to have"; never what Govt/this dept already has (own GRs, official
    orders). Addressee as the proposal came: via HC "प्रबंधक …, उच्च न्यायालय (अपील शाखा), मुंबई", else the
@@ -54,8 +53,8 @@ content; section 0 wins over every ask / discuss / stop line (no interaction in 
 6. [I8] Medical reimbursement -> medical-bill/: 00-INDEX.docx first; Medical-Bill-Samples.docx same-type sample,
    wording unchanged, fill only "____"; deficiency -> Format-1 (note + information letter); outside rules /
    delayed / out-of-state -> Format-2 (सा.आ.वि. "एक विशेष बाब"; अ.मु.स. (वित्त) only when going to Finance/PHD);
-   never the sample's name/hospital/diagnosis; drop non-applicable paras, renumber; GR quotes from old files =
-   marked not verified with the original GR.
+   never the sample's name/hospital/diagnosis; drop non-applicable paras, renumber; caution "old-file GR quotes not
+   verified with the original GR" -> Study part 7 only.
 
 ## 3. Note (टिप्पणी) [SOP4]
 - [I4.3] Desk sample format (note of C R 66-2025, letter with letterhead logo); ready-made; only the proposal's
@@ -65,8 +64,14 @@ content; section 0 wins over every ask / discuss / stop line (no interaction in 
   `{"table": [[...],[...]], "bold_last": true}` in note.paras. GR text verbatim in “ ” + "(पृ.N/प.वि.)". Earlier
   record of the same matter = a fact with its reference.
 - Page refs: only "पृ.N/प.वि.", N = page of the returned PDF (proposal 1..n, then reply/extra PDFs, then GR pages;
-  from <pdf>.map.json). Reply pages follow the proposal pages: cite them by their package page, never an invented N.
-  Never "पॅकेज PDF" in the note body or the letter. No repo paths, no internal ids (z6_0235 …).
+  from <pdf>.map.json). Reply pages: cite their package page, never an invented N.
+  No repo paths, no internal ids (z6_0235 …).
+- [I4.27] Drafts (note + related, letter, order/parawise): no warning, no trace of AI. Own text (not quotes /
+  related extracts) never has: "पॅकेज", "इशारा", "पडताळणी अपूर्ण", "मागवावे", "वाचन अपूर्ण", "अस्पष्ट",
+  "पडताळलेले नाही", own "टीप :", warning, TODO, AI, Claude, Anthropic, "मॉडेल", model, "स्वयंचलित", automatic,
+  engine, "प्रणालीने तयार", generated, LLM, GPT, Gemini. Unknown -> "____"; missing GR/source, discrepancies,
+  [I8] caution -> Study part 4/7 + `warnings` only. The missing-info para stays. No "—", "→", URLs.
+  Metadata: tools.
 - Banned (closed list, = tools/lint_spec.py BANNED): "दिसून येते", "असे दिसते", "पडताळणी केली असता",
   "माझ्या मते", "मला वाटते", "असे वाटते", "ठरवावे", "कदाचित", "बहुधा"; also no commentary, theory,
   arithmetic explanation or advice.
@@ -80,12 +85,12 @@ content; section 0 wins over every ask / discuss / stop line (no interaction in 
   / उ.वि.स. नि. उ.स. (श्री. बोंद्रे) / प्र.स. व वि.प. (श्री. खटी); then "अ.मु.स. (वित्त)" ONLY when the file goes
   to Finance (last para (b)); otherwise never.
 - [I4.4] `related` = "संबंधित माहिती (संदर्भासाठी)" at the note's end: verbatim GR/rule/precedent extracts with
-  source; each ends with exactly "(पॅकेज PDF पृ. N)" ("(पॅकेज PDF पृ. N-M)" / "(पॅकेज PDF पृ. N,M)"), or
-  "(पॅकेज PDF मध्ये नाही)" when not in the package [I4.11]. No repo paths, internal ids or old-case names.
+  source; each ends with " (पृ.N/प.वि.)" ("(पृ.N-M/प.वि.)" / "(पृ.N,M/प.वि.)") when in the returned PDF, else no
+  page marker [I4.11][I4.27]. No repo paths, internal ids or old-case names.
 
-- [I4.18] Language: short sentences, one point each, clear subject ("<authority> यांनी … सादर केला आहे."); "श्रीमती" not "सौ."; one space after "श्री."/"श्रीमती"; name as in the proposal (Marathi initials e.g. "ह. ना. आपटे" if the proposal has them, else as written); missing-information list as a table; letter: no "तात्काळ", request "…उपलब्ध करून देण्यात यावी, ही विनंती." Quotes stay verbatim. Model: samples/specs/CR131_2026_special-pay_info-letter.json.
+- [I4.18] Language: short sentences, one point each, clear subject ("<authority> यांनी … सादर केला आहे."); "श्रीमती" not "सौ."; one space after "श्री."/"श्रीमती"; name as in the proposal (its Marathi-initials form if it has one); missing-information list as a table; letter: no "तात्काळ", request "…उपलब्ध करून देण्यात यावी, ही विनंती." Quotes stay verbatim. Model: CR131 sample.
 
-- [I4.19] Marathi forms (GR कपासू-2020/प्र.क्र.56/भाषा-2, दि. 10.11.2022), outside quotes: "दि. 17.09.2026", "क्र. 108", running "प्र. क्र."; ":-" not ".:-"; "करून", "प्रारूप". Exempt: quotes/extracts, पृ.N/प.वि., file nos. and tokens with '/' or '-', signers, dates, GR codes.
+- [I4.19] Marathi forms (GR22, below), outside quotes: "दि. 17.09.2026", "क्र. 108", running "प्र. क्र."; ":-" not ".:-"; "करून", "प्रारूप". Exempt: quotes/extracts, पृ.N/प.वि., file nos. and tokens with '/' or '-', signers, dates, GR codes.
 
 ## 4. Letter [SOP4][I4.5][I4.10]
 - ref_no "संकिर्ण-2026/<file no>/प्र.क्र.<n>/का.6" (spelling "संकिर्ण" even when the निर्देशपत्र has "संकीर्ण"; 2026 =
@@ -123,7 +128,7 @@ Sources: GR22 = मराठी भाषा विभाग GR कपासू-
   [I4.19] stays until Abhi decides. Exemptions: [I4.19].
 - Words [C18 p.3 सूचना 4–5, प्रपत्र 1 p.7]: Marathi initials ("ह. ना. आपटे", not "एच. एन. आपटे") and designations;
   कोश terms, not English words; "Act" = "अधिनियम", "Rules" = "नियम", "Regulations" = "विनियम" [GADT p.61]; no literal
-  English idioms ("In this connection it may be stated that") [GADT 3.5(3) p.7, 4.13(13) p.11].
+  English idioms [GADT 3.5(3) p.7, 4.13(13) p.11].
 - Grammar: one प्रयोग per sentence: "<authority> यांनी … सादर केला आहे." or "… सादर करण्यात आला आहे.", never
   "शासनाने … मान्यता देण्यात आली" [GADT p.58, 60–61; RP p.190–192]. Passive/विध्यर्थ verb agrees with the object:
   "माहिती … देण्यात यावी", "कागदपत्रे … यावीत"; several objects -> the last [GADT p.61; RP p.176–177].
@@ -167,29 +172,28 @@ Sources: GR22 = मराठी भाषा विभाग GR कपासू-
   `11ae057d-`); never `<PREFIX>_Proposal_with_GRs.pdf`.
 - [I4.8][I4.17][SOP6] Study: `python3 tools/build_study.py study.json OUTDIR/<PREFIX>_Study.docx`; read scanned
   pages as images. Headings exactly, in order (भाग 1 on: each on a new page):
-  - "भाग 0 — वरिष्ठांसाठी ब्रीफिंग" (1–2 pages, bullets only): (अ) proposal in one line — who, what, from whom;
-    (आ) key-facts table (dates, period, amount, posts); (इ) provision/GR — no., date, exact condition in one line,
-    पृ./प.वि.; (ई) each approval condition पूर्ण / अपूर्ण / माहिती नाही (facts only); (उ) competent authority
-    (dept / Finance / GAD / cabinet) + basis; (ऊ) financial burden; (ए) earlier similar case / Finance-GAD
-    opinion; (ऐ) proposed action + essential points asked; (ओ) likely seniors' questions with answers from
-    provisions/facts. Optional simple chart here only; note/letter use tables.
+  - "भाग 0 — वरिष्ठांसाठी ब्रीफिंग" (1–2 pages, bullets; [I4.17] (अ)–(ओ)): proposal in one line; key-facts table;
+    GR + exact condition, पृ./प.वि.; each condition पूर्ण / अपूर्ण / माहिती नाही; competent authority + basis;
+    financial burden; earlier case / Finance-GAD opinion; action + points asked; seniors' likely questions with
+    answers. Optional chart here only.
   - "भाग 1 — प्रस्तावाचे मराठी रूपांतर (जसेच्या तसे)": page-wise, verbatim; English translated (names/laws/GR nos.
     in brackets); "[हस्तलिखित शेरा: …]", "[शिक्का: …]", "[अस्पष्ट]".
   - "भाग 2 — प्रस्तावाचा गोषवारा": from/to/letter no.+date; demand in one para; employee/posts/amounts/dates table;
     documents attached and NOT attached/incomplete (page refs).
   - "भाग 3 — लागू तरतुदी (जसाच्या तसा उतारा + स्रोत)": extract, source (no., date, page, para), repo path,
-    status (मूळ वाचले / सारांशावरून / not verified), "(पॅकेज PDF पृ. N)"; missing -> "उपलब्ध नाही — मागवावे".
+    status (मूळ वाचले / सारांशावरून / not verified), "(पॅकेज PDF पृ. N)" or "(पॅकेज PDF मध्ये नाही)"; missing ->
+    "उपलब्ध नाही — मागवावे".
   - "भाग 4 — शंका / माहिती-मागणी": numbered, each with reason + page ref; only what is really needed.
   - "भाग 5 — टिप्पणी (नोंद) मसुदा" (= the note), "भाग 6 — पत्र मसुदा(दे)" (= the letter; blank no./date),
     "भाग 7 — पडताळणी-नोंद": what was read from images, numbers/dates checked twice, unclear items, provisions
-    not found.
+    not found, discrepancies, medical caution [I8].
 
 ## 6. Checks [SOP4][SOP7]
 - Before every build: `python3 tools/lint_spec.py spec.json --study study.json --pages <package pages>` until
   "LINT OK" (caps: section 0; after them build with `--no-lint`, lines -> warnings).
 - `python3 tools/verify_outputs.py OUTDIR PREFIX "OUTDIR/<original name>" <proposal pages> --original-name "<name>"`
-  must print ALL OK (fonts, ids/paths, page-ref ranges, signer chain, letter, Study headings, name, stamps,
-  bookmarks, annotations). After the caps: warnings — except HARD (missing outputs, internal ids / repo paths,
+  must print ALL OK (fonts, ids/paths, page refs, signers, letter, headings, name, stamps, bookmarks,
+  annotations, [I4.27] words/metadata). After the caps: warnings — except HARD (missing outputs, internal ids / repo paths,
   annotations on proposal pages): always fix those.
 - Then re-read every number and date against its page image.
 
