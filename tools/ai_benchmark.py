@@ -368,7 +368,11 @@ def report(out):
 
 
 def chart(res, path):
-    import matplotlib
+    try:
+        import matplotlib
+    except ImportError:  # chart is optional; results.json / results.md are the record (CI has no matplotlib)
+        print("matplotlib not installed — results.png skipped", file=sys.stderr)
+        return
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     runs = res["runs"]
