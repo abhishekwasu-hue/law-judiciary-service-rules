@@ -5,10 +5,17 @@
 const SECRET_KEYS = ['supabase_service_key', 'github_token', 'anthropic_api_key', 'gemini_api_key', 'openai_api_key'];
 const PLAIN_KEYS = ['supabase_url', 'supabase_anon_key', 'github_repo', 'github_branch', 'model', 'model_light', 'model_review', 'budget_usd', 'monthly_budget_usd', 'owner_email',
   // other AI providers (Abhi 02.11.2026, docs/AI_PROVIDERS_RESEARCH.md: A = Study part 1 on Gemini, C = fallback when Claude fails)
-  'part1_provider', 'gemini_model', 'fallback_provider', 'fallback_model', 'fallback_model_light'];
+  'part1_provider', 'gemini_model', 'fallback_provider', 'fallback_model', 'fallback_model_light',
+  // engine tiers read by tools/engine_supabase.py engine_config (QUALITY_AUDIT §7): escalation model, reasoning effort
+  'model_strong', 'effort'];
 const PROVIDERS = { part1_provider: ['', 'claude', 'gemini'], fallback_provider: ['', 'gemini', 'openai'] };
 const MODEL_KEYS = ['gemini_model', 'fallback_model', 'fallback_model_light'];
 const MODEL_NAME = /^[A-Za-z0-9][A-Za-z0-9._:@\/-]{1,99}$/;
+const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'];
+const REQUIRED_KEYS = ['supabase_url', 'supabase_anon_key', 'owner_email']; // never saved empty (Settings PUT)
+const LETTER_STATUS = ['मसुदा', 'पाठवले', 'उत्तर प्राप्त', 'स्मरणपत्र']; // = letters.status CHECK (migration 0001)
+const DEFAULT_RUN_USD = 0.75;                   // estimate for a running run when nothing better is known
+const isId = v => /^\d+$/.test(String(v ?? ''));
 const ALL_KEYS = [...SECRET_KEYS, ...PLAIN_KEYS];
 const FILE_KINDS = ['proposal', 'extra_doc', 'reply'];
 const MAX_UPLOAD = 50 * 1024 * 1024;
@@ -18,6 +25,18 @@ const SIGN_BUCKETS = ['proposals', 'outputs', 'gr-library'];
 const RUN_TOKEN_TTL = 4 * 3600;                 // > job timeout (180 min) + queue time
 const STALE_MS = 3.5 * 3600 * 1000;             // queued/running longer than this = stuck (job timeout 180 min)
 const STALE_REASON = 'वेळ संपली — पुन्हा तयार करा';
+
+// PostgREST error: the browser gets only "db <status>" (no table/column text); code/detail stay for the Worker's own checks.
+class DbError extends Error {
+  constructor(status, body) {
+    super(`db ${status}`);
+    this.status = status;
+    let j = null;
+    try { j = JSON.parse(body); } catch { /* not JSON */ }
+    this.code = (j && j.code) || '';
+    this.detail = j ? [j.message, j.details, j.hint].filter(Boolean).join(' ') : String(body || '');
+  }
+}
 
 const json = (o, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { 'content-type': 'application/json; charset=utf-8' } });
 const bad = (msg, s = 400) => json({ error: msg }, s);
@@ -38,7 +57,7 @@ function sb(cfg) {
     async rest(path, opt = {}) {
       const r = await fetch(`${base}/rest/v1/${path}`, { ...opt, headers: { ...h, 'content-type': 'application/json', Prefer: 'return=representation', ...(opt.headers || {}) } });
       const t = await r.text();
-      if (!r.ok) throw new Error(`db ${r.status}: ${t.slice(0, 200)}`);
+      if (!r.ok) throw new DbError(r.status, t.slice(0, 500));
       return t ? JSON.parse(t) : null;
     },
     async upload(bucket, path, body, type) {
@@ -63,12 +82,25 @@ async function currentUser(req, cfg) {
   const r = await fetch(`${cfg.supabase_url.replace(/\/$/, '')}/auth/v1/user`, { headers: { apikey: cfg.supabase_anon_key, Authorization: `Bearer ${m[1]}` } });
   if (!r.ok) return null;
   const u = await r.json();
-  const rows = await sb(cfg).rest(`members?user_id=eq.${u.id}&select=role`);
-  if (rows.length) return { id: u.id, email: u.email, role: rows[0].role };
-  // first sign-in of the owner email given at setup → becomes owner
-  if (cfg.owner_email && u.email && u.email.toLowerCase() === cfg.owner_email.toLowerCase()) {
-    await sb(cfg).rest('members', { method: 'POST', body: JSON.stringify({ user_id: u.id, email: u.email, role: 'owner' }) });
-    return { id: u.id, email: u.email, role: 'owner' };
+  const db = sb(cfg);
+  const memberRole = async () => {
+    const rows = await db.rest(`members?user_id=eq.${encodeURIComponent(u.id)}&select=role`);
+    return rows && rows.length ? rows[0].role : null;
+  };
+  const role = await memberRole();
+  if (role) return { id: u.id, email: u.email, role };
+  // first sign-in of the owner email given at setup → becomes owner, only with a confirmed e-mail address
+  const confirmed = !!(u.email_confirmed_at || u.confirmed_at);
+  if (confirmed && cfg.owner_email && u.email && u.email.toLowerCase() === cfg.owner_email.toLowerCase()) {
+    // two first requests in parallel: the second insert is ignored (or 409) → read the row the first one wrote
+    let ins = null;
+    try {
+      ins = await db.rest('members', { method: 'POST', body: JSON.stringify({ user_id: u.id, email: u.email, role: 'owner' }), headers: { Prefer: 'resolution=ignore-duplicates,return=representation' } });
+    } catch (e) {
+      if (!(e instanceof DbError && (e.status === 409 || e.code === '23505'))) throw e;
+    }
+    if (ins && ins.length) return { id: u.id, email: u.email, role: 'owner' };
+    return { id: u.id, email: u.email, role: await memberRole() };
   }
   return { id: u.id, email: u.email, role: null };
 }
@@ -115,6 +147,21 @@ async function failRuns(cfg, filter, reason, actor = null) {
   return rows || [];
 }
 
+// Single use of the config token, atomic in Postgres (M, QUALITY_AUDIT §7): only the request whose conditional PATCH
+// sets runs.config_taken_at gets a row back. true = taken now, false = taken before / no such run,
+// null = column not there yet (migration 0005 not applied) → the caller relies on the KV flag alone.
+async function takeConfig(cfg, runId) {
+  try {
+    const rows = await sb(cfg).rest(`runs?id=eq.${Number(runId)}&config_taken_at=is.null`, {
+      method: 'PATCH', body: JSON.stringify({ config_taken_at: new Date().toISOString() }), headers: { Prefer: 'return=representation' },
+    });
+    return !!(rows && rows.length);
+  } catch (e) {
+    if (e instanceof DbError && (e.code === '42703' || e.code === 'PGRST204' || (/config_taken_at/.test(e.detail) && /does not exist|could not find/i.test(e.detail)))) return null;
+    throw e;
+  }
+}
+
 // ---------- monthly spend (calendar month in India time: IST = UTC+5:30, no DST) ----------
 const IST_MS = 5.5 * 3600 * 1000;
 function istMonth(nowMs = Date.now()) {
@@ -133,12 +180,27 @@ function monthlyLimit(cfg) {
   const n = Number(v);
   return v && Number.isFinite(n) && n > 0 ? n : DEFAULT_MONTHLY_USD;
 }
+// Estimated cost of one run: median cost_usd of this month's finished runs, else the per-run budget, else $0.75.
+function runEstimate(cfg, finished) {
+  const c = finished.map(r => r.cost_usd).filter(v => v !== null && v !== undefined && v !== '').map(Number).filter(Number.isFinite).sort((a, b) => a - b);
+  if (c.length) return c.length % 2 ? c[(c.length - 1) / 2] : (c[c.length / 2 - 1] + c[c.length / 2]) / 2;
+  const b = Number(String(cfg.budget_usd || '').trim());
+  return String(cfg.budget_usd || '').trim() && Number.isFinite(b) && b > 0 ? b : DEFAULT_RUN_USD;
+}
 async function monthSpend(cfg) {
   const { month, start, end } = istMonth();
-  const rows = (await sb(cfg).rest(`runs?created_at=gte.${encodeURIComponent(start)}&created_at=lt.${encodeURIComponent(end)}&select=cost_usd,created_at`)) || [];
+  const rows = (await sb(cfg).rest(`runs?created_at=gte.${encodeURIComponent(start)}&created_at=lt.${encodeURIComponent(end)}&select=cost_usd,created_at,state`)) || [];
   const inMonth = rows.filter(r => r.created_at && istMonth(new Date(r.created_at).getTime()).month === month);
   const spent = inMonth.reduce((t, r) => t + (Number(r.cost_usd) || 0), 0);
-  return { month, spent_usd: Math.round(spent * 10000) / 10000, limit_usd: monthlyLimit(cfg), runs: inMonth.length };
+  // queued/running runs (not stale) have no cost yet: each is reserved at the estimate, so runs started together
+  // cannot jointly pass the limit
+  const since = Date.now() - STALE_MS;
+  const isActive = r => (r.state === 'queued' || r.state === 'running') && new Date(r.created_at).getTime() > since;
+  const active = inMonth.filter(isActive);
+  const est = active.length ? runEstimate(cfg, inMonth.filter(r => r.state === 'done' || r.state === 'failed')) : 0;
+  const reserved = active.reduce((t, r) => t + Math.max(0, est - (Number(r.cost_usd) || 0)), 0);
+  return { month, spent_usd: Math.round(spent * 10000) / 10000, limit_usd: monthlyLimit(cfg), runs: inMonth.length,
+    reserved_usd: Math.round(reserved * 10000) / 10000, active_runs: active.length };
 }
 
 // ---------- routes ----------
@@ -186,9 +248,10 @@ async function route(req, env, url) {
     const tok = await runToken(env, req);
     if (!tok || tok.used || tok.run_id !== url.searchParams.get('run_id')) return bad('bad token', 403);
     if (!cfg.anthropic_api_key || !cfg.supabase_url || !cfg.supabase_service_key) return bad('config incomplete (Settings)', 412); // token stays unused
+    if ((await takeConfig(cfg, tok.run_id)) === false) return bad('bad token', 403);
     const exp = tok.exp || Math.floor(Date.now() / 1000) + RUN_TOKEN_TTL;
     await env.SETTINGS.put(tok.key, JSON.stringify({ run_id: tok.run_id, used: true, exp }), { expiration: exp });
-    const out = { anthropic_api_key: cfg.anthropic_api_key, model: cfg.model, model_light: cfg.model_light || '', model_review: cfg.model_review || '', budget_usd: cfg.budget_usd || '', supabase_url: cfg.supabase_url, supabase_service_key: cfg.supabase_service_key };
+    const out = { anthropic_api_key: cfg.anthropic_api_key, model: cfg.model, model_light: cfg.model_light || '', model_review: cfg.model_review || '', budget_usd: cfg.budget_usd || '', model_strong: cfg.model_strong || '', effort: cfg.effort || '', supabase_url: cfg.supabase_url, supabase_service_key: cfg.supabase_service_key };
     // other providers: a key is sent only when its provider is chosen (A: part 1 on Gemini; C: fallback provider)
     const gem = (cfg.part1_provider === 'gemini' || cfg.fallback_provider === 'gemini') && cfg.gemini_api_key;
     if (gem) out.gemini_api_key = cfg.gemini_api_key;
@@ -231,7 +294,10 @@ async function route(req, env, url) {
   if (p === '/api/me') return json(user);
 
   // GET /api/spend (members) → {month, spent_usd, limit_usd (empty setting = 20), runs}: runs.cost_usd this IST calendar month
-  if (p === '/api/spend' && M === 'GET') return json(await monthSpend(cfg));
+  if (p === '/api/spend' && M === 'GET') {
+    const { month, spent_usd, limit_usd, runs } = await monthSpend(cfg);
+    return json({ month, spent_usd, limit_usd, runs });
+  }
 
   // POST /api/runs/sweep → runs queued/running for more than 3.5 h are marked failed (called by the app on load)
   if (p === '/api/runs/sweep' && M === 'POST') {
@@ -265,11 +331,18 @@ async function route(req, env, url) {
       if (k in b && b[k] !== null && !ok.includes(String(b[k]).trim())) return bad(`${k}: one of ${ok.filter(Boolean).join(', ')} or empty`);
     for (const k of MODEL_KEYS)
       if (k in b && b[k] !== null && String(b[k]).trim() !== '' && !MODEL_NAME.test(String(b[k]).trim())) return bad(`${k}: model name`);
+    // model_strong: empty / none = off; effort: one of EFFORTS or empty (= engine default)
+    if ('model_strong' in b && b.model_strong !== null) {
+      const v = String(b.model_strong).trim();
+      if (v !== '' && v.toLowerCase() !== 'none' && !MODEL_NAME.test(v)) return bad('model_strong: model name or none');
+    }
+    if ('effort' in b && b.effort !== null && String(b.effort).trim() !== '' && !EFFORTS.includes(String(b.effort).trim()))
+      return bad(`effort: one of ${EFFORTS.join(', ')} or empty`);
+    for (const k of REQUIRED_KEYS) if (k in b && b[k] !== null && String(b[k]).trim() === '') return bad(`${k} required`);
     for (const k of ALL_KEYS) {
       if (!(k in b) || b[k] === null) continue;
       const v = String(b[k]).trim();
       if (SECRET_KEYS.includes(k) && (v === '' || v.startsWith('••••'))) continue; // unchanged secret
-      if (k === 'owner_email' && !v) continue;
       await env.SETTINGS.put(k, v);
     }
     return json({ ok: true });
@@ -296,11 +369,23 @@ async function route(req, env, url) {
     if (b.cr_year && !/^\d{4}$/.test(String(b.cr_year))) return bad('cr_year: 4 digits');
     const allowed = ['cr_no', 'cr_year', 'file_no', 'subject', 'category', 'priority', 'employee_name', 'post', 'office', 'received_from', 'received_via', 'inward_date', 'due_date'];
     const row = Object.fromEntries(allowed.filter(k => b[k] !== undefined && b[k] !== '').map(k => [k, b[k]]));
-    if (row.cr_no && row.cr_year) {
-      const dup = await db.rest(`cases?cr_no=eq.${encodeURIComponent(row.cr_no)}&cr_year=eq.${encodeURIComponent(row.cr_year)}&select=id&limit=1`);
-      if (dup.length) return json({ error: 'duplicate_cr', existing_id: dup[0].id }, 409);
+    // duplicate: same year and same number ignoring leading zeros ("021" = "21"); cr_no is stored as given
+    const findDup = async () => {
+      if (!row.cr_no || !row.cr_year) return null;
+      const n = String(row.cr_no).replace(/^0+(?=\d)/, '');
+      const dup = await db.rest(`cases?cr_no=match.${encodeURIComponent(`^0*${n}$`)}&cr_year=eq.${encodeURIComponent(row.cr_year)}&select=id&order=id.asc&limit=1`);
+      return dup && dup.length ? dup[0].id : null;
+    };
+    const dupId = await findDup();
+    if (dupId !== null) return json({ error: 'duplicate_cr', existing_id: dupId }, 409);
+    let c;
+    try {
+      [c] = await db.rest('cases', { method: 'POST', body: JSON.stringify(row) });
+    } catch (e) {
+      // a parallel request inserted the same C R between the check and the insert (unique cr_no, cr_year)
+      if (e instanceof DbError && (e.status === 409 || e.code === '23505')) return json({ error: 'duplicate_cr', existing_id: await findDup() }, 409);
+      throw e;
     }
-    const [c] = await db.rest('cases', { method: 'POST', body: JSON.stringify(row) });
     await log(cfg, c.id, user.id, 'case_created', { cr: c.cr_no ? `${c.cr_no}/${c.cr_year || ''}` : '' });
     return json(c);
   }
@@ -308,8 +393,11 @@ async function route(req, env, url) {
   // POST /api/upload?case_id=&kind=  body = file bytes, header x-file-name (original name, URI-encoded)
   if (p === '/api/upload' && M === 'POST') {
     if (!canWrite(user)) return bad('read-only', 403);
-    const caseId = Number(url.searchParams.get('case_id')), kind = url.searchParams.get('kind');
-    const name = decodeURIComponent(req.headers.get('x-file-name') || '');
+    const caseIdRaw = url.searchParams.get('case_id'), kind = url.searchParams.get('kind');
+    let name;
+    try { name = decodeURIComponent(req.headers.get('x-file-name') || ''); } catch { return bad('x-file-name: bad encoding'); }
+    if (!isId(caseIdRaw)) return bad('case_id, kind, x-file-name required');
+    const caseId = Number(caseIdRaw);
     if (!caseId || !FILE_KINDS.includes(kind) || !name || /[\\/]/.test(name)) return bad('case_id, kind, x-file-name required');
     const len = Number(req.headers.get('content-length') || 0);
     if (len > MAX_UPLOAD) return bad('file over 50 MB', 413);
@@ -346,12 +434,13 @@ async function route(req, env, url) {
     if (!canWrite(user)) return bad('read-only', 403);
     if (!cfg.github_repo || !cfg.github_token || !cfg.anthropic_api_key) return bad('Settings: GitHub repo/token and Anthropic key needed', 412);
     const { case_id, instructions } = await req.json();
-    if (!/^\d+$/.test(String(case_id ?? ''))) return bad('case_id required');
+    if (!isId(case_id)) return bad('case_id required');
     const has = await db.rest(`case_files?case_id=eq.${case_id}&kind=eq.proposal&select=id&limit=1`);
     if (!has.length) return bad('upload the proposal PDF first');
     // monthly limit: once this month's spend reached it, no new run is dispatched (runs already going finish)
     const sp = await monthSpend(cfg);
-    if (sp.spent_usd >= sp.limit_usd) return json({ error: 'monthly_budget_reached', spent_usd: sp.spent_usd, limit_usd: sp.limit_usd }, 402);
+    // queued/running runs count at their estimate (reserved_usd), so several runs started together cannot pass it
+    if (sp.spent_usd + sp.reserved_usd >= sp.limit_usd) return json({ error: 'monthly_budget_reached', spent_usd: sp.spent_usd, limit_usd: sp.limit_usd, reserved_usd: sp.reserved_usd }, 402);
     // one run at a time per case (H3, QUALITY_AUDIT §7): a double tap / second tab / second user would start a second,
     // paid run. Runs older than STALE_MS are stuck (swept), so they do not block.
     const since = new Date(Date.now() - STALE_MS).toISOString();
@@ -401,14 +490,17 @@ async function route(req, env, url) {
 
   // GET /api/search?q= → register/*.md full-text search (GitHub code search, server-side)
   if (p === '/api/search' && M === 'GET') {
-    const q = (url.searchParams.get('q') || '').slice(0, 100);
+    // GitHub qualifiers (repo:, org:, user:, path:, in:, language:, … — any `word:` token) are removed from q:
+    // the search stays inside register/ of github_repo
+    const q = (url.searchParams.get('q') || '').slice(0, 100).split(/\s+/).filter(t => t && !/[A-Za-z_]+:/.test(t)).join(' ');
     if (!q || !cfg.github_repo || !cfg.github_token) return json([]);
     const r = await fetch(`https://api.github.com/search/code?q=${encodeURIComponent(`${q} repo:${cfg.github_repo} path:register`)}&per_page=15`, {
       headers: { Authorization: `Bearer ${cfg.github_token}`, Accept: 'application/vnd.github.text-match+json', 'User-Agent': 'prastav-kaksha' },
     });
     if (!r.ok) return bad(`search ${r.status}`, 502);
     const j = await r.json();
-    return json(j.items.map(i => ({ path: i.path, frags: (i.text_matches || []).slice(0, 2).map(x => x.fragment) })));
+    const repo = cfg.github_repo.toLowerCase();
+    return json((j.items || []).filter(i => String((i.repository && i.repository.full_name) || '').toLowerCase() === repo).map(i => ({ path: i.path, frags: (i.text_matches || []).slice(0, 2).map(x => x.fragment) })));
   }
 
   // letters: POST create, PATCH /api/letters/:id update
@@ -416,7 +508,7 @@ async function route(req, env, url) {
     if (!canWrite(user)) return bad('read-only', 403);
     const b = await req.json();
     const row = Object.fromEntries(['case_id', 'ref_no', 'addressed_to', 'sent_date', 'reply_due', 'status'].filter(k => b[k]).map(k => [k, b[k]]));
-    if (!row.case_id) return bad('case_id required');
+    if (!isId(row.case_id)) return bad('case_id required');
     const [l] = await db.rest('letters', { method: 'POST', body: JSON.stringify(row) });
     if (row.sent_date) await db.rest(`cases?id=eq.${row.case_id}`, { method: 'PATCH', body: JSON.stringify({ stage: 'पत्र पाठवले (माहिती प्रतीक्षेत)' }) });
     await log(cfg, row.case_id, user.id, 'letter_saved', row);
@@ -427,7 +519,12 @@ async function route(req, env, url) {
     if (!canWrite(user)) return bad('read-only', 403);
     const b = await req.json();
     const row = Object.fromEntries(['ref_no', 'addressed_to', 'sent_date', 'reply_due', 'reply_received_date', 'status'].filter(k => k in b).map(k => [k, b[k] || null]));
-    const [l] = await db.rest(`letters?id=eq.${m[1]}`, { method: 'PATCH', body: JSON.stringify(row) });
+    if ('status' in row && !LETTER_STATUS.includes(row.status)) return bad(`status: one of ${LETTER_STATUS.join(', ')}`);
+    const [l] = (await db.rest(`letters?id=eq.${m[1]}`, { method: 'PATCH', body: JSON.stringify(row) })) || [];
+    if (!l) return bad('not found', 404);
+    // same as POST: a sent date moves the case to "letter sent"
+    if (row.sent_date) await db.rest(`cases?id=eq.${Number(l.case_id)}`, { method: 'PATCH', body: JSON.stringify({ stage: 'पत्र पाठवले (माहिती प्रतीक्षेत)' }) });
+    await log(cfg, l.case_id, user.id, 'letter_updated', { letter_id: l.id, ...row });
     return json(l);
   }
 
