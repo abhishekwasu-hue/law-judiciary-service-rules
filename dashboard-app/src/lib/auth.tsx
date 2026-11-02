@@ -36,9 +36,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return;
         }
         const client = initSupabase(cfg.supabase_url, cfg.supabase_anon_key);
+        let resolvedUid: string | null = null; // user whose /api/me already succeeded
         const resolve = async (s: Session | null) => {
+          if (!alive) return;
           setSession(s);
           if (!s) {
+            resolvedUid = null;
             setMe(null);
             setPhase('login');
             return;
@@ -48,6 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const m = await api<Me>('/api/me');
             if (!alive) return;
             setMe(m);
+            resolvedUid = s.user.id;
             setPhase('ready');
           } catch (e) {
             if (e instanceof ApiError && e.status === 403) setPhase('not_member');
@@ -60,8 +64,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         };
         const { data } = await client.auth.getSession();
         await resolve(data.session);
+        if (!alive) return; // effect already cleaned up: do not register a listener nobody unsubscribes
         const sub = client.auth.onAuthStateChange((ev, s) => {
-          if (ev === 'SIGNED_IN' || ev === 'SIGNED_OUT') void resolve(s);
+          if (!alive) return;
+          // supabase-js repeats SIGNED_IN on tab focus: same user → keep the session fresh, no extra /api/me
+          if (ev === 'SIGNED_IN' && s && s.user.id === resolvedUid) setSession(s);
+          else if (ev === 'SIGNED_IN' || ev === 'SIGNED_OUT') void resolve(s);
           else if (ev === 'TOKEN_REFRESHED') setSession(s);
         });
         unsub = () => sub.data.subscription.unsubscribe();

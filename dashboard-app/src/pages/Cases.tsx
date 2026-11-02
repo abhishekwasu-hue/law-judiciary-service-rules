@@ -84,9 +84,9 @@ export default function Cases() {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-bold">प्रकरणे <span className="text-base font-normal text-slate-500">({rows.length})</span></h1>
         <div className="flex gap-2">
-          <div className="inline-flex rounded-lg border border-slate-300 p-0.5 dark:border-navy-700" role="tablist">
+          <div className="inline-flex rounded-lg border border-slate-300 p-0.5 dark:border-navy-700" role="group" aria-label="दृश्य">
             {(['table', 'kanban'] as const).map(v => (
-              <button key={v} role="tab" aria-selected={view === v} className={`min-h-tap rounded-md px-3 font-semibold ${view === v ? 'bg-navy-700 text-white' : ''}`} onClick={() => setParam('view', v === 'table' ? '' : v)}>
+              <button key={v} type="button" aria-pressed={view === v} className={`min-h-tap rounded-md px-3 font-semibold ${view === v ? 'bg-navy-700 text-white' : ''}`} onClick={() => setParam('view', v === 'table' ? '' : v)}>
                 {v === 'table' ? 'तक्ता' : 'फलक'}
               </button>
             ))}

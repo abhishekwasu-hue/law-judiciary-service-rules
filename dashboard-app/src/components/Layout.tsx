@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import CommandPalette from './CommandPalette';
@@ -47,6 +47,7 @@ const NAV = [
   { to: '/cases', label: 'प्रकरणे', icon: '🗂️' },
   { to: '/gr', label: 'GR ग्रंथालय', icon: '📚' },
   { to: '/search', label: 'नोंदवही शोध', icon: '🔎' },
+  { to: '/nasti', label: 'नस्ती डॅशबोर्ड', icon: '📊' },
 ];
 
 export function ThemeToggle() {
@@ -66,32 +67,105 @@ export function ThemeToggle() {
   );
 }
 
-/** Logout with an in-app confirmation (no window.confirm). */
-function LogoutButton({ className, label }: { className: string; label: string }) {
+/** In-app logout confirmation (no window.confirm). */
+function LogoutConfirm({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { signOut } = useAuth();
-  const [ask, setAsk] = useState(false);
   useEffect(() => {
-    if (!ask) return;
-    const k = (e: KeyboardEvent) => e.key === 'Escape' && setAsk(false);
+    if (!open) return;
+    const k = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', k);
     return () => window.removeEventListener('keydown', k);
-  }, [ask]);
+  }, [open, onClose]);
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4" onMouseDown={e => e.target === e.currentTarget && onClose()}>
+      <div className="card w-full max-w-sm space-y-4 p-5" role="alertdialog" aria-modal="true" aria-labelledby="logout-q">
+        <div id="logout-q" className="text-lg font-bold">app मधून बाहेर पडायचे का?</div>
+        <p className="text-slate-600 dark:text-slate-300">चालू प्रक्रिया थांबणार नाही; पुन्हा लॉगिन करून पाहता येईल.</p>
+        <div className="flex gap-2">
+          <button className="btn-ghost min-h-tap flex-1" onClick={onClose} autoFocus>नाही, थांबा</button>
+          <button className="btn-primary min-h-tap flex-1" onClick={() => void signOut()}>होय, बाहेर पडा</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LogoutButton({ className, label }: { className: string; label: string }) {
+  const [ask, setAsk] = useState(false);
+  const close = useCallback(() => setAsk(false), []);
   return (
     <>
       <button className={className} onClick={() => setAsk(true)}>{label}</button>
-      {ask && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/50 p-4" onMouseDown={e => e.target === e.currentTarget && setAsk(false)}>
-          <div className="card w-full max-w-sm space-y-4 p-5" role="alertdialog" aria-modal="true" aria-labelledby="logout-q">
-            <div id="logout-q" className="text-lg font-bold">app मधून बाहेर पडायचे का?</div>
-            <p className="text-slate-600 dark:text-slate-300">चालू प्रक्रिया थांबणार नाही; पुन्हा लॉगिन करून पाहता येईल.</p>
-            <div className="flex gap-2">
-              <button className="btn-ghost min-h-tap flex-1" onClick={() => setAsk(false)} autoFocus>नाही, थांबा</button>
-              <button className="btn-primary min-h-tap flex-1" onClick={() => void signOut()}>होय, बाहेर पडा</button>
-            </div>
-          </div>
+      <LogoutConfirm open={ask} onClose={close} />
+    </>
+  );
+}
+
+/** Phone header: settings (owner) + logout behind one "⋯" button so the header fits 360 px. */
+function MoreMenu({ isOwner }: { isOwner: boolean }) {
+  const [open, setOpen] = useState(false);
+  const [ask, setAsk] = useState(false);
+  const closeAsk = useCallback(() => setAsk(false), []);
+  const btn = useRef<HTMLButtonElement>(null);
+  const menu = useRef<HTMLDivElement>(null);
+  const loc = useLocation();
+  useEffect(() => setOpen(false), [loc.pathname]);
+  useEffect(() => {
+    if (!open) return;
+    menu.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
+    const k = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setOpen(false);
+        btn.current?.focus();
+      } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        const items = Array.from(menu.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') || []);
+        const i = items.indexOf(document.activeElement as HTMLElement);
+        const n = items.length;
+        if (!n) return;
+        e.preventDefault();
+        items[(i + (e.key === 'ArrowDown' ? 1 : -1) + n) % n].focus();
+      }
+    };
+    const out = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (!menu.current?.contains(t) && !btn.current?.contains(t)) setOpen(false);
+    };
+    window.addEventListener('keydown', k);
+    window.addEventListener('mousedown', out);
+    return () => {
+      window.removeEventListener('keydown', k);
+      window.removeEventListener('mousedown', out);
+    };
+  }, [open]);
+  const item = 'flex min-h-tap w-full items-center gap-2 px-4 py-2 text-left font-semibold hover:bg-slate-100 focus:bg-slate-100 focus:outline-none dark:hover:bg-navy-800 dark:focus:bg-navy-800';
+  return (
+    <div className="relative">
+      <button
+        ref={btn}
+        className="btn-ghost min-h-tap min-w-tap px-2 text-xl leading-none"
+        aria-label="अधिक पर्याय"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-controls="more-menu"
+        onClick={() => setOpen(o => !o)}
+      >
+        ⋯
+      </button>
+      {open && (
+        <div ref={menu} id="more-menu" role="menu" aria-label="अधिक पर्याय" className="card absolute right-0 top-full z-40 mt-1 w-48 overflow-hidden py-1">
+          {isOwner && (
+            <NavLink to="/settings" role="menuitem" className={item} onClick={() => setOpen(false)}>
+              <span aria-hidden="true">⚙️</span> सेटिंग्ज
+            </NavLink>
+          )}
+          <button role="menuitem" className={item} onClick={() => { setOpen(false); setAsk(true); }}>
+            <span aria-hidden="true">⎋</span> बाहेर पडा
+          </button>
         </div>
       )}
-    </>
+      <LogoutConfirm open={ask} onClose={closeAsk} />
+    </div>
   );
 }
 
@@ -157,24 +231,21 @@ export default function Layout() {
 
       <div className="min-w-0 flex-1">
         <header className="no-print sticky top-0 z-30 flex items-center justify-between gap-2 border-b border-slate-200 bg-white/95 px-4 py-2 backdrop-blur dark:border-navy-800 dark:bg-navy-900/95 md:hidden">
-          <div className="flex items-center gap-2">
-            <img src="/icon.svg" alt="" className="h-8 w-8" />
-            <span className="font-head text-lg font-bold">प्रस्ताव कक्ष</span>
+          <div className="flex min-w-0 items-center gap-2">
+            <img src="/icon.svg" alt="" className="h-8 w-8 shrink-0" />
+            <span className="truncate font-head text-lg font-bold">प्रस्ताव कक्ष</span>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex shrink-0 items-center gap-1">
             <button className="btn-ghost min-h-tap min-w-tap px-2 text-sm font-semibold" onClick={() => setPalette(true)}>शोध</button>
             <ThemeToggle />
-            {me?.role === 'owner' && (
-              <NavLink to="/settings" className="btn-ghost min-w-tap px-2" aria-label="सेटिंग्ज">⚙️</NavLink>
-            )}
-            <LogoutButton className="btn-ghost min-h-tap min-w-tap whitespace-nowrap px-2 text-sm font-semibold" label="बाहेर पडा" />
+            <MoreMenu isOwner={me?.role === 'owner'} />
           </div>
         </header>
         <main className="mx-auto w-full max-w-7xl px-4 pb-28 pt-4 md:pb-10 md:pt-6">
           <ActiveRunsBar />
           <RouteBoundary />
         </main>
-        <nav className="no-print fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)] dark:border-navy-800 dark:bg-navy-900 md:hidden" aria-label="मुख्य">
+        <nav className="no-print fixed inset-x-0 bottom-0 z-30 grid grid-cols-6 border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)] dark:border-navy-800 dark:bg-navy-900 md:hidden" aria-label="मुख्य">
           {NAV.map(i => (
             <NavLink
               key={i.to}

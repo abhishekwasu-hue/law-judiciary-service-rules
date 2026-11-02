@@ -8,11 +8,11 @@ Pre-step for the engine (docs/QUALITY_AUDIT.md §5 item 1). No network. Per page
   <outdir>/p-NN.txt       PDF text layer (empty file when the page has none, e.g. a scan)
   <outdir>/p-NN.ocr.txt   tesseract OCR, only when tesseract is installed (lang mar+eng if both installed, else eng /
                           whatever is available; the lang used is recorded)
-  <outdir>/pages.json     {"pdf", "pages", "dpi", "small_dpi", "files": [{"page", "png", "png_small", "txt", "ocr"}],
+  <outdir>/pages.json     {"pdf", "pdf_sha256" (of the rendered PDF: extract_check.py ignores OCR of another file), "pages", "dpi", "small_dpi", "files": [{"page", "png", "png_small", "txt", "ocr"}],
                            "ocr_lang", "ocr_error",
                            "has_text_layer": [bool per page]}
 Exit 0 also when OCR is unavailable (ocr_lang = null); exit 1 only when the PDF cannot be read/rendered."""
-import json, os, shutil, subprocess, sys
+import hashlib, json, os, shutil, subprocess, sys
 from concurrent.futures import ThreadPoolExecutor
 
 import pymupdf
@@ -86,7 +86,10 @@ def main(argv):
             err = str(e)[:300]
     elif exe:
         err = "tesseract has no mar/eng language data"
-    info = {"pdf": os.path.basename(src), "pages": n, "dpi": dpi, "small_dpi": small if small > 0 else None, "files": files,
+    sha = hashlib.sha256()
+    with open(src, "rb") as fh:
+        for b in iter(lambda: fh.read(1 << 16), b""): sha.update(b)
+    info = {"pdf": os.path.basename(src), "pdf_sha256": sha.hexdigest(), "pages": n, "dpi": dpi, "small_dpi": small if small > 0 else None, "files": files,
             "ocr_lang": lang if exe and lang and not err else None, "ocr_error": err, "has_text_layer": has_text}
     json.dump(info, open(os.path.join(out, "pages.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     print(f"prep_pages: {n} page(s) -> {out} | text layer on {sum(has_text)} | ocr {info['ocr_lang'] or 'none'}"

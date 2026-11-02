@@ -27,6 +27,7 @@ const CaseDetail = lazyRetry(() => import('./pages/CaseDetail'));
 const GrLibrary = lazyRetry(() => import('./pages/GrLibrary'));
 const RegisterSearch = lazyRetry(() => import('./pages/RegisterSearch'));
 const Settings = lazyRetry(() => import('./pages/Settings'));
+const NastiDashboard = lazyRetry(() => import('./pages/NastiDashboard'));
 
 function PageFallback() {
   return (
@@ -71,6 +72,7 @@ function Gate() {
             <Route path="cases/:id" element={<Suspense fallback={<PageFallback />}><CaseDetail /></Suspense>} />
             <Route path="gr" element={<Suspense fallback={<PageFallback />}><GrLibrary /></Suspense>} />
             <Route path="search" element={<Suspense fallback={<PageFallback />}><RegisterSearch /></Suspense>} />
+            <Route path="nasti" element={<Suspense fallback={<PageFallback />}><NastiDashboard /></Suspense>} />
             <Route path="settings" element={<Suspense fallback={<PageFallback />}><Settings /></Suspense>} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>

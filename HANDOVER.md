@@ -1,4 +1,4 @@
-# HANDOVER — state as of 01.11.2026 (App B live, cost tiers, §4.18) (read after CLAUDE.md files)
+# HANDOVER — state as of 02.11.2026 (App B live; branch ccr-323f0225-1a76vj / PR #3 open) (read after CLAUDE.md files)
 
 ## Done (all in this repo)
 - Procedure: INSTRUCTIONS.md §4 items 1–18 (§4.18, 01.11.2026: sentence flow + respectful language), PROPOSAL_SOP.md, PROPOSAL_WORKFLOW.md, samples/specs/ (approved notes), tools/ (mkdocs, build_note_letter, build_study, pkg3, highlight, lint_spec, verify_outputs, gr_request, oldcases_text, prep_pages).
@@ -14,7 +14,10 @@
 
 - 02.11.2026: Abhi approved the CR131 sample built under §4.18–§4.20 (samples/specs/CR131_2026_special-pay_info-letter.json) — the model for letter tables (data only; documents listed after the table) and language.
 
+- 02.11.2026 (PR #3, branch ccr-323f0225-1a76vj, NOT merged/deployed yet): "नस्ती डॅशबोर्ड" tab (Abhi's APK page, unchanged, /nasti); re-audit docs/QUALITY_AUDIT.md §7; three H fixes (APP_B_DESIGN D14: engine isolation, review gate with hashes, one run per case); other AI providers A + C (D15, docs/AI_PROVIDERS_RESEARCH.md). Engine latest commits (before this PR): drafter Sonnet, Opus final review gate, monthly spend limit $20 (hard).
+
 ## Pending
+0. **PR #3** — merged 02.11.2026 on Abhi's word; still to do by Abhi: `scripts/deploy.ps1` (Worker + app) and migration `supabase/migrations/20261102000005_config_taken.sql` in the SQL editor. Other providers (D16): choose in Settings → इतर AI; free hosted models are not confidential-safe (table there). First live run after merge = check of H1 on the real runner (engine user, sudo, bind mount) — watch the run; if it fails at "Process the proposal", the log line names the step. A/C need Abhi's paid Gemini/OpenAI keys in Settings; first real use on an approved case (CR131) and compare.
 1. **C R 128/2026** — Abhi to give सांकेतांक for 4 GRs (12.03.2014, 31.03.2018, 14.05.2021, 02.12.2022) and the CR 128 proposal PDF (not in repo). Then download (gr.maharashtra.gov.in/Site/Upload/Government%20Resolutions/Marathi/<code>.pdf) and rebuild the package: proposal = CR 128 PDF; enclosures SC order pdf/sc/... p.1,2,20,34,35 (para 14 a–c highlighted, p.34), pdf/gr/202204191549468012.pdf p.1-2, pdf/gr/202301111807499612.pdf p.1-2, MJS Rules 2008 pdf/71-district-court-staff-recruitment-rules/... p.1,2,18,19,20, MCS Pension Rules 1982 pdf/80-retirement-age-group-d-reemployment/... p.11,12,22, then the new GRs; update पृ./प.वि. in samples/specs/CR128_*.json; rebuild with tools/build_note_letter.py.
 2. **App A desk page** (claude.ai artifact) — Abhi decides: keep RYzwfiGwJpbVxyD5C2rCy2 or 8cJP8wz6j5tYM5kRHK1rVx, or retire App A (App B is live). If kept: Abhi checks the three downloads on TEST-1, then Claude deletes TEST-1 (cases/TEST-1, outputs/TEST-1__*, assets bdb3fa89612a93be3a0df53ac37f98e9, cfa33bb4f301bb18e77e27aa9eb41fd6).
 3. **Pack 3 decisions still open (Abhi)** — docs/QUALITY_AUDIT.md: which pdf/ folders the engine needs (sparse checkout); approve-before-save rule for samples/specs; App A keep/retire (item 2).

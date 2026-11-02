@@ -16,6 +16,8 @@ interface DataState {
   refresh: () => Promise<void>;
   setStage: (id: number, stage: string) => Promise<void>;
   patchLocal: (c: Case) => void;
+  /** Replace the letters of one case in the shared store (after a local re-read of that case's letters). */
+  setCaseLetters: (caseId: number, rows: Letter[]) => void;
 }
 const Ctx = createContext<DataState>(null as unknown as DataState);
 
@@ -34,24 +36,53 @@ export function DataProvider({ children }: { children: ReactNode }) {
     casesRef.current = cases;
   }, [cases]);
 
-  const refresh = useCallback(async () => {
-    const [c, l] = await Promise.all([
-      sb().from('cases').select('*').order('created_at', { ascending: false }),
-      sb().from('letters').select('*').order('created_at', { ascending: false }),
-    ]);
-    if (c.error) setError(c.error.message);
-    else setError('');
-    setCases((c.data as Case[]) || []);
-    setLetters((l.data as Letter[]) || []);
-    const r = await sb().from('runs').select('*').order('created_at', { ascending: false }).limit(500);
-    const m = new Map<number, Run>();
-    for (const x of (r.data as Run[]) || []) {
-      if (!m.has(x.case_id)) m.set(x.case_id, x);
-      runState.current.set(x.id, x.state);
+  const fetchAll = useCallback(async () => {
+    // A failed read keeps the previous data and reports the error (never shown as "no cases").
+    try {
+      const [c, l, r] = await Promise.all([
+        sb().from('cases').select('*').order('created_at', { ascending: false }),
+        sb().from('letters').select('*').order('created_at', { ascending: false }),
+        sb().from('runs').select('*').order('created_at', { ascending: false }).limit(500),
+      ]);
+      const errs = [c.error && `प्रकरणे: ${c.error.message}`, l.error && `पत्रे: ${l.error.message}`, r.error && `प्रक्रिया: ${r.error.message}`].filter(Boolean);
+      setError(errs.join(' • '));
+      if (!c.error) setCases((c.data as Case[]) || []);
+      if (!l.error) setLetters((l.data as Letter[]) || []);
+      if (!r.error) {
+        const m = new Map<number, Run>();
+        for (const x of (r.data as Run[]) || []) {
+          if (!m.has(x.case_id)) m.set(x.case_id, x);
+          runState.current.set(x.id, x.state);
+        }
+        setLatestRuns(m);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
     }
-    setLatestRuns(m);
     setLoading(false);
   }, []);
+
+  // Coalesced refresh: tab focus, `online` and Realtime (re)subscribe can fire together → at most one fetch in flight + one queued.
+  const inFlight = useRef<Promise<void> | null>(null);
+  const again = useRef(false);
+  const refresh = useCallback(async () => {
+    if (inFlight.current) {
+      again.current = true;
+      return inFlight.current;
+    }
+    const run = (async () => {
+      do {
+        again.current = false;
+        await fetchAll();
+      } while (again.current);
+    })();
+    inFlight.current = run;
+    try {
+      await run;
+    } finally {
+      inFlight.current = null;
+    }
+  }, [fetchAll]);
 
   // Stuck runs (queued/running > 3.5 h) → failed "वेळ संपली — पुन्हा तयार करा" (Worker, service role). Once per app load.
   const canWrite = useCanWrite();
@@ -61,6 +92,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     void refresh();
+    // Realtime does not replay events missed while the tab slept or the network dropped → re-read on return.
+    const onVisible = () => document.visibilityState === 'visible' && void refresh();
+    const onOnline = () => void refresh();
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('online', onOnline);
+    // (re)subscribed: events between the last read and now were not delivered → re-read (coalesced with the first read)
+    const onStatus = (status: string) => status === 'SUBSCRIBED' && void refresh();
     const ch = sb()
       .channel('cases-all')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'cases' }, payload => {
@@ -72,7 +110,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
           setCases(s => (s.some(x => x.id === row.id) ? s.map(x => (x.id === row.id ? row : x)) : [row, ...s]));
         }
       })
-      .subscribe();
+      .subscribe(onStatus);
     const chr = sb()
       .channel('runs-all')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'runs' }, payload => {
@@ -94,14 +132,21 @@ export function DataProvider({ children }: { children: ReactNode }) {
           return n;
         });
       })
-      .subscribe();
+      .subscribe(onStatus);
     return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('online', onOnline);
       void sb().removeChannel(ch);
       void sb().removeChannel(chr);
     };
   }, [refresh, toast]);
 
   const patchLocal = useCallback((row: Case) => setCases(s => s.map(x => (x.id === row.id ? row : x))), []);
+  const setCaseLetters = useCallback(
+    (caseId: number, rows: Letter[]) =>
+      setLetters(s => [...rows, ...s.filter(x => x.case_id !== caseId)].sort((a, b) => (a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : 0))),
+    [],
+  );
 
   /** Optimistic stage change; RLS allows owner/staff; the DB trigger logs it in `activity`. */
   const setStage = useCallback(async (id: number, stage: string) => {
@@ -123,7 +168,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  return <Ctx.Provider value={{ cases, letters, latestRuns, loading, error, refresh, setStage, patchLocal }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ cases, letters, latestRuns, loading, error, refresh, setStage, patchLocal, setCaseLetters }}>{children}</Ctx.Provider>;
 }
 export const useData = () => useContext(Ctx);
 

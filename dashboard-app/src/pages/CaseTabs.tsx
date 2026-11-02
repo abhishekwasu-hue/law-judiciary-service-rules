@@ -1,16 +1,18 @@
-import { useMemo, useRef, useState, type FormEvent } from 'react';
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { api, downloadFile, humanError, uploadFile } from '../lib/api';
+import { lazy, Suspense, useMemo, useRef, useState, type FormEvent } from 'react';
+import { ApiError, api, downloadFile, humanError, uploadFile } from '../lib/api';
 import { ACTION_LABEL, FILE_KIND_LABEL, LETTER_STATUSES, RUN_STATE_LABEL, TONE_HEX, runActive, runTone } from '../lib/constants';
 import { asArray, daysBetween, fmtDate, fmtDateTime, textOf, todayISO } from '../lib/format';
 import { diffLines, type DiffLine } from '../lib/diff';
 import type { CaseFile, Letter, Run } from '../lib/types';
-import { Chip, Empty, Field, Modal, Section, SkeletonRows, Spinner } from '../components/ui';
+import { Chip, Empty, Field, Modal, Section, Skeleton, SkeletonRows, Spinner } from '../components/ui';
 import { useToast } from '../components/Toast';
 import RunProgress, { RunCost, RunWarnings } from '../components/RunProgress';
 import PdfViewer from '../components/PdfViewer';
 import DocxView, { docxParagraphs } from '../components/DocxView';
 import type { CaseCtx } from './CaseDetail';
+
+// Recharts loads only with this chart (not with the case page).
+const StageDaysChart = lazy(() => import('../components/Charts').then(m => ({ default: m.StageDaysChart })));
 
 const ofKind = (files: CaseFile[], kind: string) => files.filter(f => f.kind === kind).sort((a, b) => b.version - a.version || (a.created_at < b.created_at ? 1 : -1));
 const latestRun = (runs: Run[] | null) => runs?.[0];
@@ -71,17 +73,20 @@ export function ReRun({ ctx, title = 'सुधारणा करून पु�
   const toast = useToast();
   const [text, setText] = useState(preset);
   const [busy, setBusy] = useState(false);
+  const [pending, setPending] = useState<number | null>(null); // dispatched run whose Realtime row is not here yet (H3)
   const r = latestRun(ctx.runs);
-  const running = runActive(r); // a failed or stale (> 3.5 h) latest run does not block
+  const running = runActive(r) || (pending !== null && !(ctx.runs ?? []).some(x => x.id === pending)); // a failed or stale (> 3.5 h) latest run does not block
   if (!ctx.canWrite) return null;
   async function go(e: FormEvent) {
     e.preventDefault();
     setBusy(true);
     try {
-      await api('/api/run', { body: { case_id: ctx.c.id, instructions: text.trim() || undefined } });
+      const started = await api<{ id: number }>('/api/run', { body: { case_id: ctx.c.id, instructions: text.trim() || undefined } });
+      setPending(started.id);
       toast('प्रक्रिया पुन्हा सुरू झाली');
       setText('');
     } catch (x) {
+      if (x instanceof ApiError && x.message === 'run_active') setPending(Number((x.data as { run_id?: number } | undefined)?.run_id) || null);
       toast(humanError(x), 'err');
     } finally {
       setBusy(false);
@@ -165,17 +170,9 @@ export function BriefingTab({ ctx }: { ctx: CaseCtx }) {
           )}
           {days.length > 0 && (
             <Section title="टप्पानिहाय दिवस (या प्रकरणाचे)">
-              <div className="h-56">
-                <ResponsiveContainer>
-                  <BarChart data={days} layout="vertical" margin={{ left: 8, right: 16 }}>
-                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#94a3b833" />
-                    <XAxis type="number" allowDecimals={false} tick={{ fontSize: 12 }} />
-                    <YAxis type="category" dataKey="stage" width={150} tick={{ fontSize: 12 }} />
-                    <Tooltip formatter={(v: number) => [`${v} दिवस`, '']} />
-                    <Bar dataKey="days" fill={TONE_HEX.navy} radius={[0, 4, 4, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
+              <Suspense fallback={<Skeleton className="h-40 w-full" />}>
+                <StageDaysChart days={days} />
+              </Suspense>
             </Section>
           )}
         </div>

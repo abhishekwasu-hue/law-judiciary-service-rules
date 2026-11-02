@@ -50,6 +50,8 @@ info = json.load(open(os.path.join(out, "pages.json"), encoding="utf-8"))
 check(info["pages"] == 3 and info["has_text_layer"] == [False, True, False], "pages.json: pages + has_text_layer")
 check([f["png"] for f in info["files"]] == ["p-01.png", "p-02.png", "p-03.png"] and all(f["ocr"] is None for f in info["files"]),
       "pages.json: files[], ocr null")
+import hashlib
+check(info.get("pdf_sha256") == hashlib.sha256(open(pdf, "rb").read()).hexdigest(), "pages.json: pdf_sha256 of the rendered PDF")
 check(info["ocr_lang"] is None and info["dpi"] == 110 and info["pdf"] == "प्रस्ताव.pdf", "pages.json: ocr_lang null, dpi, pdf name")
 check(info["small_dpi"] == 80 and [f["png_small"] for f in info["files"]] == ["p-01.sm.png", "p-02.sm.png", "p-03.sm.png"],
       "pages.json: small_dpi + png_small")

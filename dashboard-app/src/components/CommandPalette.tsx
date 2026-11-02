@@ -53,6 +53,12 @@ export default function CommandPalette({ open, onClose }: { open: boolean; onClo
       <div className="card w-full max-w-xl overflow-hidden" role="dialog" aria-modal="true" aria-label="झटपट शोध">
         <input
           ref={input}
+          role="combobox"
+          aria-expanded={list.length > 0}
+          aria-controls="cmdk-list"
+          aria-autocomplete="list"
+          aria-activedescendant={list[sel] ? `cmdk-${list[sel].id}` : undefined}
+          aria-label="झटपट शोध"
           className="w-full border-b border-slate-200 bg-transparent px-4 py-4 text-lg outline-none dark:border-navy-800"
           placeholder="झटपट शोध — पान किंवा प्रकरण (C R क्र., विषय)…"
           value={q}
@@ -67,18 +73,22 @@ export default function CommandPalette({ open, onClose }: { open: boolean; onClo
             else if (e.key === 'Enter') run(list[sel]);
           }}
         />
-        <ul className="max-h-[50vh] overflow-auto py-1" role="listbox">
-          {list.length === 0 && <li className="px-4 py-3 text-slate-500">काहीही सापडले नाही</li>}
+        {list.length === 0 && <div className="px-4 py-3 text-slate-500" role="status">काहीही सापडले नाही</div>}
+        {/* focus stays in the input (combobox); options are chosen with ↑ ↓ Enter or a tap */}
+        <ul id="cmdk-list" className="max-h-[50vh] overflow-auto py-1" role="listbox" aria-label="निकाल">
           {list.map((c, i) => (
-            <li key={c.id} role="option" aria-selected={i === sel}>
-              <button
-                className={`flex min-h-tap w-full items-center justify-between gap-3 px-4 py-2 text-left ${i === sel ? 'bg-navy-100 dark:bg-navy-800' : ''}`}
-                onMouseEnter={() => setSel(i)}
-                onClick={() => run(c)}
-              >
-                <span className="truncate">{c.label}</span>
-                {c.hint && <span className="shrink-0 text-sm text-slate-500">{c.hint}</span>}
-              </button>
+            <li
+              key={c.id}
+              id={`cmdk-${c.id}`}
+              role="option"
+              aria-selected={i === sel}
+              className={`flex min-h-tap w-full cursor-pointer items-center justify-between gap-3 px-4 py-2 text-left ${i === sel ? 'bg-navy-100 dark:bg-navy-800' : ''}`}
+              onMouseEnter={() => setSel(i)}
+              onMouseDown={e => e.preventDefault()}
+              onClick={() => run(c)}
+            >
+              <span className="truncate">{c.label}</span>
+              {c.hint && <span className="shrink-0 text-sm text-slate-500">{c.hint}</span>}
             </li>
           ))}
         </ul>

@@ -52,6 +52,29 @@ D11. (01.11.2026) **Budget is SOFT** — `budget_usd` (engine default 0.75; Work
     use stored per run (migration 0004).
 D12. (01.11.2026) **Engine speed/quality steps:** page pre-step (tools/prep_pages.py), compact rules tools/ENGINE_BRIEF.md,
     lint before build, verify re-run in the workflow; §4.18 language rule in samples + lint.
+D13. (02.11.2026, Abhi: "Ek tab add karun he application, tyamdhe add kra") **"नस्ती डॅशबोर्ड" tab** — Abhi's
+    नस्ती-स्थिती डॅशबोर्ड (Nasti-Dashboard.apk, Capacitor; its single page assets/public/index.html) copied UNCHANGED to
+    `dashboard-app/public/nasti/index.html` (sha256 fa757418…) and shown at `/nasti` in a full-height iframe
+    (`src/pages/NastiDashboard.tsx`; nav item 📊; phone bottom bar 6 columns). Its data stays in the browser's localStorage
+    (same origin), not in Supabase; Android-only plugins fall back to browser download/share/copy. The static file is served
+    without login (it holds code, no data). Needs a deploy (scripts/deploy.ps1) to go live.
+D14. (02.11.2026, Abhi: "पहिले तीन H मुद्दे दुरुस्त करा") **Engine isolation (H1):** checkout without persisted
+    credentials; keys only in the runner's 700 file `/tmp/engine-secrets/secrets.env` (ENGINE_SECRETS; read by
+    engine_supabase.py), never in the job env; Claude runs as unix user `engine` (no sudo) on a bind mount `/srv/engine`
+    with an explicit env (Anthropic key, run ids, run token, model names). Progress text via Worker `POST /api/engine/step`
+    (run token, this run only). The commit step authenticates with `secrets.GITHUB_TOKEN` in that step only.
+    **Review gate (H2):** verify reads `/tmp/work/review.json` itself; it must be approved and carry `spec_sha256` /
+    `part0_sha256` equal to the final files, and the CLI's modelUsage must show MODEL_REVIEW ran (skipped only when it is
+    the orchestrator's model). **One run per case (H3):** Worker `/api/run` → 409 `run_active` while a non-stale
+    queued/running run exists; the app locks the button from the API reply.
+D15. (02.11.2026, Abhi: "AI साठी A व C") **Other providers** (research: docs/AI_PROVIDERS_RESEARCH.md). Settings: secrets
+    `gemini_api_key`, `openai_api_key`; plain `part1_provider` (''|claude|gemini), `gemini_model`, `fallback_provider`
+    (''|gemini|openai), `fallback_model`, `fallback_model_light`. A key leaves the Worker only when its provider is chosen.
+    **A:** `tools/part1_vision.py` (was gemini_part1.py) writes Study part 1 (one request per page, runner user; result in the Claude result
+    format for cost lines); part1check gate unchanged. **C:** when the main Claude run fails on the provider side
+    (`engine_supabase.py fallback_ok`), LiteLLM 1.105.1 (wheel sha256-checked) is started as the runner on 127.0.0.1:4000
+    and the main run is repeated through it (all Claude model names → fallback models); warning on the case; all gates
+    apply; cost recorded at Claude prices (approximate). Paid keys only. Not yet run with real Gemini/OpenAI keys.
 
 ## Open questions for Abhi (work continues on the defaults)
 Q1. D1/D2 (keys in Cloudflare KV via Settings; setup code read once from the Cloudflare dashboard) — OK?
@@ -69,3 +92,13 @@ Q3. Second AI provider as fallback — default: none.
 7. Live deploy — DONE 01.11.2026 (Abhi's accounts; URL and Supabase project above). First live runs ~10 min, $2.28–3.32
    (all on Opus, before D10/D11). Expected with tiers $1.0–1.8 — not yet measured. Later UX: auto-reload after deploys,
    Marathi errors, duplicate C R notice, live ETA from real run times.
+D16. (02.11.2026, Abhi: "विविध एआय मॉडेल्सचे एपीआय की प्रोव्हाइड करण्याची फॅसिलिटी ठेवा, फ्री मॉडेल पण युज करता आले पाहिजे")
+    **Providers:** gemini, openai, openrouter, groq, mistral, cerebras, cloudflare (Workers AI; + account id), ollama (own
+    server URL, key optional) — Settings keys `<p>_api_key` (cloudflare_api_token), plain `engine_provider` /
+    `engine_model(_light)`, `fallback_provider` / `fallback_model(_light)`, `part1_provider` / `part1_model`,
+    `cloudflare_account_id`, `ollama_base_url`. A key leaves the Worker only for a chosen provider; the Anthropic key is
+    not required when another provider runs the engine. **Engine:** `ENGINE_PROVIDER` runs the whole engine through the
+    LiteLLM gateway from the start; fallback as D15 for any provider ≠ the engine's; part 1 via `tools/part1_vision.py`
+    (Gemini native or OpenAI-compatible chat API). Real cost per answer from `tools/litellm_cost.py` (LiteLLM price table
+    by the provider model; free = $0; checked: Gemini 2.5 Pro/Flash exact). All gates unchanged. Free models: research
+    docs/AI_PROVIDERS_RESEARCH.md §5 — none is both big enough and confidential except own Ollama; Settings shows the table.

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent, type KeyboardEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { sb } from '../lib/supabase';
 import { useData, overdueIds } from '../lib/data';
@@ -36,7 +36,7 @@ export interface CaseCtx {
 
 export default function CaseDetail() {
   const id = Number(useParams().id);
-  const { cases, letters: allLetters, setStage, patchLocal, refresh } = useData();
+  const { cases, letters: allLetters, setStage, patchLocal, setCaseLetters } = useData();
   const canWrite = useCanWrite();
   const toast = useToast();
   const [sp, setSp] = useSearchParams();
@@ -50,49 +50,73 @@ export default function CaseDetail() {
   const runs = useRuns(id || null);
 
   const c = cases.find(x => x.id === id) ?? single ?? null;
+  // the case currently shown: responses that arrive for an earlier id are dropped
+  const curId = useRef(id);
+  curId.current = id;
 
   // A failed fetch must not look like "अजून तयार नाही": keep the old data and show a reload message.
   const [loadErr, setLoadErr] = useState(false);
   const [reloading, setReloading] = useState(false);
   const [caseTry, setCaseTry] = useState(0);
 
+  // another case opened (same component instance): clear everything of the previous one
+  const [shownId, setShownId] = useState(id);
+  if (shownId !== id) {
+    setShownId(id);
+    setSingle(undefined);
+    setFiles([]);
+    setLetters([]);
+    setActivity([]);
+    setLoadErr(false);
+    setEditOpen(false);
+  }
+
   useEffect(() => {
     if (!cases.find(x => x.id === id))
       void sb().from('cases').select('*').eq('id', id).maybeSingle().then(
         ({ data, error }) => {
+          if (curId.current !== id) return;
           if (error) setLoadErr(true);
           setSingle((data as Case) || null);
         },
-        () => { setLoadErr(true); setSingle(null); },
+        () => {
+          if (curId.current !== id) return;
+          setLoadErr(true);
+          setSingle(null);
+        },
       );
   }, [id, cases, caseTry]);
 
   const reloadFiles = useCallback(async () => {
     try {
       const { data, error } = await sb().from('case_files').select('*').eq('case_id', id).order('version', { ascending: false }).order('created_at', { ascending: false });
+      if (curId.current !== id) return;
       if (error) return setLoadErr(true);
       setFiles((data as CaseFile[]) || []);
     } catch {
-      setLoadErr(true);
+      if (curId.current === id) setLoadErr(true);
     }
   }, [id]);
   const reloadLetters = useCallback(async () => {
     try {
       const { data, error } = await sb().from('letters').select('*').eq('case_id', id).order('created_at', { ascending: false });
+      if (curId.current !== id) return;
       if (error) return setLoadErr(true);
-      setLetters((data as Letter[]) || []);
-      void refresh();
+      const rows = (data as Letter[]) || [];
+      setLetters(rows);
+      setCaseLetters(id, rows); // only this case's letters in the shared store (no full refetch)
     } catch {
-      setLoadErr(true);
+      if (curId.current === id) setLoadErr(true);
     }
-  }, [id, refresh]);
+  }, [id, setCaseLetters]);
   const reloadActivity = useCallback(async () => {
     try {
       const { data, error } = await sb().from('activity').select('*').eq('case_id', id).order('at', { ascending: false }).limit(300);
+      if (curId.current !== id) return;
       if (error) return setLoadErr(true);
       setActivity((data as Activity[]) || []);
     } catch {
-      setLoadErr(true);
+      if (curId.current === id) setLoadErr(true);
     }
   }, [id]);
   const reloadMembers = useCallback(async () => {
@@ -110,8 +134,8 @@ export default function CaseDetail() {
     setReloading(true);
     setCaseTry(n => n + 1);
     await Promise.all([reloadFiles(), reloadLetters(), reloadActivity(), reloadMembers()]);
-    setReloading(false);
-  }, [reloadFiles, reloadLetters, reloadActivity, reloadMembers]);
+    if (curId.current === id) setReloading(false);
+  }, [id, reloadFiles, reloadLetters, reloadActivity, reloadMembers]);
 
   useEffect(() => {
     void reloadAll();
@@ -269,9 +293,13 @@ function EditCase({ open, onClose, c, onSaved }: { open: boolean; onClose: () =>
   });
   const [f, setF] = useState(pick(c));
   const [busy, setBusy] = useState(false);
+  // reset from `c` only when the modal opens (false → true); a Realtime update must not wipe what is being typed
+  const wasOpen = useRef(false);
   useEffect(() => {
-    if (open) setF(pick(c));
-  }, [open, c]);
+    if (open && !wasOpen.current) setF(pick(c));
+    wasOpen.current = open;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
   const set = (k: keyof ReturnType<typeof pick>) => (e: { target: { value: string } }) => setF(s => ({ ...s, [k]: e.target.value }));
 
   async function save(e: FormEvent) {

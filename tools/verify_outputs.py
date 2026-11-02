@@ -27,10 +27,12 @@ Checks
   - विषय and संदर्भ paragraphs: centred, every run bold
   - intro paragraph (starting "उपरोक्त विषयाबाबत") contains "ही विनंती" outside quotes (§4.18)
   - "आपला," present, signature "आपली," absent ("आपली पत्रे" in संदर्भ is allowed); lines "( राजेश वडनेरकर )", "अवर सचिव ,महाराष्ट्र शासन", "प्रत : निवड नस्ती"
+ status.json (when <outdir>/status.json exists): `letter_needed` is true/false and true <=> a letter is present
  Study: headings भाग 0 … भाग 7
  Package PDF:
   - file name is the original proposal name (not *_Proposal_with_GRs.pdf); with --original-name NAME: the file name must
-    equal NAME minus a random upload prefix like "11ae057d-" (the *_Proposal_with_GRs.pdf ban is then skipped, §4.16)
+    equal NAME minus a random upload prefix like "11ae057d-" (engine_supabase.strip_upload_prefix: 8 hex characters
+    with at least one letter a-f, so "20261101-CR130.pdf" is kept as is; the *_Proposal_with_GRs.pdf ban is then skipped, §4.16)
   - every page carries exactly "पृ. i / N" in the bottom 40 pt strip; bookmarks present
   - <pdf>.map.json: proposal pages == <proposal pages>; total pages == proposal + enclosure pages (no separator pages);
     no mark with status "TEXT NOT FOUND" / "page not included" or hits == 0 (works with or without per-mark "hits")
@@ -56,7 +58,7 @@ from lint_spec import (AMS, BANNED, FIN, ID_RE, LH_EMAIL, RELATED, REF_NO, REPO_
                        MISSING_FORM, MISSING_HEAD, SIGNERS, banned_hits, finance_problems, heading_problems, id_hits,
                        lang_hits, ns, num, part_no, ref_problems, repo_hits, signer_problems, style_hits, unquoted)
 INTRO_HEAD = "उपरोक्त विषयाबाबत"  # letter intro paragraph (lint_spec.INTRO_START begins with it)
-UPLOAD_PREFIX = re.compile(r"^[0-9a-fA-F]{8}-")
+from engine_supabase import strip_upload_prefix  # noqa: E402 — the ONE upload-prefix rule (§4.16)
 
 results = []
 
@@ -238,6 +240,21 @@ def main(argv):
         last = numbered[-1] if numbered else (ntexts[sig_start - 1] if sig_start else "")
         check("अ.मु.स. (वित्त) <=> Finance last para", finance_problems(last, has_ams))
 
+        # status.json `letter_needed` (engine; reported to the app) must agree with the built file
+        sj = os.path.join(out, "status.json")
+        if os.path.exists(sj):
+            try:
+                ln = json.load(open(sj, encoding="utf-8-sig")).get("letter_needed")
+            except Exception as e:
+                ln = e
+            if isinstance(ln, bool):
+                check("status.json letter_needed = letter in Note_and_Letter",
+                      [] if ln == has_letter else [f"letter_needed {str(ln).lower()} but the Note_and_Letter "
+                                                   + ("has a letter" if has_letter else "has no letter")])
+            else:
+                check("status.json letter_needed = letter in Note_and_Letter",
+                      [f"status.json letter_needed not true/false ({ln!r})"[:120]])
+
         # letter
         if not has_letter:
             print("OK: letter — none (note only)")
@@ -283,7 +300,7 @@ def main(argv):
     # ---------------- Package PDF ----------------
     if P is not None:
         if orig is not None:  # §4.16: the original name is kept even if it looks machine-made
-            want = UPLOAD_PREFIX.sub("", os.path.basename(orig))
+            want = strip_upload_prefix(os.path.basename(orig))
             check("package file name = original proposal name",
                   [] if os.path.basename(pkg) == want else [f"'{os.path.basename(pkg)}' != original name '{want}'"])
         else:

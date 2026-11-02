@@ -1,17 +1,16 @@
-import { useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { sb } from '../lib/supabase';
-import { fmtUsd, getSpend, type Spend } from '../lib/api';
+import { fmtUsd, getSpend, humanError, type Spend } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { dueSoon, isPendingLetter, useData } from '../lib/data';
 import { ACTION_LABEL, CATEGORIES, STAGES, TONE_HEX, stageTone, type Tone } from '../lib/constants';
 import { crLabel, daysBetween, fmtDate, fmtDateTime, monthLabel, textOf, todayISO } from '../lib/format';
 import type { Activity } from '../lib/types';
-import { Empty, Section, Skeleton } from '../components/ui';
+import { Empty, Section, Skeleton, Spinner } from '../components/ui';
 
-// Categorical palette for the donut (10 categories); navy-led, saffron used once.
-const CAT_COLORS = ['#2b4477', '#ee8a1c', '#3b82f6', '#0d9488', '#7c3aed', '#be185d', '#65a30d', '#0891b2', '#a16207', '#64748b'];
+// Recharts is loaded only when the आलेख section is opened.
+const HomeCharts = lazy(() => import('../components/Charts').then(m => ({ default: m.HomeCharts })));
 
 function Kpi({ label, value, tone, to }: { label: string; value: number | null; tone: Tone; to: string }) {
   return (
@@ -40,10 +39,11 @@ function SpendKpi({ spend }: { spend: Spend | null | 'err' }) {
   );
 }
 
-const chartAxis ={ tick: { fontSize: 12, fill: '#64748b' } };
-
 export default function Home() {
-  const { cases, letters, loading } = useData();
+  const { cases, letters, loading, error, refresh } = useData();
+  const [actErr, setActErr] = useState('');
+  const [reloading, setReloading] = useState(false);
+  const [actTry, setActTry] = useState(0);
   const nav = useNavigate();
   const [acts, setActs] = useState<Activity[] | null>(null);
   const isOwner = useAuth().me?.role === 'owner';
@@ -57,8 +57,35 @@ export default function Home() {
   useEffect(() => {
     const since = new Date();
     since.setMonth(since.getMonth() - 12);
-    void sb().from('activity').select('*').gte('at', since.toISOString()).order('at', { ascending: false }).limit(2000).then(({ data }) => setActs((data as Activity[]) || []));
-  }, [cases.length]);
+    void sb().from('activity').select('*').gte('at', since.toISOString()).order('at', { ascending: false }).limit(2000).then(
+      ({ data, error: e }) => {
+        setActErr(e ? e.message : '');
+        if (!e) setActs((data as Activity[]) || []);
+        else setActs(a => a ?? []);
+      },
+      (e: unknown) => {
+        setActErr(String(e));
+        setActs(a => a ?? []);
+      },
+    );
+  }, [cases.length, actTry]);
+  const anyErr = [error, actErr].filter(Boolean).join(' • ');
+  async function reloadAll() {
+    setReloading(true);
+    setActTry(n => n + 1);
+    await refresh();
+    setReloading(false);
+  }
+  // A failed read must not look like "no cases" / "nothing pending".
+  const errCard = anyErr ? (
+    <div className="card flex flex-wrap items-center justify-between gap-3 border-red-300 bg-red-50 p-4 text-red-900 dark:border-red-800 dark:bg-red-900/30 dark:text-red-100" role="alert">
+      <div className="min-w-0">
+        <div className="font-bold">⚠️ माहिती आणता आली नाही — पुन्हा लोड करा</div>
+        <div className="mt-1 break-words text-sm">{humanError(anyErr)}</div>
+      </div>
+      <button className="btn-primary" disabled={reloading} onClick={() => void reloadAll()}>{reloading && <Spinner />} ↻ पुन्हा लोड करा</button>
+    </div>
+  ) : null;
 
   const byId = useMemo(() => new Map(cases.map(c => [c.id, c])), [cases]);
   const monthStart = useMemo(() => {
@@ -134,6 +161,7 @@ export default function Home() {
     return [...m.entries()].map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value).slice(0, 10);
   }, [letters, byId]);
 
+  if (!loading && cases.length === 0 && error) return errCard;
   if (!loading && cases.length === 0)
     return (
       <div className="card">
@@ -143,13 +171,13 @@ export default function Home() {
       </div>
     );
 
-  const tipStyle = { contentStyle: { borderRadius: 8, fontSize: 14 } };
   return (
     <div className="grid gap-5 lg:grid-cols-2">
       <div className="order-first flex flex-wrap items-center justify-between gap-2 lg:col-span-2">
         <h1 className="text-2xl font-bold">मुख्य पृष्ठ</h1>
         <Link to="/new" className="btn-accent">+ नवीन प्रस्ताव</Link>
       </div>
+      {errCard && <div className="order-first lg:col-span-2">{errCard}</div>}
 
       <div className={`order-2 grid grid-cols-3 gap-2 sm:gap-3 lg:order-1 lg:col-span-2 ${isOwner ? 'lg:grid-cols-6' : 'sm:grid-cols-5'}`}>
         <Kpi label="नवीन" value={loading ? null : kpi.new} tone="navy" to="/cases?stage=प्राप्त" />
@@ -162,7 +190,9 @@ export default function Home() {
 
       <div className="order-1 min-w-0 lg:order-2">
         <Section title="आज करायचे" right={<Link to="/cases?overdue=1" className="text-sm font-semibold text-red-700 hover:underline dark:text-red-300">मुदत संपलेली →</Link>}>
-          {todo.length === 0 && overdueCases.length === 0 ? (
+          {error && todo.length === 0 && overdueCases.length === 0 ? (
+            <div className="font-semibold text-red-800 dark:text-red-300" role="alert">माहिती आणता आली नाही — वरील “पुन्हा लोड करा” दाबा.</div>
+          ) : todo.length === 0 && overdueCases.length === 0 ? (
             <Empty icon="✅" title="आज काही प्रलंबित नाही" hint="मुदत संपलेली किंवा 7 दिवसांत येणारी उत्तरे येथे दिसतील." />
           ) : (
             <ul className="divide-y divide-slate-100 dark:divide-navy-800">
@@ -197,7 +227,9 @@ export default function Home() {
 
       <div className="order-3 min-w-0">
         <Section title="अलीकडील हालचाल">
-          {!acts ? <div className="space-y-2">{[0, 1, 2, 3].map(i => <Skeleton key={i} className="h-8 w-full" />)}</div> : acts.length === 0 ? (
+          {!acts ? <div className="space-y-2">{[0, 1, 2, 3].map(i => <Skeleton key={i} className="h-8 w-full" />)}</div> : actErr && acts.length === 0 ? (
+            <div className="font-semibold text-red-800 dark:text-red-300" role="alert">माहिती आणता आली नाही — वरील “पुन्हा लोड करा” दाबा.</div>
+          ) : acts.length === 0 ? (
             <Empty icon="🕘" title="हालचाल नाही" />
           ) : (
             <ul className="divide-y divide-slate-100 dark:divide-navy-800">
@@ -225,83 +257,20 @@ export default function Home() {
           <span>आलेख</span>
           <span className="text-sm font-normal text-slate-500">{chartsOpen ? 'लपवा ▲' : 'दाखवा ▼'}</span>
         </summary>
-      {chartsOpen && <div className="mt-4 grid gap-4 lg:grid-cols-2">
-        <Section title="प्रवर्गनिहाय प्रकरणे">
-          <div className="h-72">
-            {catData.length === 0 ? <Empty title="माहिती नाही" /> : (
-              <ResponsiveContainer>
-                <PieChart>
-                  <Pie data={catData} dataKey="value" nameKey="name" innerRadius="55%" outerRadius="85%" paddingAngle={2} onClick={(d: { name?: string }) => d.name && nav(`/cases?category=${encodeURIComponent(d.name)}`)} className="cursor-pointer">
-                    {catData.map(d => <Cell key={d.name} fill={CAT_COLORS[CATEGORIES.indexOf(d.name as (typeof CATEGORIES)[number])]} />)}
-                  </Pie>
-                  <Tooltip {...tipStyle} />
-                  <Legend wrapperStyle={{ fontSize: 13 }} />
-                </PieChart>
-              </ResponsiveContainer>
-            )}
-          </div>
-        </Section>
-        <Section title="टप्पानिहाय प्रकरणे">
-          <div className="h-72">
-            <ResponsiveContainer>
-              <BarChart data={stageData} layout="vertical" margin={{ left: 4, right: 16 }}>
-                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#94a3b833" />
-                <XAxis type="number" allowDecimals={false} {...chartAxis} />
-                <YAxis type="category" dataKey="name" width={160} {...chartAxis} />
-                <Tooltip {...tipStyle} formatter={(v: number) => [v, 'प्रकरणे']} />
-                <Bar dataKey="value" radius={[0, 4, 4, 0]} className="cursor-pointer" onClick={(d: { name?: string }) => d.name && nav(`/cases?stage=${encodeURIComponent(d.name)}`)}>
-                  {stageData.map(d => <Cell key={d.name} fill={TONE_HEX[d.tone]} />)}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </Section>
-        <Section title="मासिक: प्राप्त विरुद्ध बंद">
-          <div className="h-64">
-            <ResponsiveContainer>
-              <LineChart data={monthly} margin={{ left: -16, right: 8 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#94a3b833" />
-                <XAxis dataKey="name" {...chartAxis} />
-                <YAxis allowDecimals={false} {...chartAxis} />
-                <Tooltip {...tipStyle} />
-                <Legend wrapperStyle={{ fontSize: 13 }} />
-                <Line type="monotone" dataKey="प्राप्त" stroke={TONE_HEX.navy} strokeWidth={2} dot={{ r: 3 }} />
-                <Line type="monotone" dataKey="बंद" stroke={TONE_HEX.green} strokeWidth={2} dot={{ r: 3 }} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </Section>
-        <Section title="कार्यालयनिहाय प्रलंबित उत्तरे">
-          <div className="h-64">
-            {byOffice.length === 0 ? <Empty icon="✅" title="प्रलंबित उत्तर नाही" /> : (
-              <ResponsiveContainer>
-                <BarChart data={byOffice} margin={{ left: -16, right: 8 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#94a3b833" />
-                  <XAxis dataKey="name" {...chartAxis} interval={0} />
-                  <YAxis allowDecimals={false} {...chartAxis} />
-                  <Tooltip {...tipStyle} formatter={(v: number) => [v, 'उत्तरे']} />
-                  <Bar dataKey="value" fill={TONE_HEX.amber} radius={[4, 4, 0, 0]} className="cursor-pointer" onClick={(d: { name?: string }) => d.name && d.name !== 'नमूद नाही' && nav(`/cases?office=${encodeURIComponent(d.name)}`)} />
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </div>
-        </Section>
-        <Section title="सरासरी दिवस — टप्पानिहाय" className="lg:col-span-2">
-          <div className="h-64">
-            {avgDays.length === 0 ? <Empty title="टप्पे बदलल्यावर येथे दिसेल" /> : (
-              <ResponsiveContainer>
-                <BarChart data={avgDays} margin={{ left: -16, right: 8 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#94a3b833" />
-                  <XAxis dataKey="name" {...chartAxis} interval={0} />
-                  <YAxis {...chartAxis} />
-                  <Tooltip {...tipStyle} formatter={(v: number) => [`${v} दिवस`, 'सरासरी']} />
-                  <Bar dataKey="value" fill={TONE_HEX.navy} radius={[4, 4, 0, 0]} className="cursor-pointer" onClick={(d: { name?: string }) => d.name && nav(`/cases?stage=${encodeURIComponent(d.name)}`)} />
-                </BarChart>
-              </ResponsiveContainer>
-            )}
-          </div>
-        </Section>
-      </div>}
+      {chartsOpen && (
+        <Suspense fallback={<div className="mt-4 grid gap-4 lg:grid-cols-2">{[0, 1].map(i => <Skeleton key={i} className="h-72 w-full" />)}</div>}>
+          <HomeCharts
+            catData={catData}
+            stageData={stageData}
+            monthly={monthly}
+            byOffice={byOffice}
+            avgDays={avgDays}
+            onCategory={n => nav(`/cases?category=${encodeURIComponent(n)}`)}
+            onStage={n => nav(`/cases?stage=${encodeURIComponent(n)}`)}
+            onOffice={n => nav(`/cases?office=${encodeURIComponent(n)}`)}
+          />
+        </Suspense>
+      )}
       </details>
     </div>
   );
