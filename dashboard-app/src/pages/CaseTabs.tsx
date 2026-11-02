@@ -94,7 +94,7 @@ export function ReRun({ ctx, title = 'सुधारणा करून पु�
   }
   return (
     <form onSubmit={go} className="space-y-2">
-      <Field label={title}>
+      <Field label={title} hint="ही सूचना पाळून संपूर्ण अभ्यास पुन्हा तयार होतो (कायमच्या नियमांच्या मर्यादेत).">
         <textarea className="input min-h-[80px]" placeholder="उदा. पत्रात फक्त सेवापुस्तकाची प्रत मागवा…" value={text} onChange={e => setText(e.target.value)} />
       </Field>
       <button className="btn-primary" disabled={busy || running}>{busy && <Spinner />} {running ? 'प्रक्रिया चालू…' : 'पुन्हा तयार करा'}</button>

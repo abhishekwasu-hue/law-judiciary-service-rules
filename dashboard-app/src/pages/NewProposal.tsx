@@ -278,7 +278,10 @@ export default function NewProposal() {
                 <select className="input" disabled={locked} value={f.priority} onChange={set('priority')}>{PRIORITIES.map(c => <option key={c}>{c}</option>)}</select>
               </Field>
             </div>
-            <Field label="विशेष सूचना (ऐच्छिक)"><textarea className="input min-h-[72px]" value={f.instructions} onChange={set('instructions')} /></Field>
+            <Field label="विशेष सूचना (ऐच्छिक)" hint="इथे लिहिलेली सूचना अभ्यास करताना पाळली जाते (कायमच्या नियमांच्या मर्यादेत). रिकामे ठेवल्यास नेहमीप्रमाणे.">
+              <textarea className="input min-h-[72px]" value={f.instructions} onChange={set('instructions')}
+                placeholder={'उदा. • पत्रात फक्त सेवापुस्तकाची प्रत मागवा\n• पत्र नको; नस्ती वित्त विभागाकडे पाठवा\n• पान 7 वरील हस्तलिखित शेरा नीट वाचा'} />
+            </Field>
             {done && created ? (
               <Link className="btn-accent flex w-full items-center justify-center py-3 text-xl" to={`/cases/${created.id}?tab=note`}>
                 तयार फाइल पाहा →

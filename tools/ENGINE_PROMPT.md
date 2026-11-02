@@ -13,7 +13,8 @@ caching): this file, then tools/ENGINE_BRIEF.md, then the tool docstrings, then 
   `WORKDIR/in/reply/` = the office's answer to this Section's earlier information-request letter — read it as part of
   the record and prepare the NEXT note on the basis of the proposal + the reply (PROPOSAL_SOP Step 3: letter only if
   essential information is still missing; otherwise the note goes onward for approval).
-- `instructions` (if not empty) = the user's correction for this re-run. Follow it exactly, within the binding rules.
+- `instructions` (if not empty) = the user's instruction for THIS run — given at upload (first run) or as a correction for
+  a re-run. Follow it exactly, within the binding rules; record in Study part 7 how it was applied.
 - `WORKDIR/pages/` = the proposal already split by the workflow (tools/prep_pages.py): `p-NN.png` (110 dpi — the image
   every page is read from), `p-NN.sm.png` (80 dpi — only for your own look at rendered GR/package pages, never for
   reading the proposal), `p-NN.txt` (text layer), `p-NN.ocr.txt` (tesseract OCR, lang in `pages.json` `ocr_lang`),
