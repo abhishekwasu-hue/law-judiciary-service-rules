@@ -15,6 +15,7 @@ const run55 = { state: 'queued' };
 const letterPatches = [];
 let pendingLetters = [];
 let monthRuns = [];
+let activeRuns = [];
 const spendQueries = [];
 globalThis.fetch = async (u, opt = {}) => {
   u = String(u); calls.push({ u, opt });
@@ -30,8 +31,10 @@ globalThis.fetch = async (u, opt = {}) => {
   if (u.startsWith(`${SB}/rest/v1/case_files?case_id=eq.7&kind=eq.proposal`)) return res([{ id: 1 }]);
   if (u === `${SB}/rest/v1/runs`) return res([{ id: 55, case_id: 7 }], 201);
   if (u.startsWith(`${SB}/rest/v1/runs?created_at=gte.`) && !opt.method) { spendQueries.push(u); return res(monthRuns); }
+  if (u.startsWith(`${SB}/rest/v1/runs?case_id=eq.`) && u.includes('state=in.(queued,running)') && !opt.method) return res(activeRuns.filter(r => u.includes(`case_id=eq.${r.case_id}&`)));
   if (u.startsWith(`${SB}/rest/v1/runs?`) && opt.method === 'PATCH') {
     patches.push({ u, body: JSON.parse(opt.body) });
+    if (u.includes('id=eq.80&state=in.(queued,running)')) return res([{ id: 80, case_id: 7 }]);
     if (u.includes('id=eq.55&state=in.(queued,running)')) return res(run55.state === 'failed' ? [] : (run55.state = 'failed', [{ id: 55, case_id: 7 }]));
     if (u.includes('created_at=lt.') && u.includes('state=in.(queued,running)')) return res([{ id: 60, case_id: 7 }, { id: 61, case_id: 8 }]);
     return res([]);
@@ -245,4 +248,59 @@ test('monthly spend: IST month sum, boundary, 402 block on /api/run', async () =
     env.SETTINGS.m.set('monthly_budget_usd', '');
     monthRuns = [];
   }
+});
+
+test('one run at a time per case (409), engine step via run token, provider settings (A/C)', async () => {
+  const owner = { authorization: 'Bearer owner-jwt' };
+  monthRuns = [];
+  // H3: an active (queued/running, not stale) run blocks a second dispatch
+  activeRuns = [{ id: 77, case_id: 7 }];
+  const before = calls.filter(c => c.u.endsWith('/dispatches')).length;
+  const r = await call('/api/run', { method: 'POST', headers: owner, body: JSON.stringify({ case_id: 7 }) });
+  assert.equal(r.status, 409);
+  assert.deepEqual(await r.json(), { error: 'run_active', run_id: 77 });
+  assert.equal(calls.filter(c => c.u.endsWith('/dispatches')).length, before, 'no second dispatch');
+  const q = calls.filter(c => c.u.includes('runs?case_id=eq.7&state=in.(queued,running)&created_at=gt.')).at(-1);
+  assert.ok(q, 'active-run query has the stale cut-off');
+  activeRuns = [];
+  assert.equal((await call('/api/run', { method: 'POST', headers: owner, body: JSON.stringify({ case_id: 7 }) })).status, 200);
+  assert.equal((await call('/api/run', { method: 'POST', headers: owner, body: JSON.stringify({ case_id: '7&x=1' }) })).status, 400, 'case_id must be an integer');
+
+  // H1: progress text through the Worker (the Claude step has no Supabase key)
+  const exp = Math.floor(Date.now() / 1000) + 3600;
+  env.SETTINGS.m.set('run_token:tok80', JSON.stringify({ run_id: '80', used: true, exp }));
+  const step = (t, b) => call('/api/engine/step', { method: 'POST', headers: { authorization: `Bearer ${t}` }, body: JSON.stringify(b) });
+  assert.equal((await step('nope', { run_id: 80, step: 'x' })).status, 403);
+  assert.equal((await step('tok80', { run_id: 81, step: 'x' })).status, 403, 'step bound to its run');
+  assert.equal((await step('tok80', { run_id: 80, step: ' ' })).status, 400);
+  const st = await step('tok80', { run_id: 80, step: 'पाने वाचत आहे' });
+  assert.equal(st.status, 200); assert.equal((await st.json()).changed, 1);
+  const pp = patches.at(-1);
+  assert.ok(pp.u.includes('id=eq.80&state=in.(queued,running)')); assert.deepEqual(pp.body, { step: 'पाने वाचत आहे' });
+  env.SETTINGS.m.set('run_token:tokold', JSON.stringify({ run_id: '80', used: true, exp: 1000 }));
+  assert.equal((await step('tokold', { run_id: 80, step: 'x' })).status, 403, 'expired token refused');
+
+  // A/C settings: provider enums, model names, keys masked, keys sent to the engine only for a chosen provider
+  const put = b => call('/api/settings', { method: 'PUT', headers: owner, body: JSON.stringify(b) });
+  assert.equal((await put({ part1_provider: 'openai' })).status, 400);
+  assert.equal((await put({ fallback_provider: 'grok' })).status, 400);
+  assert.equal((await put({ gemini_model: '$(id)' })).status, 400);
+  assert.equal((await put({ gemini_api_key: 'AIza-gem-secret-1111', openai_api_key: 'sk-openai-secret-2222', gemini_model: 'gemini-2.5-flash' })).status, 200);
+  const s1 = await (await call('/api/settings', { headers: owner })).json();
+  assert.equal(s1.gemini_api_key, '••••1111'); assert.equal(s1.openai_api_key, '••••2222'); assert.equal(s1.gemini_model, 'gemini-2.5-flash');
+  const cfgOf = async () => {
+    const t = 'tokcfg' + Math.random().toString(16).slice(2);
+    env.SETTINGS.m.set(`run_token:${t}`, JSON.stringify({ run_id: '90', used: false, exp }));
+    return (await call('/api/engine/config?run_id=90', { headers: { authorization: `Bearer ${t}` } })).json();
+  };
+  let c = await cfgOf();
+  assert.ok(!('gemini_api_key' in c) && !('openai_api_key' in c), 'no provider chosen -> no extra key leaves the Worker');
+  assert.equal((await put({ part1_provider: 'gemini' })).status, 200);
+  c = await cfgOf();
+  assert.equal(c.gemini_api_key, 'AIza-gem-secret-1111'); assert.ok(!('openai_api_key' in c)); assert.equal(c.part1_provider, 'gemini');
+  assert.equal((await put({ part1_provider: '', fallback_provider: 'openai', fallback_model: 'gpt-6.1-terra', fallback_model_light: 'gpt-5.4-mini' })).status, 200);
+  c = await cfgOf();
+  assert.equal(c.openai_api_key, 'sk-openai-secret-2222'); assert.ok(!('gemini_api_key' in c));
+  assert.equal(c.fallback_provider, 'openai'); assert.equal(c.fallback_model, 'gpt-6.1-terra'); assert.equal(c.fallback_model_light, 'gpt-5.4-mini');
+  assert.equal((await put({ fallback_provider: '' })).status, 200);
 });

@@ -95,6 +95,10 @@ Expected cost per typical proposal (15 pages, 3 GRs; estimate, not yet measured 
    `review` = {"approved", "changes", "corrections"[, "reason"]}. approved false -> status.json
    `{"state": "failed", "summary": "अंतिम पडताळणी (reviewer) मान्यता नाही — <reason>", ...}`. Never write "done"
    without `review.approved: true` (the workflow refuses it).
+   The reviewer writes `spec_sha256` / `part0_sha256` (the files it approved) into review.json; the workflow reads
+   /tmp/work/review.json itself, recomputes both hashes and checks the CLI usage shows MODEL_REVIEW ran. So after the
+   review NEVER change /tmp/work/spec.json or /tmp/work/study_part0.json; if lint/verify still needs a change there,
+   make it and call `reviewer` again (it re-checks and re-hashes). Never write or edit review.json yourself.
 Progress steps (rule 4) as before.
 
 ### Study part 1
@@ -155,7 +159,8 @@ Step 0 is done by the workflow:
    say "उपलब्ध नाही — मागवावे".
 3. Nothing extra of your own (INSTRUCTIONS §4.13): no boxes, no markings; proposal scan pages unchanged; yellow
    highlights only on the quoted lines of the enclosed GR/rule pages.
-4. Progress — run at each milestone (ignore an error from it, it is only the live status):
+4. Progress — run at each milestone (ignore an error from it, it is only the live status; this step has no Supabase key —
+   the command sends the text through the Worker with the run token):
    `python3 tools/engine_supabase.py step "पाने वाचत आहे"` (Step 1), `"GR शोधत आहे"` (Step 2),
    `"मसुदा तयार करत आहे"` (Steps 3–4, 6), `"PDF बनवत आहे"` (Step 5), `"तपासणी चालू"` (Step 7).
 5. Case identity: cr_no, cr_year, file_no, subject and category may be EMPTY in case.json (Abhi may skip them at upload;

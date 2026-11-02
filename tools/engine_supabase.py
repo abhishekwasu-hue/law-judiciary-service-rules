@@ -53,8 +53,34 @@ INPUT_KINDS = ("proposal", "extra_doc", "reply")
 MIME = {".pdf": "application/pdf", ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"}
 
 
+SECRETS_FILE = "/tmp/engine-secrets/secrets.env"
+
+
+def secret_file_values():
+    """KEY=VALUE lines of the workflow's secrets file (ENGINE_SECRETS, default /tmp/engine-secrets/secrets.env; dir 700,
+    owned by the runner user). H1 (QUALITY_AUDIT §7): the Supabase service key is no longer put into the job env, so the
+    Claude step (another unix user) can neither inherit nor read it; runner-side steps read it from this file."""
+    path = os.environ.get("ENGINE_SECRETS") or SECRETS_FILE
+    out = {}
+    try:
+        for line in open(path, encoding="utf-8"):
+            k, sep, v = line.rstrip("\n").partition("=")
+            if sep and k.strip(): out[k.strip()] = v.strip()
+    except OSError:
+        pass
+    return out
+
+
+def lookup(k):
+    return os.environ.get(k, "").strip() or secret_file_values().get(k, "")
+
+
+def has_supabase():
+    return bool(lookup("SUPABASE_URL") and lookup("SUPABASE_SERVICE_KEY"))
+
+
 def env(k):
-    v = os.environ.get(k, "").strip()
+    v = lookup(k)
     if not v:
         print(f"engine_supabase: env {k} missing", file=sys.stderr); sys.exit(2)
     return v
@@ -358,9 +384,85 @@ def engine_config(cfg):
     main = model("model")
     if strong == main:
         strong = ""
-    return {"MODEL": main, "MODEL_LIGHT": model("model_light"), "MODEL_REVIEW": model("model_review"),
-            "MODEL_STRONG": strong, "EFFORT": eff,
-            "BUDGET_USD": f"{bud:.2f}"}
+    out = {"MODEL": main, "MODEL_LIGHT": model("model_light"), "MODEL_REVIEW": model("model_review"),
+           "MODEL_STRONG": strong, "EFFORT": eff,
+           "BUDGET_USD": f"{bud:.2f}"}
+    out.update(provider_config(cfg))
+    return out
+
+
+# Other AI providers (Abhi 02.11.2026; docs/AI_PROVIDERS_RESEARCH.md). A: Study part 1 on Gemini (machine-checked by
+# part1check). C: when the Claude run fails on the provider side (credit, key, overloaded, API error), the same engine
+# run is repeated through a local LiteLLM gateway on the fallback provider. Paid API keys only (free tiers: no
+# confidential data — Gemini terms). Defaults below are used when the Settings value is empty or invalid.
+FALLBACK_DEFAULTS = {"gemini": ("gemini-2.5-pro", "gemini-2.5-flash"), "openai": ("gpt-6.1-sol", "gpt-5.4-mini")}
+PROVIDER_MODEL_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{1,80}")
+
+
+def provider_config(cfg):
+    """PART1_PROVIDER (claude|gemini — gemini only with a Gemini key), GEMINI_MODEL, FALLBACK_PROVIDER (''|gemini|openai
+    — only with that provider's key), FALLBACK_MODEL, FALLBACK_MODEL_LIGHT. Keys themselves are never printed."""
+    s = lambda k: cfg.get(k).strip() if isinstance(cfg.get(k), str) else ""
+    m = lambda k, d: s(k) if PROVIDER_MODEL_RE.fullmatch(s(k)) else d
+    p1 = "gemini" if s("part1_provider") == "gemini" and s("gemini_api_key") else "claude"
+    fb = s("fallback_provider")
+    if fb not in FALLBACK_DEFAULTS or not s(f"{fb}_api_key"):
+        fb = ""
+    main_d, light_d = FALLBACK_DEFAULTS.get(fb, ("", ""))
+    return {"PART1_PROVIDER": p1, "GEMINI_MODEL": m("gemini_model", "gemini-2.5-flash"), "FALLBACK_PROVIDER": fb,
+            "FALLBACK_MODEL": m("fallback_model", main_d) if fb else "", "FALLBACK_MODEL_LIGHT": m("fallback_model_light", light_d) if fb else ""}
+
+
+def provider_failure(res, err, rc):
+    """True when a failed Claude run failed on the PROVIDER side (no credit, key refused, overloaded / rate limit,
+    API 5xx, connection) — the case for the fallback provider (C). Not for the case's own problems (max turns, time-out,
+    a wrong model name, review/verify failures)."""
+    if str(rc) == "124" or str((res or {}).get("subtype") or "") in ("error_max_turns", "error_max_budget_usd"):
+        return False
+    low = " ".join(str(x) for x in ((res or {}).get("result"), err) if x)[:6000].lower()
+    return bool(re.search(r"credit balance|billing|insufficient.?(credit|fund|quota)|payment required|invalid.{0,12}api.?key|"
+                          r"authentication_error|x-api-key|\b401\b|unauthori[sz]ed|rate.?limit|overloaded|\b429\b|\b529\b|"
+                          r"\b5\d\d\b.{0,40}(error|status)|api_error|internal server error|service unavailable|"
+                          r"econnrefused|econnreset|etimedout|connection error|fetch failed|network error", low))
+
+
+def litellm_config(conf):
+    """LiteLLM proxy config (YAML text; JSON is valid YAML) for the fallback run: every Claude model name the engine
+    uses (MODEL, MODEL_REVIEW, MODEL_STRONG -> FALLBACK_MODEL; MODEL_LIGHT and any other claude-* -> FALLBACK_MODEL_LIGHT)
+    is routed to the fallback provider. The provider key is read by the proxy from its own env (never written here)."""
+    fb = conf["FALLBACK_PROVIDER"]
+    pre, keyenv = {"gemini": ("gemini/", "GEMINI_API_KEY"), "openai": ("openai/", "OPENAI_API_KEY")}[fb]
+    dep = lambda name, target: {"model_name": name, "litellm_params": {"model": pre + target, "api_key": "os.environ/" + keyenv}}
+    main, light = conf["FALLBACK_MODEL"], conf["FALLBACK_MODEL_LIGHT"]
+    names = []
+    for k in ("MODEL", "MODEL_REVIEW", "MODEL_STRONG"):
+        if conf.get(k) and conf[k] not in names: names.append(conf[k])
+    ml = [dep(n, main) for n in names]
+    if conf.get("MODEL_LIGHT") and conf["MODEL_LIGHT"] not in names:
+        ml.append(dep(conf["MODEL_LIGHT"], light))
+    ml.append(dep("claude-*", light))
+    return json.dumps({"model_list": ml, "litellm_settings": {"drop_params": True, "num_retries": 3, "request_timeout": 600},
+                       "router_settings": {"disable_cooldowns": True},
+                       "general_settings": {"master_key": "os.environ/LITELLM_MASTER_KEY"}}, indent=1)
+
+
+def cmd_fallback_ok(args):
+    """fallback_ok <claude.json> <claude.err> <rc> -> exit 0 when the fallback provider should take over (C)."""
+    res = read_claude_json(args[0]) if args else None
+    err = open(args[1], encoding="utf-8", errors="replace").read()[-6000:] if len(args) > 1 and os.path.exists(args[1]) else ""
+    rc = args[2] if len(args) > 2 else "0"
+    failed = res is None or bool(res.get("is_error")) or res.get("subtype") not in (None, "success") or str(rc) not in ("", "0")
+    ok = failed and provider_failure(res, err, rc)
+    print("FALLBACK YES" if ok else "FALLBACK NO")
+    sys.exit(0 if ok else 1)
+
+
+def cmd_litellm_config(args):
+    conf = {k: os.environ.get(k, "").strip() for k in ("MODEL", "MODEL_LIGHT", "MODEL_REVIEW", "MODEL_STRONG",
+                                                         "FALLBACK_PROVIDER", "FALLBACK_MODEL", "FALLBACK_MODEL_LIGHT")}
+    if conf["FALLBACK_PROVIDER"] not in FALLBACK_DEFAULTS or not conf["FALLBACK_MODEL"] or not conf["FALLBACK_MODEL_LIGHT"]:
+        print("litellm_config: no fallback provider", file=sys.stderr); sys.exit(2)
+    open(args[0], "w", encoding="utf-8").write(litellm_config(conf))
 
 
 def cmd_config(path):
@@ -382,7 +484,10 @@ REVIEW = (" You are the final approver. LOOK at the proposal page images (WORKDI
           "letter; not `related`) and /tmp/work/study_part0.json directly with MINIMAL edits (never restyle approved "
           "wording). Write /tmp/work/review.json = {\"approved\": true|false, \"changes\": N, \"corrections\": "
           "[\"<Marathi: what changed>\"], \"reason\": \"<Marathi, only when not approved>\"}. approved=false only "
-          "when the case cannot be made correct by small edits.")
+          "when the case cannot be made correct by small edits. LAST, after all your edits: put the sha256 of the files you "
+          "approved into review.json as \"spec_sha256\" and \"part0_sha256\" (`sha256sum /tmp/work/spec.json "
+          "/tmp/work/study_part0.json`). The workflow refuses the case if either file differs from these hashes, so "
+          "nobody may change them after you; a later change needs a new review.")
 
 
 def agents_json(conf, brief="tools/ENGINE_BRIEF.md"):
@@ -585,7 +690,68 @@ def cmd_claude_result(args):
         cmd_fail(claude_reason(res, err, rc))
 
 
+def sha256_file(path):
+    import hashlib
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for b in iter(lambda: f.read(1 << 16), b""): h.update(b)
+    return h.hexdigest()
+
+
+def model_ran(results, model):
+    """True when the CLI's own modelUsage (not model-written text) shows `model` with a cost > 0. Keys may carry a
+    suffix (e.g. "claude-opus-5-5[1m]" or a date), so the configured id is matched as a prefix."""
+    m = str(model or "").strip()
+    for r in results:
+        mu = r.get("modelUsage") if isinstance(r.get("modelUsage"), dict) else {}
+        for k, u in mu.items():
+            c = u.get("costUSD") if isinstance(u, dict) else None
+            if str(k).startswith(m) and isinstance(c, (int, float)) and not isinstance(c, bool) and c > 0:
+                return True
+    return False
+
+
+def review_gate(review_dir, claude_json=None):
+    """H2 (QUALITY_AUDIT §7): the final approval is read from the reviewer's own /tmp/work/review.json (not the copy in
+    status.json), must name the sha256 of the spec.json / study_part0.json it approved (any later change -> refused),
+    and the CLI's modelUsage must show MODEL_REVIEW actually ran (skipped when MODEL_REVIEW is the orchestrator's own
+    model, where usage cannot tell them apart). -> None = OK, else a Marathi reason."""
+    try:
+        rv = json.load(open(os.path.join(review_dir, "review.json"), encoding="utf-8"))
+    except Exception:
+        return "reviewer ची review.json नाही (अंतिम पडताळणी झाली नाही)"
+    if not isinstance(rv, dict) or rv.get("approved") is not True:
+        why = str((rv or {}).get("reason") or "").strip() if isinstance(rv, dict) else ""
+        return "reviewer ची मान्यता नाही" + (f" — {why}" if why else "")
+    for name, key in (("spec.json", "spec_sha256"), ("study_part0.json", "part0_sha256")):
+        fp = os.path.join(review_dir, name)
+        if not os.path.exists(fp):
+            if name == "spec.json": return "spec.json नाही"
+            continue
+        want = str(rv.get(key) or "").strip().lower()
+        if not want:
+            return f"review.json मध्ये {key} नाही (मान्य केलेली आवृत्ती ओळखता येत नाही)"
+        if want != sha256_file(fp):
+            return f"मान्यतेनंतर {name} बदलली — पुन्हा reviewer ची मान्यता आवश्यक"
+    review_model = (os.environ.get("MODEL_REVIEW") or DEFAULTS["model_review"]).strip()
+    light = (os.environ.get("MODEL_LIGHT") or DEFAULTS["model_light"]).strip()
+    if claude_json and review_model != light:
+        res = read_claude_json(claude_json)
+        if res is None:
+            return "Claude निकाल (claude.json) वाचता आला नाही — reviewer चालला का ते तपासता आले नाही"
+        if not model_ran([res], review_model):
+            return f"reviewer मॉडेल ({short_model(review_model)}) प्रत्यक्ष चालले नाही"
+    return None
+
+
 def cmd_verify(args):
+    args = list(args)
+    review_dir = claude_json = None
+    for flag in ("--review", "--claude"):
+        if flag in args:
+            k = args.index(flag); v = args[k + 1] if k + 1 < len(args) else ""; del args[k:k + 2]
+            if flag == "--review": review_dir = v
+            else: claude_json = v
     out = args[0]
     work = args[1] if len(args) > 1 else ""
     try:
@@ -598,6 +764,10 @@ def cmd_verify(args):
     if rv.get("approved") is not True:
         why = str(rv.get("reason") or "").strip() or "review नोंद नाही"
         return cmd_fail(f"अंतिम पडताळणी (reviewer) मान्यता नाही — {why} — पुन्हा तयार करा."[:500])
+    if review_dir:
+        why = review_gate(review_dir, claude_json)
+        if why:
+            return cmd_fail(f"अंतिम पडताळणी (reviewer) मान्यता नाही — {why} — पुन्हा तयार करा."[:500])
     prefix = str(st.get("prefix") or "").strip()
     if not prefix:
         sf = glob.glob(os.path.join(out, "*_Study.docx"))
@@ -696,6 +866,21 @@ def cmd_warn(text):
     activity("run_warning", {"run_id": int(RUN), "warning": text})
 
 
+def cmd_step_worker(text):
+    """Progress text through the Worker (POST /api/engine/step with the run token) — used inside the Claude step, which
+    has no Supabase key. Never fails the run: the step text is only the live status."""
+    tok, worker, run = (os.environ.get(k, "").strip() for k in ("RUN_TOKEN", "WORKER", "RUN_ID"))
+    if not (tok and re.match(r"https?://", worker) and run.isdigit()):
+        print("engine_supabase step: no run token / worker", file=sys.stderr); return
+    req = urllib.request.Request(f"{worker.rstrip('/')}/api/engine/step", method="POST",
+                                 data=json.dumps({"run_id": int(run), "step": (text or "")[:200]}, ensure_ascii=False).encode("utf-8"),
+                                 headers={"Authorization": f"Bearer {tok}", "Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=30) as r: r.read()
+    except Exception as e:
+        print("engine_supabase step (worker):", e, file=sys.stderr)
+
+
 def cmd_fail(reason):
     reason = (reason or "अयशस्वी").strip()[:500]
     try:
@@ -717,11 +902,17 @@ def main(a):
         return cmd_agents(a[1:])
     if len(a) == 3 and a[0] == "part1check":
         return cmd_part1check(a[1:])
+    if len(a) >= 2 and a[0] == "fallback_ok":
+        return cmd_fallback_ok(a[1:])
+    if len(a) == 2 and a[0] == "litellm_config":
+        return cmd_litellm_config(a[1:])
     if len(a) < 2 or a[0] not in ("fetch", "step", "log_url", "finish", "fail", "claude_result", "verify", "warn",
                                   "extracts"):
         print(__doc__); sys.exit(2)
-    init()
     c, arg = a[0], " ".join(a[1:])
+    if c == "step" and not has_supabase():
+        return cmd_step_worker(arg)  # the Claude step runs without the Supabase key (H1)
+    init()
     if c == "fail":
         cmd_fail(arg)
     try:

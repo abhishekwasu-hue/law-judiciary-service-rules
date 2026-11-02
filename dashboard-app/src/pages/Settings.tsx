@@ -7,7 +7,7 @@ import { fmtDate } from '../lib/format';
 import { Chip, Field, Section, SkeletonRows, Spinner } from '../components/ui';
 import { useToast } from '../components/Toast';
 
-const PLAIN: { k: string; label: string; hint?: string; num?: boolean; max?: number; ai?: boolean; ph?: string }[] = [
+const PLAIN: { k: string; label: string; hint?: string; num?: boolean; max?: number; ai?: boolean; alt?: boolean; ph?: string; choices?: [string, string][] }[] = [
   { k: 'owner_email', label: 'मालकाचा ई-मेल', hint: 'या ई-मेलने लॉगिन करणाऱ्याला सेटिंग्ज बदलण्याचा अधिकार' },
   { k: 'supabase_url', label: 'Supabase URL', hint: 'माहिती-साठ्याचा पत्ता — Supabase प्रकल्पाच्या सेटिंग्जमध्ये मिळतो' },
   { k: 'supabase_anon_key', label: 'Supabase anon key', hint: 'त्याच ठिकाणची सार्वजनिक की (anon)' },
@@ -17,12 +17,20 @@ const PLAIN: { k: string; label: string; hint?: string; num?: boolean; max?: num
   { k: 'model_review', label: 'अंतिम पडताळणी मॉडेल (model_review)', hint: 'नोंद, पत्र व ब्रीफिंगची अंतिम तपासणी व मंजुरी — सर्वात सक्षम मॉडेल ठेवा; रिकामे = डीफॉल्ट', ai: true, ph: 'उदा. claude-opus-…' },
   { k: 'model_light', label: 'स्वस्त मॉडेल (model_light)', hint: 'Study भाग 1–7, संबंधित माहिती व यांत्रिक काम — स्वस्त मॉडेल; रिकामे = डीफॉल्ट', ai: true, ph: 'उदा. claude-haiku-…' },
   { k: 'budget_usd', label: 'कमाल खर्च ($) (budget_usd)', hint: 'प्रत्येक प्रस्तावासाठी अपेक्षित कमाल खर्च ($). ओलांडल्यास फक्त सूचना येते — काम थांबत नाही, दर्जा घटत नाही. रिकामे = 0.75', num: true, max: 20, ai: true, ph: 'उदा. 1.5' },
+  // other AI providers (Abhi 02.11.2026 — docs/AI_PROVIDERS_RESEARCH.md: A = Study भाग 1 on Gemini, C = fallback)
+  { k: 'part1_provider', label: 'Study भाग 1 कोणाकडून (part1_provider)', hint: 'Gemini निवडल्यास भाग 1 Gemini करते; प्रत्येक आकडा/दिनांक/नाव मुख्य मॉडेलच्या वाचनाशी यंत्राने जुळवला जातो', alt: true, choices: [['', 'Claude (डीफॉल्ट)'], ['gemini', 'Gemini']] },
+  { k: 'gemini_model', label: 'Gemini मॉडेल — भाग 1 (gemini_model)', hint: 'रिकामे = gemini-2.5-flash ($0.30/$2.50); अधिक अचूक: gemini-2.5-pro ($1.25/$10)', alt: true, ph: 'gemini-2.5-flash' },
+  { k: 'fallback_provider', label: 'राखीव AI (fallback_provider)', hint: 'Claude चे credit/key/सेवा बंद पडल्यास संपूर्ण अभ्यास याच्याकडून; प्रकरणावर सूचना येते', alt: true, choices: [['', 'नाही (डीफॉल्ट)'], ['gemini', 'Google Gemini'], ['openai', 'OpenAI (ChatGPT)']] },
+  { k: 'fallback_model', label: 'राखीव — मुख्य मॉडेल (fallback_model)', hint: 'रिकामे = Gemini: gemini-2.5-pro • OpenAI: gpt-6.1-sol', alt: true },
+  { k: 'fallback_model_light', label: 'राखीव — स्वस्त मॉडेल (fallback_model_light)', hint: 'रिकामे = Gemini: gemini-2.5-flash • OpenAI: gpt-5.4-mini', alt: true },
   { k: 'monthly_budget_usd', label: 'मासिक कमाल खर्च ($) (monthly_budget_usd)', hint: 'या महिन्यात (भारतीय वेळ) एकूण कमाल खर्च; ओलांडल्यावर नवीन प्रक्रिया सुरू होत नाही, चालू प्रक्रिया पूर्ण होते. रिकामे = $20', num: true, max: 1000, ai: true, ph: 'रिकामे = $20' },
 ];
-const SECRET: { k: string; label: string; hint: string }[] = [
+const SECRET: { k: string; label: string; hint: string; alt?: boolean }[] = [
   { k: 'supabase_service_key', label: 'Supabase service_role key', hint: 'माहिती-साठ्याची गुप्त की' },
   { k: 'github_token', label: 'GitHub token', hint: 'प्रक्रिया सुरू करण्यासाठी GitHub ची परवानगी-की' },
   { k: 'anthropic_api_key', label: 'Anthropic API key', hint: 'AI प्रक्रियेसाठीची की' },
+  { k: 'gemini_api_key', label: 'Google Gemini API key', hint: 'फक्त सशुल्क (billing चालू) प्रकल्पाची की', alt: true },
+  { k: 'openai_api_key', label: 'OpenAI API key', hint: 'राखीव AI = OpenAI असल्यास', alt: true },
 ];
 const ROLE_LABEL: Record<string, string> = { owner: 'मालक', staff: 'कार्यासन कर्मचारी', senior: 'वरिष्ठ (फक्त वाचन)' };
 
@@ -57,7 +65,20 @@ export default function Settings() {
 
   const plainField = (p: (typeof PLAIN)[number]) => (
     <Field key={p.k} label={p.label} hint={p.hint}>
-      <input className="input font-mono" {...(p.num ? { type: 'number', inputMode: 'decimal' as const, min: 0.01, max: p.max, step: 0.01 } : {})} placeholder={p.ph} value={edit[p.k] ?? ''} onChange={e => setEdit(s => ({ ...s, [p.k]: e.target.value }))} />
+      {p.choices ? (
+        <select className="input" value={edit[p.k] ?? ''} onChange={e => setEdit(s => ({ ...s, [p.k]: e.target.value }))}>
+          {p.choices.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+        </select>
+      ) : <input className="input font-mono" {...(p.num ? { type: 'number', inputMode: 'decimal' as const, min: 0.01, max: p.max, step: 0.01 } : {})} placeholder={p.ph} value={edit[p.k] ?? ''} onChange={e => setEdit(s => ({ ...s, [p.k]: e.target.value }))} />}
+    </Field>
+  );
+  const secretField = (s: (typeof SECRET)[number]) => (
+    <Field
+      key={s.k}
+      label={s.label}
+      hint={<>{s.hint} • {cur?.[s.k] ? <>सध्या: <span className="font-mono">{cur[s.k]}</span> — बदलायची असल्यासच टाइप करा</> : <Chip tone="amber">भरलेली नाही</Chip>}</>}
+    >
+      <input className="input font-mono" type="password" autoComplete="off" placeholder={cur?.[s.k] || ''} value={edit[s.k] ?? ''} onChange={e => setEdit(x => ({ ...x, [s.k]: e.target.value }))} />
     </Field>
   );
 
@@ -119,7 +140,7 @@ export default function Settings() {
         ) : (
           <form onSubmit={save} className="space-y-4">
             <div className="grid gap-4 md:grid-cols-2">
-              {PLAIN.filter(p => !p.ai).map(plainField)}
+              {PLAIN.filter(p => !p.ai && !p.alt).map(plainField)}
             </div>
             <fieldset className="space-y-3 rounded-lg border border-slate-200 p-4 dark:border-navy-800">
               <legend className="px-1 text-lg font-bold">AI मॉडेल व खर्च</legend>
@@ -129,16 +150,19 @@ export default function Settings() {
               </div>
             </fieldset>
             <div className="grid gap-4 md:grid-cols-3">
-              {SECRET.map(s => (
-                <Field
-                  key={s.k}
-                  label={s.label}
-                  hint={<>{s.hint} • {cur[s.k] ? <>सध्या: <span className="font-mono">{cur[s.k]}</span> — बदलायची असल्यासच टाइप करा</> : <Chip tone="amber">भरलेली नाही</Chip>}</>}
-                >
-                  <input className="input font-mono" type="password" autoComplete="off" placeholder={cur[s.k] || ''} value={edit[s.k] ?? ''} onChange={e => setEdit(x => ({ ...x, [s.k]: e.target.value }))} />
-                </Field>
-              ))}
+              {SECRET.filter(s => !s.alt).map(secretField)}
             </div>
+            <fieldset className="space-y-3 rounded-lg border border-slate-200 p-4 dark:border-navy-800">
+              <legend className="px-1 text-lg font-bold">इतर AI (पर्यायी)</legend>
+              <ul className="list-disc space-y-1 pl-5 text-sm text-slate-600 dark:text-slate-300">
+                <li>फक्त <b>सशुल्क</b> key वापरा. Gemini च्या मोफत स्तरावर Google माहिती वापरते व माणसे वाचू शकतात; अटींनुसार गोपनीय माहिती पाठवू नये.</li>
+                <li>सामान्यपणे सर्व काम Claude करते. राखीव AI फक्त Claude बंद पडल्यास (credit/key/सेवा) संपूर्ण अभ्यास करते — प्रकरणावर सूचना येते, सर्व तपासण्या लागू.</li>
+              </ul>
+              <div className="grid gap-4 md:grid-cols-3">
+                {PLAIN.filter(p => p.alt).map(plainField)}
+                {SECRET.filter(s => s.alt).map(secretField)}
+              </div>
+            </fieldset>
             <button className="btn-primary" disabled={busy}>{busy && <Spinner />} जतन करा</button>
           </form>
         )}

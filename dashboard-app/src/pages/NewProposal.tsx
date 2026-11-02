@@ -56,6 +56,7 @@ export default function NewProposal() {
   const [created, setCreated] = useState<Case | null>(null);
   const [runErr, setRunErr] = useState('');
   const [dupId, setDupId] = useState<number | null>(null); // C R/year already in another case
+  const [pendingRun, setPendingRun] = useState<number | null>(null); // run dispatched; its Realtime row may not be here yet
   const runs = useRuns(created?.id ?? null);
   const run: Run | undefined = created ? runs?.[0] : undefined; // ignore the previous case after reset
   const statusRef = useRef<HTMLDivElement>(null);
@@ -72,7 +73,8 @@ export default function NewProposal() {
   };
   const setYear = (e: { target: { value: string } }) => setF(s => ({ ...s, cr_year: e.target.value.replace(/\D/g, '').slice(0, 4) }));
   const done = run?.state === 'done';
-  const running = !!run && (run.state === 'queued' || run.state === 'running') && !isStale(run);
+  // locked from the moment /api/run answers (H3): a second tap cannot start a second paid run before Realtime delivers the row
+  const running = (pendingRun !== null && run?.id !== pendingRun) || (!!run && (run.state === 'queued' || run.state === 'running') && !isStale(run));
   const failed = !!run && !done && !running;
 
   if (!canWrite) return <div className="card p-6 text-center">आपल्याला फक्त वाचण्याची परवानगी आहे.</div>;
@@ -138,10 +140,14 @@ export default function NewProposal() {
         }
       }
       try {
-        await api('/api/run', { body: { case_id: c.id, instructions: f.instructions.trim() || undefined } });
+        const started = await api<{ id: number }>('/api/run', { body: { case_id: c.id, instructions: f.instructions.trim() || undefined } });
+        setPendingRun(started.id);
         toast('अभ्यास सुरू झाला');
       } catch (x) {
-        setRunErr(humanError(x));
+        if (x instanceof ApiError && x.message === 'run_active') {
+          setPendingRun(Number((x.data as { run_id?: number } | undefined)?.run_id) || null);
+          toast(humanError(x));
+        } else setRunErr(humanError(x));
       }
     } catch (x) {
       if (x instanceof ApiError && x.message === 'duplicate_cr') {
@@ -165,6 +171,7 @@ export default function NewProposal() {
     setUps([]);
     setCreated(null);
     setRunErr('');
+    setPendingRun(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
   return (

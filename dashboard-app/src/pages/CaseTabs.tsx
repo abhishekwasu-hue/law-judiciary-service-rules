@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState, type FormEvent } from 'react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { api, downloadFile, humanError, uploadFile } from '../lib/api';
+import { ApiError, api, downloadFile, humanError, uploadFile } from '../lib/api';
 import { ACTION_LABEL, FILE_KIND_LABEL, LETTER_STATUSES, RUN_STATE_LABEL, TONE_HEX, runActive, runTone } from '../lib/constants';
 import { asArray, daysBetween, fmtDate, fmtDateTime, textOf, todayISO } from '../lib/format';
 import { diffLines, type DiffLine } from '../lib/diff';
@@ -71,17 +71,20 @@ export function ReRun({ ctx, title = 'सुधारणा करून पु�
   const toast = useToast();
   const [text, setText] = useState(preset);
   const [busy, setBusy] = useState(false);
+  const [pending, setPending] = useState<number | null>(null); // dispatched run whose Realtime row is not here yet (H3)
   const r = latestRun(ctx.runs);
-  const running = runActive(r); // a failed or stale (> 3.5 h) latest run does not block
+  const running = runActive(r) || (pending !== null && !(ctx.runs ?? []).some(x => x.id === pending)); // a failed or stale (> 3.5 h) latest run does not block
   if (!ctx.canWrite) return null;
   async function go(e: FormEvent) {
     e.preventDefault();
     setBusy(true);
     try {
-      await api('/api/run', { body: { case_id: ctx.c.id, instructions: text.trim() || undefined } });
+      const started = await api<{ id: number }>('/api/run', { body: { case_id: ctx.c.id, instructions: text.trim() || undefined } });
+      setPending(started.id);
       toast('प्रक्रिया पुन्हा सुरू झाली');
       setText('');
     } catch (x) {
+      if (x instanceof ApiError && x.message === 'run_active') setPending(Number((x.data as { run_id?: number } | undefined)?.run_id) || null);
       toast(humanError(x), 'err');
     } finally {
       setBusy(false);

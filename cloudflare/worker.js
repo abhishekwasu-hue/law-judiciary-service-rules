@@ -2,14 +2,19 @@
 // The browser talks only to this Worker and to Supabase (anon key + user JWT, RLS). No key is hard-coded:
 // every key/URL lives in KV namespace SETTINGS, entered on the app's Settings screen (owner only).
 
-const SECRET_KEYS = ['supabase_service_key', 'github_token', 'anthropic_api_key'];
-const PLAIN_KEYS = ['supabase_url', 'supabase_anon_key', 'github_repo', 'github_branch', 'model', 'model_light', 'model_review', 'budget_usd', 'monthly_budget_usd', 'owner_email'];
+const SECRET_KEYS = ['supabase_service_key', 'github_token', 'anthropic_api_key', 'gemini_api_key', 'openai_api_key'];
+const PLAIN_KEYS = ['supabase_url', 'supabase_anon_key', 'github_repo', 'github_branch', 'model', 'model_light', 'model_review', 'budget_usd', 'monthly_budget_usd', 'owner_email',
+  // other AI providers (Abhi 02.11.2026, docs/AI_PROVIDERS_RESEARCH.md: A = Study part 1 on Gemini, C = fallback when Claude fails)
+  'part1_provider', 'gemini_model', 'fallback_provider', 'fallback_model', 'fallback_model_light'];
+const PROVIDERS = { part1_provider: ['', 'claude', 'gemini'], fallback_provider: ['', 'gemini', 'openai'] };
+const MODEL_KEYS = ['gemini_model', 'fallback_model', 'fallback_model_light'];
+const MODEL_NAME = /^[A-Za-z0-9][A-Za-z0-9._:@\/-]{1,99}$/;
 const ALL_KEYS = [...SECRET_KEYS, ...PLAIN_KEYS];
 const FILE_KINDS = ['proposal', 'extra_doc', 'reply'];
 const MAX_UPLOAD = 50 * 1024 * 1024;
 const SIGN_BUCKETS = ['proposals', 'outputs', 'gr-library'];
 // Run token (D4): created at dispatch, sent to GitHub in the payload. Single use for /api/engine/config (the secrets);
-// after that it is only good for /api/engine/fail (marks THIS run failed, returns nothing secret) until it expires.
+// after that it is only good for /api/engine/fail and /api/engine/step (THIS run only, return nothing secret) until it expires.
 const RUN_TOKEN_TTL = 4 * 3600;                 // > job timeout (180 min) + queue time
 const STALE_MS = 3.5 * 3600 * 1000;             // queued/running longer than this = stuck (job timeout 180 min)
 const STALE_REASON = 'वेळ संपली — पुन्हा तयार करा';
@@ -183,7 +188,13 @@ async function route(req, env, url) {
     if (!cfg.anthropic_api_key || !cfg.supabase_url || !cfg.supabase_service_key) return bad('config incomplete (Settings)', 412); // token stays unused
     const exp = tok.exp || Math.floor(Date.now() / 1000) + RUN_TOKEN_TTL;
     await env.SETTINGS.put(tok.key, JSON.stringify({ run_id: tok.run_id, used: true, exp }), { expiration: exp });
-    return json({ anthropic_api_key: cfg.anthropic_api_key, model: cfg.model, model_light: cfg.model_light || '', model_review: cfg.model_review || '', budget_usd: cfg.budget_usd || '', supabase_url: cfg.supabase_url, supabase_service_key: cfg.supabase_service_key });
+    const out = { anthropic_api_key: cfg.anthropic_api_key, model: cfg.model, model_light: cfg.model_light || '', model_review: cfg.model_review || '', budget_usd: cfg.budget_usd || '', supabase_url: cfg.supabase_url, supabase_service_key: cfg.supabase_service_key };
+    // other providers: a key is sent only when its provider is chosen (A: part 1 on Gemini; C: fallback provider)
+    const gem = (cfg.part1_provider === 'gemini' || cfg.fallback_provider === 'gemini') && cfg.gemini_api_key;
+    if (gem) out.gemini_api_key = cfg.gemini_api_key;
+    if (cfg.fallback_provider === 'openai' && cfg.openai_api_key) out.openai_api_key = cfg.openai_api_key;
+    for (const k of ['part1_provider', 'gemini_model', 'fallback_provider', 'fallback_model', 'fallback_model_light']) out[k] = cfg[k] || '';
+    return json(out);
   }
 
   // engine: record a failure when the workflow has no Supabase env (e.g. the config step failed). Run token, used or not.
@@ -195,6 +206,20 @@ async function route(req, env, url) {
     const reason = String(b.reason || 'इंजिन अयशस्वी — पुन्हा तयार करा').trim().slice(0, 300);
     const rows = await failRuns(cfg, `id=eq.${Number(tok.run_id)}`, reason);
     return json({ ok: true, changed: rows.length });
+  }
+
+  // engine: live progress text from the Claude step, which has no Supabase key (H1, QUALITY_AUDIT §7). Run token,
+  // used or not; THIS run only, only while it is queued/running; returns nothing secret.
+  if (p === '/api/engine/step' && M === 'POST') {
+    const tok = await runToken(env, req);
+    const b = await req.json().catch(() => ({}));
+    if (!tok || tok.run_id !== String(b.run_id || '')) return bad('bad token', 403);
+    if (tok.exp && tok.exp < Math.floor(Date.now() / 1000)) return bad('bad token', 403);
+    if (!cfg.supabase_url || !cfg.supabase_service_key) return bad('not configured', 503);
+    const step = String(b.step || '').trim().slice(0, 200);
+    if (!step) return bad('step required');
+    const rows = await sb(cfg).rest(`runs?id=eq.${Number(tok.run_id)}&state=in.(queued,running)`, { method: 'PATCH', body: JSON.stringify({ step }) });
+    return json({ ok: true, changed: (rows || []).length });
   }
 
   if (!configured) return bad('not configured', 503);
@@ -236,6 +261,10 @@ async function route(req, env, url) {
       const n = Number(String(b.monthly_budget_usd).trim());
       if (!Number.isFinite(n) || n <= 0 || n > 1000) return bad('monthly_budget_usd: positive number <= 1000');
     }
+    for (const [k, ok] of Object.entries(PROVIDERS))
+      if (k in b && b[k] !== null && !ok.includes(String(b[k]).trim())) return bad(`${k}: one of ${ok.filter(Boolean).join(', ')} or empty`);
+    for (const k of MODEL_KEYS)
+      if (k in b && b[k] !== null && String(b[k]).trim() !== '' && !MODEL_NAME.test(String(b[k]).trim())) return bad(`${k}: model name`);
     for (const k of ALL_KEYS) {
       if (!(k in b) || b[k] === null) continue;
       const v = String(b[k]).trim();
@@ -317,12 +346,17 @@ async function route(req, env, url) {
     if (!canWrite(user)) return bad('read-only', 403);
     if (!cfg.github_repo || !cfg.github_token || !cfg.anthropic_api_key) return bad('Settings: GitHub repo/token and Anthropic key needed', 412);
     const { case_id, instructions } = await req.json();
-    if (!case_id) return bad('case_id required');
+    if (!/^\d+$/.test(String(case_id ?? ''))) return bad('case_id required');
     const has = await db.rest(`case_files?case_id=eq.${case_id}&kind=eq.proposal&select=id&limit=1`);
     if (!has.length) return bad('upload the proposal PDF first');
     // monthly limit: once this month's spend reached it, no new run is dispatched (runs already going finish)
     const sp = await monthSpend(cfg);
     if (sp.spent_usd >= sp.limit_usd) return json({ error: 'monthly_budget_reached', spent_usd: sp.spent_usd, limit_usd: sp.limit_usd }, 402);
+    // one run at a time per case (H3, QUALITY_AUDIT §7): a double tap / second tab / second user would start a second,
+    // paid run. Runs older than STALE_MS are stuck (swept), so they do not block.
+    const since = new Date(Date.now() - STALE_MS).toISOString();
+    const active = await db.rest(`runs?case_id=eq.${case_id}&state=in.(queued,running)&created_at=gt.${encodeURIComponent(since)}&select=id&order=created_at.desc&limit=1`);
+    if (active && active.length) return json({ error: 'run_active', run_id: active[0].id }, 409);
     const [run] = await db.rest('runs', { method: 'POST', body: JSON.stringify({ case_id, instructions: instructions || null, created_by: user.id }) });
     try {
       await dispatchRun(env, cfg, run, url.origin);

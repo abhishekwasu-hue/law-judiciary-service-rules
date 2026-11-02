@@ -24,6 +24,7 @@ DB = {
 STORE = {f"proposals/7/proposal/v1/{PROP}": b"%PDF old", "proposals/7/proposal/v2/file.pdf": b"%PDF new",
          "proposals/7/reply/v1/उत्तर.pdf": b"%PDF reply"}
 LOG = []
+WSTEPS = []
 
 
 def match(rows, q):
@@ -50,6 +51,8 @@ class H(BaseHTTPRequestHandler):
         u = urllib.parse.urlparse(self.path); path = urllib.parse.unquote(u.path); q = urllib.parse.parse_qs(u.query)
         n = int(self.headers.get("Content-Length") or 0); body = self.rfile.read(n) if n else b""
         LOG.append({"m": self.command, "path": path, "q": q, "body": body, "h": self.headers})
+        if path == "/api/engine/step":  # Worker route (H1): run token, no Supabase key
+            WSTEPS.append({"auth": self.headers.get("Authorization"), "body": json.loads(body)}); return self.send(200, {"ok": True})
         if self.headers.get("apikey") != KEY or self.headers.get("Authorization") != f"Bearer {KEY}":
             return self.send(401, {"error": "auth"})
         if path.startswith("/storage/v1/object/"):
@@ -297,7 +300,7 @@ import engine_supabase as es
 
 c = es.engine_config({})
 check(c == {"MODEL": "claude-opus-5-5", "MODEL_LIGHT": "claude-haiku-5-5", "MODEL_REVIEW": "claude-opus-5-5", "MODEL_STRONG": "",
-            "EFFORT": "medium", "BUDGET_USD": "0.75"},
+            "EFFORT": "medium", "BUDGET_USD": "0.75", "PART1_PROVIDER": "claude", "GEMINI_MODEL": "gemini-2.5-flash", "FALLBACK_PROVIDER": "", "FALLBACK_MODEL": "", "FALLBACK_MODEL_LIGHT": ""},
       f"config: defaults (drafter, light Haiku, reviewer Opus, no strong tier, soft budget 0.75) {c}")
 c = es.engine_config({"model": "claude-sonnet-5-5", "model_review": "claude-opus-5-5"})
 check(c["MODEL"] == "claude-sonnet-5-5" and c["MODEL_REVIEW"] == "claude-opus-5-5" and c["MODEL_LIGHT"] == "claude-haiku-5-5",
@@ -323,9 +326,48 @@ json.dump({"anthropic_api_key": "sk-secret", "model": "claude-opus-5-5", "model_
 r = subprocess.run([sys.executable, TOOL, "config", cfgf], capture_output=True, text=True, encoding="utf-8",
                    env={k: v for k, v in os.environ.items() if not k.startswith("SUPABASE")})
 check(r.returncode == 0 and r.stdout.splitlines() == ["MODEL=claude-opus-5-5", "MODEL_LIGHT=claude-haiku-5-5", "MODEL_REVIEW=claude-opus-5-5", "MODEL_STRONG=",
-      "EFFORT=medium", "BUDGET_USD=0.90"] and "sk-secret" not in r.stdout, f"config CLI: KEY=VALUE lines, no secret, no Supabase env ({r.stdout!r} {r.stderr[:200]})")
+      "EFFORT=medium", "BUDGET_USD=0.90",
+      "PART1_PROVIDER=claude", "GEMINI_MODEL=gemini-2.5-flash", "FALLBACK_PROVIDER=", "FALLBACK_MODEL=", "FALLBACK_MODEL_LIGHT="] and "sk-secret" not in r.stdout, f"config CLI: KEY=VALUE lines, no secret, no Supabase env ({r.stdout!r} {r.stderr[:200]})")
 r = subprocess.run([sys.executable, TOOL, "config", os.path.join(tmp, "absent.json")], capture_output=True, text=True, encoding="utf-8")
 check(r.returncode == 0 and "MODEL=claude-opus-5-5" in r.stdout, "config CLI: unreadable file -> defaults")
+
+# --- other providers (A: part 1 on Gemini; C: fallback through LiteLLM) — Abhi 02.11.2026
+pc = es.provider_config
+check(pc({"part1_provider": "gemini"})["PART1_PROVIDER"] == "claude", "A: gemini part 1 needs a Gemini key")
+check(pc({"part1_provider": "gemini", "gemini_api_key": "k", "gemini_model": "gemini-2.5-pro"}) | {} ==
+      {"PART1_PROVIDER": "gemini", "GEMINI_MODEL": "gemini-2.5-pro", "FALLBACK_PROVIDER": "", "FALLBACK_MODEL": "", "FALLBACK_MODEL_LIGHT": ""}, "A: gemini part 1 + model")
+check(pc({"fallback_provider": "openai"})["FALLBACK_PROVIDER"] == "" and pc({"fallback_provider": "x", "x_api_key": "k"})["FALLBACK_PROVIDER"] == "",
+      "C: fallback needs a known provider and its key")
+c = pc({"fallback_provider": "gemini", "gemini_api_key": "k", "fallback_model": "$(id)", "fallback_model_light": "gemini-2.5-flash-lite"})
+check(c["FALLBACK_PROVIDER"] == "gemini" and c["FALLBACK_MODEL"] == "gemini-2.5-pro" and c["FALLBACK_MODEL_LIGHT"] == "gemini-2.5-flash-lite",
+      f"C: invalid model -> provider default {c}")
+pf = es.provider_failure
+for res, err, rc, want, label in (
+        ({"is_error": True, "result": "API Error: 529 {\"type\":\"overloaded_error\"}"}, "", "1", True, "overloaded"),
+        (None, "Credit balance is too low", "1", True, "no credit"),
+        ({"is_error": True, "result": "Invalid API key · Please run /login"}, "", "1", True, "key refused"),
+        ({"is_error": True, "result": "API Error: Connection error."}, "", "1", True, "connection"),
+        ({"subtype": "error_max_turns", "is_error": True}, "429", "0", False, "max turns (case problem)"),
+        (None, "overloaded", "124", False, "time-out"),
+        ({"is_error": True, "result": "model: claude-x not_found_error"}, "", "1", False, "wrong model name")):
+    check(pf(res, err, rc) is want, f"C: provider failure? {label} -> {want}")
+jf2 = os.path.join(tmp, "fb.json"); ef2 = os.path.join(tmp, "fb.err")
+json.dump({"type": "result", "subtype": "success", "is_error": False}, open(jf2, "w")); open(ef2, "w").write("")
+r = subprocess.run([sys.executable, TOOL, "fallback_ok", jf2, ef2, "0"], capture_output=True, text=True)
+check(r.returncode == 1 and "FALLBACK NO" in r.stdout, "fallback_ok: successful run -> no fallback")
+json.dump({"type": "result", "subtype": "success", "is_error": True, "result": "API Error: 529 overloaded"}, open(jf2, "w"))
+r = subprocess.run([sys.executable, TOOL, "fallback_ok", jf2, ef2, "1"], capture_output=True, text=True)
+check(r.returncode == 0 and "FALLBACK YES" in r.stdout, "fallback_ok: overloaded -> fallback")
+conf = {"MODEL": "claude-sonnet-5-5", "MODEL_LIGHT": "claude-haiku-5-5", "MODEL_REVIEW": "claude-opus-5-5", "MODEL_STRONG": "",
+        "FALLBACK_PROVIDER": "gemini", "FALLBACK_MODEL": "gemini-2.5-pro", "FALLBACK_MODEL_LIGHT": "gemini-2.5-flash"}
+lc = json.loads(es.litellm_config(conf))
+routes = {d["model_name"]: d["litellm_params"]["model"] for d in lc["model_list"]}
+check(routes == {"claude-sonnet-5-5": "gemini/gemini-2.5-pro", "claude-opus-5-5": "gemini/gemini-2.5-pro",
+                 "claude-haiku-5-5": "gemini/gemini-2.5-flash", "claude-*": "gemini/gemini-2.5-flash"}
+      and all(d["litellm_params"]["api_key"] == "os.environ/GEMINI_API_KEY" for d in lc["model_list"])
+      and lc["general_settings"]["master_key"] == "os.environ/LITELLM_MASTER_KEY", f"C: LiteLLM routes, keys only by env name {routes}")
+lc = json.loads(es.litellm_config({**conf, "FALLBACK_PROVIDER": "openai", "FALLBACK_MODEL": "gpt-6.1-sol", "FALLBACK_MODEL_LIGHT": "gpt-5.4-mini"}))
+check(lc["model_list"][0]["litellm_params"] == {"model": "openai/gpt-6.1-sol", "api_key": "os.environ/OPENAI_API_KEY"}, "C: OpenAI routes")
 
 ag = es.agents_json({"MODEL": "claude-sonnet-5-5", "MODEL_LIGHT": "claude-haiku-5-5", "MODEL_REVIEW": "claude-opus-5-5", "MODEL_STRONG": ""})
 check(set(ag) == {"drafter", "study_writer", "related_writer", "reviewer"} and ag["drafter"]["model"] == "claude-sonnet-5-5"
@@ -431,6 +473,55 @@ if pymupdf and FONTF:
           f"extracts: all match -> no warning, no scratch file left ({run_row['warnings']})")
 else:
     print("skip  extracts (pymupdf or Devanagari font missing)")
+
+# --- H1: secrets file instead of job env; progress through the Worker when no Supabase key is reachable
+noenv = {k: v for k, v in os.environ.items() if not k.startswith("SUPABASE")}
+sec = os.path.join(tmp, "secrets.env")
+open(sec, "w", encoding="utf-8").write(f"SUPABASE_URL={BASE}\nSUPABASE_SERVICE_KEY={KEY}\n")
+r = subprocess.run([sys.executable, TOOL, "step", "GR शोधत आहे"], capture_output=True, text=True, encoding="utf-8",
+                   env=dict(noenv, ENGINE_SECRETS=sec, CASE_ID="7", RUN_ID="11", PYTHONIOENCODING="utf-8"))
+check(r.returncode == 0 and run_row["step"] == "GR शोधत आहे" and not WSTEPS, f"secrets file: runner-side command reaches Supabase without job env ({r.stderr[:200]})")
+r = subprocess.run([sys.executable, TOOL, "step", "मसुदा तयार करत आहे"], capture_output=True, text=True, encoding="utf-8",
+                   env=dict(noenv, ENGINE_SECRETS=os.path.join(tmp, "absent.env"), CASE_ID="7", RUN_ID="11", RUN_TOKEN="rt-1",
+                            WORKER=BASE, PYTHONIOENCODING="utf-8"))
+check(r.returncode == 0 and WSTEPS == [{"auth": "Bearer rt-1", "body": {"run_id": 11, "step": "मसुदा तयार करत आहे"}}]
+      and run_row["step"] == "GR शोधत आहे", f"step without Supabase key -> Worker /api/engine/step with the run token ({WSTEPS} {r.stderr[:200]})")
+r = subprocess.run([sys.executable, TOOL, "step", "x"], capture_output=True, text=True, encoding="utf-8",
+                   env=dict(noenv, ENGINE_SECRETS=os.path.join(tmp, "absent.env"), CASE_ID="7", RUN_ID="11", PYTHONIOENCODING="utf-8"))
+check(r.returncode == 0 and len(WSTEPS) == 1, "step with neither key nor token: no error (live status only)")
+
+# --- H2: review gate reads the reviewer's own review.json, hashes and the CLI's modelUsage
+import hashlib
+rd = os.path.join(tmp, "rev"); os.makedirs(rd)
+open(os.path.join(rd, "spec.json"), "w", encoding="utf-8").write('{"note": 1}')
+open(os.path.join(rd, "study_part0.json"), "w", encoding="utf-8").write('{"heading": "भाग 0"}')
+H_ = lambda n: hashlib.sha256(open(os.path.join(rd, n), "rb").read()).hexdigest()
+cjf = os.path.join(tmp, "claude_rev.json")
+def gate(review, usage, **envx):
+    if review is None:
+        if os.path.exists(os.path.join(rd, "review.json")): os.remove(os.path.join(rd, "review.json"))
+    else:
+        json.dump(review, open(os.path.join(rd, "review.json"), "w", encoding="utf-8"), ensure_ascii=False)
+    json.dump({"type": "result", "subtype": "success", "modelUsage": usage}, open(cjf, "w", encoding="utf-8"))
+    st_ok = {"state": "done", "prefix": "CR130_2026", "package_pdf": PROP, "proposal_pages": 5, "review": {"approved": True, "changes": 0}}
+    json.dump(st_ok, open(os.path.join(out, "status.json"), "w", encoding="utf-8"), ensure_ascii=False)
+    run_row.update(state="running", step="तपासणी चालू")
+    return run("verify", out, work, "--review", rd, "--claude", cjf, VERIFY_SCRIPT=fake, MODEL_REVIEW="claude-opus-5-5", MODEL_LIGHT="claude-haiku-5-5", **envx)
+used = {"claude-haiku-5-5": {"costUSD": 0.2}, "claude-opus-5-5[1m]": {"costUSD": 0.41}}
+good = {"approved": True, "changes": 0, "spec_sha256": H_("spec.json"), "part0_sha256": H_("study_part0.json")}
+for rv, us, label, want in (
+        (None, used, "no review.json (status.json copy alone is not enough)", "review.json नाही"),
+        ({**good, "approved": False, "reason": "पत्र नको"}, used, "review.json approved false", "पत्र नको"),
+        ({k: v for k, v in good.items() if k != "spec_sha256"}, used, "no spec hash", "spec_sha256"),
+        ({**good, "spec_sha256": "0" * 64}, used, "spec changed after approval", "spec.json बदलली"),
+        ({**good, "part0_sha256": "0" * 64}, used, "part 0 changed after approval", "study_part0.json बदलली"),
+        (good, {"claude-haiku-5-5": {"costUSD": 0.3}}, "reviewer model never ran", "प्रत्यक्ष चालले नाही")):
+    r = gate(rv, us)
+    check(r.returncode == 1 and run_row["state"] == "failed" and want in run_row["step"], f"review gate: {label} -> failed ({run_row['step'][:120]})")
+r = gate(good, used)
+check(r.returncode == 0 and run_row["state"] == "running", f"review gate: approved, hashes match, Opus usage present -> verify runs ({r.stderr[:200]})")
+r = run("verify", out, work, "--review", rd, "--claude", cjf, VERIFY_SCRIPT=fake, MODEL_REVIEW="claude-haiku-5-5", MODEL_LIGHT="claude-haiku-5-5")
+check(r.returncode == 0, "review gate: reviewer = orchestrator model -> usage check skipped (hashes still checked)")
 
 srv.shutdown()
 print("ALL TESTS PASSED")

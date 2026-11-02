@@ -135,9 +135,9 @@ Earlier §1–§3 items now fixed in code: stuck-run sweep + cancelled(), fetch-
 
 | Sev | Where | Problem | Fix | Eff |
 |---|---|---|---|---|
-| H | process-proposal.yml:27-28,69,217-220 | Claude step (skip-permissions, Bash, internet, untrusted PDFs) has SUPABASE_SERVICE_KEY + ANTHROPIC key in env; checkout persists a contents:write GITHUB_TOKEN in .git/config | `persist-credentials: false`; `env -u` Supabase vars for Claude; progress via Worker + run token; commit token fetched after Claude | M |
-| H | engine_supabase.py:597-600 | Opus review gate trusts `review.approved` written by the Haiku orchestrator | require MODEL_REVIEW in modelUsage; reviewer records sha256 of spec/part 0, recomputed | S |
-| H/M | worker.js:316-336; NewProposal.tsx:140-145; CaseTabs.tsx:77-95 | No server check for a run already queued/running → double tap / two tabs = 2 runs, double cost | 409 if an active non-stale run exists; lock button on the API reply | S |
+| H ✅ 02.11 | process-proposal.yml:27-28,69,217-220 | Claude step (skip-permissions, Bash, internet, untrusted PDFs) has SUPABASE_SERVICE_KEY + ANTHROPIC key in env; checkout persists a contents:write GITHUB_TOKEN in .git/config | `persist-credentials: false`; `env -u` Supabase vars for Claude; progress via Worker + run token; commit token fetched after Claude | M |
+| H ✅ 02.11 | engine_supabase.py:597-600 | Opus review gate trusts `review.approved` written by the Haiku orchestrator | require MODEL_REVIEW in modelUsage; reviewer records sha256 of spec/part 0, recomputed | S |
+| H ✅ 02.11 | worker.js:316-336; NewProposal.tsx:140-145; CaseTabs.tsx:77-95 | No server check for a run already queued/running → double tap / two tabs = 2 runs, double cost | 409 if an active non-stale run exists; lock button on the API reply | S |
 | M | process-proposal.yml:240; extract_check.py | Final extract check non-fatal (`|| true`); note-body “…” quotes never machine-checked | fail on mismatch; include note-body quotes | M |
 | M | process-proposal.yml:155-230 | part1check run only by the model | re-run in the verify step | S |
 | M | verify_outputs.py:285; engine_supabase.py:177,616 | Upload-prefix regex `^[0-9a-f]{8}-` also strips real names like "20261101-CR130.pdf"; two regexes differ | strip only a known upload prefix; one shared regex | S |
@@ -159,3 +159,4 @@ Earlier §1–§3 items now fixed in code: stuck-run sweep + cancelled(), fetch-
 | L | engine/tools | gr_request code not validated (path); duplicate pkg3 labels; OCR not tied to package sha; tests not in CI; actions not SHA-pinned; curl --retry vs single-use token | per item | S |
 | L | front end | DocxView unsanitised hrefs/w:char; ✕ on uploaded extras; scroll to status; dupId never cleared; reloadLetters refreshes all; chart axis labels clipped on phone; PDF outline open on phone; auth listener dup; ARIA | per item | XS–S |
 Feature ideas (suggestions only): push notification on run end; share PDF from WhatsApp into "नवीन प्रस्ताव"; camera upload of reply; one-click download of all three files; selectable/searchable PDF text; tap पृ.N → package page; reply-due reminders; outgoing-letter register; "मंजूर आवृत्ती" mark + senior remarks.
+Status 02.11.2026: the three H items fixed (APP_B_DESIGN D14; tests: worker 6/6, engine_supabase_test incl. review gate + Worker step, workflow step run locally as separate runner/engine users with a fake claude — engine had no Supabase env, could not read the secrets file, no git token in .git/config). Also fixed with them: case_id validated in /api/run.

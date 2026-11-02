@@ -56,6 +56,7 @@ export function humanError(e: unknown): string {
     const lim = e instanceof ApiError ? Number((e.data as { limit_usd?: unknown } | undefined)?.limit_usd) : NaN;
     return budgetReachedText(Number.isFinite(lim) ? lim : null);
   }
+  if (msg === 'run_active') return 'या प्रकरणाची प्रक्रिया आधीच चालू आहे — ती संपेपर्यंत थांबा';
   for (const [re, mr] of MARATHI) if (re.test(msg)) return mr;
   if (looksMarathi(msg)) return msg;
   return GENERIC;

@@ -22,3 +22,12 @@ Abhi (02.11.2026): "AI api key sarv paid models aahet, option thewa, google gemi
 
 ## 3. Open questions (Abhi)
 Q1 Which fit (A / B / C)? Default: A, then C.  Q2 May proposal contents go to Google / OpenAI paid APIs (office policy)? Default: ask before use.  Q3 Test case for side-by-side? Default: CR131.
+
+## 4. Decision and build (Abhi 02.11.2026: "AI साठी A व C")
+Built: A (Study part 1 on Gemini, `tools/gemini_part1.py`) and C (fallback provider through LiteLLM) — APP_B_DESIGN D15.
+Defaults: part 1 on Claude; Gemini model gemini-2.5-flash; fallback off; fallback models Gemini 2.5 Pro / 2.5 Flash or
+OpenAI gpt-6.1-sol / gpt-5.4-mini. Tested: mock Gemini API (3 tests), LiteLLM gateway reached Google with Claude Code's
+requests (fake key → Google's own "API key not valid"), workflow step locally (overload → fallback → proxy → second run).
+NOT yet tested: output quality with real Gemini/OpenAI keys — first real use should be on an approved case (e.g. CR131)
+and compared with the approved note before relying on it. Q2 (office policy on sending proposals to Google/OpenAI paid
+APIs) stays Abhi's: nothing is sent unless he enters a key and chooses the provider.
