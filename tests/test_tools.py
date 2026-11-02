@@ -224,6 +224,56 @@ class TestPkg3AndHighlight(TmpCase):
         self.assertEqual(os.path.getsize(out), size)
 
 
+    def test_also_reply_after_proposal(self):
+        # A1 H9: reply PDFs follow the proposal pages (--also or enclosures.json "proposal_parts"), bookmarked
+        # "उत्तर-पत्र", stamped like proposal pages (no white strip), recorded in map.json
+        if not os.path.exists(GR_PDF):
+            self.skipTest("GR PDF not in checkout")
+        prop = self.make_proposal()
+        d = pymupdf.open(); d.new_page().insert_text((72, 100), "Reply page"); rp = os.path.join(self.tmp, "reply.pdf"); d.save(rp)
+        enc = os.path.join(self.tmp, "enc.json")
+        jdump([{"path": GR_PDF, "pages": "1", "label": "GR"}], enc)
+        out = os.path.join(self.tmp, "o.pdf")
+        r = run([os.path.join(TOOLS, "pkg3.py"), prop, enc, out, "--also", rp])
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        mp = jload(out + ".map.json")
+        self.assertEqual(mp["प्रस्ताव"]["pages"], [1, 2])
+        self.assertEqual(mp["उत्तर-पत्र"], {"first_page": 3, "pages": [3], "kind": "reply"})
+        self.assertEqual(mp["proposal_parts"], ["उत्तर-पत्र"])
+        self.assertEqual(mp["GR"]["first_page"], 4)
+        o = pymupdf.open(out)
+        self.assertEqual([t[1:] for t in o.get_toc()], [["प्रस्ताव", 1], ["उत्तर-पत्र", 3], ["GR", 4]])
+        self.assertEqual([x for x in o[2].get_drawings() if x.get("fill")], [], "white strip on a reply page")
+        o.close()
+        # the same through enclosures.json
+        jdump({"proposal_parts": [{"path": rp, "label": "उत्तर-पत्र दि. 12.10.2026"}], "enclosures": [{"path": GR_PDF, "pages": "1", "label": "GR"}]}, enc)
+        r = run([os.path.join(TOOLS, "pkg3.py"), prop, enc, out])
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(jload(out + ".map.json")["proposal_parts"], ["उत्तर-पत्र दि. 12.10.2026"])
+
+    def test_highlight_updates_map(self):
+        # A1 M: a pkg3 mark "TEXT NOT FOUND" that highlight.py places is recorded as placed in map.json
+        if not os.path.exists(GR_PDF):
+            self.skipTest("GR PDF not in checkout")
+        prop = self.make_proposal()
+        enc = os.path.join(self.tmp, "enc.json")
+        jdump([{"path": GR_PDF, "pages": "1", "label": "GR", "marks": [{"page": 1, "text": "no such text zzqx"}]}], enc)
+        out = os.path.join(self.tmp, "o.pdf")
+        r = run([os.path.join(TOOLS, "pkg3.py"), prop, enc, out])
+        self.assertEqual(jload(out + ".map.json")["marks"][0]["status"], "TEXT NOT FOUND")
+        d = pymupdf.open(out)
+        tops = [l["bbox"][1] for b in d[2].get_text("dict")["blocks"] for l in b.get("lines", [])
+                if "".join(s["text"] for s in l["spans"]).strip()]
+        d.close()
+        mj = os.path.join(self.tmp, "marks.json")
+        jdump([{"page": 3, "mode": "lines", "y0": tops[0] - 1, "y1": tops[0] + 1}], mj)
+        r = run([os.path.join(TOOLS, "highlight.py"), out, mj])
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        mk = jload(out + ".map.json")["marks"][0]
+        self.assertEqual(mk["status"], "highlighted (highlight.py)")
+        self.assertGreaterEqual(mk["hits"], 1)
+
+
 @unittest.skipIf(docx is None, "python-docx not installed")
 class TestBuildStudy(TmpCase):
     def test_fonts(self):
@@ -313,7 +363,22 @@ class TestGrRequestCode(TmpCase):
         self.assertEqual(sorted(os.listdir(os.path.join(self.tmp, "pdf", "gr"))), ["INDEX.tsv"])
         with open(os.path.join(self.tmp, "tools", "gr-request.txt"), encoding="utf-8") as f:
             todo = f.read().split("# done")[0]
-        self.assertNotIn("code ", todo)   # moved to '# done', not retried
+        self.assertNotIn("code ", todo)   # moved to the done file, not retried
+
+    def test_pending_and_done_in_separate_files(self):
+        # A2 LOW: pending lines stay in gr-request.txt, results go to gr-request-done.txt; an old '# done' section moves
+        os.makedirs(os.path.join(self.tmp, "tools"))
+        with open(os.path.join(self.tmp, "tools", "gr-request.txt"), "w", encoding="utf-8") as f:
+            f.write("# requests\ncode 12345\n# done\ncode 1  ->  saved\n")
+        r = run([os.path.join(TOOLS, "gr_request.py")], cwd=self.tmp)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        req = read_text(os.path.join(self.tmp, "tools", "gr-request.txt"))
+        done = read_text(os.path.join(self.tmp, "tools", "gr-request-done.txt"))
+        self.assertNotIn("# done", req)
+        self.assertNotIn("code ", req)
+        self.assertIn("# requests", req)
+        self.assertIn("code 12345  ->  rejected", done)
+        self.assertIn("code 1  ->  saved", done)
 
 
 if __name__ == "__main__":

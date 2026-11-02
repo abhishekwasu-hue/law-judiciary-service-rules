@@ -1,13 +1,30 @@
 # ENGINE_BRIEF — binding rules for one engine run
-From INSTRUCTIONS.md [I§.n], PROPOSAL_SOP.md [SOP step], tools/PROPOSAL_PROMPT.md. The source wins on conflict.
+From INSTRUCTIONS.md [I§.n], PROPOSAL_SOP.md [SOP step], tools/PROPOSAL_PROMPT.md. The source wins on conflict of
+content; section 0 wins over every ask / discuss / stop line (no interaction in this run).
+
+## 0. Never stop — deliver with warnings [I4.26] (Abhi, 02.11.2026; ENGINE_PROMPT rules 2, 5, 9)
+- status.json "failed" ONLY when no output could be produced (pages unreadable, nothing built). Otherwise "done";
+  each unresolved problem = a `warnings` line "पडताळणी अपूर्ण — <what, where>" (lint/verify/extract/part1 not clean
+  after the caps, C R/file no. missing, GR not found, instruction vs binding rule, part 1 incomplete for time).
+- Caps per problem: orchestrator 2 + drafter 2 + drafter_strong 1 (if set) attempts; then warning, go on, never loop.
+- "Ask" / "discuss first" ([I3.2], [SOP2] सांकेतांक) = a `warnings` line + a Study part 4 question; work goes on.
+- C R no./year/file no. missing in case.json and on every page -> PREFIX `Case<id>_<year>`, ref_no
+  `संकिर्ण-<year>/____/प्र.क्र.____/का.6`, warning; never a reason to stop, refuse or fail. Unclear page -> "अस्पष्ट".
+- Instruction vs a binding rule -> the rule wins in the files; warning "पडताळणी अपूर्ण — सूचना '…' नियम §… मुळे लागू
+  केली नाही".
+- Review: 1 review + 1 re-review. The reviewer runs `python3 tools/lint_spec.py /tmp/work/spec.json` to LINT OK
+  before hashing; a substantive error -> approved=false with `reason` (+ `redraft` points) -> ONE drafter redraft ->
+  re-review; still false -> delivered, warning "अंतिम पडताळणी (Opus) मान्यता नाही — वापरण्यापूर्वी तपासा: <reason>".
 
 ## 1. Sources and text [I1]
 - [I1.1] Nothing of your own: no information, meaning, opinion or conclusion. GR/rule/circular/judgment text is
-  copied verbatim — no change, abridging or cutting.
+  copied verbatim — no change, abridging or cutting. Sole exception: a parawise report's Rule 58(4)(a)
+  recommendation (section 4b), from the record only.
 - [I1.2] Every extract carries its source: GR/rule no. + date, page no., para (rule/sub-rule) no.; judgment: court,
   case no., date, para.
 - [I1.3] Only official Govt of India / Maharashtra GRs, rules, court orders; no third-party sources (confidential).
-- [I1.4] Not readable / not available -> write "वाचन अपूर्ण / उपलब्ध नाही"; never guess.
+- [I1.4] Never guess. One form per use: unreadable text on a page -> "अस्पष्ट" (part 1 "[अस्पष्ट]"); a source not
+  readable / not available -> "वाचन अपूर्ण / उपलब्ध नाही"; a GR not found after fetching -> "उपलब्ध नाही — मागवावे".
 - [I3] All government text in Devanagari Marathi (only an affidavit / parawise reply in English). Fewest words.
 - [I5] Precedent library first for the same subject: quote earlier Finance/GAD opinions with ref no./date verbatim;
   never decide "take opinion again / not" yourself; old-case names/diagnoses -> "____".
@@ -25,7 +42,7 @@ From INSTRUCTIONS.md [I§.n], PROPOSAL_SOP.md [SOP step], tools/PROPOSAL_PROMPT.
    `dept …` in tools/gr-request.txt, then `python3 tools/gr_request.py` (official URL
    gr.maharashtra.gov.in/Site/Upload/Government%20Resolutions/Marathi/<code>.pdf; archive.org collection
    maharashtragr; last 2 code digits = dept: 05 Finance, 12 L&J). Only the GRs needed; add them to the package.
-   Only if still not found: "उपलब्ध नाही — मागवावे" (+ ask its सांकेतांक in ONE line).
+   Only if still not found: "उपलब्ध नाही — मागवावे", `grs_missing` + warning (its सांकेतांक asked there, section 0).
 4. [SOP3][I4.9][I4.15] Letter ONLY if information ESSENTIAL to decide/approve is missing; ask only that, as an
    empty table; nothing supplementary or "nice to have"; never what Govt/this dept already has (own GRs, official
    orders). Addressee as the proposal came: via HC "प्रबंधक …, उच्च न्यायालय (अपील शाखा), मुंबई", else the
@@ -47,7 +64,8 @@ From INSTRUCTIONS.md [I§.n], PROPOSAL_SOP.md [SOP step], tools/PROPOSAL_PROMPT.
   पत्रास अनुसरून सादर."). Short numbered paras. Facts/posts/periods/amounts in TABLES:
   `{"table": [[...],[...]], "bold_last": true}` in note.paras. GR text verbatim in “ ” + "(पृ.N/प.वि.)". Earlier
   record of the same matter = a fact with its reference.
-- Page refs: only "पृ.N/प.वि.", N = page of the returned PDF (proposal 1..n, then GR pages; from <pdf>.map.json).
+- Page refs: only "पृ.N/प.वि.", N = page of the returned PDF (proposal 1..n, then reply/extra PDFs, then GR pages;
+  from <pdf>.map.json). Reply pages follow the proposal pages: cite them by their package page, never an invented N.
   Never "पॅकेज PDF" in the note body or the letter. No repo paths, no internal ids (z6_0235 …).
 - Banned (closed list, = tools/lint_spec.py BANNED): "दिसून येते", "असे दिसते", "पडताळणी केली असता",
   "माझ्या मते", "मला वाटते", "असे वाटते", "ठरवावे", "कदाचित", "बहुधा"; also no commentary, theory,
@@ -70,7 +88,9 @@ From INSTRUCTIONS.md [I§.n], PROPOSAL_SOP.md [SOP step], tools/PROPOSAL_PROMPT.
 - [I4.19] Marathi forms (GR कपासू-2020/प्र.क्र.56/भाषा-2, दि. 10.11.2022), outside quotes: "दि. 17.09.2026", "क्र. 108", running "प्र. क्र."; ":-" not ".:-"; "करून", "प्रारूप". Exempt: quotes/extracts, पृ.N/प.वि., file nos. and tokens with '/' or '-', signers, dates, GR codes.
 
 ## 4. Letter [SOP4][I4.5][I4.10]
-- ref_no "संकिर्ण-2026/<file no>/प्र.क्र.<n>/का.6"; date "__.__.2026"; to; subject; refs ("आपले पत्र क्र. …, दि. …").
+- ref_no "संकिर्ण-2026/<file no>/प्र.क्र.<n>/का.6" (spelling "संकिर्ण" even when the निर्देशपत्र has "संकीर्ण"; 2026 =
+  the year of the file no., never copied from a sample); date "__.__.<current year>"; to; subject; refs ("आपले पत्र
+  क्र. …, दि. …").
 - intro: "उपरोक्त विषयाबाबत संदर्भाधीन पत्रास अनुसरून आपणांस कळविण्यात येते की, सदर प्रकरणी पुढील कार्यवाहीसाठी
   खालील माहिती … उपलब्ध करून देण्यात यावी, ही विनंती:-"; points = empty table or a few short points (essential only,
   official language of earlier files, tables where needed [I4.15]).
@@ -120,7 +140,8 @@ Sources: GR22 = मराठी भाषा विभाग GR कपासू-
 - Court matter (GP/AGP/HC/MAT notice: रिट याचिका, मूळ अर्ज/O.A., अवमान याचिका, SLP): note para 1 "<सहायक सरकारी वकील,
   …> यांच्या पृ.N/प.वि. वरील दि. __ रोजीच्या पत्रास अनुसरून सादर.", "पार्श्वभूमी थोडक्यात खालीलप्रमाणे आहे:-" + numbered
   facts (B9). Facts suffice -> spec `parawise` (English; Rule 58(3) every point; Rule 58(4) Note (ii) elaborate facts with
-  rule/GR refs, never "denied"/"not admitted" alone, documents enclosed; recommendation oppose / not oppose) + letter to
+  rule/GR refs, never "denied"/"not admitted" alone, documents enclosed; recommendation oppose / not oppose from the
+  record — no record basis -> "____" + warning) + letter to
   the GP/AGP forwarding it. Essential facts missing -> info-letter first [I4.15], no `parawise`. Rule 58(4): to the GP
   within two weeks / before the notice date — hearing date in Study part 0. Signers [I4.6] (B10).
 - Order draft: spec `order` (gr / corrigendum / circular / memo / notification) ONLY when the record shows the decision
@@ -165,10 +186,11 @@ Sources: GR22 = मराठी भाषा विभाग GR कपासू-
 
 ## 6. Checks [SOP4][SOP7]
 - Before every build: `python3 tools/lint_spec.py spec.json --study study.json --pages <package pages>` until
-  "LINT OK".
+  "LINT OK" (caps: section 0; after them build with `--no-lint`, lines -> warnings).
 - `python3 tools/verify_outputs.py OUTDIR PREFIX "OUTDIR/<original name>" <proposal pages> --original-name "<name>"`
   must print ALL OK (fonts, ids/paths, page-ref ranges, signer chain, letter, Study headings, name, stamps,
-  bookmarks, annotations).
+  bookmarks, annotations). After the caps: warnings — except HARD (missing outputs, internal ids / repo paths,
+  annotations on proposal pages): always fix those.
 - Then re-read every number and date against its page image.
 
 On any doubt, read the full source file named in the tag.

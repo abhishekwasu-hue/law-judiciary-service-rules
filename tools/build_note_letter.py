@@ -77,14 +77,29 @@ def main(spec, outdir, pre):
     print(out, "letter" if has_letter else "NO letter", "sections:", len(secs), "bad-font runs:", bad)
     soffice = shutil.which("soffice") or shutil.which("soffice.exe")
     if soffice:
-        r = subprocess.run([soffice, "--headless", "--convert-to", "pdf", "--outdir", outdir, out],
-                           stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
-        if r.returncode != 0 or not os.path.exists(os.path.splitext(out)[0] + ".pdf"):
-            print("WARNING: soffice preview failed (rc", r.returncode, ")", r.stderr.decode(errors="replace")[:300], file=sys.stderr)
+        rc, err = soffice_pdf(soffice, out, outdir)
+        if rc != 0 or not os.path.exists(os.path.splitext(out)[0] + ".pdf"):
+            print("WARNING: soffice preview failed (rc", rc, ")", err[:300], file=sys.stderr)
     else:
         print("WARNING: soffice not found — no PDF preview (docx is complete)", file=sys.stderr)
     return 0 if ok else 1
 
+
+
+def soffice_pdf(soffice, src, outdir, timeout=180):
+    """LibreOffice preview with a PRIVATE profile (parallel conversions by other agents do not collide, A2 LOW) and a
+    time limit. -> (returncode, stderr text); rc 124 = timed out."""
+    import tempfile
+    prof = tempfile.mkdtemp(prefix="lo_preview_")
+    try:
+        r = subprocess.run([soffice, "-env:UserInstallation=file://" + prof.replace(os.sep, "/"), "--headless",
+                            "--convert-to", "pdf", "--outdir", outdir, src],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, timeout=timeout)
+        return r.returncode, r.stderr.decode(errors="replace")
+    except subprocess.TimeoutExpired:
+        return 124, f"soffice timed out after {timeout} s"
+    finally:
+        shutil.rmtree(prof, ignore_errors=True)
 
 def lint(spec):
     """pre-build lint (same rules as verify_outputs.py); True when clean."""

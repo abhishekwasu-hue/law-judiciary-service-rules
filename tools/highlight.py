@@ -9,7 +9,11 @@ string that repeats elsewhere on the page). marks.json = list of:
   {"page": N, "mode": "rect",  "rects": [[x0,y0,x1,y1],...]} explicit line rectangles (points) — one per printed line
 Exit code 1 (PDF left unchanged) if any mark gets 0 highlights, a page is out of range, or tesseract fails.
 Tips: get line positions with  python3 -c "import pymupdf as m;d=m.open('p.pdf');[print(round(l['bbox'][1]),''.join(s['text'] for s in l['spans'])[:60]) for b in d[N-1].get_text('dict')['blocks'] for l in b.get('lines',[])]"
-Render the page afterwards and LOOK: highlight only the quoted lines."""
+Render the page afterwards and LOOK: highlight only the quoted lines.
+map.json (A1 M): when <package.pdf>.map.json exists (tools/pkg3.py), every pkg3 mark that was NOT placed ("TEXT NOT
+FOUND" / hits 0) on a page this run highlights gets status "highlighted (highlight.py)" and hits = the highlights placed
+there, so verify_outputs.py no longer reports it. A mark of marks.json may name the pkg3 mark it replaces with "label"
+and/or "text" (then only that record is updated); without them every unplaced record of that page is updated."""
 import sys, json, os, csv, subprocess, tempfile, shutil
 import pymupdf as m
 
@@ -59,6 +63,7 @@ def ocr_lines(pg, lang):
 
 def main(pdf, mj):
     d = m.open(pdf); marks = json.load(open(mj, encoding="utf-8-sig")); total = 0; failed = []
+    placed = []  # (page, highlights, mark)
     for i, mk in enumerate(marks):
         if not 1 <= mk["page"] <= len(d):
             failed.append((i, mk["page"], "page out of range")); continue
@@ -80,13 +85,47 @@ def main(pdf, mj):
             failed.append((i, mk["page"], f"unknown mode {mk['mode']!r}")); continue
         if n == 0:
             failed.append((i, mk["page"], f"0 highlights in mode {mk['mode']}"))
+        else:
+            placed.append((mk["page"], n, mk))
         total += n
     if failed:
         print("FAIL (PDF not changed):", failed, file=sys.stderr)
         return 1
     tmpout = pdf + ".tmp"; d.save(tmpout, garbage=3, deflate=True); d.close(); os.replace(tmpout, pdf)
     print("highlights added:", total)
+    n_map = update_map(pdf, placed)
+    if n_map is not None:
+        print("map.json marks updated:", n_map)
     return 0
+
+
+def unplaced(rec):
+    st = str(rec.get("status", ""))
+    return "NOT FOUND" in st.upper() or ("hits" in rec and not rec["hits"] and st != "page not included")
+
+
+def update_map(pdf, placed):
+    """Mark the pkg3 records this run fixed as placed in <pdf>.map.json. -> records updated, None when no map."""
+    mpath = pdf + ".map.json"
+    if not os.path.exists(mpath):
+        return None
+    try:
+        mp = json.load(open(mpath, encoding="utf-8-sig"))
+    except Exception as e:
+        print("WARNING: map.json not updated:", e, file=sys.stderr); return None
+    n = 0
+    for page, hits, mk in placed:
+        for rec in mp.get("marks", []) or []:
+            if rec.get("pdf_page") != page or not unplaced(rec):
+                continue
+            if mk.get("label") and rec.get("label") != mk["label"]:
+                continue
+            if mk.get("text") and rec.get("text") != mk["text"]:
+                continue
+            rec["status"] = "highlighted (highlight.py)"; rec["hits"] = hits; n += 1
+    tmp = mpath + ".tmp"
+    json.dump(mp, open(tmp, "w", encoding="utf-8"), ensure_ascii=False, indent=1); os.replace(tmp, mpath)
+    return n
 
 
 if __name__ == "__main__":

@@ -216,33 +216,80 @@ r = run("claude_result", jf, ef, "0", "--part1", p1f, "--wall", "900")
 check(r.returncode == 1 and run_row["state"] == "failed" and "max turns" in run_row["step"] and run_row["num_turns"] == 520,
       "claude_result main error with part1: failed with the main run's reason, sums stored")
 
-# --- verify: runs verify_outputs with PREFIX / package / proposal pages; FAIL lines become the reason
+# --- deliver with warnings (A1 H1): status.json done + the three outputs -> an error result is only a warning
+outd = os.path.join(tmp, "out_dw"); os.makedirs(outd)
+for n in ("CR130_2026_Study.docx", "CR130_2026_Note_and_Letter.docx", PROP):
+    open(os.path.join(outd, n), "wb").write(b"x")
+json.dump({"state": "done", "summary": "s"}, open(os.path.join(outd, "status.json"), "w", encoding="utf-8"))
+open(jf, "w", encoding="utf-8").write(json.dumps({"type": "result", "subtype": "error_max_turns", "is_error": True, "num_turns": 400, "total_cost_usd": 2.0}))
+run_row.update(state="running", step="तपासणी चालू", warnings=[])
+r = run("claude_result", jf, ef, "0", "--status", os.path.join(outd, "status.json"))
+check(r.returncode == 0 and run_row["state"] == "running" and any(w.startswith("अभ्यास नीट संपला नाही (अभ्यास अपूर्ण — कमाल पायऱ्या") for w in run_row["warnings"]),
+      f"claude_result max turns but done + outputs: delivered with a warning ({run_row['warnings']} {r.stderr[:200]})")
+os.remove(os.path.join(outd, "CR130_2026_Note_and_Letter.docx"))
+r = run("claude_result", jf, ef, "0", "--status", os.path.join(outd, "status.json"))
+check(r.returncode == 1 and run_row["state"] == "failed", "claude_result max turns, an output missing: failed")
+# --killed: no JSON -> estimated cost (BUDGET_USD) + warning; with outputs + done -> delivered
+open(os.path.join(outd, "CR130_2026_Note_and_Letter.docx"), "wb").write(b"x")
+run_row.update(state="running", step="तपासणी चालू", warnings=[], cost_usd=None)
+open(jf, "w").write("")
+r = run("claude_result", jf, ef, "124", "--killed", "--status", os.path.join(outd, "status.json"), BUDGET_USD="1.5")
+check(r.returncode == 0 and run_row["cost_usd"] == 1.5 and any(w.startswith("खर्च अंदाजे") for w in run_row["warnings"])
+      and any(w.startswith("अभ्यास नीट संपला नाही (वेळ संपली") for w in run_row["warnings"]),
+      f"claude_result --killed: estimated cost stored, delivered ({run_row['cost_usd']} {run_row['warnings']})")
+run_row.update(state="running", step="तपासणी चालू", warnings=[], cost_usd=None)
+r = run("claude_result", jf, ef, "0", "--killed")
+check(r.returncode == 1 and run_row["cost_usd"] == 0.75 and run_row["state"] == "failed" and "थांबवला" in run_row["step"],
+      f"claude_result --killed, no outputs: default estimate 0.75, failed ({run_row['cost_usd']} {run_row['step']})")
+# --first: cost of the failed first run before the fallback is added; --part1-no-cost: part 1 cost not added
+f0 = os.path.join(tmp, "first.json")
+json.dump({"type": "result", "subtype": "success", "is_error": True, "num_turns": 5, "total_cost_usd": 0.4}, open(f0, "w"))
+open(jf, "w", encoding="utf-8").write(json.dumps({"type": "result", "subtype": "success", "is_error": False, "num_turns": 10, "total_cost_usd": 1.0}))
+open(p1f, "w", encoding="utf-8").write(json.dumps({"type": "result", "subtype": "success", "is_error": False, "num_turns": 3, "total_cost_usd": 0.3}))
+run_row.update(state="running", step="तपासणी चालू", warnings=[])
+r = run("claude_result", jf, ef, "0", "--first", f0, "--part1", p1f, "--part1-no-cost")
+check(r.returncode == 0 and run_row["cost_usd"] == 1.4 and run_row["num_turns"] == 15 and run_row["state"] == "running",
+      f"claude_result --first added, --part1-no-cost not added ({run_row['cost_usd']}, {run_row['num_turns']})")
+open(p1f, "w", encoding="utf-8").write(json.dumps({"type": "result", "subtype": "error_max_turns", "is_error": True}))
+r = run("claude_result", jf, ef, "0", "--part1", p1f, "--part1-no-cost")
+check(r.returncode == 0 and any("भाग 1" in w for w in run_row["warnings"]), "claude_result --part1-no-cost: part-1 error still a warning")
+
+# --- verify: runs verify_outputs with PREFIX / package / proposal pages. "Deliver with warnings": only HARD FAIL lines
+#     (outputs unreadable, internal ids / repo paths, annotations on proposal pages) fail the case; others = warnings
 fake = os.path.join(tmp, "fake_verify.py"); argf = os.path.join(tmp, "verify_args.json")
 open(fake, "w", encoding="utf-8").write(
     "import json, os, sys\n"
     f"json.dump(sys.argv[1:], open({argf!r}, 'w', encoding='utf-8'), ensure_ascii=False)\n"
-    "if os.environ.get('FAKE_FAIL'):\n"
-    "    print('FAIL: Study: 3 runs without DVOT-SurekhMR'); print('FAIL: page 4: no page stamp'); print('FIX THE FAILS ABOVE | pages 9')\n"
+    "if os.environ.get('FAKE_FAIL') == 'soft':\n"
+    "    print('FAIL: Study fonts — Study: 3 runs without DVOT-SurekhMR'); print('FAIL: page stamps — no stamp on page 4'); print('FIX THE FAILS ABOVE | pages 9')\n"
+    "    sys.exit(1)\n"
+    "elif os.environ.get('FAKE_FAIL') == 'hard':\n"
+    "    print('FAIL: Note_and_Letter internal ids — internal id z6_0235'); print('FAIL: Study fonts — x'); print('FIX THE FAILS ABOVE | pages 9')\n"
+    "    sys.exit(1)\n"
+    "elif os.environ.get('FAKE_FAIL') == 'crash':\n"
+    "    raise SystemExit('boom')\n"
     "else:\n"
     "    print('ALL OK | pages 9 | toc 3')\n")
 st["prefix"] = "CR130_2026"; st["package_pdf"] = PROP; st["proposal_pages"] = 5
-# final reviewer (MODEL_REVIEW) approval is required before verify_outputs runs
+# reviewer approval missing / false -> SOFT: warning, verify_outputs still runs, case not failed
 for rv, label in ((None, "no review"), ({"approved": False, "changes": 0, "reason": "पत्राचा निर्णय चुकीचा"}, "approved false")):
     st.pop("review", None)
     if rv: st["review"] = rv
     json.dump(st, open(os.path.join(out, "status.json"), "w", encoding="utf-8"), ensure_ascii=False)
-    run_row.update(state="running", step="तपासणी चालू")
+    run_row.update(state="running", step="तपासणी चालू", warnings=[])
     if os.path.exists(argf): os.remove(argf)
     r = run("verify", out, work, VERIFY_SCRIPT=fake)
-    check(r.returncode == 1 and run_row["state"] == "failed" and run_row["step"].startswith("अंतिम पडताळणी (reviewer) मान्यता नाही")
-          and not os.path.exists(argf) and (not rv or "पत्राचा निर्णय चुकीचा" in run_row["step"]),
-          f"verify: {label} -> failed with a Marathi reason, verify_outputs not run ({run_row['step']})")
+    check(r.returncode == 0 and run_row["state"] == "running" and os.path.exists(argf)
+          and any(w.startswith("अंतिम पडताळणी (Opus) मान्यता नाही — वापरण्यापूर्वी तपासा: ") for w in run_row["warnings"])
+          and (not rv or any("पत्राचा निर्णय चुकीचा" in w for w in run_row["warnings"])),
+          f"verify: {label} -> delivered with the review warning ({run_row['warnings']})")
 st["review"] = {"approved": True, "changes": 2, "corrections": ["नोंद परि.3 दिनांक 05.08.2026 केला", "पत्रातील पदनाम"]}
 json.dump(st, open(os.path.join(out, "status.json"), "w", encoding="utf-8"), ensure_ascii=False)
-run_row.update(state="running", step="तपासणी चालू")
+run_row.update(state="running", step="तपासणी चालू", warnings=[])
 r = run("verify", out, work, VERIFY_SCRIPT=fake)
 a = json.load(open(argf, encoding="utf-8"))
-check(r.returncode == 0 and run_row["state"] == "running", f"verify ALL OK: exit 0 ({r.stderr[:200]})")
+check(r.returncode == 0 and run_row["state"] == "running" and "verify: ALL OK" in r.stdout and not run_row["warnings"],
+      f"verify ALL OK: exit 0, no warning ({r.stderr[:200]})")
 check(a[1] == "CR130_2026" and os.path.basename(a[2]) == PROP and a[0] == out, "verify: outdir, PREFIX, package PDF passed")
 check(a[3] == "5", f"verify: proposal pages from status.json when the PDF cannot be read ({a[3]})")
 check(a[4:] == ["--original-name", PROP], f"verify: --original-name = the newest proposal's original name ({a[4:]})")
@@ -252,7 +299,7 @@ work_m = os.path.join(tmp, "case_m"); out_m = os.path.join(tmp, "out_m"); os.mak
 MN = "CR66_Proposal_with_GRs.pdf"
 json.dump({**cj0, "proposal_original_name": "11ae057d-" + MN, "inputs": []}, open(os.path.join(tmp, "cm.json"), "w", encoding="utf-8"))
 os.makedirs(work_m); os.replace(os.path.join(tmp, "cm.json"), os.path.join(work_m, "case.json"))
-open(os.path.join(out_m, MN), "wb").write(b"x")
+open(os.path.join(out_m, MN), "wb").write(b"x"); open(os.path.join(out_m, "CR66_2026_Study.docx"), "wb").write(b"x")
 json.dump({"state": "done", "prefix": "CR66_2026", "package_pdf": MN, "proposal_pages": 4, "review": {"approved": True, "changes": 0}},
           open(os.path.join(out_m, "status.json"), "w", encoding="utf-8"))
 r = run("verify", out_m, work_m, VERIFY_SCRIPT=fake)
@@ -261,6 +308,12 @@ check(r.returncode == 0 and a[4:] == ["--original-name", MN] and os.path.basenam
       f"verify: upload prefix stripped, machine-looking original name passed ({a[4:]})")
 r = run("verify", out_m, VERIFY_SCRIPT=fake)
 check(len(json.load(open(argf, encoding="utf-8"))) == 4, "verify without workdir: no --original-name")
+# --case-meta (runner-written, from Supabase) wins over the engine-writable case.json
+cmf = os.path.join(tmp, "case_meta.json")
+json.dump({"proposal_original_name": "11ae057d-" + MN, "proposal_pages": 7}, open(cmf, "w", encoding="utf-8"))
+r = run("verify", out_m, work_m, "--case-meta", cmf, VERIFY_SCRIPT=fake)
+a = json.load(open(argf, encoding="utf-8"))
+check(r.returncode == 0 and a[3] == "7" and a[4:] == ["--original-name", MN], f"verify --case-meta: pages + name from the meta file ({a})")
 try:
     import pymupdf
     d = pymupdf.open()
@@ -268,11 +321,36 @@ try:
     d.save(os.path.join(work, "in", "proposal", PROP)); d.close()
     r = run("verify", out, work, VERIFY_SCRIPT=fake)
     check(json.load(open(argf, encoding="utf-8"))[3] == "3", "verify: proposal pages = page count of the fetched proposal")
+    # case_meta: original name from Supabase, pages from the fetched PDF
+    cm2 = os.path.join(tmp, "cm2", "meta.json")
+    r = run("case_meta", cm2, work)
+    m2 = json.load(open(cm2, encoding="utf-8"))
+    check(r.returncode == 0 and m2 == {"proposal_original_name": PROP, "proposal_pages": 3}, f"case_meta: name + pages ({m2} {r.stderr[:200]})")
 except ImportError:
     print("skip  verify page count (pymupdf not installed)")
-r = run("verify", out, work, VERIFY_SCRIPT=fake, FAKE_FAIL="1")
-check(r.returncode == 1 and run_row["state"] == "failed" and "DVOT-SurekhMR" in run_row["step"] and "page 4" in run_row["step"],
-      f"verify FAIL: case failed with the FAIL lines ({run_row['step']})")
+run_row.update(state="running", step="तपासणी चालू", warnings=[])
+r = run("verify", out, work, VERIFY_SCRIPT=fake, FAKE_FAIL="soft")
+check(r.returncode == 0 and run_row["state"] == "running"
+      and "पडताळणी अपूर्ण — Study fonts: Study: 3 runs without DVOT-SurekhMR" in run_row["warnings"]
+      and "पडताळणी अपूर्ण — page stamps: no stamp on page 4" in run_row["warnings"],
+      f"verify SOFT FAIL lines: delivered, one 'पडताळणी अपूर्ण' warning per check ({run_row['warnings']})")
+run_row.update(state="running", step="तपासणी चालू", warnings=[])
+r = run("verify", out, work, VERIFY_SCRIPT=fake, FAKE_FAIL="hard")
+check(r.returncode == 1 and run_row["state"] == "failed" and "internal ids" in run_row["step"] and "z6_0235" in run_row["step"]
+      and "Study fonts" not in run_row["step"] and any("Study fonts" in w for w in run_row["warnings"]),
+      f"verify HARD (confidentiality): case failed, soft lines still warnings ({run_row['step']})")
+run_row.update(state="running", step="तपासणी चालू", warnings=[])
+r = run("verify", out, work, VERIFY_SCRIPT=fake, FAKE_FAIL="crash")
+check(r.returncode == 1 and run_row["state"] == "failed" and "boom" in run_row["step"], f"verify tool crash: hard ({run_row['step']})")
+sys.path.insert(0, os.path.join(ROOT, "tools"))
+import engine_supabase as es0
+hard, soft = es0.classify_verify(["OK: x", "FAIL: annotations on proposal pages (none) — proposal page 1 has annotations ['Square']",
+                                  "FAIL: annotations (Highlight only) — page 9", "FAIL: Order_Draft repo paths — repo path 'pdf/'",
+                                  "FAIL: package PDF opens — x: no such file", "FAIL: map.json (page count, marks) — mark not placed",
+                                  "FAIL: letter ending (§4.5) — 'आपला,' line missing"])
+check([c for c, _ in hard] == ["annotations on proposal pages (none)", "Order_Draft repo paths", "package PDF opens"]
+      and [c for c, _ in soft] == ["annotations (Highlight only)", "map.json (page count, marks)", "letter ending (§4.5)"],
+      f"classify_verify: hard = confidentiality / unreadable / proposal annotations ({hard} | {soft})")
 
 # --- warn: non-fatal, appended
 run_row.update(state="done", warnings=[])
@@ -291,6 +369,10 @@ r = run("fetch", work2); check(r.returncode == 0, f"fetch with two proposal name
 cj = json.load(open(os.path.join(work2, "case.json"), encoding="utf-8"))
 check(cj["proposal_original_name"] == NEWP and os.listdir(os.path.join(work2, "in", "proposal")) == [NEWP],
       "fetch: only the newest proposal (by created_at), under its own name")
+check(open(os.path.join(work2, "in", "extra_doc", PROP), "rb").read() == b"%PDF new"
+      and any(f.get("from_kind") == "proposal" and f["kind"] == "extra_doc" for f in cj["inputs"])
+      and any("प्रस्तावाच्या 2 फाइल" in w for w in run_row.get("warnings") or []),
+      f"fetch: the other proposal PDF fetched as extra_doc + warning (A1 H13) ({run_row.get('warnings')})")
 out3 = os.path.join(tmp, "out3"); os.makedirs(out3)
 for n in ("CR130_2026_Study.docx", "CR130_2026_Note_and_Letter.docx", PROP):
     open(os.path.join(out3, n), "wb").write(b"x")
@@ -400,7 +482,10 @@ for res, err, rc, want, label in (
         ({"is_error": True, "result": "API Error: Connection error."}, "", "1", True, "connection"),
         ({"subtype": "error_max_turns", "is_error": True}, "429", "0", False, "max turns (case problem)"),
         (None, "overloaded", "124", False, "time-out"),
-        ({"is_error": True, "result": "model: claude-x not_found_error"}, "", "1", False, "wrong model name")):
+        ({"is_error": True, "result": "model: claude-x not_found_error"}, "", "1", False, "wrong model name"),
+        ({"subtype": "error_during_execution", "is_error": True, "result": "The GR site returned 503 status; fetch failed"}, "", "1", False,
+         "model's own text about a 503 (A2 LOW)"),
+        ({"subtype": "error_during_execution", "is_error": True, "result": "x", "api_error_status": 529}, "", "1", True, "api_error_status 529")):
     check(pf(res, err, rc) is want, f"C: provider failure? {label} -> {want}")
 jf2 = os.path.join(tmp, "fb.json"); ef2 = os.path.join(tmp, "fb.err")
 json.dump({"type": "result", "subtype": "success", "is_error": False}, open(jf2, "w")); open(ef2, "w").write("")
@@ -421,7 +506,8 @@ check(routes == {"claude-sonnet-5-5": "gemini/gemini-2.5-pro", "claude-opus-5-5"
 lc = json.loads(es.litellm_config({**conf, "FALLBACK_PROVIDER": "openai", "FALLBACK_MODEL": "gpt-6.1-sol", "FALLBACK_MODEL_LIGHT": "gpt-5.4-mini"}))
 check(lc["model_list"][0]["litellm_params"] == {"model": "openai/gpt-6.1-sol", "api_key": "os.environ/OPENAI_API_KEY"}, "C: OpenAI routes")
 lc = json.loads(es.litellm_config(conf, "ollama", "gemma4:31b", "gemma4:12b"))
-check(lc["model_list"][0]["litellm_params"] == {"model": "ollama_chat/gemma4:31b", "api_base": "os.environ/OLLAMA_BASE_URL"}, "Ollama route: api_base by env name, no key")
+check(lc["model_list"][0]["litellm_params"] == {"model": "ollama_chat/gemma4:31b", "api_base": "os.environ/OLLAMA_BASE_URL",
+                                                 "api_key": "os.environ/OLLAMA_API_KEY"}, "Ollama route: api_base + key always by env name (A2 LOW)")
 lc = json.loads(es.litellm_config(conf, "cloudflare", "@cf/x", "@cf/y"))
 check(lc["model_list"][0]["litellm_params"] == {"model": "cloudflare/@cf/x", "api_key": "os.environ/CLOUDFLARE_API_KEY"}, "Cloudflare route")
 # real cost from the gateway callback replaces Claude Code's Claude-priced estimate
@@ -489,9 +575,9 @@ json.dump({"state": "done", "model_log": [{"task": "पान 3", "from": "claud
 res = [{"total_cost_usd": 0.9, "modelUsage": {"claude-opus-5-5": {"costUSD": 0.8}, "claude-haiku-5-5": {"costUSD": 0.1}}}]
 ls = es.model_lines(res, stf, 0.75)
 check(ls[0] == "मॉडेल: पान 3 → Fable 5.1 (पूर्वी Opus 5.5) (हस्तलेख अस्पष्ट)" and ls[1] == "मॉडेल: भाग 1 + साधने → Haiku 5.5 (यांत्रिक)"
-      and ls[2] == "मॉडेल: खर्च — Opus 5.5 $0.80, Haiku 5.5 $0.10" and ls[3].startswith("खर्च-मर्यादा ओलांडली — दर्जा राखण्यासाठी")
+      and ls[2] == "मॉडेल: खर्च — Opus 5.5 $0.80, Haiku 5.5 $0.10" and ls[3].startswith("खर्च अंदाजापेक्षा जास्त — माहितीसाठी")
       and len(ls) == 4, f"model_lines: escalations, per-model cost, soft-budget warning {ls}")
-check(not any(l.startswith("खर्च-मर्यादा") for l in es.model_lines(res, None, 2.0)), "model_lines: under budget -> no budget warning")
+check(not any(l.startswith("खर्च अंदाजापेक्षा") for l in es.model_lines(res, None, 2.0)), "model_lines: under budget -> no budget warning")
 stv = os.path.join(tmp, "status_rv.json")
 json.dump({"state": "done", "model_log": [], "review": {"approved": True, "changes": 1, "corrections": ["पत्रातील दिनांक 05.08.2026 केला", ""]}},
           open(stv, "w", encoding="utf-8"), ensure_ascii=False)
@@ -505,7 +591,7 @@ open(jf, "w", encoding="utf-8").write(json.dumps({"type": "result", "subtype": "
 r = run("claude_result", jf, ef, "0", "--wall", "300", "--status", stf, BUDGET_USD="0.75")
 check(r.returncode == 0 and run_row["state"] == "running" and run_row["cost_usd"] == 1.2, f"claude_result over soft budget: not failed ({r.stderr[:200]})")
 check([w for w in run_row["warnings"] if w.startswith("मॉडेल: ")] == ls[:2] + ["मॉडेल: खर्च — Opus 5.5 $1.10, Haiku 5.5 $0.10"]
-      and any(w.startswith("खर्च-मर्यादा ओलांडली — दर्जा राखण्यासाठी") and "$1.20" in w for w in run_row["warnings"]),
+      and any(w.startswith("खर्च अंदाजापेक्षा जास्त — माहितीसाठी") and "$1.20" in w for w in run_row["warnings"]),
       f"claude_result: मॉडेल lines + soft-budget warning stored {run_row['warnings']}")
 r = claude({"type": "result", "subtype": "error_max_budget_usd", "is_error": True, "num_turns": 12, "total_cost_usd": 0.8})
 check(r.returncode == 1 and run_row["step"].startswith("खर्च-मर्यादा ओलांडली"), f"claude_result budget stop: Marathi reason ({run_row['step']})")
@@ -528,9 +614,20 @@ if pymupdf and FONTF:
               open(spx, "w", encoding="utf-8"), ensure_ascii=False)
     run_row.update(state="running", step="तपासणी चालू", warnings=[])
     r = run("extracts", ox, spx, os.path.join(tmp, "absent_study.json"))
-    check(r.returncode == 1 and run_row["state"] == "failed" and run_row["step"].startswith("उतारा-तपासणी अयशस्वी — 1 उतारे")
-          and "related[1]" in run_row["step"],
-          f"extracts: final mismatch in related -> case failed with a Marathi reason ({run_row['step']} {r.stderr[:200]})")
+    check(r.returncode == 0 and run_row["state"] == "running"
+          and any(w.startswith("पडताळणी अपूर्ण — उतारे: 1 उतारे") and "related[1]" in w for w in run_row["warnings"]),
+          f"extracts: final mismatch in related -> delivered with a 'पडताळणी अपूर्ण' warning ({run_row['warnings']} {r.stderr[:200]})")
+    # the same --extra sources as the in-run check: an extract marked "(पॅकेज PDF मध्ये नाही)" found in register/ = ok
+    regdir = os.path.join(tmp, "reg_x"); os.makedirs(regdir)
+    XL = "अतिरिक्त स्रोतातील हा उतारा पडताळणीसाठी पुरेसा लांब आहे असे समजावे."
+    open(os.path.join(regdir, "r.md"), "w", encoding="utf-8").write("नोंद: " + XL + "\n")
+    json.dump({"related": [{"heading": "GR", "text": ["“" + XL + "”"], "source": "(पॅकेज PDF मध्ये नाही)"}]},
+              open(spx, "w", encoding="utf-8"), ensure_ascii=False)
+    run_row.update(state="running", step="तपासणी चालू", warnings=[])
+    r = run("extracts", ox, spx, os.path.join(tmp, "absent_study.json"), "--extra", regdir)
+    check(r.returncode == 0 and run_row["warnings"] == [], f"extracts --extra: not-in-package extract found in the extra source ({run_row['warnings']})")
+    check(len(es0.extra_sources()) >= 1 and all(os.path.exists(x) for x in es0.extra_sources())
+          and any(x.endswith("register") for x in es0.extra_sources()), f"extra_sources: repo register/ (+ service-rules, OLDCASES, PRECEDENT when present) {es0.extra_sources()}")
     json.dump({"related": [{"heading": "GR", "text": ["“" + LINE + "”"], "source": "(पॅकेज PDF पृ. 2)"}]},
               open(spx, "w", encoding="utf-8"), ensure_ascii=False)
     run_row.update(state="running", step="तपासणी चालू", warnings=[])
@@ -580,7 +677,7 @@ def gate(review, usage, **envx):
     json.dump({"type": "result", "subtype": "success", "modelUsage": usage}, open(cjf, "w", encoding="utf-8"))
     st_ok = {"state": "done", "prefix": "CR130_2026", "package_pdf": PROP, "proposal_pages": 5, "review": {"approved": True, "changes": 0}}
     json.dump(st_ok, open(os.path.join(out, "status.json"), "w", encoding="utf-8"), ensure_ascii=False)
-    run_row.update(state="running", step="तपासणी चालू")
+    run_row.update(state="running", step="तपासणी चालू", warnings=[])
     return run("verify", out, work, "--review", rd, "--claude", cjf, VERIFY_SCRIPT=fake, MODEL_REVIEW="claude-opus-5-5", MODEL_LIGHT="claude-haiku-5-5", **envx)
 used = {"claude-haiku-5-5": {"costUSD": 0.2}, "claude-opus-5-5[1m]": {"costUSD": 0.41}}
 good = {"approved": True, "changes": 0, "spec_sha256": H_("spec.json"), "part0_sha256": H_("study_part0.json")}
@@ -592,11 +689,33 @@ for rv, us, label, want in (
         ({**good, "part0_sha256": "0" * 64}, used, "part 0 changed after approval", "study_part0.json बदलली"),
         (good, {"claude-haiku-5-5": {"costUSD": 0.3}}, "reviewer model never ran", "प्रत्यक्ष चालले नाही")):
     r = gate(rv, us)
-    check(r.returncode == 1 and run_row["state"] == "failed" and want in run_row["step"], f"review gate: {label} -> failed ({run_row['step'][:120]})")
+    check(r.returncode == 0 and run_row["state"] == "running"
+          and any(w.startswith("अंतिम पडताळणी (Opus) मान्यता नाही — वापरण्यापूर्वी तपासा: ") and want in w for w in run_row["warnings"]),
+          f"review gate: {label} -> delivered with the review warning ({run_row['warnings']})")
+r = gate(good, used, MODEL="claude-sonnet-5-5")
+check(r.returncode == 0 and run_row["state"] == "running" and not [w for w in run_row["warnings"] if "अंतिम पडताळणी" in w],
+      f"review gate: approved, hashes match, Opus usage present -> no warning ({run_row['warnings']} {r.stderr[:200]})")
 r = gate(good, used)
-check(r.returncode == 0 and run_row["state"] == "running", f"review gate: approved, hashes match, Opus usage present -> verify runs ({r.stderr[:200]})")
+check(r.returncode == 0 and any("सिद्ध झाले नाही" in w and "drafter" in w for w in run_row["warnings"]),
+      f"review gate: MODEL == MODEL_REVIEW, no subagent stats -> warning, not a silent pass ({run_row['warnings']})")
+run_row.update(warnings=[])
 r = run("verify", out, work, "--review", rd, "--claude", cjf, VERIFY_SCRIPT=fake, MODEL_REVIEW="claude-haiku-5-5", MODEL_LIGHT="claude-haiku-5-5")
-check(r.returncode == 0, "review gate: reviewer = orchestrator model -> usage check skipped (hashes still checked)")
+check(r.returncode == 0 and any("orchestrator" in w for w in run_row["warnings"]),
+      "review gate: reviewer = orchestrator model -> usage check skipped (hashes still checked), warning")
+# subagent statistics in the CLI JSON (A2 MED): a reviewer subagent must have run
+check(es0.subagent_runs({"subagent_stats": {"by_type": {"reviewer": 2, "drafter": 1}}}) == 2
+      and es0.subagent_runs({"subagent_stats": {"by_type": {"drafter": {"count": 1}}}}) == 0
+      and es0.subagent_runs({"subagent_stats": {"by_type": [{"subagent_type": "reviewer", "count": 1}]}}) == 1
+      and es0.subagent_runs({}) is None, "subagent_runs: shapes parsed, absent -> None")
+def gate_stats(stats):
+    json.dump({"type": "result", "subtype": "success", "modelUsage": used, "subagent_stats": stats}, open(cjf, "w", encoding="utf-8"))
+    run_row.update(state="running", warnings=[])
+    return run("verify", out, work, "--review", rd, "--claude", cjf, VERIFY_SCRIPT=fake, MODEL_REVIEW="claude-opus-5-5", MODEL_LIGHT="claude-haiku-5-5")
+r = gate_stats({"by_type": {"drafter": 3}})
+check(r.returncode == 0 and any("subagent चालला नाही" in w for w in run_row["warnings"]), f"review gate: stats without reviewer -> warning ({run_row['warnings']})")
+r = gate_stats({"by_type": {"reviewer": 1}})
+check(r.returncode == 0 and not [w for w in run_row["warnings"] if "अंतिम पडताळणी" in w], f"review gate: reviewer subagent ran -> no warning ({run_row['warnings']})")
+json.dump({"type": "result", "subtype": "success", "modelUsage": used}, open(cjf, "w", encoding="utf-8"))
 
 # --- verify re-runs part1check on the FINAL Study part 1 (study.json "भाग 1") vs facts.json (QUALITY_AUDIT §7 M)
 run_row.update(warnings=[])
@@ -611,13 +730,71 @@ check(r.returncode == 0 and run_row["state"] == "running" and "PART1 OK" in r.st
 json.dump({"parts": [{"heading": "भाग 0 — ब्रीफिंग", "blocks": []}, p1b]}, open(stj, "w", encoding="utf-8"), ensure_ascii=False)
 if os.path.exists(argf): os.remove(argf)
 r = gate(good, used)
-check(r.returncode == 1 and run_row["state"] == "failed" and run_row["step"].startswith("भाग 1 (मराठी रूपांतर) तथ्यांशी जुळला नाही")
-      and "06.08.2026" not in run_row["step"] and "05.08.2026" in run_row["step"] and not os.path.exists(argf),
-      f"verify part1: mismatch -> failed before verify_outputs ({run_row['step'][:160]})")
+pw = [w for w in run_row["warnings"] if w.startswith("पडताळणी अपूर्ण — भाग 1: भाग 1 (मराठी रूपांतर) तथ्यांशी जुळला नाही")]
+check(r.returncode == 0 and run_row["state"] == "running" and pw and "05.08.2026" in pw[0] and os.path.exists(argf),
+      f"verify part1: mismatch -> warning, verify_outputs still runs ({run_row['warnings']})")
+# A1 H8: facts of a reply ("file": "reply_1") are not compared with the proposal's part 1
+fr = json.loads(json.dumps(facts)); fr["facts"].append({"page": 1, "file": "reply_1", "items": [{"what": "दिनांक", "value": "09.09.2026", "clear": True}]})
+check(es0.part1_check(fr, p1) == [], "part1check: reply facts skipped")
 os.remove(stj)
 json.dump(p1, open(os.path.join(rd, "study_part1.json"), "w", encoding="utf-8"), ensure_ascii=False)
 r = gate(good, used)
 check(r.returncode == 0 and "PART1 OK" in r.stdout, "verify part1: no study.json -> study_part1.json checked")
+
+# --- strip_upload_prefix: a full UUID name is kept (A1 H12)
+U = "3f2a9c1e-5b7d-4e2a-9c1e-1234567890ab.pdf"
+check(es0.strip_upload_prefix(U) == U and es0.strip_upload_prefix("11ae057d-" + U) == U
+      and es0.strip_upload_prefix("11ae057d-CR66.pdf") == "CR66.pdf" and es0.strip_upload_prefix("20261101-CR130.pdf") == "20261101-CR130.pdf",
+      "strip_upload_prefix: UUID name kept, 8-hex prefix stripped, date kept")
+
+# --- fetch refuses a non-PDF / password-protected proposal before any model runs (A2)
+saved = list(DB["case_files"])
+def fetch_with(data):
+    DB["case_files"][:] = [{"id": 70, "case_id": 7, "kind": "proposal", "storage_path": "proposals/7/proposal/v1/x.pdf",
+                            "original_name": "x.pdf", "version": 1, "created_at": "99"}]
+    STORE["proposals/7/proposal/v1/x.pdf"] = data
+    run_row.update(state="queued", step=None)
+    return run("fetch", os.path.join(tmp, "case_rej"))
+r = fetch_with(b"\xff\xd8\xff JPEG")
+check(r.returncode == 1 and run_row["state"] == "failed" and run_row["step"].startswith("प्रस्ताव-फाइल PDF नाही"), f"fetch: non-PDF refused ({run_row['step']})")
+try:
+    import pymupdf
+    d = pymupdf.open(); d.new_page(); encp = os.path.join(tmp, "enc.pdf")
+    d.save(encp, encryption=pymupdf.PDF_ENCRYPT_AES_256, user_pw="u", owner_pw="o"); d.close()
+    r = fetch_with(open(encp, "rb").read())
+    check(r.returncode == 1 and "पासवर्ड" in run_row["step"], f"fetch: password-protected PDF refused ({run_row['step']})")
+except ImportError:
+    print("skip  encrypted fetch (pymupdf missing)")
+DB["case_files"][:] = saved
+
+# --- finish: clean Marathi reason; two Study files; size limit; package first, rows after all uploads
+o5 = os.path.join(tmp, "out5"); os.makedirs(o5)
+json.dump({"state": "failed", "summary": "प्रस्तावाची पाने वाचता आली नाहीत — स्पष्ट स्कॅन अपलोड करा."}, open(os.path.join(o5, "status.json"), "w", encoding="utf-8"), ensure_ascii=False)
+run_row.update(state="running")
+r = run("finish", o5)
+check(r.returncode == 1 and run_row["step"] == "प्रस्तावाची पाने वाचता आली नाहीत — स्पष्ट स्कॅन अपलोड करा.", f"finish failed state: only the Marathi summary ({run_row['step']})")
+import time
+for n in ("Case7_2026_Study.docx", "Case7_2026_Note_and_Letter.docx"):
+    open(os.path.join(o5, n), "wb").write(b"old")
+time.sleep(0.05)
+for n in ("CR130_2026_Study.docx", "CR130_2026_Note_and_Letter.docx", NEWP):
+    open(os.path.join(o5, n), "wb").write(b"new " + n.encode())
+json.dump({"state": "done", "summary": "s"}, open(os.path.join(o5, "status.json"), "w", encoding="utf-8"))
+run_row.update(state="running", warnings=[]); LOG.clear(); nrows = len(DB["case_files"])
+r = run("finish", o5)
+new_rows = DB["case_files"][nrows:]
+ups = [l["path"] for l in LOG if l["m"] == "POST" and l["path"].startswith("/storage/v1/object/")]
+check(r.returncode == 0 and run_row["state"] == "done" and {f["original_name"] for f in new_rows} >= {"CR130_2026_Study.docx", "CR130_2026_Note_and_Letter.docx"}
+      and sum("एकाच प्रकारच्या 2 फाइल" in w for w in run_row["warnings"]) == 2, f"finish: two Study/Note files -> newest + warning ({run_row['warnings']} {r.stderr[:200]})")
+posts = [l for l in LOG if l["m"] == "POST"]
+first_row = next(i for i, l in enumerate(posts) if l["path"] == "/rest/v1/case_files")
+check("package_pdf" in ups[0] and all(l["path"].startswith("/storage/") for l in posts[:first_row]) and first_row >= 3,
+      f"finish: package uploaded first, case_files rows only after all three uploads ({[l['path'] for l in posts]})")
+run_row.update(state="running", warnings=[]); nrows = len(DB["case_files"]); LOG.clear()
+r = run("finish", o5, OUTPUT_MAX_BYTES="10")
+check(r.returncode == 1 and run_row["state"] == "failed" and "MB पेक्षा मोठी" in run_row["step"] and len(DB["case_files"]) == nrows
+      and not [l for l in LOG if l["m"] == "POST" and l["path"].startswith("/storage/")]
+      and any(w.startswith("फाइल खूप मोठी") for w in run_row["warnings"]), f"finish: over the size limit -> warning + clear failure, nothing uploaded ({run_row['step']})")
 
 srv.shutdown()
 print("ALL TESTS PASSED")

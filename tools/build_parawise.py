@@ -214,7 +214,8 @@ def build(spec, out):
     # 4. recommendation
     para(d, SECTIONS[3], bold=True, before=10, after=4, keep=True)
     rec = pw["recommendation"].strip().lower()
-    para(d, REC_TEXT[rec], align=WA.JUSTIFY, left=1.0, after=4)
+    # "____" (or anything without a record basis) = left blank for the Section to fill (lint WARN, never a KeyError)
+    para(d, REC_TEXT.get(rec, "____"), align=WA.JUSTIFY, left=1.0, after=4)
     if (pw.get("recommendation_reason") or "").strip():
         para(d, pw["recommendation_reason"].strip(), align=WA.JUSTIFY, left=1.0, after=4)
     if pw.get("verification") is True:
@@ -280,7 +281,9 @@ def main(spec_path, outdir, pre, do_lint=True):
         try:
             r = subprocess.run([soffice, "-env:UserInstallation=file://" + prof.replace(os.sep, "/"), "--headless",
                                 "--convert-to", "pdf", "--outdir", outdir, out],
-                               stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+                               stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, timeout=180)
+        except subprocess.TimeoutExpired:
+            r = subprocess.CompletedProcess([], 124, b"", b"soffice timed out after 180 s")
         finally:
             shutil.rmtree(prof, ignore_errors=True)
         pdf = os.path.splitext(out)[0] + ".pdf"

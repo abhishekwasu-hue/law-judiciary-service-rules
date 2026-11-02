@@ -1,59 +1,74 @@
 #!/usr/bin/env python3
 """engine_supabase.py — app B engine <-> Supabase (stdlib only). Used by .github/workflows/process-proposal.yml.
 Env: SUPABASE_URL, SUPABASE_SERVICE_KEY, CASE_ID, RUN_ID (keys come from the Worker at run time, masked; never stored).
-Commands:
-  fetch <workdir>     the NEWEST proposal (by created_at, version, id — a corrected proposal under a new name replaces
-                      the old one) + newest version of each extra_doc / reply file ->
-                      <workdir>/in/<kind>/<original_name>; <workdir>/case.json (case row, files, run, instructions);
-                      runs: state=running, started_at, step "पाने वाचत आहे".
+Commands ("deliver with warnings", Abhi 02.11.2026: drafts are never thrown away — only HARD problems fail a case):
+  fetch <workdir>     ALL proposal uploads: the NEWEST (by created_at, version, id) is "the proposal" ->
+                      <workdir>/in/proposal/<original_name>; every other proposal name -> in/extra_doc/ + a warning
+                      (A1 H13); newest version of each extra_doc / reply file -> in/<kind>/<original_name>. A proposal
+                      that is not a PDF or is password-protected is refused at once (Marathi reason, no model run).
+                      <workdir>/case.json (case row, files, run, instructions); runs: state=running, started_at, step.
+  case_meta <out.json> [<workdir>]
+                      runner-side, right after fetch: {proposal_original_name (newest proposal row in Supabase),
+                      proposal_pages (page count of the fetched proposal PDF, null if unreadable)} — for verify --case-meta.
   step "<text>"       runs.step = text (live progress).
   log_url <url>       runs.log_url = url (Actions run page).
-  finish <outdir>     <outdir>/status.json + exactly one *_Study.docx, one *_Note_and_Letter.docx and one package .pdf
-                      (named as the ORIGINAL proposal file, INSTRUCTIONS §4.16; LibreOffice previews *_Study.pdf /
-                      *_Note_and_Letter.pdf are ignored) -> bucket outputs/<case>/<kind>/v<n>/file<ext> (ASCII key:
-                      Storage refuses non-ASCII keys; the real name only in case_files.original_name), case_files rows,
-                      runs done + summary fields, cases.stage "मसुदा तयार", activity run_done. Incomplete -> fail.
+  finish <outdir>     <outdir>/status.json + one *_Study.docx, one *_Note_and_Letter.docx (several, e.g. PREFIX changed:
+                      the one of status.json `prefix`, else the newest by mtime + a warning) and one package .pdf (named
+                      as the ORIGINAL proposal file, INSTRUCTIONS §4.16; previews *_Study.pdf / *_Note_and_Letter.pdf are
+                      ignored). Sizes are checked first (> 50 MB, OUTPUT_MAX_BYTES -> warning + clear failure); the
+                      package is uploaded FIRST, then Study, Note_and_Letter -> bucket outputs/<case>/<kind>/v<n>/file<ext>
+                      (ASCII key; the real name only in case_files.original_name); case_files rows are inserted only after
+                      all three uploads succeeded; runs done + summary fields, status.json `warnings`, cases.stage
+                      "मसुदा तयार", activity run_done. status.json state not "done" -> fail with ONLY its Marathi summary.
                       Optional outputs (02.11.2026, docs/COURT_AND_ORDERS_RESEARCH.md B7–B9): *_Order_Draft.docx ->
                       kind "order_draft", *_Parawise.docx -> kind "parawise" (same ASCII key style), uploaded when
                       present (status.json `outputs_extra` = ["order_draft", "parawise"] or [{"kind", "file"}]: a
                       listed kind whose file is absent -> warning); absence is fine; more than one of a kind, or a refused upload (enum value missing until
                       migration 0006 is applied) -> a runs.warnings line, never a failure.
-  claude_result <claude.json> [<stderr file>] [<exit code>] [--part1 <part1.json>] [--wall <seconds>] [--status <status.json>]
-                      Claude Code `--output-format json` result(s) -> runs.cost_usd and num_turns = SUM of the main run
-                      and the parallel Study-part-1 run (--part1, if its JSON exists); duration_s = --wall (wall clock
-                      of the whole step: the two runs overlap, so a sum would overstate it), else the longer of the two
-                      runs' duration_ms. An error result of the MAIN run (max turns, API key, credit, ...) -> fail with
-                      a Marathi reason + next step; exit 1. A part-1 error alone is only a warning (the main run then
-                      writes part 1 itself; verify/finish still check the Study). Adds "मॉडेल: " lines to
-                      runs.warnings (status.json model_log entries, review.corrections as "मॉडेल: Opus पडताळणी — …",
-                      per-model cost from modelUsage) and, when the
-                      total cost is over BUDGET_USD, "खर्च-मर्यादा ओलांडली — दर्जा राखण्यासाठी (…)" (soft budget).
-  verify <outdir> [<workdir>]
-                      runs tools/verify_outputs.py <outdir> <PREFIX> "<package pdf>" <proposal pages>
-                      --original-name "<newest proposal's original name>" (PREFIX/package from status.json `prefix` /
-                      `package_pdf`, else from the file names; proposal pages = page count of the fetched proposal,
-                      else status.json `proposal_pages`; original name from <workdir>/case.json, so a real file name
-                      such as CR66_Proposal_with_GRs.pdf is accepted). Not ALL OK -> fail with the FAIL lines.
-                      status.json `review.approved` must be true (final reviewer, MODEL_REVIEW), else fail.
-                      --review <work dir> [--claude <claude.json>]: review_gate (review.json hashes + modelUsage) and
-                      part1check re-run on the FINAL Study part 1 (<work>/study.json part "भाग 1", else
-                      study_part1.json) vs <work>/facts.json: mismatch -> fail; facts.json absent -> warning only.
-  extracts <outdir> <spec.json> <study.json> [<ocr dir>]
-                      tools/extract_check.py on the delivered `related` + Study part 3 vs the package PDF: a MISMATCH
-                      fails the case (Marathi reason; the run already looped until EXTRACTS OK); unverifiable extracts
-                      and the note body's “…” quotes (--note-body, new check) are "मॉडेल: उतारा-तपासणी — …" warnings.
+  claude_result <claude.json> [<stderr file>] [<exit code>] [--part1 <part1.json>] [--part1-no-cost] [--first <first.json>]
+                [--killed] [--wall <seconds>] [--status <status.json>] [--gateway-cost F --gateway-provider P]
+                      Claude Code `--output-format json` result(s) -> runs.cost_usd and num_turns = SUM of the main run,
+                      the parallel Study-part-1 run (--part1; with --part1-no-cost it went through the gateway: parsed for
+                      warnings only, its cost is already in the gateway file) and the first, failed run before a provider
+                      fallback (--first); duration_s = --wall, else the longest run. --killed (or rc 124/137/143) with no
+                      JSON: an estimated cost_usd = BUDGET_USD (else 0.75) is stored + a warning. An error result of the
+                      MAIN run (max turns, time-out, killed, budget, API …): when --status is "done" and the three outputs
+                      exist in its directory -> only a warning "अभ्यास नीट संपला नाही (…) — तयार मसुदे जतन केले" (exit 0;
+                      verify / extracts / finish still decide); otherwise fail with a Marathi reason + next step (exit 1).
+                      A part-1 error alone is only a warning. Adds "मॉडेल: " lines (status.json model_log, review
+                      corrections, per-model cost) and, over BUDGET_USD, the information line "खर्च अंदाजापेक्षा जास्त —
+                      माहितीसाठी (…)".
+  verify <outdir> [<workdir>] [--review <work dir>] [--claude <claude.json>] [--case-meta <meta.json>]
+                      runs tools/verify_outputs.py <outdir> <PREFIX> "<package pdf>" <proposal pages> --original-name …
+                      (PREFIX/package from status.json, else the file names; pages + original name from --case-meta
+                      (runner-written) when given, else <workdir>/case.json + the fetched proposal, else status.json
+                      `proposal_pages`, else map.json). FAIL lines are classified: HARD (exit 1, case failed) = an output
+                      missing / unreadable ("… opens"), internal ids / repo paths (confidentiality), annotations on the
+                      proposal pages, or verify_outputs itself not running; every other FAIL -> a runs.warnings line
+                      "पडताळणी अपूर्ण — <check>: <detail>" (exit 0). "ALL OK" printed when clean.
+                      --review: review_gate (review.json + hashes; a "reviewer" subagent in the CLI's subagent statistics,
+                      else MODEL_REVIEW in modelUsage) — not approved / hash mismatch / review.json missing -> warning
+                      "अंतिम पडताळणी (Opus) मान्यता नाही — वापरण्यापूर्वी तपासा: <reason>"; reviewer = drafter or
+                      orchestrator model without subagent statistics -> a warning (never a silent pass). part1check on the
+                      FINAL Study part 1 vs <work>/facts.json (proposal facts only): mismatch -> "पडताळणी अपूर्ण — भाग 1: …".
+  extracts <outdir> <spec.json> <study.json> [<ocr dir>] [--extra PATH ...]
+                      tools/extract_check.py on the delivered `related` + Study part 3 (+ note body “…” quotes) vs the
+                      package PDF, with the in-run --extra sources (register/, service-rules/, OLDCASES/t, PRECEDENT; A1
+                      H7). Never fails the case: a MISMATCH -> "पडताळणी अपूर्ण — उतारे: …"; unverifiable / note-body
+                      results -> "मॉडेल: उतारा-तपासणी — …" lines.
   config <cfg.json>   (local) the non-secret run settings from the Worker's /api/engine/config JSON as KEY=VALUE
                       lines for $GITHUB_ENV: MODEL (main tier = drafter, every quality-critical task; from Settings,
                       default claude-opus-5-5; Abhi's plan: Sonnet),
                       MODEL_LIGHT (mechanical tier + orchestrating session; default claude-haiku-5-5), MODEL_STRONG
                       (optional one-way escalation tier; default off), MODEL_REVIEW (final reviewer/approver;
                       default claude-opus-5-5), EFFORT (default medium), BUDGET_USD (SOFT,
-                      default 0.75 — never stops or degrades the run). Invalid values -> defaults.
+                      default 0.75 — information only, never stops or degrades the run). Invalid values -> defaults.
   agents <out.json>   (local) Claude Code --agents JSON: drafter (MODEL), study_writer + related_writer
                       (MODEL_LIGHT), reviewer (MODEL_REVIEW) [+ drafter_strong (MODEL_STRONG)].
   part1check <facts.json> <study_part1.json>
                       (local) cheap-tier Study part 1 vs the main tier's facts: every number/date (and Devanagari
-                      name/post) of a page must occur in that page's part-1 text. PART1 OK / MISMATCH lines, exit 1.
+                      name/post) of a page must occur in that page's part-1 text; facts with "file" other than "proposal"
+                      (reply_<n>, extra_<n>) are skipped. PART1 OK / MISMATCH lines, exit 1.
   warn "<text>"       runs.warnings += text (non-fatal, e.g. new GRs not pushed); activity run_warning.
   fail "<reason>"     runs: state failed, step reason, finished_at; activity run_failed; exit 1.
                       (If the run is already failed, the earlier, more specific reason is kept.)"""
@@ -175,6 +190,44 @@ def inputs_of(files):
     return ([p] if p else []) + newest(files, ("extra_doc", "reply"))
 
 
+def older_proposals(files):
+    """A1 H13: every OTHER proposal upload (newest version per name, a name other than the newest proposal's) — fetched
+    too, as extra documents (e.g. a phone scan split in two PDFs), never silently dropped."""
+    p = newest_proposal(files)
+    if not p:
+        return []
+    return [f for f in newest(files, ("proposal",)) if f["original_name"] != p["original_name"]]
+
+
+def proposal_problem(data):
+    """A2: refuse a proposal the engine cannot read BEFORE any model runs. -> Marathi reason, or None.
+    Not a PDF (no %PDF header in the first 1 KB) or password-protected (pymupdf needs_pass). A PDF pymupdf cannot open
+    for another reason is left to prep_pages (pymupdf often repairs it) -> None."""
+    if b"%PDF" not in (data or b"")[:1024]:
+        return ("प्रस्ताव-फाइल PDF नाही — प्रस्ताव PDF स्वरूपात (स्कॅन PDF) अपलोड करा, नंतर पुन्हा तयार करा.")
+    try:
+        import pymupdf
+    except ImportError:
+        return None
+    try:
+        with pymupdf.open(stream=data, filetype="pdf") as d:
+            if d.needs_pass or d.is_encrypted:
+                return ("प्रस्ताव PDF पासवर्ड-संरक्षित आहे — पासवर्ड नसलेली प्रत अपलोड करा, नंतर पुन्हा तयार करा.")
+    except Exception:
+        return None
+    return None
+
+
+def unique_dst(work, kind, name, taken):
+    dst = os.path.join(work, "in", kind, safe_name(name))
+    stem, ext = os.path.splitext(dst)
+    k = 2
+    while dst in taken:
+        dst = f"{stem} ({k}){ext}"; k += 1
+    taken.add(dst)
+    return dst
+
+
 def cmd_fetch(work):
     case = (rest("GET", f"cases?id=eq.{CASE}&select=*") or [None])[0]
     run = (rest("GET", f"runs?id=eq.{RUN}&select=*") or [None])[0]
@@ -183,16 +236,24 @@ def cmd_fetch(work):
     files = rest("GET", f"case_files?case_id=eq.{CASE}&select=*&order=created_at.asc") or []
     inputs = inputs_of(files)
     if not any(f["kind"] == "proposal" for f in inputs):
-        raise RuntimeError("प्रस्ताव PDF अपलोड केलेला नाही")
-    got = []
-    for f in inputs:
+        return cmd_fail("प्रस्ताव PDF अपलोड केलेला नाही — प्रस्ताव अपलोड करा, नंतर पुन्हा तयार करा.")
+    older = older_proposals(files)
+    got, taken, warns = [], set(), []
+    for f in inputs + [dict(o, kind="extra_doc", from_kind="proposal") for o in older]:
         bucket, _, path = f["storage_path"].partition("/")
         data = http("GET", f"{BASE}/storage/v1/object/{bucket}/{enc(path)}", raw=True)
-        dst = os.path.join(work, "in", f["kind"], safe_name(f["original_name"]))
+        if f["kind"] == "proposal" and not f.get("from_kind"):
+            why = proposal_problem(data)
+            if why:
+                return cmd_fail(why)
+        dst = unique_dst(work, f["kind"], f["original_name"], taken)
         os.makedirs(os.path.dirname(dst), exist_ok=True)
         open(dst, "wb").write(data)
         got.append({**f, "local_path": os.path.relpath(dst, work).replace("\\", "/")})
     prop = [f for f in got if f["kind"] == "proposal"]
+    if older:
+        warns.append(f"प्रस्तावाच्या {len(older) + 1} फाइल अपलोड आहेत — नवीनतम '{prop[0]['original_name']}' प्रस्ताव म्हणून घेतली; "
+                     f"इतर ({', '.join(o['original_name'] for o in older)}) अतिरिक्त कागदपत्र म्हणून वाचल्या"[:300])
     info = {"case": case, "run": {"id": run["id"], "instructions": run.get("instructions") or ""},
             "instructions": run.get("instructions") or "",
             "proposal_original_name": prop[0]["original_name"],
@@ -201,7 +262,36 @@ def cmd_fetch(work):
     os.makedirs(work, exist_ok=True)
     json.dump(info, open(os.path.join(work, "case.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     patch_run({"state": "running", "started_at": now(), "step": "पाने वाचत आहे"})
+    if warns:
+        add_warnings(warns)
     print(f"fetched {len(got)} file(s) -> {work}/in")
+
+
+def cmd_case_meta(args):
+    """case_meta <out.json> [<workdir>] — runner-side, run right after `fetch` (before the Claude step): the proposal's
+    original name from Supabase (newest proposal case_files row; nothing is downloaded) and its page count from the
+    fetched proposal PDF in <workdir> (default /tmp/case) when it can be read -> {proposal_original_name,
+    proposal_pages}. `verify --case-meta` uses this file instead of the engine-writable case.json."""
+    outp = args[0]
+    work = args[1] if len(args) > 1 else (os.environ.get("WORKDIR") or "/tmp/case")
+    prop = newest_proposal(rest("GET", f"case_files?case_id=eq.{CASE}&kind=eq.proposal&select=*") or [])
+    if not prop:
+        raise RuntimeError("प्रस्ताव PDF अपलोड केलेला नाही")
+    name = prop["original_name"]
+    pages = None
+    src = os.path.join(work, "in", "proposal", safe_name(name))
+    if os.path.exists(src):
+        try:
+            import pymupdf
+            with pymupdf.open(src) as d:
+                pages = len(d)
+        except Exception as e:
+            print(f"engine_supabase case_meta: pages not read ({e})", file=sys.stderr)
+    meta = {"proposal_original_name": name, "proposal_pages": pages}
+    d = os.path.dirname(os.path.abspath(outp))
+    os.makedirs(d, exist_ok=True)
+    json.dump(meta, open(outp, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+    print("case_meta:", json.dumps(meta, ensure_ascii=False))
 
 
 def storage_name(n):
@@ -216,7 +306,14 @@ def storage_name(n):
 UPLOAD_PREFIX = re.compile(r"^(?=[0-9a-f]{0,7}[a-f])[0-9a-f]{8}-", re.I)
 
 
+# A full UUID file name (8-4-4-4-12 hex, e.g. "3f2a9c1e-5b7d-4e2a-9c1e-1234567890ab.pdf") is a machine-made name of its
+# own (A1 H12): it is kept exactly as uploaded (ENGINE_PROMPT rule 5), never cut to "5b7d-4e2a-….pdf".
+UUID_NAME = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}(?:\.[A-Za-z0-9]{1,8})?$", re.I)
+
+
 def strip_upload_prefix(n):
+    if UUID_NAME.match(os.path.basename(str(n))):
+        return n
     return UPLOAD_PREFIX.sub("", n)
 
 
@@ -230,24 +327,64 @@ EXTRA_OUTPUTS = (("order_draft", "_Order_Draft.docx", "शासन आदेश
                  ("parawise", "_Parawise.docx", "परिच्छेदनिहाय अभिप्राय"))
 
 
-def upload_output(kind, p):
-    name = os.path.basename(p)
+# Supabase Storage bucket `outputs` refuses objects over 50 MB (413; init.sql file_size_limit). OUTPUT_MAX_BYTES overrides
+# (tests / a raised bucket limit).
+def output_limit():
+    try:
+        return int(os.environ.get("OUTPUT_MAX_BYTES") or 50 * 1024 * 1024)
+    except ValueError:
+        return 50 * 1024 * 1024
+
+
+def next_version(kind):
     prev = rest("GET", f"case_files?case_id=eq.{CASE}&kind=eq.{kind}&select=version&order=version.desc&limit=1") or []
-    ver = prev[0]["version"] + 1 if prev else 1
+    return prev[0]["version"] + 1 if prev else 1
+
+
+def put_object(kind, p):
+    """Storage upload only (no case_files row) -> {kind, name, version, path}."""
+    name = os.path.basename(p)
+    ver = next_version(kind)
     path = f"{CASE}/{kind}/v{ver}/{storage_name(name)}"  # ASCII object key; real name in original_name
     ctype = MIME.get(os.path.splitext(name)[1].lower()) or mimetypes.guess_type(name)[0] or "application/octet-stream"
     http("POST", f"{BASE}/storage/v1/object/outputs/{enc(path)}", open(p, "rb").read(),
          {"Content-Type": ctype, "x-upsert": "true"})
-    try:
-        rest("POST", "case_files", {"case_id": int(CASE), "kind": kind, "storage_path": f"outputs/{path}",
-                                    "original_name": name, "version": ver, "uploaded_by": None}, "return=minimal")
+    return {"kind": kind, "name": name, "version": ver, "path": path}
+
+
+def drop_object(path):
+    try:  # best effort: an object without its row is an orphan
+        http("DELETE", f"{BASE}/storage/v1/object/outputs/{enc(path)}")
     except Exception:
-        try:  # no row -> remove the orphan object (best effort; e.g. enum value missing before migration 0006)
-            http("DELETE", f"{BASE}/storage/v1/object/outputs/{enc(path)}")
-        except Exception:
-            pass
+        pass
+
+
+def insert_row(u):
+    rest("POST", "case_files", {"case_id": int(CASE), "kind": u["kind"], "storage_path": f"outputs/{u['path']}",
+                                "original_name": u["name"], "version": u["version"], "uploaded_by": None}, "return=minimal")
+
+
+def upload_output(kind, p):
+    u = put_object(kind, p)
+    try:
+        insert_row(u)
+    except Exception:
+        drop_object(u["path"])  # no row -> remove the orphan object (e.g. enum value missing before migration 0006)
         raise
-    return {"kind": kind, "name": name, "version": ver}
+    return {"kind": kind, "name": u["name"], "version": u["version"]}
+
+
+def pick_newest(paths, prefix=""):
+    """Several *_Study.docx / *_Note_and_Letter.docx (PREFIX changed mid-run, A1 M): the one of status.json `prefix`, else
+    the newest by mtime. -> (path or None, warning or None)."""
+    if not paths:
+        return None, None
+    if len(paths) == 1:
+        return paths[0], None
+    mine = [p for p in paths if prefix and os.path.basename(p).startswith(prefix + "_")]
+    best = mine[0] if len(mine) == 1 else max(paths, key=lambda p: (os.path.getmtime(p), p))
+    others = ", ".join(os.path.basename(p) for p in paths if p != best)
+    return best, f"एकाच प्रकारच्या {len(paths)} फाइल सापडल्या — {os.path.basename(best)} जतन केली (इतर: {others})"[:300]
 
 
 def listed_extras(st):
@@ -288,25 +425,51 @@ def cmd_finish(out):
     try:
         st = json.load(open(os.path.join(out, "status.json"), encoding="utf-8"))
     except Exception as e:
-        return cmd_fail(f"status.json वाचता आले नाही: {e}")
+        return cmd_fail(f"status.json वाचता आले नाही ({str(e)[:120]}) — पुन्हा तयार करा.")
+    if not isinstance(st, dict):
+        return cmd_fail("status.json वाचता आले नाही — पुन्हा तयार करा.")
     if st.get("state") != "done":
-        return cmd_fail(f"status.json state = {st.get('state')!r}: {st.get('summary') or ''}")
-    study = glob.glob(os.path.join(out, "*_Study.docx"))
-    nl = glob.glob(os.path.join(out, "*_Note_and_Letter.docx"))
+        # A3 H: only the engine's own Marathi summary is shown to Abhi (no "status.json state = …" prefix)
+        return cmd_fail(str(st.get("summary") or "").strip() or "अभ्यास पूर्ण झाला नाही — पुन्हा तयार करा.")
+    prefix = str(st.get("prefix") or "").strip()
+    study, w1 = pick_newest(glob.glob(os.path.join(out, "*_Study.docx")), prefix)
+    nl, w2 = pick_newest(glob.glob(os.path.join(out, "*_Note_and_Letter.docx")), prefix)
     pdfs = package_pdfs(out)
+    if len(pdfs) > 1 and st.get("package_pdf"):
+        want = os.path.join(out, os.path.basename(str(st["package_pdf"])))
+        pdfs = [p for p in pdfs if p == want] or pdfs
     prop = newest_proposal(rest("GET", f"case_files?case_id=eq.{CASE}&kind=eq.proposal&select=*") or [])
     names = {safe_name(prop["original_name"]), strip_upload_prefix(safe_name(prop["original_name"]))} if prop else set()
     probs = []
-    if len(study) != 1: probs.append(f"*_Study.docx: {len(study)}")
-    if len(nl) != 1: probs.append(f"*_Note_and_Letter.docx: {len(nl)}")
-    if len(pdfs) != 1: probs.append(f"package .pdf: {len(pdfs)}")
+    if not study: probs.append("*_Study.docx नाही")
+    if not nl: probs.append("*_Note_and_Letter.docx नाही")
+    if len(pdfs) != 1: probs.append(f"पॅकेज PDF: {len(pdfs)}")
     elif os.path.basename(pdfs[0]) not in names:
         probs.append(f"package PDF नाव मूळ प्रस्ताव-फाइलचे नाही: {os.path.basename(pdfs[0])}")
     if probs:
         return cmd_fail("आउटपुट अपूर्ण — " + "; ".join(probs))
-    uploaded = []
-    for kind, p in (("study", study[0]), ("note_letter", nl[0]), ("package_pdf", pdfs[0])):
-        uploaded.append(upload_output(kind, p))
+    main3 = (("package_pdf", pdfs[0]), ("study", study), ("note_letter", nl))  # package FIRST (largest, A2)
+    lim = output_limit()
+    big = [(os.path.basename(p), os.path.getsize(p)) for _, p in main3 if os.path.getsize(p) > lim]
+    if big:
+        txt = "; ".join(f"{n} {sz / 1048576:.1f} MB" for n, sz in big)
+        try:
+            add_warnings([f"फाइल खूप मोठी — जतन करण्याची मर्यादा {lim / 1048576:.0f} MB: {txt}"[:300]])
+        except Exception as e:
+            print("engine_supabase: size warning not stored:", e, file=sys.stderr)
+        return cmd_fail(f"आउटपुट जतन झाले नाही — फाइल {lim / 1048576:.0f} MB पेक्षा मोठी ({txt}). "
+                        "प्रस्ताव कमी resolution मध्ये स्कॅन करून पुन्हा अपलोड करा, नंतर पुन्हा तयार करा."[:500])
+    # all objects first, rows only after every upload succeeded (A2: no orphan rows of a failed run)
+    put = []
+    try:
+        for kind, p in main3:
+            put.append(put_object(kind, p))
+    except Exception as e:
+        for u in put: drop_object(u["path"])
+        return cmd_fail(f"आउटपुट जतन झाले नाही (Storage) — {str(e)[:200]} — पुन्हा तयार करा.")
+    for u in put:
+        insert_row(u)
+    uploaded = [{"kind": u["kind"], "name": u["name"], "version": u["version"]} for u in put]
     extra, extra_warn = upload_extras(out, st)
     uploaded += extra
     lst = lambda k: st.get(k) if isinstance(st.get(k), list) else []
@@ -316,6 +479,7 @@ def cmd_finish(out):
     rest("PATCH", f"cases?id=eq.{CASE}", {"stage": "मसुदा तयार"}, "return=minimal")
     fill_case(st.get("case"))
     sw = [str(x).strip()[:300] for x in lst("warnings") if str(x).strip()]  # engine notes for Abhi (e.g. C R not found)
+    sw += [w for w in (w1, w2) if w]
     sw += [w[:300] for w in extra_warn]
     if sw:
         try:
@@ -439,7 +603,7 @@ def engine_config(cfg):
     MODEL_REVIEW = final reviewer/approver (Opus-class; checks and minimally corrects note + letter + part 0; the run
     is not "done" without its approval), MODEL_STRONG = optional one-way escalation tier above MODEL
     (empty / "none" = off). BUDGET_USD is SOFT: the run is never stopped or degraded for it; going over it only adds
-    the warning "खर्च-मर्यादा ओलांडली — दर्जा राखण्यासाठी"."""
+    the information line "खर्च अंदाजापेक्षा जास्त — माहितीसाठी"."""
     cfg = cfg if isinstance(cfg, dict) else {}
     def model(k):
         v = cfg.get(k)
@@ -529,11 +693,27 @@ def provider_failure(res, err, rc):
     a wrong model name, review/verify failures)."""
     if str(rc) == "124" or str((res or {}).get("subtype") or "") in ("error_max_turns", "error_max_budget_usd"):
         return False
-    low = " ".join(str(x) for x in ((res or {}).get("result"), err) if x)[:6000].lower()
+    low = api_error_text(res, err)[:6000].lower()
     return bool(re.search(r"credit balance|billing|insufficient.?(credit|fund|quota)|payment required|invalid.{0,12}api.?key|"
                           r"authentication_error|x-api-key|\b401\b|unauthori[sz]ed|rate.?limit|overloaded|\b429\b|\b529\b|"
                           r"\b5\d\d\b.{0,40}(error|status)|api_error|internal server error|service unavailable|"
                           r"econnrefused|econnreset|etimedout|connection error|fetch failed|network error", low))
+
+
+CLI_ERR_LINE = re.compile(r"^\s*(API Error|Invalid API key|(Your )?credit balance|Please run /login|Not logged in|"
+                          r"Authentication|Request failed|Connection error)", re.I)
+
+
+def api_error_text(res, err):
+    """A2 LOW: the text that may show a PROVIDER error — stderr, the CLI's `api_error_status`, and only those lines of
+    the result that the CLI itself writes for an API failure ("API Error: 529 …", "Invalid API key …"). The model's own
+    result text ("the GR site returned 503 status") never triggers the fallback."""
+    r = res or {}
+    parts = [str(err or "")]
+    if r.get("api_error_status") not in (None, ""):
+        parts.append(f"api_error status {r.get('api_error_status')}")
+    parts += [l for l in str(r.get("result") or "").splitlines() if CLI_ERR_LINE.match(l)]
+    return " ".join(p for p in parts if p)
 
 
 def litellm_config(conf, provider=None, main=None, light=None):
@@ -548,7 +728,8 @@ def litellm_config(conf, provider=None, main=None, light=None):
         lp = {"model": pre + target}
         if provider == "ollama":
             lp["api_base"] = "os.environ/OLLAMA_BASE_URL"
-            if os.environ.get("OLLAMA_API_KEY"): lp["api_key"] = "os.environ/OLLAMA_API_KEY"
+            # A2 LOW: always by env NAME — the key lives in the secrets file / the gateway's env, not in this shell
+            lp["api_key"] = "os.environ/OLLAMA_API_KEY"
         elif provider == "cloudflare":
             lp["api_key"] = "os.environ/CLOUDFLARE_API_KEY"  # LiteLLM's name; the workflow sets it from CLOUDFLARE_API_TOKEN
         else:
@@ -618,13 +799,30 @@ REVIEW = (" You are the final approver. LOOK at the proposal page images (WORKDI
           "a cross-check) for every number, date, name and amount used in the note, the letter and Study part 0. Check "
           "rule compliance (INSTRUCTIONS §4 incl. §4.18; the lint_spec rules), that the letter-or-not decision follows "
           "PROPOSAL_SOP Step 3 / INSTRUCTIONS §4.15, and the official language. Correct /tmp/work/spec.json (note + "
-          "letter, and `order` / `parawise` when present; not `related`) and /tmp/work/study_part0.json directly with MINIMAL edits (never restyle approved "
-          "wording). Write /tmp/work/review.json = {\"approved\": true|false, \"changes\": N, \"corrections\": "
-          "[\"<Marathi: what changed>\"], \"reason\": \"<Marathi, only when not approved>\"}. approved=false only "
-          "when the case cannot be made correct by small edits. LAST, after all your edits: put the sha256 of the files you "
-          "approved into review.json as \"spec_sha256\" and \"part0_sha256\" (`sha256sum /tmp/work/spec.json "
-          "/tmp/work/study_part0.json`). The workflow refuses the case if either file differs from these hashes, so "
-          "nobody may change them after you; a later change needs a new review.")
+          "letter, and `order` / `parawise` when present; not `related`) and /tmp/work/study_part0.json directly with "
+          "MINIMAL edits (never restyle approved wording). Never refuse approval for missing case fields (C R no., file "
+          "no., subject, category — ref_no blanks ____ are allowed) or for unclear pages ('अस्पष्ट' + a warning). "
+          "Correct small problems directly. After your edits run `python3 tools/lint_spec.py /tmp/work/spec.json` and "
+          "leave it LINT OK, then compute spec_sha256 / part0_sha256 (`sha256sum /tmp/work/spec.json "
+          "/tmp/work/study_part0.json`) and write /tmp/work/review.json = {\"approved\": true|false, \"changes\": N, "
+          "\"corrections\": [\"<Marathi: what changed>\"], \"spec_sha256\": \"…\", \"part0_sha256\": \"…\"} "
+          "(+ \"reason\" and \"redraft\" when not approved). Set approved=false only for a substantive error you cannot "
+          "correct by small edits, and then give `reason` (one Marathi line) and `redraft` (numbered points for the "
+          "drafter). You are called at most twice (review + one re-review); a second approved=false is delivered to the "
+          "user with your reason as a warning. You never write /tmp/out/status.json and never set any state \"failed\". "
+          "The workflow compares the hashes with the delivered files, so nobody may change them after you; a later "
+          "change needs a new review.")
+DRAFTER = (" Never stop or refuse: write every output you can. Missing C R/file no. → PREFIX Case<id>_<year>, ref_no "
+           "'संकिर्ण-<year>/____/प्र.क्र.____/का.6'; unclear → 'अस्पष्ट'. Each problem you cannot resolve → report it in "
+           "one line starting 'पडताळणी अपूर्ण — <what, where>' for status.json `warnings`. On a redraft request, fix "
+           "exactly the reviewer's `reason`/`redraft` points. Year: never copy 2026 from a sample. Rule 58(4)(a) "
+           "recommendation only from the record, else '____'.")
+WRITER = (" If an extract cannot be matched to its page, report it as 'पडताळणी अपूर्ण — उतारा …'; never invent text.")
+NEVER_STOP = (" Never stop: a missing C R / file no. / date is \"____\", an unreadable page or value is \"अस्पष्ट\", a "
+              "GR that cannot be fetched goes to grs_missing — each with a warning line, never a reason to stop, refuse "
+              "or fail. Any \"ask the user / discuss first\" line of INSTRUCTIONS, SOP or the brief means: add the "
+              "question to the warnings and continue. You never write a \"failed\" state; the run always ends with its "
+              "outputs (state \"done\", problems in `warnings`).")
 
 
 def agents_json(conf, brief="tools/ENGINE_BRIEF.md"):
@@ -638,36 +836,38 @@ def agents_json(conf, brief="tools/ENGINE_BRIEF.md"):
             " (grep the exact item). Nothing of your own; verbatim quotes with source; unreadable = \"अस्पष्ट\". "
             "Do exactly the task in the delegation message, write the files it names, and reply in at most 5 lines "
             "(files written, open doubts, anything you could not read). Batch independent tool calls in one message; "
-            "never read a file twice; limit command output. No git, no questions, never print environment values.")
+            "never read a file twice; limit command output. No git, no questions, never print environment values."
+            + NEVER_STOP)
     out = {"drafter": {
         "description": "Drafter. Read facts/numbers/dates/names/handwriting/stamps from the proposal page images; "
                        "letter-or-not decision; GR selection for the note body and the enclosures; note body and "
                        "letter spec; the optional spec `order` (order draft) / `parawise` (court remarks, English) "
                        "per the brief's court and order-draft rules; Study part 0; extracts and Study part 1 pages that failed their check; content "
                        "fixes that lint/verify still reports after 2 mechanical attempts.",
-        "prompt": base, "model": conf["MODEL"]}}
+        "prompt": base + DRAFTER, "model": conf["MODEL"]}}
     if conf.get("MODEL_STRONG"):
         out["drafter_strong"] = {
             "description": "Escalation tier (one-way up, only per the escalation rules): a page or a content problem "
                            "the main tier reported as still unclear / still failing.",
-            "prompt": base, "model": conf["MODEL_STRONG"]}
+            "prompt": base + DRAFTER, "model": conf["MODEL_STRONG"]}
     light = conf.get("MODEL_LIGHT") or DEFAULTS["model_light"]
     out["study_writer"] = {
         "description": "Cheap tier. Study parts 2, 3, 4, 7 from facts.json, the drafter's spec and the package pages; "
                        "parts 5-6 = exact copies of the spec's note and letter text (never redrafted). Part 3 extracts "
                        "verbatim from the package GR pages with source and \"(पॅकेज PDF पृ. N)\"; checked by "
                        "tools/extract_check.py.",
-        "prompt": base + VERBATIM, "model": light}
+        "prompt": base + VERBATIM + WRITER, "model": light}
     out["related_writer"] = {
         "description": "Cheap tier. The note's \"संबंधित माहिती (संदर्भासाठी)\" (spec `related`): verbatim GR/rule/"
                        "precedent extracts with source, each ending \"(पॅकेज PDF पृ. N)\" or \"(पॅकेज PDF मध्ये नाही)\"; "
                        "checked by tools/extract_check.py.",
-        "prompt": base + VERBATIM, "model": light}
+        "prompt": base + VERBATIM + WRITER, "model": light}
     out["reviewer"] = {
         "description": "Final review and approval (Opus-class). Checks every number/date/name of the note, letter and "
                        "Study part 0 against the page images, the rules (INSTRUCTIONS §4 incl. §4.18, the brief), the "
-                       "letter-or-not decision and the language; corrects spec/part-0 text with minimal edits and "
-                       "writes /tmp/work/review.json {approved, changes, corrections[]}.",
+                       "letter-or-not decision and the language; corrects spec/part-0 text with minimal edits, runs lint_spec, "
+                       "then writes /tmp/work/review.json {approved, changes, corrections[], hashes; reason + redraft "
+                       "when not approved}; called at most twice.",
         "prompt": base + REVIEW, "model": conf.get("MODEL_REVIEW") or DEFAULTS["model_review"]}
     return out
 
@@ -685,8 +885,8 @@ DEV_DIGITS = str.maketrans("०१२३४५६७८९", "0123456789")
 
 
 def part1_check(facts, part1):
-    """Part 1 (cheap tier) against the main tier's facts list: every number/date of every facts item must occur in
-    that page's part-1 text (Devanagari digits normalised); a Devanagari value without digits (name, post) must
+    """Part 1 (cheap tier) against the main tier's facts list: every number/date of every PROPOSAL facts item (no
+    "file" key, or "file": "proposal"; reply_<n> / extra items are skipped) must occur in that page's part-1 text (Devanagari digits normalised); a Devanagari value without digits (name, post) must
     occur as written (spaces ignored). -> list of "page N: <what> = <value>" mismatches; [] = confirmed."""
     pages, cur = {}, None
     for b in (part1 or {}).get("blocks") or []:
@@ -700,6 +900,9 @@ def part1_check(facts, part1):
     bad = []
     for f in (facts or {}).get("facts") or []:
         if not isinstance(f, dict): continue
+        # A1 H8: facts of a reply / concurrence / extra document ("file": "reply_1", "extra", …) carry page numbers of
+        # THAT file, not of the proposal — part 1 is the proposal's rendering, so only proposal facts are compared
+        if str(f.get("file") or "proposal").strip().lower() not in ("proposal", "प्रस्ताव"): continue
         try: pg = int(f.get("page"))
         except (TypeError, ValueError): continue
         text = pages.get(pg)
@@ -773,7 +976,7 @@ def model_lines(results, status_path=None, budget=None):
     total = [r.get("total_cost_usd", r.get("cost_usd")) for r in results]
     total = sum(float(c) for c in total if isinstance(c, (int, float)) and not isinstance(c, bool))
     if budget is not None and total > budget:
-        lines.append(f"खर्च-मर्यादा ओलांडली — दर्जा राखण्यासाठी (खर्च ${total:.2f} / मर्यादा ${budget:.2f})")
+        lines.append(f"खर्च अंदाजापेक्षा जास्त — माहितीसाठी (खर्च ${total:.2f} / अंदाज ${budget:.2f})")
     return [l[:300] for l in lines]
 
 
@@ -784,22 +987,59 @@ def add_warnings(lines):
     patch_run({"warnings": w + lines})
 
 
+def outputs_present(out):
+    """The three outputs a delivery needs exist in <out> (Study, Note_and_Letter, one package PDF)."""
+    if not out or not os.path.isdir(out):
+        return False
+    return bool(glob.glob(os.path.join(out, "*_Study.docx")) and glob.glob(os.path.join(out, "*_Note_and_Letter.docx"))
+                and package_pdfs(out))
+
+
+def status_done(status_path):
+    try:
+        st = json.load(open(status_path, encoding="utf-8-sig"))
+    except Exception:
+        return False
+    return isinstance(st, dict) and st.get("state") == "done"
+
+
+def killed_estimate():
+    """Cost stored for a run Claude Code could not report (killed / timeout / cancel, no JSON): BUDGET_USD, else 0.75."""
+    try:
+        b = float(os.environ.get("BUDGET_USD") or 0)
+    except ValueError:
+        b = 0
+    return round(b if b > 0 else DEFAULTS["budget_usd"], 4)
+
+
 def cmd_claude_result(args):
+    """claude_result <claude.json> [<stderr>] [<rc>] [--part1 F] [--part1-no-cost] [--first F] [--killed] [--wall S]
+    [--status status.json] [--gateway-cost F --gateway-provider P]. "Deliver with warnings" (Abhi: drafts are never
+    thrown away, A1 H1): when status.json is "done" and the three outputs exist, an error result of the main run (max
+    turns, time-out, killed, budget, …) is only a warning; verify / extracts / finish still decide."""
     args = list(args)
-    part1 = wall = status = None
+    part1 = wall = status = first = None
     gw = gw_prov = None
-    for flag in ("--part1", "--wall", "--status", "--gateway-cost", "--gateway-provider"):
+    killed = part1_no_cost = False
+    for flag in ("--killed", "--part1-no-cost"):
+        while flag in args:
+            args.remove(flag)
+            if flag == "--killed": killed = True
+            else: part1_no_cost = True
+    for flag in ("--part1", "--wall", "--status", "--gateway-cost", "--gateway-provider", "--first"):
         if flag in args:
             k = args.index(flag); v = args[k + 1] if k + 1 < len(args) else ""; del args[k:k + 2]
             if flag == "--part1": part1 = v
             elif flag == "--status": status = v
             elif flag == "--gateway-cost": gw = v
             elif flag == "--gateway-provider": gw_prov = v
+            elif flag == "--first": first = v
             else:
                 try: wall = float(v)
                 except ValueError: wall = None
     res = read_claude_json(args[0]) if args else None
     p1 = read_claude_json(part1) if part1 else None
+    r0 = read_claude_json(first) if first else None   # the first, failed run before a provider fallback (A2 HIGH)
     gc = gateway_cost(gw)
     if res is not None and gc is not None:
         # the run went through the LiteLLM gateway: real cost by provider model (Claude Code priced it as Claude)
@@ -809,8 +1049,14 @@ def cmd_claude_result(args):
     if len(args) > 1 and os.path.exists(args[1]):
         err = open(args[1], encoding="utf-8", errors="replace").read()[-4000:]
     rc = args[2] if len(args) > 2 else "0"
-    results = [r for r in (res, p1) if r]
+    # part 1 through the gateway: its cost is already in the gateway cost file -> parsed for warnings only
+    results = [r for r in (res, None if part1_no_cost else p1, r0) if r]
     fields = claude_fields(results, wall)
+    warns = []
+    if res is None and (killed or str(rc) in ("124", "137", "143")):
+        est = killed_estimate()  # A2 HIGH: a killed run has no JSON; its spend must still count toward the month limit
+        fields["cost_usd"] = round(fields.get("cost_usd", 0.0) + est, 4)
+        warns.append(f"खर्च अंदाजे — Claude थांबवला गेला (निकाल नाही); अंदाजे ${est:.2f} नोंदवला")
     if fields:
         try:
             patch_run(fields)
@@ -818,22 +1064,38 @@ def cmd_claude_result(args):
             print("engine_supabase: cost not stored:", e, file=sys.stderr)
     try:
         b = os.environ.get("BUDGET_USD")
-        add_warnings(model_lines(results, status, float(b) if b else None))
+        add_warnings(model_lines(results, status, float(b) if b else None) + warns)
     except Exception as e:
         print("engine_supabase: model lines not stored:", e, file=sys.stderr)
     if res:
         print("claude:", res.get("subtype"), "| turns", res.get("num_turns"), "| cost", res.get("total_cost_usd", res.get("cost_usd")))
     if p1:
-        print("part1 :", p1.get("subtype"), "| turns", p1.get("num_turns"), "| cost", p1.get("total_cost_usd", p1.get("cost_usd")))
+        print("part1 :", p1.get("subtype"), "| turns", p1.get("num_turns"), "| cost", p1.get("total_cost_usd", p1.get("cost_usd")),
+              "(cost not added: gateway)" if part1_no_cost else "")
+    if r0:
+        print("first :", r0.get("subtype"), "| turns", r0.get("num_turns"), "| cost", r0.get("total_cost_usd", r0.get("cost_usd")))
     if part1 and (p1 is None or p1.get("is_error") or p1.get("subtype") not in (None, "success")):
         try:
             cmd_warn("भाग 1 (समांतर रूपांतर) स्वतंत्रपणे पूर्ण झाला नाही — मुख्य अभ्यासाने लिहिला ("
                      + str((p1 or {}).get("subtype") or "निकाल नाही") + ").")
         except Exception as e:
             print("engine_supabase: part1 warning not stored:", e, file=sys.stderr)
-    failed = res is None or bool(res.get("is_error")) or res.get("subtype") not in (None, "success") or str(rc) not in ("", "0")
-    if failed:
-        cmd_fail(claude_reason(res, err, rc))
+    failed = (res is None or bool(res.get("is_error")) or res.get("subtype") not in (None, "success")
+              or str(rc) not in ("", "0") or killed)
+    if not failed:
+        return
+    reason = claude_reason(res, err, rc) if not (killed and res is None and str(rc) in ("", "0")) else \
+        "Claude थांबवला गेला — अभ्यास पूर्ण झाला नाही. पुन्हा तयार करा."
+    if status and status_done(status) and outputs_present(os.path.dirname(os.path.abspath(status))):
+        # drafts exist and the engine said "done": deliver with a warning; the gates after this step still apply
+        print("claude_result: run ended with an error, but status.json is done and the outputs exist -> deliver with warnings")
+        try:
+            why = re.sub(r"[\s.—]*(नंतर )?पुन्हा तयार करा.*$", "", reason).rstrip(" .,—")
+            add_warnings([f"अभ्यास नीट संपला नाही ({why}) — तयार मसुदे जतन केले, वापरण्यापूर्वी तपासा"[:300]])
+        except Exception as e:
+            print("engine_supabase: warning not stored:", e, file=sys.stderr)
+        return
+    cmd_fail(reason)
 
 
 def sha256_file(path):
@@ -857,11 +1119,42 @@ def model_ran(results, model):
     return False
 
 
-def review_gate(review_dir, claude_json=None):
+def subagent_runs(res, name="reviewer"):
+    """Number of `name` subagent runs from the CLI result's own subagent statistics (A2 MED), or None when the result
+    carries none. Accepted shapes: {"subagent_stats": {"by_type": {"reviewer": 2}}} / {"reviewer": {"count": 2}} /
+    [{"type"|"subagent_type"|"name": "reviewer", "count"|"runs": 2}]."""
+    st = (res or {}).get("subagent_stats")
+    if not isinstance(st, dict):
+        return None
+    bt = st.get("by_type", st)
+    n = None
+    def num(v):
+        if isinstance(v, bool): return None
+        if isinstance(v, (int, float)): return int(v)
+        if isinstance(v, dict):
+            for k in ("count", "runs", "total", "invocations"):
+                if isinstance(v.get(k), (int, float)) and not isinstance(v.get(k), bool): return int(v[k])
+            return 1
+        return None
+    if isinstance(bt, dict):
+        if not bt: return None
+        n = num(bt.get(name)) if name in bt else 0
+    elif isinstance(bt, list):
+        if not bt: return None
+        n = 0
+        for x in bt:
+            if isinstance(x, dict) and name in (x.get("type"), x.get("subagent_type"), x.get("name")):
+                n += num({k: v for k, v in x.items() if k in ("count", "runs", "total", "invocations")}) or 1
+    return n
+
+
+def review_gate(review_dir, claude_json=None, notes=None):
     """H2 (QUALITY_AUDIT §7): the final approval is read from the reviewer's own /tmp/work/review.json (not the copy in
     status.json), must name the sha256 of the spec.json / study_part0.json it approved (any later change -> refused),
-    and the CLI's modelUsage must show MODEL_REVIEW actually ran (skipped when MODEL_REVIEW is the orchestrator's own
-    model, where usage cannot tell them apart). -> None = OK, else a Marathi reason."""
+    and the CLI result must show the reviewer ran: a "reviewer" subagent in its subagent statistics when present (A2
+    MED), else MODEL_REVIEW in modelUsage with a cost > 0 (skipped when MODEL_REVIEW is the orchestrator's own model).
+    When usage cannot tell the reviewer apart (MODEL_REVIEW = MODEL or MODEL_LIGHT, no subagent statistics) a Marathi
+    note is appended to `notes` (a warning, never a silent pass). -> None = OK, else a Marathi reason."""
     try:
         rv = json.load(open(os.path.join(review_dir, "review.json"), encoding="utf-8"))
     except Exception:
@@ -881,12 +1174,20 @@ def review_gate(review_dir, claude_json=None):
             return f"मान्यतेनंतर {name} बदलली — पुन्हा reviewer ची मान्यता आवश्यक"
     review_model = (os.environ.get("MODEL_REVIEW") or DEFAULTS["model_review"]).strip()
     light = (os.environ.get("MODEL_LIGHT") or DEFAULTS["model_light"]).strip()
-    if claude_json and review_model != light:
-        res = read_claude_json(claude_json)
-        if res is None:
-            return "Claude निकाल (claude.json) वाचता आला नाही — reviewer चालला का ते तपासता आले नाही"
-        if not model_ran([res], review_model):
-            return f"reviewer मॉडेल ({short_model(review_model)}) प्रत्यक्ष चालले नाही"
+    drafter = (os.environ.get("MODEL") or DEFAULTS["model"]).strip()
+    if not claude_json:
+        return None
+    res = read_claude_json(claude_json)
+    if res is None:
+        return "Claude निकाल (claude.json) वाचता आला नाही — reviewer चालला का ते तपासता आले नाही"
+    n = subagent_runs(res, "reviewer")
+    if n is not None:
+        return None if n > 0 else "reviewer subagent चालला नाही (CLI निकाल)"
+    if review_model != light and not model_ran([res], review_model):
+        return f"reviewer मॉडेल ({short_model(review_model)}) प्रत्यक्ष चालले नाही"
+    if review_model in (light, drafter) and notes is not None:
+        notes.append(f"अंतिम पडताळणी: reviewer प्रत्यक्ष चालला हे CLI निकालावरून सिद्ध झाले नाही "
+                     f"(reviewer व {'orchestrator' if review_model == light else 'drafter'} एकच मॉडेल {short_model(review_model)}) — तपासा")
     return None
 
 
@@ -924,97 +1225,192 @@ def part1_gate(work_dir):
     return None, None
 
 
+# verify classification ("deliver with warnings", Abhi 02.11.2026: drafts are never thrown away). HARD = the case fails:
+# an output missing / unreadable, confidentiality (internal ids, repo paths in note/letter/Study/optional drafts),
+# annotations on the proposal pages. Every other FAIL line of verify_outputs.py is SOFT -> a runs.warnings line.
+HARD_CHECK = re.compile(r"^(?:Study opens|Note_and_Letter opens|package PDF opens|.*\binternal ids|.*\brepo paths|"
+                        r"annotations on proposal pages)\b")
+SOFT_PREFIX = "पडताळणी अपूर्ण — "
+
+
+def review_label():
+    return (short_model(os.environ.get("MODEL_REVIEW") or DEFAULTS["model_review"]).split() or ["Opus"])[0]
+
+
+def review_warning(why):
+    return f"अंतिम पडताळणी ({review_label()}) मान्यता नाही — वापरण्यापूर्वी तपासा: {why}"[:300]
+
+
+def soft_line(check, detail):
+    d = re.sub(r"\s+", " ", str(detail)).strip()[:160]
+    return f"{SOFT_PREFIX}{check}: {d}"[:300]
+
+
+def classify_verify(lines):
+    """verify_outputs.py stdout lines -> (hard [(check, detail)], soft [(check, detail)])."""
+    hard, soft = [], []
+    for l in lines:
+        if not l.startswith("FAIL"): continue
+        body = l[5:].strip() if l.startswith("FAIL:") else l[4:].strip()
+        check, _, detail = body.partition(" — ")
+        (hard if HARD_CHECK.match(check) else soft).append((check.strip(), detail.strip()))
+    return hard, soft
+
+
+def read_case_meta(path):
+    """--case-meta file (runner-written by `case_meta`): {proposal_original_name, proposal_pages}."""
+    try:
+        cm = json.load(open(path, encoding="utf-8-sig"))
+    except Exception as e:
+        print(f"engine_supabase verify: --case-meta not read ({e})", file=sys.stderr)
+        return "", None
+    name = safe_name(str(cm.get("proposal_original_name") or "")) if isinstance(cm, dict) else ""
+    pg = cm.get("proposal_pages") if isinstance(cm, dict) else None
+    pg = pg if isinstance(pg, int) and not isinstance(pg, bool) and pg > 0 else None
+    return ("" if name == "file" else name), pg
+
+
+def map_proposal_pages(pkg):
+    try:
+        mp = json.load(open(pkg + ".map.json", encoding="utf-8-sig"))
+        return len(mp["प्रस्ताव"]["pages"])
+    except Exception:
+        return None
+
+
 def cmd_verify(args):
+    """verify <outdir> [<workdir>] [--review <work dir>] [--claude <claude.json>] [--case-meta <meta.json>]
+    HARD problems fail the case (exit 1); SOFT problems become "पडताळणी अपूर्ण — <check>: <detail>" warnings (exit 0)."""
     args = list(args)
-    review_dir = claude_json = None
-    for flag in ("--review", "--claude"):
+    review_dir = claude_json = case_meta = None
+    for flag in ("--review", "--claude", "--case-meta"):
         if flag in args:
             k = args.index(flag); v = args[k + 1] if k + 1 < len(args) else ""; del args[k:k + 2]
             if flag == "--review": review_dir = v
-            else: claude_json = v
+            elif flag == "--claude": claude_json = v
+            else: case_meta = v
     out = args[0]
     work = args[1] if len(args) > 1 else ""
     try:
         st = json.load(open(os.path.join(out, "status.json"), encoding="utf-8"))
     except Exception as e:
-        return cmd_fail(f"status.json वाचता आले नाही: {e}")
-    if st.get("state") != "done":
+        return cmd_fail(f"status.json वाचता आले नाही ({str(e)[:120]}) — पुन्हा तयार करा.")
+    if not isinstance(st, dict) or st.get("state") != "done":
         return  # `finish` records the engine's own failure reason
+    warns = []
     rv = st.get("review") if isinstance(st.get("review"), dict) else {}
-    if rv.get("approved") is not True:
-        why = str(rv.get("reason") or "").strip() or "review नोंद नाही"
-        return cmd_fail(f"अंतिम पडताळणी (reviewer) मान्यता नाही — {why} — पुन्हा तयार करा."[:500])
     if review_dir:
-        why = review_gate(review_dir, claude_json)
+        notes = []
+        why = review_gate(review_dir, claude_json, notes)
         if why:
-            return cmd_fail(f"अंतिम पडताळणी (reviewer) मान्यता नाही — {why} — पुन्हा तयार करा."[:500])
+            warns.append(review_warning(why))
+        elif rv.get("approved") is not True:
+            warns.append(review_warning("status.json मध्ये मान्यता-नोंद नाही"))
+        warns += notes
         kind, why = part1_gate(review_dir)
-        if kind == "fail":
-            return cmd_fail(f"{why} — पुन्हा तयार करा."[:500])
-        if kind == "warn":
+        if kind:
             print("verify:", why)
-            add_warnings([why])
+            warns.append(why if kind == "warn" else soft_line("भाग 1", why))
         else:
             print("verify: PART1 OK")
+    elif rv.get("approved") is not True:
+        warns.append(review_warning(str(rv.get("reason") or "").strip() or "review नोंद नाही"))
     prefix = str(st.get("prefix") or "").strip()
-    if not prefix:
-        sf = glob.glob(os.path.join(out, "*_Study.docx"))
-        prefix = os.path.basename(sf[0])[: -len("_Study.docx")] if len(sf) == 1 else ""
+    sf = glob.glob(os.path.join(out, "*_Study.docx"))
+    if not prefix or not os.path.exists(os.path.join(out, f"{prefix}_Study.docx")):
+        best, _ = pick_newest(sf, prefix)
+        prefix = os.path.basename(best)[: -len("_Study.docx")] if best else prefix
     pkg = os.path.join(out, os.path.basename(str(st["package_pdf"]))) if st.get("package_pdf") else ""
     if not pkg or not os.path.exists(pkg):
         pp = package_pdfs(out)
         pkg = pp[0] if len(pp) == 1 else ""
     pages = None
     orig = ""
-    if work:
+    if case_meta:
+        orig, pages = read_case_meta(case_meta)
+    elif work:
         try:
             cj = json.load(open(os.path.join(work, "case.json"), encoding="utf-8"))
             orig = safe_name(str(cj.get("proposal_original_name") or ""))
             if orig == "file": orig = ""
-            if orig and pkg and os.path.basename(pkg) == strip_upload_prefix(orig):
-                orig = os.path.basename(pkg)  # the package keeps the name with only the upload prefix stripped
             src = next(os.path.join(work, f["local_path"]) for f in cj["inputs"] if f["kind"] == "proposal")
             import pymupdf  # on the runner (tools/requirements-engine.txt)
             with pymupdf.open(src) as d:
                 pages = len(d)
         except Exception as e:
             print(f"engine_supabase verify: proposal pages from status.json ({e})", file=sys.stderr)
+    if orig and pkg and os.path.basename(pkg) == strip_upload_prefix(orig):
+        orig = os.path.basename(pkg)  # the package keeps the name with only the upload prefix stripped
     if pages is None and str(st.get("proposal_pages") or "").strip().isdigit():
         pages = int(str(st["proposal_pages"]).strip())
-    missing = [x for x, v in (("PREFIX", prefix), ("package PDF", pkg), ("proposal pages", pages)) if not v]
-    if missing:
-        return cmd_fail("पडताळणी करता आली नाही — माहिती नाही: " + ", ".join(missing))
+    if not prefix or not pkg:
+        add_warnings(warns)
+        return cmd_fail("आउटपुट अपूर्ण — " + ", ".join(x for x, v in (("*_Study.docx", prefix), ("पॅकेज PDF", pkg)) if not v)
+                        + " नाही — पुन्हा तयार करा.")
+    if pages is None:
+        pages = map_proposal_pages(pkg)
+        warns.append(soft_line("प्रस्ताव-पाने", "पानांची संख्या माहीत नाही" + (f" — map.json वरून {pages}" if pages else "")))
+        pages = pages or 0
     script = os.environ.get("VERIFY_SCRIPT") or os.path.join(os.path.dirname(os.path.abspath(__file__)), "verify_outputs.py")
     cmd = [sys.executable, script, out, prefix, pkg, str(pages)] + (["--original-name", orig] if orig else [])
     r = subprocess.run(cmd, capture_output=True, text=True,
                        encoding="utf-8", errors="replace")
     lines = (r.stdout or "").splitlines()
     print(r.stdout, end="")
-    fails = [l for l in lines if l.startswith("FAIL")]
-    if r.returncode == 0 and not fails and any(l.startswith("ALL OK") for l in lines):
-        print("verify: ALL OK")
-        return
-    if fails:
-        detail = "; ".join(l[5:].strip() if l.startswith("FAIL:") else l for l in fails[:6])
-        if len(fails) > 6: detail += f"; … (+{len(fails) - 6})"
-    else:
+    hard, soft = classify_verify(lines)
+    clean = r.returncode == 0 and not hard and not soft and any(l.startswith("ALL OK") for l in lines)
+    if not clean and not hard and not soft:
+        # the tool itself did not run through: confidentiality is not confirmed -> hard
         errl = (r.stderr or "").strip().splitlines()
-        detail = errl[-1] if errl else f"exit {r.returncode}"
-    cmd_fail(f"पडताळणी (verify_outputs) अयशस्वी — {detail}"[:500])
+        hard = [("verify_outputs", errl[-1] if errl else f"exit {r.returncode}")]
+    if soft:
+        warns += [soft_line(c, d) for c, d in soft[:8]]
+        if len(soft) > 8: warns.append(f"{SOFT_PREFIX}आणखी {len(soft) - 8} तपासण्या")
+    try:
+        add_warnings(warns)
+    except Exception as e:
+        print("engine_supabase: verify warnings not stored:", e, file=sys.stderr)
+    if hard:
+        detail = "; ".join(f"{c}: {d}" if d else c for c, d in hard[:4])
+        if len(hard) > 4: detail += f"; … (+{len(hard) - 4})"
+        return cmd_fail(f"पडताळणी (verify_outputs) अयशस्वी — {detail} — पुन्हा तयार करा."[:500])
+    if clean and not warns:
+        print("verify: ALL OK")
+    else:
+        print(f"verify: delivered with {len(warns)} warning(s) (soft)")
+
+
+def extra_sources(extra=()):
+    """Sources for "(पॅकेज PDF मध्ये नाही)" extracts — the SAME as the in-run check (A1 H7): register/, service-rules/
+    of the repo, OLDCASES/t (default /tmp/old/t) and PRECEDENT (default /tmp/precedent), plus any --extra given."""
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    old = os.environ.get("OLDCASES") or "/tmp/old"
+    cand = [os.path.join(root, "register"), os.path.join(root, "service-rules"), os.path.join(old, "t"),
+            os.environ.get("PRECEDENT") or "/tmp/precedent"] + list(extra)
+    out = []
+    for c in cand:
+        if c and os.path.exists(c) and c not in out: out.append(c)
+    return out
 
 
 def cmd_extracts(args):
-    """extracts <outdir> <spec.json> <study.json> [<ocr dir>] — final verbatim guard (tools/extract_check.py) on the
-    delivered `related` + Study part 3 (+ the note body's “…” quotes, --note-body) against the package PDF.
-    The run already loops until EXTRACTS OK, so a final MISMATCH in `related` / Study part 3 is real -> the case FAILS
-    (Marathi reason, cmd_fail; nothing is uploaded). Unverifiable extracts (scan / garbled text layer) and every
-    note-body result (new check, warn_only) are only "मॉडेल: उतारा-तपासणी — …" warning lines."""
+    """extracts <outdir> <spec.json> <study.json> [<ocr dir>] [--extra PATH ...] — final verbatim guard
+    (tools/extract_check.py) on the delivered `related` + Study part 3 (+ the note body's “…” quotes, --note-body)
+    against the package PDF, with the same --extra sources as the in-run check (extra_sources). Never fails the case
+    ("deliver with warnings"): a MISMATCH is a "पडताळणी अपूर्ण — उतारे: …" warning; unverifiable extracts and every
+    note-body result are "मॉडेल: उतारा-तपासणी — …" warning lines."""
+    args = list(args)
+    extra = []
+    while "--extra" in args:
+        k = args.index("--extra")
+        if k + 1 < len(args): extra.append(args[k + 1])
+        del args[k:k + 2]
     out, spec, study = args[:3]
     try:
         st = json.load(open(os.path.join(out, "status.json"), encoding="utf-8"))
     except Exception:
         st = {}
-    if st.get("state") != "done":
+    if not isinstance(st, dict) or st.get("state") != "done":
         return
     pkg = os.path.join(out, os.path.basename(str(st.get("package_pdf") or "")))
     if not st.get("package_pdf") or not os.path.exists(pkg):
@@ -1025,9 +1421,11 @@ def cmd_extracts(args):
     cmd = [sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "extract_check.py"), pkg, "--note-body"]
     cmd += ["--spec", spec] if os.path.exists(spec) else []
     cmd += ["--study", study] if os.path.exists(study) else []
-    if len(cmd) == 3:
+    if len(cmd) == 4:
         return add_warnings(["मॉडेल: उतारा-तपासणी — spec/study सापडले नाहीत, तपासणी झाली नाही"])
     cmd += ["--ocr-dir", args[3]] if len(args) > 3 and os.path.isdir(args[3]) else []
+    for x in extra_sources(extra):
+        cmd += ["--extra", x]
     rj = os.path.join(out, ".extracts.json")
     r = subprocess.run(cmd + ["--json", rj], capture_output=True, text=True, encoding="utf-8", errors="replace")
     print(r.stdout, end="")
@@ -1045,6 +1443,8 @@ def cmd_extracts(args):
     nunv = [x for x in note_r if x.get("status") == "unverifiable"]
     where = lambda xs: "; ".join(sorted({str(x.get("where")) for x in xs}))[:180]
     lines = []
+    if bad:
+        lines.append(soft_line("उतारे", f"{len(bad)} उतारे मूळ PDF शी जसेच्या तसे जुळले नाहीत ({where(bad)}) — वापरण्यापूर्वी तपासा"))
     if unv:
         lines.append(f"मॉडेल: उतारा-तपासणी — {len(unv)} उतारे पडताळता आले नाहीत (स्कॅन/विस्कळीत मजकूर-स्तर)")
     if nbad:
@@ -1052,8 +1452,7 @@ def cmd_extracts(args):
     if nunv:
         lines.append(f"मॉडेल: उतारा-तपासणी — नोंदीतील {len(nunv)} अवतरणे पडताळता आली नाहीत (पृ.N/प.वि. नाही / स्कॅन)")
     add_warnings(lines)
-    if bad:
-        cmd_fail(f"उतारा-तपासणी अयशस्वी — {len(bad)} उतारे मूळ PDF शी जसेच्या तसे जुळले नाहीत ({where(bad)}) — पुन्हा तयार करा."[:500])
+    print("extracts:", "MISMATCH (warning)" if bad else "OK")
 
 
 def cmd_warn(text):
@@ -1105,7 +1504,7 @@ def main(a):
     if len(a) in (2, 5) and a[0] == "litellm_config":
         return cmd_litellm_config(a[1:])
     if len(a) < 2 or a[0] not in ("fetch", "step", "log_url", "finish", "fail", "claude_result", "verify", "warn",
-                                  "extracts"):
+                                  "extracts", "case_meta"):
         print(__doc__); sys.exit(2)
     c, arg = a[0], " ".join(a[1:])
     if c == "step" and not has_supabase():
@@ -1122,10 +1521,17 @@ def main(a):
         elif c == "verify": cmd_verify(a[1:])
         elif c == "warn": cmd_warn(arg)
         elif c == "extracts": cmd_extracts(a[1:])
+        elif c == "case_meta": cmd_case_meta(a[1:])
     except SystemExit:
         raise
     except Exception as e:
-        if c in ("fetch", "finish", "claude_result", "verify", "extracts"):
+        if c == "extracts":  # the final verbatim guard never fails the case ("deliver with warnings")
+            try:
+                add_warnings([f"मॉडेल: उतारा-तपासणी — साधन चालले नाही ({str(e)[:120]})"])
+            except Exception:
+                pass
+            print(f"engine_supabase {c}: {e}", file=sys.stderr); sys.exit(0)
+        if c in ("fetch", "finish", "claude_result", "verify", "case_meta"):
             cmd_fail(f"{c}: {e}")
         print(f"engine_supabase {c}: {e}", file=sys.stderr); sys.exit(1)
 

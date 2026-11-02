@@ -281,6 +281,37 @@ class VerifyOutputs(unittest.TestCase):
         build_pkg(os.path.join(d, PKGNAME), annot_on_proposal=True)
         self.must_fail(d, "annotations")
 
+    def test_annotation_on_proposal_check_name(self):
+        # the engine treats "annotations on proposal pages" as HARD, the Highlight-type rule as soft: separate checks
+        d = self.case("annot2")
+        build_pkg(os.path.join(d, PKGNAME), annot_on_proposal=True)
+        self.must_fail(d, "annotations on proposal pages (none)")
+        rc, out = self.run_verify(d)
+        self.assertIn("OK: annotations (Highlight only)", out)
+
+    def test_reply_parts_after_proposal(self):
+        # A1 H9: reply pages appended right after the proposal (map "proposal_parts") — proposal count still = NPP,
+        # and a count that includes them is accepted too; an annotation on a reply page is a proposal-side annotation
+        d = self.case("reply")
+        pkg = os.path.join(d, PKGNAME)
+        build_pkg(pkg)
+        mp = json.load(open(pkg + ".map.json", encoding="utf-8"))
+        mp["प्रस्ताव"]["pages"] = list(range(1, NPP))
+        mp["उत्तर-पत्र"] = {"first_page": NPP, "pages": [NPP], "kind": "reply"}
+        mp["proposal_parts"] = ["उत्तर-पत्र"]
+        json.dump(mp, open(pkg + ".map.json", "w", encoding="utf-8"), ensure_ascii=False)
+        rc, out = self.run_verify(d, npp=NPP)
+        self.assertEqual(rc, 0, out)
+        rc, out = self.run_verify(d, npp=NPP - 1)
+        self.assertEqual(rc, 0, out)
+
+    def test_uuid_original_name_kept(self):
+        d = self.case("uuid")
+        u = "3f2a9c1e-5b7d-4e2a-9c1e-1234567890ab.pdf"
+        os.rename(os.path.join(d, PKGNAME), os.path.join(d, u)); os.rename(os.path.join(d, PKGNAME + ".map.json"), os.path.join(d, u + ".map.json"))
+        rc, out = self.run_verify(d, pkg=u, extra=("--original-name", u))
+        self.assertEqual(rc, 0, out)
+
     def test_wrong_font_attribute(self):
         d = self.case("font")
         f = os.path.join(d, f"{PRE}_Note_and_Letter.docx")
@@ -322,6 +353,39 @@ class VerifyOutputs(unittest.TestCase):
         d = self.case("vinanti")
         build_note(self.intro_with(", ही विनंती", ""), d)
         self.must_fail(d, "letter intro request wording")
+
+    def test_reply_letter_without_request_ok(self):
+        # a conveying letter (no points, intro does not ask) needs no "ही विनंती" (lint_spec.requests_info)
+        d = self.case("conv")
+        def f(s):
+            s["letter"]["points"] = []
+            s["letter"]["intro"] = ("उपरोक्त विषयाबाबत संदर्भाधीन पत्रास अनुसरून आपणांस कळविण्यात येते की, "
+                                    "सदर प्रकरणी वित्त विभागाचा अभिप्राय प्राप्त झाला आहे.")
+        build_note(self.spec_with(f), d)
+        rc, out = self.run_verify(d)
+        self.assertIn("OK: letter intro request wording", out)
+
+    def test_ma_not_checked_in_refs_and_copies(self):
+        # §4.23: the letter's to / refs / copies are exempt (same as lint_spec); the body is checked
+        d = self.case("ma_refs")
+        def f(s):
+            s["letter"]["refs"] = [s["letter"]["refs"][0] + " (प्रबंधक (अपील शाखा), उच्च न्यायालय, मुंबई)"]
+        build_note(self.spec_with(f), d)
+        rc, out = self.run_verify(d)
+        self.assertIn('OK: "मा." before the High Court', out)
+        d2 = self.case("ma_body")
+        build_note(self.intro_with("सदर प्रकरणी", "उच्च न्यायालयाच्या पत्रानुसार सदर प्रकरणी"), d2)
+        self.must_fail(d2, '"मा." before the High Court')
+
+    def test_finance_closing_line_joined(self):
+        # a separate closing "मान्यतेस्तव सादर." (note.closing) joins the last para, as in lint_spec (finance_route)
+        sp = json.load(open(os.path.join(ROOT, "samples", "specs", "CR66_2026_finance-approval_no-letter.json"), encoding="utf-8"))
+        sp["note"]["paras"][-1] = "सबब, उपरोक्त प्रस्तावास मान्यता मिळण्याबाबत सार्वजनिक आरोग्य विभागास विनंती करण्यास हरकत नसावी."
+        sp["note"]["closing"] = "मान्यतेस्तव सादर."
+        d = self.case("fin_closing")
+        build_note(sp, d)
+        rc, out = self.run_verify(d)
+        self.assertIn("OK: अ.मु.स. (वित्त) <=> Finance last para", out)
 
     def test_quoted_sau_tatkal_ok(self):
         d = self.case("quoted")

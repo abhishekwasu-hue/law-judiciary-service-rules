@@ -89,6 +89,17 @@ class TestLintParawise(unittest.TestCase):
         s["parawise"]["recommendation_reason"] = " "
         self.assertTrue(any(p.startswith("parawise.recommendation_reason:") for p in LP.lint_parawise(s)))
 
+    def test_recommendation_blank_is_warning(self):
+        """lead F1 (02.11.2026): "____" when the record gives no basis — WARN, not an error (Rule 58(4)(a))."""
+        for v in ("____", " ________ "):
+            s = copy.deepcopy(self.spec); s["parawise"]["recommendation"] = v; s["parawise"]["recommendation_reason"] = ""
+            self.assertEqual(LP.lint_parawise(s), [], v)
+            self.assertTrue(any(w.startswith("parawise.recommendation:") for w in LP.warnings_parawise(s)))
+        s = copy.deepcopy(self.spec); s["parawise"]["recommendation"] = "_"
+        self.assertTrue(any(p.startswith("parawise.recommendation:") for p in LP.lint_parawise(s)))
+        s = copy.deepcopy(self.spec); s["parawise"]["recommendation"] = "oppose"
+        self.assertFalse(any(w.startswith("parawise.recommendation:") for w in LP.warnings_parawise(s)))
+
     def test_ids_and_repo_paths(self):
         s = copy.deepcopy(self.spec)
         s["parawise"]["paras"][2]["remarks"] += " See z6_0235 and register/pay.md."
@@ -191,6 +202,17 @@ class TestBuildParawise(unittest.TestCase):
         self.assertIn("recommends that the petition be not opposed", text)
         self.assertIn("Verification", text)
         self.assertIn("Nil.", text)
+
+    def test_blank_recommendation_builds(self):
+        # lint allows recommendation "____" (warning): the build prints "____" for the owner to fill (no KeyError)
+        s = load(WP); s["parawise"]["recommendation"] = "____"
+        p = os.path.join(self.tmp, "b.json")
+        with open(p, "w", encoding="utf-8") as f:
+            json.dump(s, f, ensure_ascii=False)
+        r = self.build(p, "B")
+        self.assertNotIn("KeyError", r.stderr)
+        self.assertTrue(os.path.exists(os.path.join(self.tmp, "B_Parawise.docx")), r.stdout + r.stderr)
+        self.assertIn("____", all_text(docx.Document(os.path.join(self.tmp, "B_Parawise.docx"))))
 
     def test_refuses_without_parawise(self):
         r = self.build(INFO, "N")

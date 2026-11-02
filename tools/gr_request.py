@@ -6,11 +6,13 @@ Requests: tools/gr-request.txt, one per line:
   dept <date_from> <date_to> <department words>      e.g.  dept 2022-04-19 2022-04-19 Law Judiciary   (all GRs of that dept on those dates, max 15)
     (searches title/description in the archive.org mirror of gr.maharashtra.gov.in; downloads at most 5 matches)
 A code (from a `code` line or a search hit) must be 16-20 digits (re.fullmatch); anything else is rejected with a
-logged line ("rejected: invalid code") and moved to '# done' — it never becomes a file path or URL.
+logged line ("rejected: invalid code") and moved to the done file — it never becomes a file path or URL.
 Output: pdf/gr/<code>.pdf  +  pdf/gr/INDEX.tsv (code, date, department, title, request).
-Processed lines are moved to the '# done' section so they are not fetched again. A request that found nothing or hit an
+Processed lines are moved to tools/gr-request-done.txt (A2 LOW: pending and done in separate files, so a union merge
+of two concurrent runs can never put a pending request among the done ones); tools/gr-request.txt keeps only the
+header comments and the pending lines. An old '# done' section in gr-request.txt is moved to the done file once. A request that found nothing or hit an
 error ("not found" / "no match" / "error") stays in the to-do list with a counter (`  #retry=N`) and is tried again on the
-next run; after 3 tries it moves to '# done' as "gave up after 3 tries". The INDEX row is written together with the PDF
+next run; after 3 tries it moves to the done file as "gave up after 3 tries". The INDEX row is written together with the PDF
 (metadata is looked up afterwards and filled in; a metadata error never leaves a PDF without its INDEX row)."""
 import json, os, re, time, urllib.parse, urllib.request
 MAX_TRIES = 3
@@ -62,7 +64,7 @@ def save(code, req, m=None):
         except Exception as e:
             return f"saved (metadata not found: {str(e)[:60]})"
     return "saved"
-lines = open("tools/gr-request.txt", encoding="utf-8").read().split("\n")
+lines = open("tools/gr-request.txt", encoding="utf-8").read().split("\n") if os.path.exists("tools/gr-request.txt") else []
 todo, done, head = [], [], []
 sect = "head"
 for l in lines:
@@ -110,5 +112,11 @@ for line in todo:
             print("\n".join(mine), f"  (try {tries}/{MAX_TRIES}; kept for retry)", sep="\n")
         else:
             log[start:] = [f"{x}  (gave up after {MAX_TRIES} tries)" for x in mine]
-open("tools/gr-request.txt", "w", encoding="utf-8").write("\n".join(head + retry + ["# done"] + [f"{x}" for x in log] + [x for x in done if x.strip()]) + "\n")
+REQ, DONE = "tools/gr-request.txt", "tools/gr-request-done.txt"
+open(REQ, "w", encoding="utf-8").write("\n".join([h for h in head if h.strip()] + retry) + "\n")
+new_done = [x for x in log + done if x.strip()]  # this run's results first, then a migrated old '# done' section
+if new_done:
+    prev = open(DONE, encoding="utf-8").read() if os.path.exists(DONE) else ""
+    if prev and not prev.endswith("\n"): prev += "\n"
+    open(DONE, "w", encoding="utf-8").write(prev + "\n".join(new_done) + "\n")
 print("\n".join(log))

@@ -9,7 +9,7 @@ import unittest
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BRIEF = os.path.join(ROOT, "tools", "ENGINE_BRIEF.md")
 LINT = os.path.join(ROOT, "tools", "lint_spec.py")
-MAX_BYTES = 21504  # 01.11.2026: +§4.18 language rule, +§4.19 Marathi forms (14 KiB); 02.11.2026: +Marathi language rules section, owner instruction (18.5 KiB); 02.11.2026: +section 4b court cases / order drafts, owner instruction (21 KiB)
+MAX_BYTES = 23552  # 02.11.2026: +section 0 "never stop — deliver with warnings" (caps, terminal states, C R fallback; A1 audit) (23 KiB); 01.11.2026: +§4.18 language rule, +§4.19 Marathi forms (14 KiB); 02.11.2026: +Marathi language rules section, owner instruction (18.5 KiB); 02.11.2026: +section 4b court cases / order drafts, owner instruction (21 KiB)
 
 
 def lint_constant(name):

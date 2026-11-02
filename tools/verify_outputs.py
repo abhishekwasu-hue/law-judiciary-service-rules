@@ -19,7 +19,8 @@ Checks
   नियम 1–4 'आपणास' / 'यांनां'
  Note (start of Note_and_Letter up to "संबंधित माहिती (संदर्भासाठी)" or the letter):
   - signer chain = INSTRUCTIONS §4.6 names in order, "अ.मु.स. (वित्त)" last
-  - "अ.मु.स. (वित्त)" present  <=>  last numbered para contains "वित्त विभागाच्या मान्यतेस्तव"
+  - "अ.मु.स. (वित्त)" present  <=>  the last numbered para (+ a separate closing line "मान्यतेस्तव सादर.") sends the file
+    to Finance / Public Health (lint_spec.finance_route)
  Note body and letter: no "पॅकेज PDF" (allowed only in "संबंधित माहिती" and the Study); no BANNED word
  Note body and letter (§4.18, text outside “…” quotes only): no 'सौ.'; 'श्री.' followed by a space; letter: no 'तात्काळ'
  Note body and letter (§4.19, outside quotes, lint_spec.lang_hits): no '.:-', no 'करुन' / 'प्रारुप' / 'अनुसरुन', a space after
@@ -29,7 +30,8 @@ Checks
   - starts on a new page / new section (page break or section break before the letterhead)
   - ref no. संकिर्ण-<year>/<file no>/प्र.क्र.<n>/का.6 ; e-mail lnjd.desk6-mh@mah.gov.in on the letterhead
   - विषय and संदर्भ paragraphs: centred, every run bold
-  - intro paragraph (starting "उपरोक्त विषयाबाबत") contains "ही विनंती" outside quotes (§4.18)
+  - intro paragraph (starting "उपरोक्त विषयाबाबत") contains "ही विनंती" outside quotes (§4.18) when the letter asks for
+    information (lint_spec.requests_info: a table / numbered points, a reminder, or "… उपलब्ध करून देण्यात यावी")
   - "आपला," present, signature "आपली," absent ("आपली पत्रे" in संदर्भ is allowed); lines "( राजेश वडनेरकर )", "अवर सचिव ,महाराष्ट्र शासन", "प्रत : निवड नस्ती"
  status.json (when <outdir>/status.json exists): `letter_needed` is true/false and true <=> a letter is present
  Study: headings भाग 0 … भाग 7
@@ -44,7 +46,13 @@ Checks
   - every page carries exactly "पृ. i / N" in the bottom 40 pt strip; bookmarks present
   - <pdf>.map.json: proposal pages == <proposal pages>; total pages == proposal + enclosure pages (no separator pages);
     no mark with status "TEXT NOT FOUND" / "page not included" or hits == 0 (works with or without per-mark "hits")
-  - no annotation on proposal pages; only Highlight annotations elsewhere
+    reply / concurrence letters appended after the proposal (map.json "proposal_parts", tools/pkg3.py --also) count as
+    proposal-side pages: proposal pages == <proposal pages> or proposal + reply pages == <proposal pages>
+  - "annotations on proposal pages (none)": no annotation on proposal (and reply-part) pages;
+    "annotations (Highlight only)": only Highlight annotations elsewhere
+ The engine (tools/engine_supabase.py verify) treats only these FAILs as HARD (case failed): "… opens" (Study,
+ Note_and_Letter, package PDF), "… internal ids", "… repo paths", "annotations on proposal pages"; every other FAIL is
+ delivered with a "पडताळणी अपूर्ण — …" warning.
 """
 import json
 import os
@@ -62,10 +70,10 @@ FONT_ATTRS = ("ascii", "hAnsi", "cs", "eastAsia")
 THEME_ATTRS = ("asciiTheme", "hAnsiTheme", "cstheme", "eastAsiaTheme")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 # shared rule definitions — ONE copy, in tools/lint_spec.py (pre-build lint uses the same rules)
-from lint_spec import (AMS, BANNED, FIN, ID_RE, LH_EMAIL, RELATED, REF_NO, REPO_RE, REQUEST,  # noqa: E402,F401
+from lint_spec import (AMS, BANNED, BARE_CLOSING_RE, FIN, ID_RE, LH_EMAIL, RELATED, REF_NO, REPO_RE, REQUEST,  # noqa: E402,F401
                        MISSING_FORM, MISSING_HEAD, SIGNERS, banned_hits, finance_problems, heading_problems, id_hits,
-                       lang_hits, ma_hits, ns, num, part_no, ref_problems, repo_hits, signer_problems, style_hits, unquoted,
-                       warn_hits)
+                       lang_hits, ma_hits, ns, num, part_no, ref_problems, repo_hits, requests_info, signer_problems,
+                       style_hits, unquoted, warn_hits)
 INTRO_HEAD = "उपरोक्त विषयाबाबत"  # letter intro paragraph (lint_spec.INTRO_START begins with it)
 from engine_supabase import strip_upload_prefix  # noqa: E402 — the ONE upload-prefix rule (§4.16)
 
@@ -166,6 +174,26 @@ def p_bold(p):
     return True
 
 
+def letter_body_for_ma(texts):
+    """§4.23 "मा." check on the letter: the विषय line and the body from "महोदय" on — not the addressee block (प्रति, …),
+    the संदर्भ lines or the प्रत : copy lines (same exemptions as lint_spec: letter.to / refs / copies)."""
+    out, state = [], "head"
+    for t in texts:
+        n = ns(t)
+        if n.startswith("विषय"): state = "subject"
+        elif n.startswith("संदर्भ"): state = "refs"
+        elif n.startswith("महोदय"): state = "body"
+        if state == "subject" or (state == "body" and not n.startswith("प्रत")):
+            out.append(t)
+    return "\n".join(out)
+
+
+def letter_info(blocks, letter_txt):
+    """What lint_spec.requests_info needs from a built letter: points (a table or numbered "1)" points) / reminder."""
+    pts = any(b["kind"] == "tbl" for b in blocks) or any(re.match(r"\s*[0-9०-९]+\s*\)", b["text"]) for b in blocks)
+    return {"points": pts, "reminder": "स्मरणपत्र-" in letter_txt}
+
+
 def main(argv):
     argv = list(argv); orig = None
     if "--original-name" in argv:
@@ -243,7 +271,7 @@ def main(argv):
               [f"{where}: {x}" for where, t, isl in (("note", note_txt, False), ("letter", letter_txt, True))
                for x in style_hits(t, letter=isl)])
         # §4.23 "मा." — the letter's addressee block (before "विषय") is excepted
-        lbody = letter_txt.split("विषय", 1)[1] if "विषय" in letter_txt else letter_txt
+        lbody = letter_body_for_ma([b["text"] for b in bl[lstart:]] if has_letter else [])
         check('"मा." before the High Court and judges §4.23 (note body, letter)',
               [f"{where}: {x}" for where, t in (("note", note_txt), ("letter", lbody)) for x in ma_hits(t)])
 
@@ -273,6 +301,9 @@ def main(argv):
         check("note signer chain (§4.6)", sp)
         numbered = [t for t in ntexts[:sig_start] if re.match(r"[0-9०-९]+\.", t)]
         last = numbered[-1] if numbered else (ntexts[sig_start - 1] if sig_start else "")
+        # a separate closing line "मान्यतेस्तव सादर." (spec note.closing, Format-1/2) belongs to the last para (as in lint_spec)
+        if numbered and sig_start and BARE_CLOSING_RE.match(ntexts[sig_start - 1]):
+            last = last + " " + ntexts[sig_start - 1]
         check("अ.मु.स. (वित्त) <=> Finance last para", finance_problems(last, has_ams))
 
         # status.json `letter_needed` (engine; reported to the app) must agree with the built file
@@ -322,7 +353,7 @@ def main(argv):
             intro = next((t for t in lt if t.startswith(INTRO_HEAD)), None)
             rq = []
             if intro is None: rq.append("intro paragraph 'उपरोक्त विषयाबाबत …' missing")
-            elif REQUEST not in unquoted(intro): rq.append(f"intro lacks '{REQUEST}' — '…उपलब्ध करून देण्यात यावी, {REQUEST}.'")
+            elif requests_info(letter_info(bl[lstart:], letter_txt), intro) and REQUEST not in unquoted(intro): rq.append(f"intro lacks '{REQUEST}' — '…उपलब्ध करून देण्यात यावी, {REQUEST}.'")
             check("letter intro request wording §4.18", rq)
             en = []
             if "आपला," not in lt: en.append("'आपला,' line missing")
@@ -352,7 +383,8 @@ def main(argv):
         if orig is not None:  # §4.16: the original name is kept even if it looks machine-made
             want = strip_upload_prefix(os.path.basename(orig))
             check("package file name = original proposal name",
-                  [] if os.path.basename(pkg) == want else [f"'{os.path.basename(pkg)}' != original name '{want}'"])
+                  [] if os.path.basename(pkg) in (want, os.path.basename(orig))
+                  else [f"'{os.path.basename(pkg)}' != original name '{want}'"])
         else:
             check("package file name = original proposal name",
                   [f"'{os.path.basename(pkg)}' is a generated name"] if re.search(r"_Proposal_with_GRs\.pdf$", pkg, re.I) else [])
@@ -366,6 +398,7 @@ def main(argv):
         check("bookmarks", [] if P.get_toc() else ["package has no bookmarks"])
         mpath = pkg + ".map.json"
         mp_pr = []
+        unmarked = set(range(1, npp + 1))  # pages that must carry no annotation: the proposal (+ reply parts, below)
         try:
             mp = json.load(open(mpath, encoding="utf-8-sig"))
         except Exception as e:
@@ -373,8 +406,16 @@ def main(argv):
         if mp is not None:
             ents = {k: v for k, v in mp.items() if isinstance(v, dict) and "pages" in v}
             prop = mp.get("प्रस्ताव") or next((v for v in ents.values() if v.get("first_page") == 1), None)
+            # reply / concurrence letters appended right after the proposal (pkg3 --also / "proposal_parts")
+            parts = [ents[k] for k in (mp.get("proposal_parts") or []) if k in ents]
+            part_pages = [p for v in parts for p in v["pages"]]
+            if prop is not None:
+                unmarked |= set(prop["pages"])
+            unmarked |= set(part_pages)
             if prop is None: mp_pr.append("no proposal entry in map")
-            elif len(prop["pages"]) != npp: mp_pr.append(f"map has {len(prop['pages'])} proposal pages, given {npp}")
+            elif len(prop["pages"]) != npp and len(prop["pages"]) + len(part_pages) != npp:
+                mp_pr.append(f"map has {len(prop['pages'])} proposal pages"
+                             + (f" (+{len(part_pages)} reply pages)" if part_pages else "") + f", given {npp}")
             tot = sum(len(v["pages"]) for v in ents.values())
             if tot != N: mp_pr.append(f"package has {N} pages but proposal + enclosures = {tot} (separator/extra pages?)")
             for mk in mp.get("marks", []) or []:
@@ -382,12 +423,14 @@ def main(argv):
                 if "NOT FOUND" in stt.upper() or stt == "page not included" or ("hits" in mk and not mk["hits"]):
                     mp_pr.append(f"mark not placed: {mk.get('label', '')} p.{mk.get('pdf_page', mk.get('src_page', '?'))} ({stt or 'hits 0'})")
         check("map.json (page count, marks)", mp_pr)
-        an_pr = []
+        an_prop, an_kind = [], []
         for i, pg in enumerate(P):
             an = [a.type[1] for a in pg.annots()]
-            if i < npp and an: an_pr.append(f"proposal page {i + 1} has annotations {sorted(set(an))}")
-            elif any(x != "Highlight" for x in an): an_pr.append(f"page {i + 1}: non-highlight annotation {sorted(set(an))}")
-        check("annotations (none on proposal, Highlight only)", an_pr)
+            if (i + 1) in unmarked and an: an_prop.append(f"proposal page {i + 1} has annotations {sorted(set(an))}")
+            elif any(x != "Highlight" for x in an): an_kind.append(f"page {i + 1}: non-highlight annotation {sorted(set(an))}")
+        # two checks: annotations on the proposal pages are HARD for the engine (engine_supabase HARD_CHECK); the type rule is soft
+        check("annotations on proposal pages (none)", an_prop)
+        check("annotations (Highlight only)", an_kind)
 
     ok = all(results)
     print("ALL OK" if ok else "FIX THE FAILS ABOVE", "| pages", N, "| toc", len(P.get_toc()) if P is not None else 0)

@@ -41,11 +41,15 @@ gist of your own (that is part 2 of the main run).
 ]}
 ```
    Allowed block keys: `subheading`, `para`, `bullets`, `table` (no images). Write long text in steps (e.g. one page at a
-   time into a scratch file under /tmp/part1/, then assemble) so nothing is lost.
+   time into a scratch file under /tmp/part1/) and REWRITE `OUT/study_part1.json` as valid JSON after every few pages,
+   so a time-out still leaves the pages done (the main run keeps them and does only the rest).
 2. Check it: `python3 -c` — the file parses as JSON, `heading` starts with "भाग 1", every proposal page 1..`pages` has its
    own subheading, every block has one allowed key.
 3. Only then create the empty marker `OUT/study_part1.done`. If you cannot complete part 1, write `OUT/study_part1.failed`
-   with a one-line reason instead (never both).
+   with a one-line reason instead (never both); keep the valid partial `OUT/study_part1.json`.
+4. Long proposals (e.g. a long English petition): every page is still rendered in full (INSTRUCTIONS §4.8 "जसेच्या तसे";
+   no summary). If you run short of turns, stop cleanly: each page not done gets its subheading and one para
+   "[भाग 1 वेळेअभावी अपूर्ण — मूळ पान पाहावे]", then `.failed` with the reason "पाने <N–M> अपूर्ण" — never stop silently.
 
 ## Rules
 - No questions (no interaction). Scratch work in /tmp only; never write in the repo, WORKDIR or any other OUTDIR.

@@ -9,15 +9,27 @@ caching): this file, then tools/ENGINE_BRIEF.md, then the tool docstrings, then 
 - `WORKDIR/case.json`: `case` (cr_no, cr_year, file_no, subject, category, employee_name, post, office, received_from,
   received_via, inward_date, stage), `instructions`, `proposal_original_name`, `inputs` (each with `kind`,
   `original_name`, `version`, `local_path` relative to WORKDIR), `files` (all earlier files of the case, metadata only).
-- `WORKDIR/in/proposal/<original name>` = the proposal PDF. `WORKDIR/in/extra_doc/` = extra documents of the same case.
+- `WORKDIR/in/proposal/<original name>` = the proposal PDF. More than one PDF there (e.g. a scan split in two): read ALL
+  of them; the package's proposal = `proposal_original_name`; every other proposal PDF is handled like an extra_doc
+  (below) + warning "पडताळणी अपूर्ण — प्रस्तावाच्या <k> PDF फाइल्स आल्या; '<name>' संलग्नक म्हणून जोडली — तपासा"
+  (02.11.2026, A1 H13). `WORKDIR/in/extra_doc/` = extra documents of the same case.
   `WORKDIR/in/reply/` = the office's answer to this Section's earlier information-request letter — read it as part of
   the record and prepare the NEXT note on the basis of the proposal + the reply (PROPOSAL_SOP Step 3: letter only if
   essential information is still missing; otherwise the note goes onward for approval).
+- Reply / extra_doc / additional proposal PDFs IN THE PACKAGE (02.11.2026, A1): they are the FIRST entries of
+  enclosures.json, in upload order (all pages `"pages": ""`, label e.g. "प्राप्त उत्तर दि. __" / "अतिरिक्त कागदपत्र",
+  no marks), then the GR pages. So reply pages follow the proposal pages in the package; cite them by their package
+  page "पृ.N/प.वि." from `<pdf>.map.json`, never an invented N. A reply that is not a PDF (jpg/docx) is cited by its
+  letter no./date only + a warning. `proposal_pages` (verify, status.json) = pages of the proposal PDF only.
 - `instructions` (if not empty) = the user's instruction for THIS run — given at upload (first run) or as a correction for
-  a re-run. Follow it exactly, within the binding rules; record in Study part 7 how it was applied.
+  a re-run. Follow it exactly, within the binding rules; record in Study part 7 how it was applied. If it conflicts
+  with a binding rule (one lint/verify enforce, e.g. "अ.मु.स. (वित्त) जोडा" without a Finance route, "तातडीने" in a
+  letter): the RULE wins in the files; Study part 7 + `warnings`: "पडताळणी अपूर्ण — सूचना '<instruction>' नियम
+  <§…> मुळे लागू केली नाही". Never loop on it, never fail for it.
 - `WORKDIR/pages/` = the proposal already split by the workflow (tools/prep_pages.py): `p-NN.png` (110 dpi — the image
-  every page is read from), `p-NN.sm.png` (80 dpi — only for your own look at rendered GR/package pages, never for
-  reading the proposal), `p-NN.txt` (text layer), `p-NN.ocr.txt` (tesseract OCR, lang in `pages.json` `ocr_lang`),
+  every page is read from — by the drafter, the reviewer and the part-1 helper), `p-NN.sm.png` (80 dpi — only for a
+  quick look at layout or at rendered GR/package pages, never for reading a proposal number, date or name),
+  `p-NN.txt` (text layer), `p-NN.ocr.txt` (tesseract OCR, lang in `pages.json` `ocr_lang`),
   `pages.json` (`files[]`: `png`, `png_small`, `txt`, `ocr`; `has_text_layer[]`). Reply PDFs:
   `WORKDIR/pages_reply_<n>/` (same layout; `pages.json` `pdf` = file). Missing/incomplete -> render yourself
   (`python3 tools/prep_pages.py <pdf> <dir>`). Text layer / OCR are a first pass and cross-check only: every number,
@@ -37,9 +49,9 @@ The budget is SOFT: going over it only adds a warning; never skip a check, an es
 | Note `related` ("संबंधित माहिती (संदर्भासाठी)") — verbatim GR/rule/precedent extracts + source + "(पॅकेज PDF पृ. N)" | related_writer (MODEL_LIGHT) | `extract_check.py`: each extract must occur on its cited package page; mismatches -> drafter |
 | Study parts 2, 3, 4, 7; parts 5–6 = exact copies of the spec's note / letter text (never redrafted) | study_writer (MODEL_LIGHT) | part 3 by `extract_check.py` (mismatches -> drafter); lint; parts 5–6 copied by you from spec |
 | Study part 1 page rendering | helper run (MODEL_LIGHT), then `part1check` vs the drafter's facts | kept only when every number/date/name matches; failing pages -> drafter |
-| Final review: every number/date/name of note, letter, part 0 vs the images; INSTRUCTIONS §4 incl. §4.18; letter-or-not; language; minimal direct corrections | reviewer (MODEL_REVIEW) | approval required: workflow fails the case without `review.approved` |
+| Final review: every number/date/name of note, letter, part 0 vs the images; INSTRUCTIONS §4 incl. §4.18; letter-or-not; language; minimal direct corrections | reviewer (MODEL_REVIEW) | 1 review + 1 re-review max; not approved -> delivered with warning (Order step 7) |
 | pkg3 / highlight / build_note_letter / build_study / lint / verify / extract_check runs; page numbers from map.json | you (MODEL_LIGHT) | scripts; LINT OK, ALL OK, EXTRACTS OK |
-| Fixing lint/verify lines | you, max 2 attempts; then drafter | content fixes go up after 2 failed attempts |
+| Fixing lint/verify/extract lines | you 2 attempts -> drafter 2 -> drafter_strong 1 (if set) | then "पडताळणी अपूर्ण" warning and go on (rule 9) |
 
 Expected cost per typical proposal (15 pages, 3 GRs; estimate, not yet measured live; prices of docs/QUALITY_AUDIT.md
 §6, $/MTok: Opus 5.5 4/20, Sonnet 5.5 2/10, Haiku 5.5 0.10/0.50; cache read 0.20 / 0.20 / 0.01):
@@ -70,8 +82,9 @@ Expected cost per typical proposal (15 pages, 3 GRs; estimate, not yet measured 
    the brief's court / order-draft rules call for them — and /tmp/work/related_plan.md (which GR/rule/
    precedent paras the note's `related` should carry, with file + page; no quotes needed). List unclear pages in
    facts.json `unclear`."
-   facts.json = `{"pages": n, "facts": [{"page": N, "document": "...", "items": [{"what": "...", "value": "<as on
-   the image>", "clear": true}]}], "unclear": ["<page: what>"]}`.
+   facts.json = `{"pages": n, "facts": [{"file": "proposal", "page": N, "document": "...", "items": [{"what": "...",
+   "value": "<as on the image>", "clear": true}]}], "unclear": ["<page: what>"]}`. `file` = "proposal" (page = proposal
+   page; the only entries part1check compares), "reply_<n>" / "extra_<n>" (page = page inside that file).
 3. pkg3 -> compare `<pdf>.map.json` with the drafter's पृ.N (fix only page numbers, mechanically). If any enclosed
    page has no usable text layer (scan / legacy font / garbled Unicode — most gr.maharashtra.gov.in PDFs), run
    `python3 tools/prep_pages.py "OUTDIR/<package>" /tmp/work/pkgpages --small-dpi 0` once (OCR for extract_check).
@@ -85,25 +98,34 @@ Expected cost per typical proposal (15 pages, 3 GRs; estimate, not yet measured 
 5. Merge `related.json` into spec.json `related`. Assemble study.json = part 0 + part 1 + parts 2–4 + part 5 (note
    text copied from spec) + part 6 (letter text copied from spec) + part 7. Run
    `python3 tools/extract_check.py "OUTDIR/<package>" --spec /tmp/work/spec.json --study /tmp/work/study.json
-   [--ocr-dir /tmp/work/pkgpages] --extra OLDCASES/t --extra PRECEDENT --log-out /tmp/work/xlog.json --from
-   MODEL_LIGHT --to MODEL`. EXTRACTS FAIL -> delegate the MISMATCH units (printed lines) to `drafter` (correct those
-   extracts from the page/image; one-way, never back to the cheap tier), merge, re-run until EXTRACTS OK; append
-   xlog.json entries to `model_log`. UNVERIFIABLE lines are not failures (logged by the workflow). The workflow
-   repeats this check on the delivered files (also the note body's “…” quotes, as warnings): a MISMATCH in `related`
-   / Study part 3 then FAILS the case, so never stop before EXTRACTS OK.
+   [--ocr-dir /tmp/work/pkgpages] --extra OLDCASES/t --extra PRECEDENT --extra register --extra service-rules
+   [--extra <each GR/rule PDF quoted but not enclosed>] --log-out /tmp/work/xlog.json --from MODEL_LIGHT --to MODEL`.
+   EXTRACTS FAIL -> delegate the MISMATCH units (printed lines) to `drafter` (correct those extracts from the
+   page/image; one-way, never back to the cheap tier), merge, re-run; append xlog.json entries to `model_log`. Cap:
+   2 drafter rounds (+1 `drafter_strong` if set). Still MISMATCH -> keep the unit unchanged (its source ending stays
+   "(पॅकेज PDF पृ. N)"), warning "पडताळणी अपूर्ण — उतारा मूळ पानाशी जुळला नाही: <where, पृ.>", go on.
+   UNVERIFIABLE lines are not failures. The workflow repeats this check on the delivered files and reports what is
+   left as warnings.
 6. lint -> build_note_letter [-> build_parawise / build_order when spec has `parawise` / `order`] -> build_study ->
-   verify (rule 6) until LINT OK / ALL OK.
+   write a draft OUTDIR/status.json (rule 9, without `review`) -> verify (rule 6). Fix ladder: Escalation (b); its end
+   state: rule 9. A PREFIX change (C R found later) -> delete the old-PREFIX files in OUTDIR before rebuilding.
 7. D-final -> `reviewer` (ONE Agent call): "Read the brief, /tmp/work/facts.json, /tmp/work/spec.json,
    /tmp/work/study_part0.json; LOOK at the page images WORKDIR/pages/p-NN.png. Check and correct per your
-   definition; write /tmp/work/review.json." If `changes` > 0: copy the corrected part 0 / note / letter text into
+   definition; after your edits run `python3 tools/lint_spec.py /tmp/work/spec.json` until LINT OK, then write the
+   hashes and /tmp/work/review.json." If `changes` > 0: copy the corrected part 0 / note / letter text into
    study.json (parts 0, 5, 6), then lint -> build -> extract_check -> verify again. Copy review.json into status.json
-   `review` = {"approved", "changes", "corrections"[, "reason"]}. approved false -> status.json
-   `{"state": "failed", "summary": "अंतिम पडताळणी (reviewer) मान्यता नाही — <reason>", ...}`. Never write "done"
-   without `review.approved: true` (the workflow refuses it).
+   `review` = {"approved", "changes", "corrections"[, "reason"]}.
+   Caps (02.11.2026, Abhi: drafts are never thrown away): at most 1 review + 1 re-review per run.
+   - approved false -> ONE redraft round: `drafter` gets the reviewer's `reason` (and `redraft` points) and fixes
+     spec / part 0 / part 1; lint -> build -> extract_check -> verify; then the one re-review. Still false -> deliver:
+     state "done", `review` {"approved": false, "changes", "corrections", "reason"}, warning "अंतिम पडताळणी (Opus)
+     मान्यता नाही — वापरण्यापूर्वी तपासा: <reason>".
+   - No review.json at all (reviewer failed) -> the same delivery, reason "reviewer चालला नाही".
    The reviewer writes `spec_sha256` / `part0_sha256` (the files it approved) into review.json; the workflow reads
    /tmp/work/review.json itself, recomputes both hashes and checks the CLI usage shows MODEL_REVIEW ran. So after the
-   review NEVER change /tmp/work/spec.json or /tmp/work/study_part0.json; if lint/verify still needs a change there,
-   make it and call `reviewer` again (it re-checks and re-hashes). Never write or edit review.json yourself.
+   review NEVER change /tmp/work/spec.json or /tmp/work/study_part0.json. If verify still needs a change there: make
+   it and use the re-review if it is still unused; otherwise leave the files, warning "पडताळणी अपूर्ण — <line>".
+   Never write or edit review.json yourself.
 Progress steps (rule 4) as before.
 
 ### Study part 1
@@ -111,9 +133,19 @@ Progress steps (rule 4) as before.
 - `.done` + valid -> `python3 tools/engine_supabase.py part1check /tmp/work/facts.json /tmp/work/study_part1.json`.
   PART1 OK -> insert UNCHANGED as parts[1]. MISMATCH lines -> delegate to `drafter`: redo exactly those pages of
   part 1 from the images (or all of part 1 if more than a third of the pages fail) and log the escalation.
-- `.failed` / invalid / missing -> delegate the whole of part 1 to `drafter` (rule (c) below).
-- Whoever writes it, part 1 keeps one subheading "PDF पान N — <document>" per page. The workflow's verify step re-runs
-  part1check on the FINAL part 1 (study.json "भाग 1") against /tmp/work/facts.json and fails the case on a mismatch.
+- `.failed` / invalid / missing -> keep the valid pages of a partial study_part1.json (a page whose only para is
+  "[भाग 1 वेळेअभावी अपूर्ण — मूळ पान पाहावे]" is not done); delegate the rest (or all) of
+  part 1 to `drafter` (rule (c) below).
+- After ANY part-1 write (drafter redo, drafter_strong, merge) run part1check again (A1 H11). Cap: 2 drafter rounds
+  (+1 drafter_strong); still MISMATCH -> keep the text, warning "पडताळणी अपूर्ण — भाग 1 पान <N>: part1check जुळले नाही".
+- Time budget (A1 H10; long / English proposals): your first Bash call writes `date +%s > /tmp/work/t0`. When part 1
+  is still not complete for all pages after 90 minutes of the run, or the drafter's part-1 work has used about 40
+  turns, stop part-1 work: deliver the pages done; each page not done keeps its subheading "PDF पान N — <document>" and
+  one para "[भाग 1 वेळेअभावी अपूर्ण — मूळ पान पाहावे]"; warning "पडताळणी अपूर्ण — भाग 1: पाने <N–M> चे रूपांतर वेळेअभावी
+  झाले नाही". Pages used by the note/letter (निर्देशपत्र, forwarding letters) are done first. Never fail for part 1;
+  otherwise part 1 stays complete and verbatim (INSTRUCTIONS §4.8 "जसेच्या तसे"; no summary of a page).
+- Whoever writes it, part 1 keeps one subheading "PDF पान N — <document>" per page. The workflow re-runs part1check
+  on the FINAL part 1 (study.json "भाग 1") against /tmp/work/facts.json and reports a mismatch as a warning.
 
 ### Escalation rules (one way up; log every one)
 (a) Facts: a page in facts.json `unclear`, an item `clear:false`, or a handwritten/stamp page whose OCR is empty —
@@ -124,7 +156,11 @@ Progress steps (rule 4) as before.
     failing after 2 drafter attempts -> `drafter_strong` if it exists.
 (c) A cheap-tier output fails its check (study_part1.json invalid, part1check MISMATCH, extract_check MISMATCH in
     `related` or Study part 3, related.json / study_rest.json missing or invalid) -> `drafter` (only the failing units).
-Never move a task down. Budget is SOFT: never skip an escalation for cost; the workflow records the warning.
+(d) End of every ladder (02.11.2026): per problem at most you 2 + drafter 2 + drafter_strong 1 (if set) attempts; then
+    stop editing that item, add "पडताळणी अपूर्ण — <what, where>" (the printed line) to status.json `warnings` and go
+    on with the next step. Never loop, never fail for it (rule 9).
+Never move a task down. Budget is SOFT: never skip an escalation for cost; the workflow adds an information line
+"खर्च अंदाजापेक्षा जास्त — माहितीसाठी" (not an error).
 Log in status.json `model_log` (list): `{"task": "<Marathi, e.g. भाग 1 पान 3>", "from": "<model id>", "to": "<model id>",
 "reason": "<Marathi, e.g. हस्तलेख अस्पष्ट / lint 2 वेळा अयशस्वी / part1check जुळले नाही / उतारा मूळ PDF शी जुळला नाही>"}`
 — also the fixed routing: `{"task": "तथ्ये, नोंद, पत्र, भाग 0", "from": "", "to": MODEL, "reason": "मसुदा"}`,
@@ -157,7 +193,8 @@ on the page images):
 - Facts suffice -> spec `parawise` (English; B8; Rules for the Conduct of the Legal Affairs of Government 1984,
   Rule 58(3): a parawise report on ALL points of the petition; Rule 58(4) Note (ii): never cryptic "denied" /
   "not admitted" — elaborate factual position with rule/GR/order references, copies of those documents listed as
-  enclosed; Rule 58(4)(a): recommendation oppose / not oppose with the reason from the record) + a letter to the
+  enclosed; Rule 58(4)(a): recommendation oppose / not oppose with the reason from the record — the one stated
+  exception to "no opinion of your own"; no record basis -> "____" for the Section + warning) + a letter to the
   GP/AGP forwarding it (to = the GP/AGP as in the notice; intro "उपरोक्त विषयाबाबत संदर्भाधीन पत्रास अनुसरून आपणांस
   कळविण्यात येते की, सदर याचिकेतील परिच्छेदनिहाय अभिप्राय (इंग्रजी) व संबंधित शासन निर्णयांच्या प्रती सोबत
   पाठविण्यात येत आहेत. … , ही विनंती."; copy to the RLA / JS-DS of L&J (Nagpur/Aurangabad bench) only where Rule 58(4)
@@ -187,14 +224,19 @@ status.json `outputs_extra` lists what was built, e.g. `[{"kind": "parawise", "f
 
 ## Lint before building
 Before every build run `python3 tools/lint_spec.py spec.json --study study.json --pages <package pages>` (docstring in
-tools/lint_spec.py; same checks as verify_outputs.py) and fix every line it prints until "LINT OK".
-build_note_letter.py and build_study.py lint again themselves and exit 1 on a rule problem.
+tools/lint_spec.py; same checks as verify_outputs.py) and fix every line it prints until "LINT OK" (ladder:
+Escalation (b); end state (d) — then build anyway and record the lines as warnings).
+build_note_letter.py and build_study.py lint again themselves and exit 1 on a rule problem. Only after the ladder's
+end state (d), build with `--no-lint` so the draft is delivered, and put the remaining lint lines in `warnings`.
 
 ## Binding
 The binding rules are `tools/ENGINE_BRIEF.md` (appended BELOW this prompt; subagents Read the file) and the tool
 docstrings (appended below and saved as /tmp/work/TOOL_DOCS.md). Full rule files (INSTRUCTIONS.md, PROPOSAL_SOP.md,
 PROPOSAL_WORKFLOW.md, tools/PROPOSAL_PROMPT.md) stay the authority: grep the exact item on a real doubt; INSTRUCTIONS.md
-wins on any conflict. register/00-INDEX.md = index of verified extracts. Do NOT read HANDOVER.md or OWNER_RULES.md.
+wins on any conflict of CONTENT (sources, format, language). This run has NO interaction (A1 H14): rules 2, 5 and 9
+below override every ask / discuss / stop line of the rule files — INSTRUCTIONS §3.2 "आधी वापरकर्त्याशी चर्चा",
+PROPOSAL_SOP Step 2.3 "ask its सांकेतांक in ONE line", the brief. Such a question becomes a status.json `warnings`
+line + a Study part 4 question, and the work goes on. register/00-INDEX.md = index of verified extracts. Do NOT read HANDOVER.md or OWNER_RULES.md.
 Do PROPOSAL_SOP.md Steps 1–7 through the tier split above. **Skip SOP Step 0b and Step 8 (the workflow delivers).**
 Step 0 is done by the workflow:
 - `OLDCASES/index.tsv` + `OLDCASES/t/NNN.txt` = text of every old case note/letter (tools/oldcases_text.py).
@@ -207,8 +249,9 @@ Step 0 is done by the workflow:
 ## Rules for this run
 1. Work ONLY on this one case. Never use another case's files as a source; old cases only as precedents (SOP Step 2.5).
 2. No interaction is possible: never ask questions. Log every doubt (with a provisional default) in Study part 4 and
-   part 7, and carry on. A GR still not found after SOP Step 2.3 goes into `grs_missing` (below) and the note/Study
-   say "उपलब्ध नाही — मागवावे".
+   part 7, and carry on. "Ask"/"discuss" in any rule file = a `warnings` line + a Study part 4 question. A GR still not
+   found after SOP Step 2.3 goes into `grs_missing` (below) + warning "पडताळणी अपूर्ण — GR सापडला नाही: <date, title>
+   (सांकेतांक द्यावा)", and the note/Study say "उपलब्ध नाही — मागवावे".
 3. Nothing extra of your own (INSTRUCTIONS §4.13): no boxes, no markings; proposal scan pages unchanged; yellow
    highlights only on the quoted lines of the enclosed GR/rule pages.
 4. Progress — run at each milestone (ignore an error from it, it is only the live status; this step has no Supabase key —
@@ -223,7 +266,8 @@ Step 0 is done by the workflow:
    **A missing C R no. / year / file no. is NEVER a reason to stop or to write state "failed" (Abhi, 02.11.2026).** If it
    is in neither case.json nor any page: PREFIX = `Case<case id from case.json>_<year of the proposal's latest letter, else
    the current year>` (e.g. Case7_2026); letter `ref_no` = `संकिर्ण-<year>/____/प्र.क्र.____/का.6` (blanks for the Section
-   to fill by hand); add "C R क्रमांक प्रस्तावात सापडला नाही — प्रकरणाच्या तपशिलात भरावा; पत्र-क्रमांक हाताने भरावा"
+   to fill by hand). Year in ref_no / date: never copied from a sample — ref_no year = the year of the file no. on the
+   निर्देशपत्र, date "__.__.<current year>". Add "पडताळणी अपूर्ण — C R क्रमांक प्रस्तावात सापडला नाही — प्रकरणाच्या तपशिलात भरावा; पत्र-क्रमांक हाताने भरावा"
    to status.json `warnings`; then do EVERY remaining step (note, letter, Study, package, verify, reviewer) as usual.
    Outputs in OUTDIR, nothing else there except the
    .map.json and LibreOffice previews:
@@ -236,10 +280,11 @@ Step 0 is done by the workflow:
      or `..._0001.pdf`), keep it exactly as uploaded; never "correct" it.
    Exactly one .pdf in OUTDIR besides `*_Note_and_Letter.pdf` / `*_Study.pdf` / `*_Order_Draft.pdf` / `*_Parawise.pdf` previews.
 6. Verify (SOP Step 7): `python3 tools/verify_outputs.py OUTDIR <PREFIX> "OUTDIR/<original name>" <proposal pages> --original-name "<proposal_original_name>"`
-   must print ALL OK; fix and re-run until it does. The second read of every number and date in the note, letter
-   and Study part 0 against the page images is the `reviewer`'s final review (Order step 7).
-   After you finish, the workflow runs the same command itself (PREFIX, package and proposal pages from status.json) and
-   FAILS the case unless status.json `review.approved` is true and it prints ALL OK — so never write "done" without both.
+   must print ALL OK; fix by the ladder (Escalation (b), end state (d)). The second read of every number and date in
+   the note, letter and Study part 0 against the page images is the `reviewer`'s final review (Order step 7).
+   After you finish, the workflow runs the same command itself (PREFIX, package and proposal pages from status.json):
+   its FAIL lines become warnings, except HARD ones that fail the case — missing outputs, internal ids / repo paths,
+   annotations on proposal pages. Those are always fixable (build the file; delete the id/path/annotation): fix them.
 7. Scratch work in /tmp only, never in the repo. Do NOT git commit or push anything: the workflow commits only new GRs
    in pdf/gr (from tools/gr_request.py, SOP Step 2.3 — the session has internet, run it locally).
    Do not save specs to samples/specs/ (that is done only after Abhi approves).
@@ -256,6 +301,7 @@ Step 0 is done by the workflow:
  "package_pdf": "<the package PDF file name in OUTDIR = proposal_original_name>",
  "proposal_pages": 7,
  "outputs_extra": [],
+ "warnings": ["पडताळणी अपूर्ण — <what, where>"],
  "model_log": [{"task": "तथ्ये, नोंद, पत्र, भाग 0", "from": "", "to": "<MODEL>", "reason": "मसुदा"}],
  "review": {"approved": true, "changes": 1, "corrections": ["<Marathi: what the reviewer changed>"]},
  "case": {"cr_no": "130", "cr_year": 2026, "file_no": "संकीर्ण-2026/979/प्र.क्र.130/का.6", "subject": "<as on the निर्देशपत्र>",
@@ -264,8 +310,14 @@ Step 0 is done by the workflow:
    `outputs_extra` = the optional files built (section "Court cases and order drafts"), `[]` when none.
    `prefix`, `package_pdf`, `proposal_pages` = exactly the PREFIX, package file name and proposal page count you gave
    verify_outputs.py (rule 6); the workflow re-runs it with these.
-   If the case cannot be completed, write `{"state": "failed", "summary": "<reason>", "model_log": [...]}` instead. "Cannot be
-   completed" means only: the proposal pages cannot be read at all, or the reviewer refuses approval after corrections.
+   Terminal states (02.11.2026, Abhi: "drafts must never be thrown away"; "punha ase bug yayla nko"):
+   - "failed" ONLY when no output could be produced at all (proposal pages unreadable, nothing built):
+     `{"state": "failed", "summary": "<reason>", "warnings": [...], "model_log": [...]}`.
+   - "done" in EVERY other case. Each unresolved problem = one Marathi `warnings` line "पडताळणी अपूर्ण — <what,
+     where>": lint/verify/extract/part1 not clean after the caps, C R/file no. missing (rule 5), GR not found (rule 2),
+     an instruction that conflicts with a binding rule, part 1 incomplete for time, review not approved (Order step 7:
+     "अंतिम पडताळणी (Opus) मान्यता नाही — वापरण्यापूर्वी तपासा: <reason>"). `warnings` = [] when clean.
+   - Write status.json, then run verify once more (its letter_needed check reads it); a new non-HARD FAIL -> warning.
    Missing case fields (C R no., file no., subject, category) are never a reason — use the rule 5 fallback.
    `model_log` = the routing/escalation log (see "Escalation rules"); always included.
 10. Final reply: Marathi, as few words as possible.

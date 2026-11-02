@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""pkg3.py <proposal.pdf> <enclosures.json> <out.pdf>
+"""pkg3.py <proposal.pdf> <enclosures.json> <out.pdf> [--also <reply.pdf> ...]
 Proposal returned WITH its GRs (Abhi's standing rule, INSTRUCTIONS.md §4.7, §4.11, §4.13):
   - proposal scan first (unchanged), then only the selected ORIGINAL pages of each GR/rule/judgment
   - NO separator / title / index pages
@@ -15,6 +15,14 @@ Proposal returned WITH its GRs (Abhi's standing rule, INSTRUCTIONS.md §4.7, §4
 enclosures.json:
 [ {"path": "pdf/xx/GR-2019.pdf", "pages": "1-3,7", "label": "वित्त विभाग GR दि. 01.03.2019",
    "marks": [ {"page": 2, "text": "exact words from the GR text layer"} ] } ]       # yellow highlight
+Reply / concurrence letters (A1 H8/H9): an office's reply to our letter, a Finance concurrence, … go RIGHT AFTER the
+proposal pages, unchanged (stamped like proposal pages: no white strip; never marked), each bookmarked "उत्तर-पत्र"
+(or its own label). Either on the command line, in order:  pkg3.py <proposal.pdf> <enclosures.json> <out.pdf>
+--also <reply.pdf> [--also <reply2.pdf> ...]   or in enclosures.json as an object
+{"proposal_parts": ["in/reply/उत्तर.pdf" | {"path": "...", "label": "उत्तर-पत्र दि. 12.10.2026"}], "enclosures": [ ... ]}.
+map.json then has one entry per part (with "kind": "reply") and "proposal_parts": [their labels]; verify_outputs counts
+those pages with the proposal (no annotations allowed on them). Images / DOCX: convert them first with
+tools/prep_pages.py (it writes <outdir>/source.pdf).
 "page" in marks = page number INSIDE the source PDF. "pages" must select at least one page; reversed ranges ("5-3"),
 page 0 or pages beyond the source's length raise an error; so does a duplicate "label" (each label is one map.json key).
 Each mark record in map.json: {label, src_page, pdf_page, text, hits, status}; status "highlighted" (hits >= 1),
@@ -111,15 +119,48 @@ def read_stamp(pg):
     return " ".join(t.replace("\xa0", " ").split())
 
 
-def main(prop, js, out):
+REPLY_LABEL = "उत्तर-पत्र"
+
+
+def part_entries(items):
+    """proposal_parts items ("path" or {"path", "label"}) -> [(path, label)] with unique labels."""
+    out, seen = [], set()
+    for k, it in enumerate(items or [], 1):
+        path, label = (it, None) if isinstance(it, str) else (it.get("path"), it.get("label"))
+        if not path:
+            raise ValueError(f"proposal_parts item {k}: no path")
+        label = label or REPLY_LABEL
+        base, n = label, 2
+        while label in seen or label in ("प्रस्ताव", "marks", "proposal_parts"):
+            label = f"{base} {n}"; n += 1
+        seen.add(label); out.append((path, label))
+    return out
+
+
+def main(prop, js, out, also=()):
     encs = json.load(open(js, encoding="utf-8-sig"))
+    parts = list(also)
+    if isinstance(encs, dict):
+        parts += list(encs.get("proposal_parts") or [])
+        encs = encs.get("enclosures") or []
     dst = fitz.open(); toc = []; mp = {}; report = []
     src = fitz.open(prop)
     dst.insert_pdf(src)
     toc.append([1, "प्रस्ताव", 1]); mp["प्रस्ताव"] = {"first_page": 1, "pages": list(range(1, len(src) + 1))}
+    plabels = []
+    for path, label in part_entries(parts):
+        s = fitz.open(path)
+        if s.needs_pass:
+            raise ValueError(f"{label}: {path} is password-protected")
+        start = len(dst) + 1
+        dst.insert_pdf(s)
+        toc.append([1, label, start]); mp[label] = {"first_page": start, "pages": list(range(start, len(dst) + 1)), "kind": "reply"}
+        plabels.append(label)
+    if plabels:
+        mp["proposal_parts"] = plabels
     for e in encs:
         label = e.get("label") or e["path"]
-        if label in mp or label == "marks":
+        if label in mp or label in ("marks", "proposal_parts"):
             raise ValueError(f"duplicate enclosure label '{label}' (map.json keys must be unique; 'प्रस्ताव' and 'marks' "
                              "are reserved) — give each enclosure its own label")
         s = fitz.open(e["path"]); sel = pages_of(e.get("pages"), len(s), label)
@@ -142,7 +183,7 @@ def main(prop, js, out):
                            "status": "highlighted" if hits else "TEXT NOT FOUND"})
     tot = len(dst)
     ff, fo = stamp_font()
-    nprop = len(mp["प्रस्ताव"]["pages"])
+    nprop = len(mp["प्रस्ताव"]["pages"]) + sum(len(mp[l]["pages"]) for l in plabels)  # proposal + reply parts: unchanged scans
     for i, pg in enumerate(dst, 1):
         stamp_page(pg, i, tot, ff, fo, proposal=i <= nprop)
     missing = [i for i, pg in enumerate(dst, 1) if stamp_text(i, tot) not in read_stamp(pg)]
@@ -158,6 +199,12 @@ def main(prop, js, out):
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 4:
+    argv, also = sys.argv[1:], []
+    while "--also" in argv:
+        k = argv.index("--also")
+        if k + 1 >= len(argv):
+            sys.exit(__doc__)
+        also.append(argv[k + 1]); del argv[k:k + 2]
+    if len(argv) != 3:
         sys.exit(__doc__)
-    sys.exit(main(*sys.argv[1:4]))
+    sys.exit(main(*argv, also=also))
