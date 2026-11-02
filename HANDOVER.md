@@ -40,7 +40,7 @@
 9. **After the audit fix round:** migration 0006/0007, deploy, re-run case #7; watch the first run (sandbox up/down/check lines in the log).
    Deploy from mobile: Actions → "Deploy app" (.github/workflows/deploy-app.yml; needs repo secrets CLOUDFLARE_API_TOKEN + CLOUDFLARE_ACCOUNT_ID — not yet added by Abhi).
    02.11.2026: "Download extra PDFs" re-run — the 4 folder-09 PDFs still fail (archive.org 429, marathi.gov.in DNS from GitHub; archive.org reset from this session) → Abhi gives the PDFs (shabdakosh circular 10.08.2021 first).
-7. **Language-rule conflicts (Abhi decides; provisional default in brackets):**
+7. **Language-rule conflicts — DECIDED 02.11.2026 (Abhi: "Default thewa"): the bracketed defaults below are final; only (e) still needs the PDF:**
    (a) GR 10.11.2022 अ.क्र. 6 puts a space before ":" ("उपलब्ध नाही :-"); §4.19 / samples use "नाही:-" [keep "नाही:-"].
    (b) GADT error list: "कलम ३ नुसार" wrong → "कलम ३ अनुसार"; samples' own text has "नियम 48 नुसार", "दि. … नुसार" (CR128/130/131/133) [no lint; unchanged].
    (c) "मंत्रिमंडळ" correct (GADT p.65); CR128 "मंत्रीमंडळासमोर" is inside a quoted extract [kept verbatim].
