@@ -24,6 +24,9 @@ The same text is kept in all of Abhi's repos; change it in all of them together,
 11. Use tokens minimally and optimally; keep all research in one stored file so important points aren't missed and work needs fewer
     tokens.
 12. Prove work with charts / screenshots (before / after evidence) — numbers alone are not accepted as proof.
+13. Always work with multiple agents in parallel (Abhi, 02.11.2026: "Run multiple agents always remember this"): split every
+    task into independent parts, run them as parallel subagents with separate files, then review each diff, run the tests
+    and commit as the lead. Research and audits too (one agent per area).
 
 ## B. Language and messages
 1. Explanations and reports to Abhi: Marathi (trading projects). Specs, prompts for code sessions, code and UI strings: English only.
