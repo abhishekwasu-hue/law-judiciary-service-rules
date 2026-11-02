@@ -8,7 +8,7 @@
    - **SQL Editor:** `supabase/migrations/20261101000001_init.sql`, `20261101000002_backup.sql`, `20261101000003_optional_case_fields.sql` (C R क्र./वर्ष/विषय ऐच्छिक), `20261101000004_reliability.sql` (प्रत्येक run चा खर्च/turns, थेट insert बंद), नंतर `supabase/seed.sql` — क्रमाने पेस्ट करून Run. (सध्याच्या प्रकल्पात 0001–0004 लावलेले आहेत; नवीन migration आल्यास फक्त तीच Run करा.)
    - **CLI:** `supabase/config.toml` मध्ये `PASTE_SUPABASE_PROJECT_REF` जागी ref; मग `npx supabase login` → `npx supabase link --project-ref <ref>` → `npx supabase db push --include-seed`.
 3. Database → Extensions → **pg_cron** चालू आहे का पाहा (backup migration ते चालू करते).
-4. Authentication → Sign In / Providers → **Email** चालू. Email Templates → Magic Link मध्ये `{{ .Token }}` (6 अंकी OTP) असावा.
+4. Authentication → Sign In / Providers → **Email** चालू. Email Templates → Magic Link मध्ये `{{ .Token }}` (6 अंकी OTP) असावा. (02.11.2026: Supabase मध्ये नमुना बदलण्यासाठी आधी custom SMTP लागतो — Gmail: myaccount.google.com → Security → 2-Step Verification → App passwords; Supabase → Authentication → Emails → Set up SMTP: Host `smtp.gmail.com`, Port `465`, Username = Gmail पत्ता, Password = App password, Sender name `प्रस्ताव कक्ष`.)
 5. Authentication → URL Configuration → **Site URL** = Worker ची `https://prastav-kaksha.<नाव>.workers.dev` लिंक (इ-४ नंतर भरा); तीच Redirect URLs मध्ये.
 6. Project Settings → API: **Project URL**, **anon key**, **service_role key** नोंदवा (फक्त ई-३ मध्ये भरण्यासाठी).
 
