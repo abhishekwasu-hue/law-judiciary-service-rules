@@ -2,14 +2,25 @@
 // The browser talks only to this Worker and to Supabase (anon key + user JWT, RLS). No key is hard-coded:
 // every key/URL lives in KV namespace SETTINGS, entered on the app's Settings screen (owner only).
 
-const SECRET_KEYS = ['supabase_service_key', 'github_token', 'anthropic_api_key', 'gemini_api_key', 'openai_api_key'];
+// Other AI providers (Abhi 02.11.2026: keys for various models, free models too; research docs/AI_PROVIDERS_RESEARCH.md).
+// Reached by the engine through a LiteLLM gateway; `ollama` = the office's own self-hosted model server.
+const AI_PROVIDERS = ['gemini', 'openai', 'openrouter', 'groq', 'mistral', 'cerebras', 'cloudflare', 'ollama'];
+const PROVIDER_KEY = { gemini: 'gemini_api_key', openai: 'openai_api_key', openrouter: 'openrouter_api_key', groq: 'groq_api_key',
+  mistral: 'mistral_api_key', cerebras: 'cerebras_api_key', cloudflare: 'cloudflare_api_token', ollama: 'ollama_api_key' };
+const SECRET_KEYS = ['supabase_service_key', 'github_token', 'anthropic_api_key', ...Object.values(PROVIDER_KEY)];
 const PLAIN_KEYS = ['supabase_url', 'supabase_anon_key', 'github_repo', 'github_branch', 'model', 'model_light', 'model_review', 'budget_usd', 'monthly_budget_usd', 'owner_email',
   // other AI providers (Abhi 02.11.2026, docs/AI_PROVIDERS_RESEARCH.md: A = Study part 1 on Gemini, C = fallback when Claude fails)
-  'part1_provider', 'gemini_model', 'fallback_provider', 'fallback_model', 'fallback_model_light',
+  'part1_provider', 'gemini_model', 'part1_model', 'fallback_provider', 'fallback_model', 'fallback_model_light',
+  'engine_provider', 'engine_model', 'engine_model_light', 'cloudflare_account_id', 'ollama_base_url',
   // engine tiers read by tools/engine_supabase.py engine_config (QUALITY_AUDIT §7): escalation model, reasoning effort
   'model_strong', 'effort'];
-const PROVIDERS = { part1_provider: ['', 'claude', 'gemini'], fallback_provider: ['', 'gemini', 'openai'] };
-const MODEL_KEYS = ['gemini_model', 'fallback_model', 'fallback_model_light'];
+const PROVIDERS = { part1_provider: ['', 'claude', ...AI_PROVIDERS], fallback_provider: ['', ...AI_PROVIDERS], engine_provider: ['', 'claude', ...AI_PROVIDERS] };
+const MODEL_KEYS = ['gemini_model', 'part1_model', 'fallback_model', 'fallback_model_light', 'engine_model', 'engine_model_light'];
+// providers this configuration uses (engine / fallback / part 1); 'claude' and '' are Anthropic
+const usedProviders = cfg => [...new Set([cfg.engine_provider, cfg.fallback_provider, cfg.part1_provider].filter(p => AI_PROVIDERS.includes(p)))];
+const providerReady = (cfg, p) => !!cfg[PROVIDER_KEY[p]] || (p === 'ollama' && !!cfg.ollama_base_url);
+// the main run needs the Anthropic key unless another provider (with its key) runs the engine
+const engineReady = cfg => (AI_PROVIDERS.includes(cfg.engine_provider) ? providerReady(cfg, cfg.engine_provider) : !!cfg.anthropic_api_key);
 const MODEL_NAME = /^[A-Za-z0-9][A-Za-z0-9._:@\/-]{1,99}$/;
 const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'];
 const REQUIRED_KEYS = ['supabase_url', 'supabase_anon_key', 'owner_email']; // never saved empty (Settings PUT)
@@ -247,16 +258,16 @@ async function route(req, env, url) {
   if (p === '/api/engine/config' && M === 'GET') {
     const tok = await runToken(env, req);
     if (!tok || tok.used || tok.run_id !== url.searchParams.get('run_id')) return bad('bad token', 403);
-    if (!cfg.anthropic_api_key || !cfg.supabase_url || !cfg.supabase_service_key) return bad('config incomplete (Settings)', 412); // token stays unused
+    if (!engineReady(cfg) || !cfg.supabase_url || !cfg.supabase_service_key) return bad('config incomplete (Settings)', 412); // token stays unused
     if ((await takeConfig(cfg, tok.run_id)) === false) return bad('bad token', 403);
     const exp = tok.exp || Math.floor(Date.now() / 1000) + RUN_TOKEN_TTL;
     await env.SETTINGS.put(tok.key, JSON.stringify({ run_id: tok.run_id, used: true, exp }), { expiration: exp });
     const out = { anthropic_api_key: cfg.anthropic_api_key, model: cfg.model, model_light: cfg.model_light || '', model_review: cfg.model_review || '', budget_usd: cfg.budget_usd || '', model_strong: cfg.model_strong || '', effort: cfg.effort || '', supabase_url: cfg.supabase_url, supabase_service_key: cfg.supabase_service_key };
     // other providers: a key is sent only when its provider is chosen (A: part 1 on Gemini; C: fallback provider)
-    const gem = (cfg.part1_provider === 'gemini' || cfg.fallback_provider === 'gemini') && cfg.gemini_api_key;
-    if (gem) out.gemini_api_key = cfg.gemini_api_key;
-    if (cfg.fallback_provider === 'openai' && cfg.openai_api_key) out.openai_api_key = cfg.openai_api_key;
-    for (const k of ['part1_provider', 'gemini_model', 'fallback_provider', 'fallback_model', 'fallback_model_light']) out[k] = cfg[k] || '';
+    // a provider key leaves the Worker only when that provider is chosen (engine / fallback / part 1)
+    for (const pv of usedProviders(cfg)) if (cfg[PROVIDER_KEY[pv]]) out[PROVIDER_KEY[pv]] = cfg[PROVIDER_KEY[pv]];
+    for (const k of ['part1_provider', 'gemini_model', 'part1_model', 'fallback_provider', 'fallback_model', 'fallback_model_light',
+      'engine_provider', 'engine_model', 'engine_model_light', 'cloudflare_account_id', 'ollama_base_url']) out[k] = cfg[k] || '';
     return json(out);
   }
 
@@ -329,6 +340,10 @@ async function route(req, env, url) {
     }
     for (const [k, ok] of Object.entries(PROVIDERS))
       if (k in b && b[k] !== null && !ok.includes(String(b[k]).trim())) return bad(`${k}: one of ${ok.filter(Boolean).join(', ')} or empty`);
+    if ('cloudflare_account_id' in b && b.cloudflare_account_id !== null && String(b.cloudflare_account_id).trim() !== '' && !/^[0-9a-f]{32}$/.test(String(b.cloudflare_account_id).trim()))
+      return bad('cloudflare_account_id: 32 hex characters');
+    if ('ollama_base_url' in b && b.ollama_base_url !== null && String(b.ollama_base_url).trim() !== '' && !/^https?:\/\/[A-Za-z0-9.-]+(:\d+)?(\/[A-Za-z0-9._~\/-]*)?$/.test(String(b.ollama_base_url).trim()))
+      return bad('ollama_base_url: http(s)://host[:port][/path]');
     for (const k of MODEL_KEYS)
       if (k in b && b[k] !== null && String(b[k]).trim() !== '' && !MODEL_NAME.test(String(b[k]).trim())) return bad(`${k}: model name`);
     // model_strong: empty / none = off; effort: one of EFFORTS or empty (= engine default)
@@ -432,7 +447,7 @@ async function route(req, env, url) {
   // POST /api/run {case_id, instructions} → runs row + dispatch
   if (p === '/api/run' && M === 'POST') {
     if (!canWrite(user)) return bad('read-only', 403);
-    if (!cfg.github_repo || !cfg.github_token || !cfg.anthropic_api_key) return bad('Settings: GitHub repo/token and Anthropic key needed', 412);
+    if (!cfg.github_repo || !cfg.github_token || !engineReady(cfg)) return bad('Settings: GitHub repo/token and the AI key (Anthropic or the chosen engine provider) needed', 412);
     const { case_id, instructions } = await req.json();
     if (!isId(case_id)) return bad('case_id required');
     const has = await db.rest(`case_files?case_id=eq.${case_id}&kind=eq.proposal&select=id&limit=1`);

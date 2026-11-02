@@ -320,7 +320,10 @@ test('one run at a time per case (409), engine step via run token, provider sett
 
   // A/C settings: provider enums, model names, keys masked, keys sent to the engine only for a chosen provider
   const put = b => call('/api/settings', { method: 'PUT', headers: owner, body: JSON.stringify(b) });
-  assert.equal((await put({ part1_provider: 'openai' })).status, 400);
+  assert.equal((await put({ part1_provider: 'anthropic-x' })).status, 400);
+  assert.equal((await put({ engine_provider: 'github' })).status, 400, 'GitHub Models retired (30.07.2026) — not a provider');
+  assert.equal((await put({ cloudflare_account_id: 'xyz' })).status, 400);
+  assert.equal((await put({ ollama_base_url: 'ftp://x' })).status, 400);
   assert.equal((await put({ fallback_provider: 'grok' })).status, 400);
   assert.equal((await put({ gemini_model: '$(id)' })).status, 400);
   assert.equal((await put({ gemini_api_key: 'AIza-gem-secret-1111', openai_api_key: 'sk-openai-secret-2222', gemini_model: 'gemini-2.5-flash' })).status, 200);
@@ -343,6 +346,26 @@ test('one run at a time per case (409), engine step via run token, provider sett
   assert.equal(c.openai_api_key, 'sk-openai-secret-2222'); assert.ok(!('gemini_api_key' in c));
   assert.equal(c.fallback_provider, 'openai'); assert.equal(c.fallback_model, 'gpt-6.1-terra'); assert.equal(c.fallback_model_light, 'gpt-5.4-mini');
   assert.equal((await put({ fallback_provider: '' })).status, 200);
+
+  // engine on another provider (free / other models): its key is sent, the Anthropic key is then not required
+  assert.equal((await put({ openrouter_api_key: 'sk-or-secret-3333', engine_provider: 'openrouter', engine_model: 'nvidia/nemotron-3.5-super-vl:free', engine_model_light: 'google/gemma-4-31b:free' })).status, 200);
+  c = await cfgOf();
+  assert.equal(c.openrouter_api_key, 'sk-or-secret-3333'); assert.ok(!('openai_api_key' in c) && !('gemini_api_key' in c));
+  assert.equal(c.engine_provider, 'openrouter'); assert.equal(c.engine_model, 'nvidia/nemotron-3.5-super-vl:free');
+  const ak = env.SETTINGS.m.get('anthropic_api_key');
+  env.SETTINGS.m.delete('anthropic_api_key');
+  c = await cfgOf();
+  assert.equal(c.openrouter_api_key, 'sk-or-secret-3333', 'no Anthropic key needed when another provider runs the engine');
+  assert.equal((await put({ engine_provider: 'groq' })).status, 200);
+  const t412 = 'tok412';
+  env.SETTINGS.m.set(`run_token:${t412}`, JSON.stringify({ run_id: '91', used: false, exp }));
+  assert.equal((await call('/api/engine/config?run_id=91', { headers: { authorization: `Bearer ${t412}` } })).status, 412, 'engine provider without its key -> incomplete');
+  // self-hosted Ollama needs only its URL
+  assert.equal((await put({ engine_provider: 'ollama', ollama_base_url: 'https://ollama.office.example:11434', engine_model: 'gemma4:31b' })).status, 200);
+  c = await cfgOf();
+  assert.equal(c.ollama_base_url, 'https://ollama.office.example:11434'); assert.equal(c.engine_model, 'gemma4:31b');
+  env.SETTINGS.m.set('anthropic_api_key', ak);
+  assert.equal((await put({ engine_provider: '' })).status, 200);
 });
 
 test('engine config: atomic single use in Postgres, KV fallback without migration 0005, model_strong/effort', async () => {
