@@ -1,4 +1,4 @@
-# HANDOVER — state as of 02.11.2026 (App B live; branch ccr-323f0225-1a76vj / PR #3 open) (read after CLAUDE.md files)
+# HANDOVER — state as of 02.11.2026 (App B live; audit fix round merged to main) (read after CLAUDE.md files)
 
 ## Done (all in this repo)
 - Procedure: INSTRUCTIONS.md §4 items 1–18 (§4.18, 01.11.2026: sentence flow + respectful language), PROPOSAL_SOP.md, PROPOSAL_WORKFLOW.md, samples/specs/ (approved notes), tools/ (mkdocs, build_note_letter, build_study, pkg3, highlight, lint_spec, verify_outputs, gr_request, oldcases_text, prep_pages).
@@ -26,7 +26,18 @@
   Engine: the workflow puts tools/ENGINE_BRIEF.md into every prompt (process-proposal.yml "$(cat tools/ENGINE_BRIEF.md)") and
   build_note_letter.py refuses to build when lint fails; a real dry run of the workflow was not possible (needs a run token from the Worker).
 
+- 02.11.2026 (Abhi: "independent audit … punha ase bug yayla nko", after live run #7 failed with drafts ready): independent audit (docs/QUALITY_AUDIT.md) + fix round, 5 parallel agents.
+  Contract (INSTRUCTIONS §4.26): "failed" only when no output exists; otherwise "done" + status warnings "पडताळणी अपूर्ण — …";
+  hard stops only: missing outputs, internal ids / repo paths, annotations on proposal pages. Review not approved → warning
+  "अंतिम पडताळणी (Opus) मान्यता नाही — …". Retry caps: orchestrator 2 + drafter 2 + drafter_strong 1; reviewer 1 re-review.
+  Workflow: read-only engine sandbox (scripts/engine/sandbox.sh), runner-private files ($RP), step time budget, killed-run cost,
+  runner OCR, hash-locked LiteLLM (tools/requirements-litellm.txt). Lint: "मा." phrase rule (CR66 repaired), संकीर्ण, last-para
+  routes + अ.मु.स. (वित्त) route, request-only "ही विनंती". Worker/app: Marathi errors, C R edit, CSP, run_worker_first.
+  Tests: pytest 248 passed; engine_supabase_test ALL PASSED; worker 19/19; all 13 samples LINT OK.
+  Owner actions: apply migration 0006 (if not done) and 0007 (optional), deploy, re-run case #7. First live run = test of the sandbox on a real runner.
+
 ## Pending
+9. **After the audit fix round:** migration 0006/0007, deploy, re-run case #7; watch the first run (sandbox up/down/check lines in the log).
 7. **Language-rule conflicts (Abhi decides; provisional default in brackets):**
    (a) GR 10.11.2022 अ.क्र. 6 puts a space before ":" ("उपलब्ध नाही :-"); §4.19 / samples use "नाही:-" [keep "नाही:-"].
    (b) GADT error list: "कलम ३ नुसार" wrong → "कलम ३ अनुसार"; samples' own text has "नियम 48 नुसार", "दि. … नुसार" (CR128/130/131/133) [no lint; unchanged].
