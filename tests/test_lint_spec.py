@@ -587,5 +587,137 @@ class LintOrderParawise(unittest.TestCase):
             shutil.rmtree(d, ignore_errors=True)
 
 
+class AuditA1Fixes(unittest.TestCase):
+    """02.11.2026 (independent audit A1): "मा." phrases, REF_NO spellings, last-para routes (H5), अ.मु.स. (वित्त) route
+    (H6, §8.3), "ही विनंती" only in request letters, "ध्द" in names, L11 warn-only."""
+    def setUp(self):
+        self.s122 = load(CR122); self.s66 = load(CR66)
+
+    def with_last(self, base, txt, ams=False):
+        s = copy.deepcopy(base)
+        s["note"]["paras"][max(i for i, x in enumerate(s["note"]["paras"]) if isinstance(x, str))] = txt
+        s["note"]["signers"] = list(L.SIGNERS) + ([L.AMS] if ams else [])
+        return s
+
+    # ---- 1. "मा." ----
+    def test_ma_phrases(self):
+        cases = {"मा. प्रशासकीय न्यायमूर्ती समितीने": False, "मा.प्रशासकीय न्यायमूर्ती समिती": False,
+                 "प्रशासकीय न्यायमूर्ती समिती": True, "मा. मुख्य न्यायमूर्ती यांनी": False,
+                 "निवृत्त न्यायमूर्ती श्री. अ. ब. क": False, "सेवानिवृत्त न्यायमूर्ती यांची समिती": False, "निवृत्त मुख्य न्यायमूर्ती श्री. क": False,
+                 "प्रबंधक (अपील शाखा), उच्च न्यायालय, मुंबई": False, "सहायक सरकारी वकील, उच्च न्यायालय, खंडपीठ औरंगाबाद": False,
+                 "प्रबंधक (कार्मिक), उच्च न्यायालय (अपील शाखा), मुंबई": False, "उच्च न्यायालय, अपील शाखा, मुंबई": False,
+                 "उच्च न्यायालय, खंडपीठ नागपूर": False, "उच्च न्यायालयाने कळविले": True,
+                 "मा.प्रशासकीय मा. न्यायमूर्ती समितीने": True, "मा. मा. उच्च न्यायालय": True}
+        for t, bad in cases.items():
+            with self.subTest(t=t):
+                self.assertEqual(bool(L.ma_hits(t)), bad, (t, L.ma_hits(t)))
+                fx = L.fix_ma(t)
+                self.assertEqual(L.ma_hits(fx), [], fx)
+                self.assertNotIn("मा. मा.", fx); self.assertNotIn("प्रशासकीय मा.", fx)
+        self.assertEqual(L.fix_ma("प्रशासकीय न्यायमूर्ती समितीने"), "मा. प्रशासकीय न्यायमूर्ती समितीने")
+        self.assertEqual(L.fix_ma("मा. प्रशासकीय न्यायमूर्ती समितीने"), "मा. प्रशासकीय न्यायमूर्ती समितीने")
+        self.assertEqual(L.fix_ma("मा.प्रशासकीय मा. न्यायमूर्ती समितीने"), "मा.प्रशासकीय न्यायमूर्ती समितीने")
+
+    def test_ma_letter_address_fields_exempt(self):
+        s = copy.deepcopy(self.s122)
+        s["letter"]["refs"] = ["सहायक सरकारी वकील, उच्च न्यायालय, खंडपीठ औरंगाबाद यांचे पत्र क्र. 12, दि. 01.01.2026"]
+        s["letter"]["copies"] = ["प्रबंधक, उच्च न्यायालय यांना माहितीसाठी"]
+        self.assertEqual([p for p in L.lint_spec(s) if "§4.23" in p], [])
+        s["letter"]["intro"] = s["letter"]["intro"].replace("उपरोक्त विषयाबाबत", "उपरोक्त विषयाबाबत उच्च न्यायालयाच्या")
+        self.assertTrue(any(p.startswith("letter.intro") and "§4.23" in p for p in L.lint_spec(s)))
+
+    def test_cr66_sample_text_repaired(self):
+        txt = json.dumps(self.s66, ensure_ascii=False)
+        self.assertNotIn("प्रशासकीय मा.", txt); self.assertNotIn("मा. मा.", txt)
+        self.assertEqual(txt.count("मा. प्रशासकीय न्यायमूर्ती समिती"), 3)
+
+    # ---- 2. REF_NO ----
+    def test_ref_no_both_spellings(self):
+        for rn in ("संकिर्ण-2026/979/प्र.क्र.130/का.6", "संकीर्ण-2026/979/प्र.क्र.130/का.6", "संकीर्ण-2027/____/प्र.क्र.____/का.6"):
+            s = copy.deepcopy(self.s122); s["letter"]["ref_no"] = rn
+            self.assertEqual([p for p in L.lint_spec(s) if "ref no." in p], [], rn)
+        for rn in ("संकिरण-2026/979/प्र.क्र.130/का.6", "संकीर्ण-2026/प्र.क्र.130/का.6", "संकीर्ण-26/979/प्र.क्र.130/का.6"):
+            s = copy.deepcopy(self.s122); s["letter"]["ref_no"] = rn
+            self.assertTrue(any("ref no." in p for p in L.lint_spec(s)), rn)
+
+    # ---- 3/4. last-para routes + अ.मु.स. (वित्त) ----
+    ROUTES = {   # text -> AMS needed
+        "सबब, उपरोक्त प्रस्ताव सामान्य प्रशासन विभागाच्या मान्यतेस्तव सादर करण्यात येत आहे.": False,
+        "सबब, उपरोक्त प्रस्ताव सामान्य प्रशासन विभागाच्या अभिप्रायार्थ सादर.": False,
+        "सबब, उपरोक्त प्रस्ताव सामान्य प्रशासन विभागाच्या अभिप्रायास्तव सादर करण्यात येत आहे.": False,
+        "सबब, उपरोक्त प्रस्ताव वित्त विभागाच्या अभिप्रायास्तव सादर करण्यात येत आहे.": True,
+        "सबब, उपरोक्त प्रस्ताव वित्त विभागाच्या अभिप्रायार्थ सादर.": True,
+        "सबब, प्रस्ताव वित्त विभागाच्या मान्यतेस्तव सादर.": True,
+        "सबब, सदर प्रस्ताव सामान्य प्रशासन विभाग व वित्त विभागाच्या मान्यतेस्तव सादर करण्यात येत आहे.": True,
+        "सबब, सदर प्रस्ताव सार्वजनिक आरोग्य विभागाच्या मान्यतेस्तव सादर करण्यात येत आहे.": True,
+        "प्रस्तुत प्रकरणातील उक्त वस्तुस्थिती विचारात घेता, श्रीमती ____ यांच्या वैद्यकीय खर्चाच्या प्रतिपूर्तीच्या प्रस्तावास "
+        "“एक विशेष बाब” म्हणून मंजुरी देण्याकरिता सार्वजनिक आरोग्य विभागास विनंती करण्यास हरकत नसावी. मान्यतेस्तव सादर.": True,
+        "सबब, श्री. ____ यांच्या प्रस्तावास मंजुरी देण्याकरिता सार्वजनिक आरोग्य विभागास पुन:श्च विनंती करण्यास हरकत नसावी.": True,
+        "सबब, श्री. ____ यांना दि. 01.01.2026 पासून वेतनवाढ मंजूर करण्याचा प्रस्ताव मान्यतेस्तव सादर.": False,
+        "सबब, सदर प्रकरणी पुढील कार्यवाही आवश्यक नसल्याने नस्ती बंद करण्यास मान्यता असावी.": False,
+        "सबब, सदर प्रकरण नस्तीबंद करण्यास मान्यतेस्तव सादर.": False,
+        "सबब, वित्त विभागाच्या अभिप्रायानुसार प्रबंधक, उच्च न्यायालय (अपील शाखा), मुंबई यांना कळविण्याबाबतच्या पत्राचे प्रारूप "
+        "पृ.      /प.वि. वर मान्यतेस्तव सादर. मान्य झाल्यास पत्र निर्गमित करण्यात येईल.": False,
+        "सबब, वित्त विभागाच्या सहमतीनुसार निर्गमित करावयाच्या शासन निर्णयाचे प्रारूप पृ.      /प.वि. वर मान्यतेस्तव सादर.": False,
+    }
+
+    def test_last_para_routes(self):
+        for t, ams in self.ROUTES.items():
+            with self.subTest(t=t[:60]):
+                self.assertEqual(L.lint_spec(self.with_last(self.s122, t, ams)), [], t)
+                wrong = [p for p in L.lint_spec(self.with_last(self.s122, t, not ams)) if "Finance last para" in p]
+                self.assertTrue(wrong, f"AMS {'absent' if ams else 'present'} must fail: {t}")
+
+    def test_last_para_bare_closing(self):
+        s = self.with_last(self.s122, "सबब, श्री. ____ यांच्या प्रस्तावास मंजुरी देण्याकरिता सार्वजनिक आरोग्य विभागास विनंती "
+                                      "करण्यास हरकत नसावी.", True)
+        s["note"]["closing"] = "मान्यतेस्तव सादर."
+        self.assertEqual(L.lint_spec(s), [])
+
+    def test_last_para_negatives(self):
+        for t in ("सबब, कृपया आदेश द्यावेत.", "सबब, प्रस्ताव सामान्य प्रशासन विभागाकडे पाठवावा.",
+                  "सबब, पत्राचे प्रारूप पृ.  /प.वि. वर मान्यतेस्तव सादर.", "सबब, प्रस्ताव मान्यतेस्तव ठेवला आहे.",
+                  "प्रस्ताव वित्त विभागाच्या मान्यतेस्तव सादर करण्यात येत आहे.", "सबब, नस्ती बंद करावी.",
+                  "सबब, सार्वजनिक आरोग्य विभागास विनंती करावी."):
+            with self.subTest(t=t):
+                self.assertTrue(any("last para" in p for p in L.lint_spec(self.with_last(self.s122, t))), t)
+
+    def test_finance_route_helper(self):
+        self.assertTrue(L.finance_route("… वित्त विभागाच्या मान्यतेस्तव सादर करण्यात येत आहे."))
+        self.assertTrue(L.finance_route("… सार्वजनिक आरोग्य विभागास विनंती करण्यास हरकत नसावी."))
+        self.assertFalse(L.finance_route("सबब, वित्त विभागाच्या दि. 11.09.2019 च्या शासन निर्णयानुसार … पत्राचे प्रारूप …"))
+        self.assertFalse(L.finance_route("“वित्त विभागाच्या मान्यतेस्तव सादर”"))   # quoted text is not the route
+
+    # ---- 5. "ही विनंती" only in request letters ----
+    def test_reply_letter_without_request(self):
+        s = copy.deepcopy(self.s122)
+        s["letter"]["intro"] = ("उपरोक्त विषयाबाबत संदर्भाधीन पत्रास अनुसरून आपणांस कळविण्यात येते की, वित्त विभागाने सदर "
+                                "प्रस्तावास सहमती दर्शविलेली नाही.")
+        s["letter"]["points"] = []
+        self.assertEqual([p for p in L.lint_spec(s) if "letter.intro" in p], [])
+        s["letter"]["intro"] = ("उपरोक्त विषयाबाबत संदर्भाधीन पत्रास अनुसरून आपणांस कळविण्यात येते की, खालील माहिती "
+                                "उपलब्ध करून देण्यात यावी.")
+        self.assertTrue(any(L.REQUEST in p for p in L.lint_spec(s)))
+        s = copy.deepcopy(self.s122); s["letter"]["intro"] = s["letter"]["intro"].replace(", ही विनंती", "")
+        self.assertTrue(any(L.REQUEST in p for p in L.lint_spec(s)), "points present -> request form needed")
+
+    # ---- 6. "ध्द" ----
+    def test_dhd_names_and_quotes_exempt(self):
+        D = "'ध्द'"
+        for t in ("श्री. अ. ब. बुध्दे यांनी अर्ज सादर केला आहे.", "श्रीमती क. शुध्दे, लिपिक", "कै. म. बुध्दे यांच्या पत्नीस",
+                  "डॉ. बुध्दे यांचे प्रमाणपत्र", "(श्री. बुध्दे)", "“शुध्द प्रत”"):
+            self.assertFalse(any(D in m for m in L.style_hits(t)), t)
+        for t in ("शुध्द प्रत", "श्री. अ. बुध्दे यांनी शुध्द प्रत सादर केली.", "विषय : सुधारित वेतन (शुध्द)"):
+            self.assertTrue(any(D in m for m in L.style_hits(t)), t)
+        s = copy.deepcopy(self.s122); s["note"]["paras"].insert(0, "श्री. र. ना. बुध्दे यांनी दि. 01.01.2026 रोजी अर्ज सादर केला आहे.")
+        self.assertEqual(L.lint_spec(s), [])
+
+    # ---- 7. L11 on a letter subject: WARN only ----
+    def test_l11_subject_warn_only(self):
+        s = copy.deepcopy(self.s122); s["letter"]["subject"] = "विशेष वेतन मिळणेबाबत."
+        self.assertEqual(L.lint_spec(s), [])
+        self.assertTrue(any(w.startswith("letter.subject") and "णेबाबत" in w for w in L.lint_warnings(s)))
+
+
 if __name__ == "__main__":
     unittest.main()

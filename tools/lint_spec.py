@@ -20,17 +20,25 @@ Rules (spec.json)
     "सबब, … वित्त विभागाच्या मान्यतेस्तव सादर करण्यात येत आहे." or (order draft, 02.11.2026, docs/COURT_AND_ORDERS_RESEARCH.md
     R3 (c), B7) "सबब, … <शासन निर्णयाचे / शुद्धिपत्रकाचे / परिपत्रकाचे / ज्ञापनाचे / अधिसूचनेचे / आदेशाचे> प्रारूप पृ.  /प.वि. वर
     मान्यतेस्तव सादर." or "सबब, … अधिसूचनेची मराठी व इंग्रजी प्रारूपे पृ.  /प.वि. वर मान्यतेस्तव सादर." (optionally "… मान्य झाल्यास … निर्गमित करण्यात येईल.")
+    or (02.11.2026, audit A1 H5 — SOP Step 3 routes) "सबब, … <वित्त / सामान्य प्रशासन / सार्वजनिक आरोग्य> विभागाच्या
+    <मान्यतेस्तव / मान्यतेसाठी / अभिप्रायास्तव / अभिप्रायार्थ / सहमतीस्तव> सादर (करण्यात येत आहे)." or (INSTRUCTIONS §8.3,
+    Format-2) "… सार्वजनिक आरोग्य विभागास विनंती करण्यास हरकत नसावी. (मान्यतेस्तव सादर.)" or (approval within the department,
+    no draft) "सबब, … मान्यतेस्तव सादर." or (file closure) "सबब, … नस्ती बंद करण्यास मान्यता असावी."; a bare note.closing
+    "मान्यतेस्तव सादर." is read together with the last para
   - spec "order" / "parawise" (optional, 02.11.2026): CLI only — tools/lint_order.py lint_order(spec) /
     tools/lint_parawise.py lint_parawise(spec) are imported lazily and their lines added; a missing module is a
     "WARN" line, never an error (lint_extras)
-  - note.signers == INSTRUCTIONS §4.6 chain (+ "अ.मु.स. (वित्त)" last); "अ.मु.स. (वित्त)" present <=> last para has
-    "वित्त विभागाच्या मान्यतेस्तव"
+  - note.signers == INSTRUCTIONS §4.6 chain (+ "अ.मु.स. (वित्त)" last); "अ.मु.स. (वित्त)" present <=> the last para sends
+    the file to Finance or to the Public Health Department (§4.6, §8.3; finance_route: "वित्त विभागाच्या मान्यतेस्तव /
+    अभिप्रायास्तव / सहमतीस्तव …", "… विभागास विनंती", "सार्वजनिक आरोग्य विभागाच्या …")
   - §4.19 (text outside quotes; note body, letter, related heading/source — not the verbatim related text): no '.:-'
     (use ':-'), 'करून' not 'करुन', 'प्रारूप' not 'प्रारुप', 'अनुसरून' not 'अनुसरुन', one space after 'दि.' / 'क्र.' / 'प्र. क्र.' in running text
     (file/letter nos. and other tokens with '/' or '-' left exactly); missing-info para starts
     "प्रस्तावासोबत खालील माहिती उपलब्ध नाही:-"
-  - letter (when present): ref_no संकिर्ण-<year>/<file no>/प्र.क्र.<n>/का.6; to, subject, refs present; intro starts
-    "उपरोक्त विषयाबाबत संदर्भाधीन", contains "आपणांस कळविण्यात येते की," and ends with ":-" when there are points
+  - letter (when present): ref_no संकिर्ण-<year>/<file no>/प्र.क्र.<n>/का.6 ("संकीर्ण-" also accepted; "____" blanks);
+    to, subject, refs present; intro starts "उपरोक्त विषयाबाबत संदर्भाधीन", contains "आपणांस कळविण्यात येते की," and ends
+    with ":-" when there are points; "ही विनंती" only in an information-request letter (points / table / reminder, or the
+    intro asks "… उपलब्ध करून देण्यात यावी"; requests_info) — a reply / conveying letter needs none
   - §4.20: no document (प्रत / प्रमाणपत्र / अहवाल) in a data row of a letter.points table (outside quotes); documents go
     after the table as a numbered list introduced by DOC_INTRO
   - §4.21 स्मरणपत्र (letter.reminder): refs[0] has "या कार्यासनाचे समक्रमांकाचे पत्र", intro has "अद्याप अप्राप्त" and
@@ -38,11 +46,13 @@ Rules (spec.json)
   - §4.22 letter to the High Court that asks information from a District Judge ("प्रमुख जिल्हा व सत्र न्यायाधीश, <place>
     यांच्याकडून"): letter.copies has "प्रमुख जिल्हा व सत्र न्यायाधीश, जिल्हा व सत्र न्यायालय, <place> यांना आवश्यक
     कार्यवाहीसाठी"
-  - §4.23 "मा." (note body and letter outside quotes; not the addressee block letter.to): before मुख्य न्यायमूर्ती /
-    न्यायमूर्ती / प्रशासकीय न्यायाधीश, and before उच्च न्यायालय… (the court itself; an office designation
-    "उच्च न्यायालय (… शाखा)" excepted)
+  - §4.23 "मा." (note body and letter outside quotes; not letter.to / refs / copies): before मुख्य न्यायमूर्ती /
+    न्यायमूर्ती / प्रशासकीय न्यायाधीश (one "मा." before the whole phrase: "मा. प्रशासकीय न्यायमूर्ती समिती"; "निवृत्त
+    न्यायमूर्ती" not a title), and before उच्च न्यायालय… (the court itself; office designations "उच्च न्यायालय (… शाखा)",
+    "उच्च न्यायालय, … शाखा / खंडपीठ …", "<पद>, उच्च न्यायालय" excepted); a doubled "मा." is an error
   - §4.24 "शुद्धिपत्रक" (not शुध्दिपत्रक / शुद्धीपत्रक / शुद्धपत्रक)
-  - "ध्द" -> "द्ध" (error; मराठी भाषा विभाग GR दि. 10.11.2022)
+  - "ध्द" -> "द्ध" (error; मराठी भाषा विभाग GR दि. 10.11.2022) — not in a person's name (after श्री. / श्रीमती / कै. /
+    डॉ., §4.18 name as in the proposal) and not inside quotes
 WARN level (spec.json; note body and letter, text outside quotes; related and signers not checked; warn_hits / fix_warn;
   शुद्धलेखनाचे 18 नियम, docs/STYLE_RESEARCH_LANG.md §5.2; numbered after the §3 proposals L1–L10):
   - L11 नियम 12: "…णेसाठी / …णेबाबत / …णेकरिता" -> "…ण्यासाठी / …ण्याबाबत / …ण्याकरिता" (also a letter subject taken
@@ -71,7 +81,8 @@ D = r"[0-9०-९]+"
 NUMLIST = rf"{D}(?:\s*(?:-|–|ते|,)\s*{D})*"
 REF_LOOSE = re.compile(r"पृ\.([^/\n]{0,40}?)/\s*प\.वि\.")
 REF_PKG = re.compile(rf"पॅकेज PDF\s*पृ\.\s*({NUMLIST})")
-REF_NO = re.compile(r"संकिर्ण-[0-9]{4}/(?:[0-9]+|_{2,})/प्र\.क्र\.(?:[0-9]+|_{2,})/का\.6")   # blanks "____" when the C R / file no. is not in the proposal (ENGINE_PROMPT rule 5)
+REF_NO = re.compile(r"(?:संकिर्ण|संकीर्ण)-[0-9]{4}/(?:[0-9]+|_{2,})/प्र\.क्र\.(?:[0-9]+|_{2,})/का\.6")   # blanks "____" when the C R / file no. is not in the proposal (ENGINE_PROMPT rule 5); both spellings: the file no. is
+# copied as the निर्देशपत्र writes it ("संकीर्ण-2026/979/…" or "संकिर्ण-…") — audit A1, 02.11.2026
 QUOTE_RE = re.compile(r"“[^”]*”")
 PART_RE = re.compile(r"\s*भाग\s*([0-9०-९])(?![0-9०-९])")
 LH_EMAIL = "lnjd.desk6-mh@mah.gov.in"
@@ -85,7 +96,25 @@ ORDER_DRAFT_KINDS = (r"(?:(?:शासन\s+)?(?:निर्णयाचे|श
                      r"|अधिसूचनेची\s+मराठी\s+व\s+इंग्रजी\s+प्रारूपे)")
 LAST_ORDER_RE = re.compile(rf"^सबब\s*,.*{ORDER_DRAFT_KINDS}\s+पृ\.[^/]{{0,40}}/\s*प\.वि\.\s*वर\s+मान्यतेस्तव\s+सादर"
                            r"(?:\s+करण्यात\s+येत\s+आहे)?\s*\.(?:\s*मान्य\s+झाल्यास\s+[^.]{0,120}निर्गमित\s+करण्यात\s+येईल\s*\.)?$", re.S)
-LAST_FORMS = (LAST_LETTER_RE, LAST_FIN_RE, LAST_ORDER_RE)
+# 02.11.2026 (audit A1 H5): the other SOP Step 3 routes, in the Section's wording (old notes /tmp/old, medical-bill
+# Format-1/2, Medical-Bill-Samples.docx): "… विभागाच्या मान्यतेस्तव / अभिप्रायास्तव / अभिप्रायार्थ / सहमतीस्तव सादर (करण्यात येत आहे)."
+# for वित्त / सामान्य प्रशासन / सार्वजनिक आरोग्य विभाग; सा.आ.वि. "एक विशेष बाब" ("… सार्वजनिक आरोग्य विभागास विनंती करण्यास
+# हरकत नसावी. मान्यतेस्तव सादर." — Format-2 para 8; its opening "प्रस्तुत प्रकरणातील उक्त वस्तुस्थिती विचारात घेता," is kept);
+# approval within the department ("सबब, … मान्यतेस्तव सादर." — no draft: a draft takes the प्रारूप forms above); file closure.
+_SADAR = r"सादर(?:\s+करण्यात\s+येत\s+आहे)?\s*\."
+_ACTION = r"(?:मान्यतेस्तव|मान्यतेसाठी|अभिप्रायास्तव|अभिप्रायार्थ|अभिप्रायासाठी|सहमतीस्तव|सहमतीसाठी)"
+DEPTS = r"(?:वित्त|सामान्य\s+प्रशासन|सार्वजनिक\s+आरोग्य)\s+विभाग"
+LAST_DEPT_RE = re.compile(rf"^सबब\s*,.*{DEPTS}(?:\s+व\s+{DEPTS})?ाच्या\s+{_ACTION}\s+{_SADAR}$", re.S)
+LAST_PHD_RE = re.compile(r"^(?:सबब\s*,|.*विचारात\s+घेता\s*,).*सार्वजनिक\s+आरोग्य\s+विभागा(?:स|ला)\s+(?:पुन:श्च\s+)?विनंती\s+"
+                         rf"करण्यास\s+हरकत\s+नसावी\s*\.(?:\s*मान्यतेस्तव\s+{_SADAR})?$", re.S)
+LAST_DEPT_APPROVAL_RE = re.compile(rf"^सबब\s*,(?!.*प्रार[ुू]प).*(?:मान्यतेस्तव|मान्यतेसाठी)\s+{_SADAR}$", re.S)
+LAST_CLOSE_RE = re.compile(r"^सबब\s*,.*(?:नस्ती\s*बंद|नस्तीबंद)[^.]*(?:मान्यता\s+असावी|मान्यतेस्तव\s+सादर|सादर)\s*\.$", re.S)
+LAST_FORMS = (LAST_LETTER_RE, LAST_FIN_RE, LAST_ORDER_RE, LAST_DEPT_RE, LAST_PHD_RE, LAST_DEPT_APPROVAL_RE, LAST_CLOSE_RE)
+BARE_CLOSING_RE = re.compile(r"^(?:प्रस्ताव\s+)?मान्यतेस्तव\s+सादर\s*\.?$")   # Format-1/2: "मान्यतेस्तव सादर." as its own line
+# अ.मु.स. (वित्त) route (§4.6, §8.3 "फक्त नस्ती वित्त/सा.आ.वि. कडे जाताना"): the last para sends the file to Finance or to PHD
+_ROUTE_TAIL = rf"(?:च्या\s+{_ACTION}|स\s+(?:पुन:श्च\s+)?विनंती|कडे\s+(?:पाठवि|सादर))"
+FIN_ROUTE_RE = re.compile(rf"वित्त\s+विभागा{_ROUTE_TAIL}|सामान्य\s+प्रशासन\s+विभाग\s+व\s+वित्त\s+विभागाच्या\s+{_ACTION}")
+PHD_ROUTE_RE = re.compile(rf"सार्वजनिक\s+आरोग्य\s+विभागा{_ROUTE_TAIL}")
 INTRO_START = "उपरोक्त विषयाबाबत संदर्भाधीन"
 INTRO_HAS = "आपणांस कळविण्यात येते की,"
 MISSING_HEAD = "प्रस्तावासोबत खालील माहिती उपलब्ध नाही"  # missing-information para (PROPOSAL_SOP Step 4)
@@ -137,12 +166,25 @@ def unquoted(text):
     return QUOTE_RE.sub(" ", text or "")
 
 
+# 02.11.2026 (audit A1): a person's name is written as in the proposal (§4.18) — "ध्द" in a name (e.g. "श्री. अ. बुध्दे")
+# is not an error. Name span = after श्री. / श्रीमती / श्रीम. / कै. / डॉ. up to the next comma, ")" or "यांनी / यांचे / यांना /
+# यांच्या / यांचा / यांची" (at most 60 characters; no such end: the next three words).
+NAME_RE = re.compile(r"(?<![ऀ-ॿ])(?:श्री\.|श्रीमती|श्रीम\.|कै\.|डॉ\.)"
+                     r"(?:[^,)\n]{0,60}?(?=,|\)|\s+यां(?:नी|चे|ना|च्या|चा|ची)(?![ऀ-ॿ])|$)|(?:\s*[^\s,)]+){1,3})")
+DHD_RE = re.compile(r"ध्द")
+
+
+def unnamed(text):
+    """Text with person-name spans blanked (only for the "ध्द" rule)."""
+    return NAME_RE.sub(" ", text or "")
+
+
 # INSTRUCTIONS §4.18 (01.11.2026): respectful, clear official Marathi
 STYLE_RULES = [
     (re.compile(r"सौ\."), "आदरार्थी उल्लेख — 'सौ.' ऐवजी 'श्रीमती' (§4.18)"),
     (re.compile(r"(?<![ऀ-ॿ])कै\.(?=\S)"), "आदरार्थी उल्लेख — 'कै.' नंतर एक जागा (§4.18)"),
     # मराठी भाषा विभाग GR कपासू-2020/प्र.क्र.56/भाषा-2, दि.10.11.2022 (docs/STYLE_RESEARCH_LANG.md)
-    (re.compile(r"ध्द"), "शुद्धलेखन — 'ध्द' ऐवजी 'द्ध' (मराठी भाषा विभाग GR दि.10.11.2022)"),
+    (DHD_RE, "शुद्धलेखन — 'ध्द' ऐवजी 'द्ध' (मराठी भाषा विभाग GR दि.10.11.2022)"),
     (re.compile(r"(?<![ऀ-ॿ])श्री\.(?=[^\s(])"), "आदरार्थी उल्लेख — 'श्री.' नंतर एक जागा; नाव प्रस्तावात आहे तसे (§4.18)"),
     (re.compile(r"शुद्धीपत्र|शुद्धपत्र|शुध्दिपत्र|शुध्दीपत्र"), "शुद्धलेखन — 'शुद्धिपत्रक' (§4.24)"),
 ]
@@ -154,11 +196,20 @@ LETTER_STYLE_RULES = [
      "पत्राची भाषा — थेट आदेशात्मक शेवट; '…, ही विनंती.' अशी विनंतीपूर्वक मांडणी हवी (§4.18)"),
 ]
 REQUEST = "ही विनंती"
+ASK_RE = re.compile(r"उपलब्ध\s+करून\s+देण्यात\s+याव|पाठविण्यात\s+याव|कळविण्यात\s+याव|मागविण्यात\s+(?:आलेली|येत)")
+
+
+def requests_info(letter, intro):
+    """True for an information-request letter (§4.18 "…, ही विनंती." required): it has points / a table, is a reminder,
+    or the intro asks ("… उपलब्ध करून देण्यात यावी"). A reply / forwarding / conveying letter ("… कळविण्यात येते की, …"
+    with no request) needs no "ही विनंती" (audit A1, 02.11.2026)."""
+    L = letter if isinstance(letter, dict) else {}
+    return bool(L.get("points") or L.get("reminder") or ASK_RE.search(unquoted(intro or "")))
 
 
 def style_hits(text, letter=False):
     t = unquoted(text)
-    out = [msg for rx, msg in STYLE_RULES if rx.search(t)]
+    out = [msg for rx, msg in STYLE_RULES if (rx.search(unnamed(t)) if rx is DHD_RE else rx.search(t))]
     if letter:
         out += [msg for rx, msg in LETTER_STYLE_RULES if rx.search(t)]
     return out
@@ -269,25 +320,49 @@ def fix_warn(text):
 
 
 # INSTRUCTIONS §4.23 (Abhi, 02.11.2026): "मा." before the High Court and judges (Section practice; docs/STYLE_RESEARCH_LETTERS.md F10)
-MA_JUDGE_RE = re.compile(r"मुख्य\s+न्यायमूर्ती|(?<!मुख्य )(?<!मुख्य)न्यायमूर्ती|प्रशासकीय\s+न्यायाधीश")
-MA_COURT_RE = re.compile(r"(?<![ऀ-ॿ])(?:मुंबई\s+)?उच्च\s+न्यायालय(?!\s*\()")   # "मा. मुंबई उच्च न्यायालय"   # "उच्च न्यायालय (अपील शाखा)" = office designation: excepted
+# 02.11.2026 (audit A1): one "मा." before the whole title phrase counts — "मा. प्रशासकीय न्यायमूर्ती समिती", "मा. मुख्य
+# न्यायमूर्ती" (the phrase starts at its qualifier, so fix_ma never puts a second "मा." inside it); "निवृत्त / सेवानिवृत्त
+# न्यायमूर्ती" (a person's description) is not a title; an office designation is excepted: "उच्च न्यायालय (… शाखा)",
+# "उच्च न्यायालय, अपील / मूळ शाखा", "उच्च न्यायालय, खंडपीठ …" and "<पद>, उच्च न्यायालय" ("प्रबंधक (कार्मिक), उच्च न्यायालय",
+# "सहायक सरकारी वकील, उच्च न्यायालय"). The letter's address-like fields (to, refs, copies) are not checked (lint_spec).
+_JUDGE_QUAL = r"(?:(?:प्रशासकीय|मुख्य|प्रभारी|वरिष्ठ)\s+)?"
+MA_JUDGE_RE = re.compile(rf"(?<![ऀ-ॿ])(?<!निवृत्त )(?<!निवृत्त)(?<!निवृत्त मुख्य )(?<!निवृत्त प्रशासकीय ){_JUDGE_QUAL}न्यायमूर्ती|(?<![ऀ-ॿ])प्रशासकीय\s+न्यायाधीश")
+MA_COURT_RE = re.compile(r"(?<![ऀ-ॿ])(?:मुंबई\s+)?उच्च\s+न्यायालय(?!\s*\()(?![ऀ-ॿ]*\s*,\s*(?:[ऀ-ॿ]+\s+)?(?:शाखा|खंडपीठ))")
 MA_BEFORE = re.compile(r"मा\.\s?$")
+MA_DESIG_BEFORE = re.compile(r"(?:प्रबंधक|निबंधक|रजिस्ट्रार|वकील|अभियोक्ता|अधिकारी|अधीक्षक|सचिव|लेखापाल|न्यायमूर्ती|न्यायाधीश)"
+                             r"(?:\s*\([^)]{0,40}\))?\s*,\s*$")
+MA_DOUBLE_RE = re.compile(r"मा\.\s?मा\.|(?:प्रशासकीय|मुख्य)\s+मा\.\s?न्यायमूर्ती")
 
 
 def _ma_spans(t, court=True):
-    rxs = (MA_JUDGE_RE, MA_COURT_RE) if court else (MA_JUDGE_RE,)
-    return sorted((m.start(), m.group(0)) for rx in rxs for m in rx.finditer(t) if not MA_BEFORE.search(t[max(0, m.start() - 4):m.start()]))
+    out = []
+    for m in MA_JUDGE_RE.finditer(t):
+        if not MA_BEFORE.search(t[max(0, m.start() - 5):m.start()]):
+            out.append((m.start(), m.group(0)))
+    if court:
+        for m in MA_COURT_RE.finditer(t):
+            before = t[max(0, m.start() - 70):m.start()]
+            if not MA_BEFORE.search(before[-5:]) and not MA_DESIG_BEFORE.search(before):
+                out.append((m.start(), m.group(0)))
+    return sorted(out)
 
 
 def ma_hits(text, court=True):
-    """§4.23: occurrences outside quotes without "मा." before them."""
-    hits = [w for _, w in _ma_spans(unquoted(text), court)]
-    return [f"आदरार्थी उल्लेख — 'मा. {sorted(set(hits))[0]}' (मा. उच्च न्यायालय / मा. न्यायमूर्ती; §4.23)"] if hits else []
+    """§4.23: occurrences outside quotes without "मा." before them; a doubled "मा." inside a title phrase."""
+    t = unquoted(text)
+    hits = [w for _, w in _ma_spans(t, court)]
+    out = [f"आदरार्थी उल्लेख — 'मा. {sorted(set(hits))[0]}' (मा. उच्च न्यायालय / मा. न्यायमूर्ती; §4.23)"] if hits else []
+    dbl = MA_DOUBLE_RE.search(t)
+    if dbl:
+        out.append(f"आदरार्थी उल्लेख — दुहेरी 'मा.': '{dbl.group(0)}' (एकच 'मा.' पूर्ण पदनामापूर्वी, उदा. 'मा. प्रशासकीय न्यायमूर्ती समिती'; §4.23)")
+    return out
 
 
 def fix_ma(text, court=True):
-    """text with "मा. " inserted where §4.23 needs it (outside quotes)."""
+    """text with "मा. " inserted where §4.23 needs it (outside quotes); never a second "मा." inside a title phrase."""
     def fix(t):
+        t = re.sub(r"मा\.\s?मा\.\s?", "मा. ", t)
+        t = re.sub(r"(प्रशासकीय|मुख्य)\s+मा\.\s?(न्यायमूर्ती)", r"\1 \2", t)
         for pos, _ in reversed(_ma_spans(t, court)):
             t = t[:pos] + "मा. " + t[pos:]
         return t
@@ -327,10 +402,18 @@ def signer_problems(tail, has_ams):
     return [] if list(tail) == exp else [f"signer block {list(tail)} != {exp}"]
 
 
+def finance_route(last):
+    """True when the last para sends the file to Finance (मान्यतेस्तव / अभिप्रायास्तव / सहमतीस्तव …) or to the Public Health
+    Department (INSTRUCTIONS §4.6, §8.3: अ.मु.स. (वित्त) "फक्त नस्ती वित्त/सा.आ.वि. कडे जाताना")."""
+    t = unquoted(last or "")
+    return FIN in t or bool(FIN_ROUTE_RE.search(t) or PHD_ROUTE_RE.search(t))
+
+
 def finance_problems(last, has_ams):
-    fin = FIN in last
+    fin = finance_route(last)
     return [] if fin == has_ams else [f"'{AMS}' {'present' if has_ams else 'absent'} but last para "
-                                      f"{'contains' if fin else 'lacks'} '{FIN}'"]
+                                      f"{'sends' if fin else 'does not send'} the file to वित्त विभाग / सार्वजनिक आरोग्य विभाग "
+                                      f"('{FIN}' / '… अभिप्रायास्तव' / '… विभागास विनंती'; §4.6, §8.3)"]
 
 
 def part_no(text):
@@ -378,7 +461,8 @@ def lint_spec(spec, pages=None):
         P += [f"{path}: {m}" for m in style_hits(t)]
     for path, t in letter:
         P += [f"{path}: {m}" for m in style_hits(t, letter=True)]
-    for path, t in body + [(pth, t) for pth, t in letter if not pth.startswith("letter.to")]:
+    # §4.23: the letter's address-like fields (to, refs, copies) are not checked (audit A1, 02.11.2026)
+    for path, t in body + [(pth, t) for pth, t in letter if not re.match(r"letter\.(?:to|refs|copies)(?:\[|$)", pth)]:
         P += [f"{path}: {m}" for m in ma_hits(t)]
     rel_own = [(pth, t) for pth, t in related if not re.search(r"\.text(\[|$)", pth)]  # extracts (.text) are verbatim
     for path, t in body + letter + rel_own:
@@ -401,16 +485,20 @@ def lint_spec(spec, pages=None):
     if not isinstance(paras, list):
         P.append("note.paras: structure — must be a list"); paras = []
     closing = n.get("closing")
+    idx = [i for i, x in enumerate(paras) if isinstance(x, str)]
+    lpath, last = (f"note.paras[{idx[-1]}]", paras[idx[-1]]) if idx else ("note.paras", "")
     if isinstance(closing, str) and closing.strip():
-        lpath, last = "note.closing", closing
-    else:
-        idx = [i for i, x in enumerate(paras) if isinstance(x, str)]
-        lpath, last = (f"note.paras[{idx[-1]}]", paras[idx[-1]]) if idx else ("note.paras", "")
+        if BARE_CLOSING_RE.match(ns(closing)) and idx:   # Format-1/2: "… हरकत नसावी." + "मान्यतेस्तव सादर." line
+            lpath, last = "note.closing", last + " " + closing
+        else:
+            lpath, last = "note.closing", closing
     lastn = ns(last)
     if not any(r.match(lastn) for r in LAST_FORMS):
         P.append(f"{lpath}: last para — not one of the SOP forms ('सबब, … पत्राचे प्रारूप पृ.  /प.वि. वर मान्यतेस्तव सादर. "
                  f"मान्य झाल्यास पत्र निर्गमित करण्यात येईल.' / 'सबब, … वित्त विभागाच्या मान्यतेस्तव सादर करण्यात येत आहे.' / "
-                 f"'सबब, … शासन निर्णयाचे प्रारूप पृ.  /प.वि. वर मान्यतेस्तव सादर.')")
+                 f"'सबब, … शासन निर्णयाचे प्रारूप पृ.  /प.वि. वर मान्यतेस्तव सादर.' / 'सबब, … सामान्य प्रशासन विभागाच्या "
+                 f"मान्यतेस्तव / वित्त विभागाच्या अभिप्रायास्तव सादर.' / '… सार्वजनिक आरोग्य विभागास विनंती करण्यास हरकत नसावी. "
+                 f"मान्यतेस्तव सादर.' / 'सबब, … मान्यतेस्तव सादर.' / 'सबब, … नस्ती बंद करण्यास मान्यता असावी.')")
 
     # signers + Finance
     sg = n.get("signers")
@@ -443,7 +531,7 @@ def lint_spec(spec, pages=None):
                 P.append(f"letter.intro: intro wording — must start with '{INTRO_START}'")
             if INTRO_HAS not in it:
                 P.append(f"letter.intro: intro wording — must contain '{INTRO_HAS}'")
-            if REQUEST not in it:
+            if requests_info(L, it) and REQUEST not in unquoted(it):
                 P.append(f"letter.intro: पत्राची भाषा — माहिती मागताना '…, {REQUEST}.' अशी विनंतीपूर्वक मांडणी हवी (§4.18)")
             if L.get("points") and not it.endswith(":-"):
                 P.append("letter.intro: intro wording — must end with ':-' before the points")

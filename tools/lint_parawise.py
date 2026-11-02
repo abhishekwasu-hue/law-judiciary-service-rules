@@ -19,10 +19,11 @@ Errors
   - every para: "para" (e.g. "1", "1 to 3"), "averment" and "remarks" non-empty
   - remarks only a cryptic word ("denied", "not admitted", "admitted", "no comments", "noted", "not denied",
     "denied and not admitted", "matter of record", …) — Rule 58 Note (ii)
-  - recommendation not "oppose" / "not oppose"; recommendation_reason empty
+  - recommendation not "oppose" / "not oppose" / "____"; recommendation_reason empty (not required with "____")
   - background / enclosures not a list of str; verification not a bool
   - internal ids / repo paths anywhere (lint_spec.id_hits / repo_hits)
 Warnings
+  - recommendation "____" (blank: no basis in the record — the Section fills it; Rule 58(4)(a) still applies)
   - Devanagari outside “…” / "…" quotes (the parawise text is English; names/designations in quotes are fine)
   - remarks shorter than 8 words (Note (ii): "elaborate factual position")
   - no enclosures (Note (ii): "invariably accompanied by copies of relevant notifications, rules and orders")
@@ -50,6 +51,15 @@ CRYPTIC_PREFIX = re.compile(r"^(?:the\s+)?(?:contents?|averments?|allegations?|s
 DEV_RE = re.compile(r"[ऀ-ॿ]")
 PARA_RE = re.compile(r"\d+[A-Za-z]?(?:\s*(?:to|-|–|,|and)\s*\d+[A-Za-z]?)*(?:\s*\([^)]*\))?")
 MIN_WORDS = 8
+
+
+BLANK_RE = re.compile(r"^_{2,}$")
+
+
+def rec_blank(rec):
+    """True for the blank "____" recommendation (02.11.2026, lead F1: Rule 58(4)(a) recommendation only from the record;
+    otherwise "____" for the Section to fill + a warning)."""
+    return isinstance(rec, str) and bool(BLANK_RE.match(rec.strip()))
 
 
 def _txt(x):
@@ -105,9 +115,11 @@ def lint_parawise(spec):
             P.append(f"{path}.remarks: cryptic remark '{rm}' — Rule 58 Note (ii): not 'denied' / 'not admitted' alone; "
                      "give the elaborate factual position with rule/GR references")
     rec = pw.get("recommendation")
-    if not isinstance(rec, str) or rec.strip().lower() not in RECS:
-        P.append(f"parawise.recommendation: recommendation — must be 'oppose' or 'not oppose' (Rule 58(4)(a)): '{rec}'")
-    if not _txt(pw.get("recommendation_reason")):
+    blank = rec_blank(rec)
+    if not blank and (not isinstance(rec, str) or rec.strip().lower() not in RECS):
+        P.append(f"parawise.recommendation: recommendation — must be 'oppose' or 'not oppose' (Rule 58(4)(a)), or "
+                 f"'____' when the record gives no basis: '{rec}'")
+    if not blank and not _txt(pw.get("recommendation_reason")):
         P.append("parawise.recommendation_reason: recommendation — reason missing (Rule 58(4)(a)/(b))")
     for path, t in _strings(pw):
         for x in lint_spec.id_hits(t): P.append(f"{path}: internal id — '{x}'")
@@ -134,6 +146,9 @@ def warnings_parawise(spec):
         lab = _txt(it.get("para"))
         if lab and not PARA_RE.fullmatch(lab):
             W.append(f"parawise.paras[{i}].para: para label '{lab}' — use '1', '1 to 3', '1, 2'")
+    if rec_blank(pw.get("recommendation")):
+        W.append("parawise.recommendation: recommendation '____' — the record gives no basis; the Section fills "
+                 "'oppose' / 'not oppose' and the reason (Rule 58(4)(a)/(b))")
     if not pw.get("enclosures"):
         W.append("parawise.enclosures: no documents enclosed — Rule 58 Note (ii): copies of relevant notifications, "
                  "rules and orders")

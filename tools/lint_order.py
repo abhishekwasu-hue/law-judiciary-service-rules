@@ -10,7 +10,8 @@ Rules
   - required: ref_no, date, copies (all); subject (all but notification); read + preamble + operative (gr);
     read + corrections [{read, instead_of, read_as}] (corrigendum); operative (circular, memo, notification);
     addressee (memo); english {ref_no, operative, copies} (notification)
-  - ref_no "संकिर्ण-<year>/<file no or ____>/प्र.क्र.<n or ____>/का.6"; date "__.__.2026" / "DD.MM.YYYY" /
+  - ref_no "संकिर्ण-<year>/<file no or ____>/प्र.क्र.<n or ____>/का.6" ("संकीर्ण-" also accepted: the file no. as the
+    निर्देशपत्र writes it — audit A1, 02.11.2026); date "__.__.2026" / "DD.MM.YYYY" /
     "____ <month>, 2026" / "DD <month>, YYYY"
   - website line (decision B5) not switched off for gr / corrigendum / circular
   - the tool adds the Governor line ("महाराष्ट्राचे राज्यपाल यांच्या आदेशानुसार व नावाने,"), the website line and the
@@ -22,7 +23,8 @@ Rules
   - signer {name, designation} strings when given
   - language (own Marathi text outside “…” quotes — subject, read, preamble, operative, concurrence, corrections.read,
     copies, addressee): tools/lint_spec.py lang_hits (§4.19), style_hits (§4.18/§4.24/§4.25), ma_hits (§4.23 — not on
-    copies / addressee: address part). corrections.instead_of / read_as are verbatim text of the original order: not
+    copies / addressee: address part; the same "मा." / "ध्द" exemptions as lint_spec: one "मा." before a title phrase,
+    "निवृत्त न्यायमूर्ती", office designations "<पद>, उच्च न्यायालय", person names after श्री./श्रीमती/कै./डॉ.). corrections.instead_of / read_as are verbatim text of the original order: not
     checked. The english block is not checked for Marathi rules.
 WARN: lint_spec.warn_hits on the same own text; gr / memo without a concurrence para (specimen para 3: Finance
 concurrence or delegated powers)."""
@@ -33,7 +35,7 @@ sys.path.insert(0, HERE)
 import lint_spec  # noqa: E402  (reused, not edited)
 
 TYPES = ("gr", "corrigendum", "circular", "memo", "notification")
-REF_RE = re.compile(r"^संकिर्ण-[0-9]{4}/(?:[0-9]+|_{2,})/प्र\.क्र\.(?:[0-9]+|_{2,})/का\.6$")
+REF_RE = re.compile(r"^(?:संकिर्ण|संकीर्ण)-[0-9]{4}/(?:[0-9]+|_{2,})/प्र\.क्र\.(?:[0-9]+|_{2,})/का\.6$")
 DATE_RE = re.compile(r"^(?:[0-9_]{2}\.[0-9_]{2}\.[0-9]{4}|(?:[0-9]{1,2}|_{2,})\s+[ऀ-ॿ]+,\s*[0-9]{4})$")
 GOV = "राज्यपाल यांच्या आदेशानुसार"
 WEB = "www.maharashtra.gov.in"

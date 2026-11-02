@@ -156,6 +156,8 @@ def test_lint_bad_type_and_ref_and_date():
     assert "type" in probs(s)
     s = sample("gr"); s["order"]["ref_no"] = "संकिर्ण-2026/12/प्र.क्र.5/कार्या-6"
     assert "order.ref_no" in probs(s)
+    s = sample("gr"); s["order"]["ref_no"] = "संकीर्ण-2026/979/प्र.क्र.130/का.6"   # audit A1: both spellings
+    assert "order.ref_no" not in probs(s)
     s = sample("gr"); s["order"]["date"] = "1 Nov 2026"
     assert "order.date" in probs(s)
 
@@ -252,3 +254,13 @@ def test_signer_defaults():
     assert build_order.signer(o) == build_order.SIGNER_DEFAULT
     o = copy.deepcopy(sample("notification")["order"]); o.pop("signer", None)
     assert build_order.signer(o)["designation"] == "उप विधि सल्लागार-नि-उप सचिव"
+
+
+def test_lint_order_ma_and_dhd_exemptions():
+    """audit A1 (02.11.2026): one "मा." before the title phrase; "निवृत्त न्यायमूर्ती"; "ध्द" in a person's name."""
+    s = sample("gr")
+    s["order"]["preamble"] = ["मा. प्रशासकीय न्यायमूर्ती समितीने व निवृत्त न्यायमूर्ती श्री. अ. ब. बुध्दे यांच्या समितीने शिफारस केली आहे."]
+    assert not [p for p in lint_order.lint_order(s) if "§4.23" in p or "ध्द" in p]
+    s["order"]["preamble"] = ["प्रशासकीय न्यायमूर्ती समितीने शुध्द प्रत सादर केली आहे."]
+    P = lint_order.lint_order(s)
+    assert any("§4.23" in p for p in P) and any("ध्द" in p for p in P)
