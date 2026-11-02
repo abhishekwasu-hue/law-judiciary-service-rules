@@ -56,7 +56,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 # shared rule definitions — ONE copy, in tools/lint_spec.py (pre-build lint uses the same rules)
 from lint_spec import (AMS, BANNED, FIN, ID_RE, LH_EMAIL, RELATED, REF_NO, REPO_RE, REQUEST,  # noqa: E402,F401
                        MISSING_FORM, MISSING_HEAD, SIGNERS, banned_hits, finance_problems, heading_problems, id_hits,
-                       lang_hits, ns, num, part_no, ref_problems, repo_hits, signer_problems, style_hits, unquoted)
+                       lang_hits, ma_hits, ns, num, part_no, ref_problems, repo_hits, signer_problems, style_hits, unquoted)
 INTRO_HEAD = "उपरोक्त विषयाबाबत"  # letter intro paragraph (lint_spec.INTRO_START begins with it)
 from engine_supabase import strip_upload_prefix  # noqa: E402 — the ONE upload-prefix rule (§4.16)
 
@@ -215,6 +215,10 @@ def main(argv):
         check("respectful wording §4.18 (note body, letter)",
               [f"{where}: {x}" for where, t, isl in (("note", note_txt, False), ("letter", letter_txt, True))
                for x in style_hits(t, letter=isl)])
+        # §4.23 "मा." — the letter's addressee block (before "विषय") is excepted
+        lbody = letter_txt.split("विषय", 1)[1] if "विषय" in letter_txt else letter_txt
+        check('"मा." before the High Court and judges §4.23 (note body, letter)',
+              [f"{where}: {x}" for where, t in (("note", note_txt), ("letter", lbody)) for x in ma_hits(t)])
 
         # §4.19 (मराठी भाषा विभाग GR दि. 10.11.2022): same helpers as the pre-build lint, text outside quotes
         lg = [f"{where}: {x}" for where, t in (("note", note_txt), ("letter", letter_txt)) for x in lang_hits(t)]

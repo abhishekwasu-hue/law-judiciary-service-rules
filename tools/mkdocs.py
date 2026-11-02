@@ -22,7 +22,12 @@ spec.json:
    "intro": "उपरोक्त विषयाबाबत ... कळविण्यात येते की,",
    "points": ["1) ...", "2) ..."],
    "closing": "तरी, ... ही विनंती.",
-   "enclosure": ""    # optional 'सोबत - ...'
+   "enclosure": "",   # optional 'सोबत - ...'
+   "reminder": 1,     # optional — स्मरणपत्र-N (INSTRUCTIONS §4.21): "स्मरणपत्र-1" printed above the क्रमांक line;
+                      # refs[0] "या कार्यासनाचे समक्रमांकाचे पत्र दि. __"; intro "… माहिती अद्याप अप्राप्त आहे. … ही विनंती."
+   "copies": ["प्रमुख जिल्हा व सत्र न्यायाधीश, जिल्हा व सत्र न्यायालय, ठाणे यांना आवश्यक कार्यवाहीसाठी"]
+                      # optional — "प्रत : <each>" above "प्रत : निवड नस्ती" (INSTRUCTIONS §4.22: letter via the High Court
+                      # asking information from a District Judge)
  }
 }"""
 import sys, json, copy, os
@@ -168,6 +173,10 @@ def build_letter(spec, out):
         r0 = pe.runs[0]
         for r in pe.runs[1:]: r._element.getparent().remove(r._element)
         r0.text = "दूरध्वनी क्र. :- ०२२-२२793230\t\t\t\t   Email ID :- lnjd.desk6-mh@mah.gov.in"; setfont(r0)
+    rem = L.get("reminder")
+    if rem:  # §4.21 स्मरणपत्र: heading above the क्रमांक line (the Section's old reminders, e.g. C R 170/2024)
+        n_rem = int(rem) if str(rem).isdigit() and int(rem) > 0 else 1
+        add(body, sect, P[5], d, f"स्मरणपत्र-{n_rem}", bold=True)
     add(body, sect, P[5], d, f"क्रमांक:-{L['ref_no']}                                  दिनांक  :- {L['date']}")
     add(body, sect, P[6], d, "")
     add(body, sect, P[7], d, "प्रति,")
@@ -198,6 +207,8 @@ def build_letter(spec, out):
     add(body, sect, P[20], d, "\t\t\t\t\t\t\t         ( राजेश वडनेरकर )")
     add(body, sect, P[21], d, "\t\t\t\t\t\t       अवर सचिव ,महाराष्ट्र शासन")
     if L.get("enclosure"): add(body, sect, P[17], d, L["enclosure"])
+    for cp in L.get("copies") or []:  # §4.22
+        if isinstance(cp, str) and cp.strip(): add(body, sect, P[17], d, "प्रत : " + cp.strip())
     add(body, sect, P[17], d, "प्रत : निवड नस्ती")
     nomirror(d); d.save(out)
 
