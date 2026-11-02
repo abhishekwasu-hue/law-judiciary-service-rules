@@ -18,7 +18,23 @@
 
 - 02.11.2026 (Abhi: "1 होय, 2 होय, 3 होय, 4 होय"): INSTRUCTIONS §4.21 स्मरणपत्र, §4.22 प्रत-ओळ (HC route), §4.23 "मा.", §4.24 "शुद्धिपत्रक" — mkdocs (reminder, copies), lint, verify, ENGINE_BRIEF, samples CR66/122/128/130/131 updated.
 
+- 02.11.2026 (Abhi's task "noting and drafting follow the official Marathi grammar, शुद्धलेखन and writing-style rules"; parallel agents):
+  tools/ENGINE_BRIEF.md "Marathi language rules" (every line with its source: GADT परिशिष्ट 1 = शुद्धलेखन नियम 1–14, GR 10.11.2022
+  परिशिष्ट दोन/तीन, circular 07.05.2018, GAD manual paras 26/51/53, राजभाषा परिचय 1988); INSTRUCTIONS §4.25 (numbered 25 because
+  §4.21–4.24 already existed); lint/verify: 'अनुसरुन' error + WARN L11–L14; samples + SOP 'अनुसरून' (10 lines, extracts untouched);
+  evidence docs/LANG_RULES_EVIDENCE.md (before/after images, verify ALL OK on all six samples with stand-in package/Study).
+  Engine: the workflow puts tools/ENGINE_BRIEF.md into every prompt (process-proposal.yml "$(cat tools/ENGINE_BRIEF.md)") and
+  build_note_letter.py refuses to build when lint fails; a real dry run of the workflow was not possible (needs a run token from the Worker).
+
 ## Pending
+7. **Language-rule conflicts (Abhi decides; provisional default in brackets):**
+   (a) GR 10.11.2022 अ.क्र. 6 puts a space before ":" ("उपलब्ध नाही :-"); §4.19 / samples use "नाही:-" [keep "नाही:-"].
+   (b) GADT error list: "कलम ३ नुसार" wrong → "कलम ३ अनुसार"; samples' own text has "नियम 48 नुसार", "दि. … नुसार" (CR128/130/131/133) [no lint; unchanged].
+   (c) "मंत्रिमंडळ" correct (GADT p.65); CR128 "मंत्रीमंडळासमोर" is inside a quoted extract [kept verbatim].
+   (d) "एम.ए./पीएच.डी." and शुद्धलेखन rules 15–18 rest only on the non-official copy (STYLE_RESEARCH_LANG §5.2) [warning level only].
+   (e) Circular 10.08.2021 (शासन शब्दकोश भाग-1) is not in the repo (pdf/FAILED-extra.txt; 403 from this session); 00-INDEX of folder 09 says it was obtained — wrong [fetch via the GR request Action / Abhi gives the PDF].
+   (f) L11 (…णेबाबत) also warns on letter subjects taken from the proposal ("…मिळणेबाबत") [warning only; Abhi decides whether to convert subjects].
+8. **Workflow dry run** of the new brief on GitHub: needs a real run (run token) — check the first live run's log [watch the next run].
 0. **PR #3** — merged 02.11.2026 on Abhi's word; still to do by Abhi: `scripts/deploy.ps1` (Worker + app) and migration `supabase/migrations/20261102000005_config_taken.sql` in the SQL editor. Other providers (D16): choose in Settings → इतर AI; free hosted models are not confidential-safe (table there). First live run after merge = check of H1 on the real runner (engine user, sudo, bind mount) — watch the run; if it fails at "Process the proposal", the log line names the step. A/C need Abhi's paid Gemini/OpenAI keys in Settings; first real use on an approved case (CR131) and compare.
 1. **C R 128/2026** — Abhi to give सांकेतांक for 4 GRs (12.03.2014, 31.03.2018, 14.05.2021, 02.12.2022) and the CR 128 proposal PDF (not in repo). Then download (gr.maharashtra.gov.in/Site/Upload/Government%20Resolutions/Marathi/<code>.pdf) and rebuild the package: proposal = CR 128 PDF; enclosures SC order pdf/sc/... p.1,2,20,34,35 (para 14 a–c highlighted, p.34), pdf/gr/202204191549468012.pdf p.1-2, pdf/gr/202301111807499612.pdf p.1-2, MJS Rules 2008 pdf/71-district-court-staff-recruitment-rules/... p.1,2,18,19,20, MCS Pension Rules 1982 pdf/80-retirement-age-group-d-reemployment/... p.11,12,22, then the new GRs; update पृ./प.वि. in samples/specs/CR128_*.json; rebuild with tools/build_note_letter.py.
 2. **App A desk page** (claude.ai artifact) — Abhi decides: keep RYzwfiGwJpbVxyD5C2rCy2 or 8cJP8wz6j5tYM5kRHK1rVx, or retire App A (App B is live). If kept: Abhi checks the three downloads on TEST-1, then Claude deletes TEST-1 (cases/TEST-1, outputs/TEST-1__*, assets bdb3fa89612a93be3a0df53ac37f98e9, cfa33bb4f301bb18e77e27aa9eb41fd6).
