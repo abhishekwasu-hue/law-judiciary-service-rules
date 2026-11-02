@@ -258,6 +258,12 @@ def cmd_finish(out):
                "grs_attached": lst("grs_attached"), "grs_missing": lst("grs_missing")})
     rest("PATCH", f"cases?id=eq.{CASE}", {"stage": "मसुदा तयार"}, "return=minimal")
     fill_case(st.get("case"))
+    sw = [str(x).strip()[:300] for x in lst("warnings") if str(x).strip()]  # engine notes for Abhi (e.g. C R not found)
+    if sw:
+        try:
+            add_warnings(sw)
+        except Exception as e:
+            print("engine_supabase: status warnings not stored:", e, file=sys.stderr)
     activity("run_done", {"run_id": int(RUN), "files": uploaded})
     print("finished:", ", ".join(f"{u['kind']} v{u['version']} {u['name']}" for u in uploaded))
 

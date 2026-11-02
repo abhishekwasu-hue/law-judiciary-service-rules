@@ -170,7 +170,14 @@ Step 0 is done by the workflow:
 5. Case identity: cr_no, cr_year, file_no, subject and category may be EMPTY in case.json (Abhi may skip them at upload;
    category "इतर" counts as not chosen). Take every empty one from the निर्देशपत्र (proposal page 1) exactly as written there;
    never guess — unreadable = leave it out. Report them in status.json `case` (rule 9).
-   PREFIX = `CR<cr_no>_<cr_year>` from case.json, or from the निर्देशपत्र when empty (e.g. CR130_2026). Outputs in OUTDIR, nothing else there except the
+   PREFIX = `CR<cr_no>_<cr_year>` from case.json, or from the निर्देशपत्र when empty (e.g. CR130_2026). Look for the C R no.
+   on EVERY page image before giving up (cover sheet, inward stamp, file no. "संकीर्ण-YYYY/<file>/प्र.क्र.<n>/का.6").
+   **A missing C R no. / year / file no. is NEVER a reason to stop or to write state "failed" (Abhi, 02.11.2026).** If it
+   is in neither case.json nor any page: PREFIX = `Case<case id from case.json>_<year of the proposal's latest letter, else
+   the current year>` (e.g. Case7_2026); letter `ref_no` = `संकिर्ण-<year>/____/प्र.क्र.____/का.6` (blanks for the Section
+   to fill by hand); add "C R क्रमांक प्रस्तावात सापडला नाही — प्रकरणाच्या तपशिलात भरावा; पत्र-क्रमांक हाताने भरावा"
+   to status.json `warnings`; then do EVERY remaining step (note, letter, Study, package, verify, reviewer) as usual.
+   Outputs in OUTDIR, nothing else there except the
    .map.json and LibreOffice previews:
    - `OUTDIR/<PREFIX>_Study.docx` (part 0 briefing + parts 1–7),
    - `OUTDIR/<PREFIX>_Note_and_Letter.docx`,
@@ -206,6 +213,8 @@ Step 0 is done by the workflow:
 ```
    `prefix`, `package_pdf`, `proposal_pages` = exactly the PREFIX, package file name and proposal page count you gave
    verify_outputs.py (rule 6); the workflow re-runs it with these.
-   If the case cannot be completed, write `{"state": "failed", "summary": "<reason>", "model_log": [...]}` instead.
+   If the case cannot be completed, write `{"state": "failed", "summary": "<reason>", "model_log": [...]}` instead. "Cannot be
+   completed" means only: the proposal pages cannot be read at all, or the reviewer refuses approval after corrections.
+   Missing case fields (C R no., file no., subject, category) are never a reason — use the rule 5 fallback.
    `model_log` = the routing/escalation log (see "Escalation rules"); always included.
 10. Final reply: Marathi, as few words as possible.
