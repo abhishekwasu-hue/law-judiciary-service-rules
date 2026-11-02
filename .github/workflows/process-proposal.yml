@@ -31,7 +31,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 180
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262   # v4.4.0
         with: { fetch-depth: 1, persist-credentials: false }   # no GitHub token in .git/config (H1); the commit step authenticates itself
       # Payload is read from the event file (never interpolated into scripts); every value is masked before use.
       # The run token is single use for the config (Worker); it stays valid for /api/engine/fail (no secrets) until expiry.
@@ -48,8 +48,16 @@ jobs:
           [[ "$WORKER" =~ ^https://[A-Za-z0-9.-]+(:[0-9]+)?$ ]] || { echo "bad worker origin"; exit 1; }
           # first, so that "Record failure" can reach the Worker even if the config call fails
           { echo "CASE_ID=$CASE_ID"; echo "RUN_ID=$RUN_ID"; echo "RUN_TOKEN=$TOKEN"; echo "WORKER=$WORKER"; } >> "$GITHUB_ENV"
-          CODE=$(curl -sS --retry 2 -o /tmp/cfg.json -w '%{http_code}' -H "Authorization: Bearer $TOKEN" \
-                 "$WORKER/api/engine/config?run_id=$RUN_ID" || echo 000)
+          # the config token is single use: retry ONLY when no HTTP response arrived at all (code 000: DNS/connect
+          # failure); any HTTP status (also 5xx) is final, since a retried request would only get 403
+          CODE=000
+          for i in 1 2 3; do
+            CODE=$(curl -sS -o /tmp/cfg.json -w '%{http_code}' -H "Authorization: Bearer $TOKEN" \
+                   "$WORKER/api/engine/config?run_id=$RUN_ID" || true)
+            CODE=${CODE:-000}
+            [ "$CODE" != "000" ] && break
+            echo "config: no HTTP response (try $i/3)"; sleep 5
+          done
           if [ "$CODE" != "200" ]; then
             case "$CODE" in
               412) R="सेटिंग्ज अपूर्ण — Settings मधील Anthropic key व Supabase तपासा, नंतर पुन्हा तयार करा." ;;
@@ -58,36 +66,38 @@ jobs:
             esac
             echo "$R" > /tmp/fail_reason.txt; rm -f /tmp/cfg.json; echo "config: HTTP $CODE"; exit 1
           fi
-          for k in anthropic_api_key supabase_url supabase_service_key gemini_api_key openai_api_key model; do
+          PKEYS="gemini_api_key openai_api_key openrouter_api_key groq_api_key mistral_api_key cerebras_api_key cloudflare_api_token ollama_api_key"
+          for k in anthropic_api_key supabase_url supabase_service_key $PKEYS model; do
             V=$(jq -r ".$k // empty" /tmp/cfg.json)
             if [ -n "$V" ]; then echo "::add-mask::$V"; fi
           done
           A=$(jq -r '.anthropic_api_key // empty' /tmp/cfg.json)
           U=$(jq -r '.supabase_url // empty' /tmp/cfg.json)
           S=$(jq -r '.supabase_service_key // empty' /tmp/cfg.json)
-          G=$(jq -r '.gemini_api_key // empty' /tmp/cfg.json)
-          O=$(jq -r '.openai_api_key // empty' /tmp/cfg.json)
+          PSEC=""   # other providers' keys (sent by the Worker only for a chosen provider) as KEY=VALUE lines
+          for k in $PKEYS; do V=$(jq -r ".$k // empty" /tmp/cfg.json); [ -n "$V" ] && PSEC+="$(echo "$k" | tr '[:lower:]' '[:upper:]')=$V"$'\n'; done
           # non-secret settings: model tiers + soft budget (engine_supabase.py config; invalid/missing -> defaults)
           python3 tools/engine_supabase.py config /tmp/cfg.json > /tmp/engine_conf.env || : > /tmp/engine_conf.env
           rm -f /tmp/cfg.json
-          if [ -z "$A" ] || [ -z "$U" ] || [ -z "$S" ]; then
-            echo "सेटिंग्ज अपूर्ण — Settings मधील Anthropic key व Supabase तपासा, नंतर पुन्हा तयार करा." > /tmp/fail_reason.txt
+          EP=$(sed -n 's/^ENGINE_PROVIDER=//p' /tmp/engine_conf.env)   # another provider runs the engine -> no Anthropic key needed
+          if { [ -z "$A" ] && [ -z "$EP" ]; } || [ -z "$U" ] || [ -z "$S" ]; then
+            echo "सेटिंग्ज अपूर्ण — Settings मधील AI key (Anthropic किंवा निवडलेला AI) व Supabase तपासा, नंतर पुन्हा तयार करा." > /tmp/fail_reason.txt
             echo "config incomplete (Settings)"; exit 1
           fi
           # secrets: only into the runner's 700 file (read by engine_supabase.py and by the steps that need them)
           ( umask 077; mkdir -p "$(dirname "$ENGINE_SECRETS")"; chmod 700 "$(dirname "$ENGINE_SECRETS")"
             { echo "ANTHROPIC_API_KEY=$A"; echo "SUPABASE_URL=$U"; echo "SUPABASE_SERVICE_KEY=$S"
-              [ -n "$G" ] && echo "GEMINI_API_KEY=$G"; [ -n "$O" ] && echo "OPENAI_API_KEY=$O"; true; } > "$ENGINE_SECRETS" )
-          grep -E '^(MODEL|MODEL_LIGHT|MODEL_REVIEW|MODEL_STRONG|EFFORT|BUDGET_USD|PART1_PROVIDER|GEMINI_MODEL|FALLBACK_PROVIDER|FALLBACK_MODEL|FALLBACK_MODEL_LIGHT)=[][A-Za-z0-9._:@/-]*$' /tmp/engine_conf.env >> "$GITHUB_ENV" || true
+              printf '%s' "$PSEC"; } > "$ENGINE_SECRETS" )
+          grep -E '^(MODEL|MODEL_LIGHT|MODEL_REVIEW|MODEL_STRONG|EFFORT|BUDGET_USD|ENGINE_PROVIDER|ENGINE_MODEL|ENGINE_MODEL_LIGHT|PART1_PROVIDER|PART1_MODEL|GEMINI_MODEL|FALLBACK_PROVIDER|FALLBACK_MODEL|FALLBACK_MODEL_LIGHT|CLOUDFLARE_ACCOUNT_ID|OLLAMA_BASE_URL)=[][A-Za-z0-9._:@/-]*$' /tmp/engine_conf.env >> "$GITHUB_ENV" || true
           rm -f /tmp/engine_conf.env
       - name: Record log URL
         run: python3 tools/engine_supabase.py log_url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" || true
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065   # v5.6.0
         with:
           python-version: '3.12'
           cache: pip
           cache-dependency-path: tools/requirements-engine.txt
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020   # v4.4.0
         with:
           node-version: '20'
           cache: npm
@@ -146,9 +156,10 @@ jobs:
       # run token (only good for /api/engine/step|fail of THIS run) and the model names — no Supabase key, no GitHub
       # token (checkout without persisted credentials). Progress goes through the Worker. Ownership is given back after.
       # Study part 1 (page-wise Marathi rendering, the largest single output) runs in PARALLEL (QUALITY_AUDIT §5 item 3):
-      # A (Abhi 02.11.2026): PART1_PROVIDER=gemini -> tools/gemini_part1.py (runner user, paid Gemini key, one request per
-      # page); otherwise a second headless Claude run (tools/ENGINE_PART1_PROMPT.md) on MODEL_LIGHT. Either way the main
-      # run inserts it only when part1check matches the drafter's facts (else the drafter redoes those pages).
+      # A (Abhi 02.11.2026): PART1_PROVIDER = another provider -> tools/part1_vision.py (runner user, that provider's key;
+      # Gemini native or an OpenAI-compatible chat API with the page image); otherwise a second headless Claude run
+      # (tools/ENGINE_PART1_PROMPT.md) on MODEL_LIGHT. Either way the main run inserts it only when part1check matches the
+      # drafter's facts (else the drafter redoes those pages); the verify step re-checks it.
       # The step waits for the background run (stopped once the main run has ended) before recording the result.
       # cost/turns = sum of both runs; duration = wall clock of this step (the runs overlap).
       # C (Abhi 02.11.2026): when the main run fails on the PROVIDER side (credit, key, overloaded, API/connection error;
@@ -172,7 +183,8 @@ jobs:
           mv CLAUDE.md /tmp/CLAUDE.md.repo
           T0=$(date +%s)
           : "${MODEL:=claude-opus-5-5}" "${MODEL_LIGHT:=claude-haiku-5-5}" "${MODEL_REVIEW:=claude-opus-5-5}" "${MODEL_STRONG:=}" "${EFFORT:=medium}"
-          : "${PART1_PROVIDER:=claude}" "${GEMINI_MODEL:=gemini-2.5-flash}" "${FALLBACK_PROVIDER:=}" "${FALLBACK_MODEL:=}" "${FALLBACK_MODEL_LIGHT:=}"
+          : "${PART1_PROVIDER:=claude}" "${PART1_MODEL:=}" "${FALLBACK_PROVIDER:=}" "${FALLBACK_MODEL:=}" "${FALLBACK_MODEL_LIGHT:=}"
+          : "${ENGINE_PROVIDER:=}" "${ENGINE_MODEL:=}" "${ENGINE_MODEL_LIGHT:=}" "${CLOUDFLARE_ACCOUNT_ID:=}" "${OLLAMA_BASE_URL:=}"
           export MODEL MODEL_LIGHT MODEL_REVIEW MODEL_STRONG
           python3 tools/engine_supabase.py agents /tmp/work/agents.json
           python3 - <<'PY'
@@ -199,9 +211,53 @@ jobs:
           INDIR=(bash -c 'cd /srv/engine && exec "$@"' _)
           MARGS=(--model "$MODEL_LIGHT" --effort "$EFFORT")
 
-          # ---- Study part 1 in parallel (A: Gemini, else the Claude helper) ----
+          # ---- other AI providers: LiteLLM gateway (runner user; keys never reach `engine`) ----
+          # ENGINE_PROVIDER runs the whole engine through it; FALLBACK_PROVIDER takes over when the main run fails on the
+          # provider side; every Claude model name is routed to the chosen provider's models (engine_supabase.py
+          # litellm_config); tools/litellm_cost.py records the real cost per answer.
+          GW_PID=""; MK=""; ENG_USED=""; FB_USED=""; SKIP_MAIN=""
+          pkey() { case "$1" in cloudflare) echo CLOUDFLARE_API_TOKEN ;; *) echo "$(echo "$1" | tr '[:lower:]' '[:upper:]')_API_KEY" ;; esac; }
+          gw_stop() { if [ -n "$GW_PID" ]; then kill "$GW_PID" 2>/dev/null; wait "$GW_PID" 2>/dev/null; GW_PID=""; fi; }
+          gw_install() {
+            [ -x /tmp/litellm-venv/bin/litellm ] && return 0
+            python3 -m venv /tmp/litellm-venv && pip download -q --no-deps --only-binary=:all: -d /tmp/litellm-dl "litellm==$LITELLM_VERSION" \
+              && W=$(ls /tmp/litellm-dl/litellm-"$LITELLM_VERSION"-*manylinux_2_28_x86_64.whl) \
+              && echo "$LITELLM_WHEEL_SHA256  $W" | sha256sum -c - \
+              && /tmp/litellm-venv/bin/pip install -q "$W[proxy]"
+          }
+          gw_start() {  # gw_start <provider> <main model> <light model> -> 0 when the proxy answers on 127.0.0.1:4000
+            gw_stop
+            gw_install || return 1
+            mkdir -p /tmp/litellm && cp tools/litellm_cost.py /tmp/litellm/ \
+              && python3 tools/engine_supabase.py litellm_config /tmp/litellm/litellm.yaml "$1" "$2" "$3" || return 1
+            MK="sk-local-$(head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n')"
+            echo "::add-mask::$MK"
+            local K; K=$(pkey "$1")
+            ( export LITELLM_MASTER_KEY="$MK" LITELLM_COST_FILE=/tmp/litellm_cost.jsonl CLOUDFLARE_ACCOUNT_ID="${CLOUDFLARE_ACCOUNT_ID:-}" OLLAMA_BASE_URL="${OLLAMA_BASE_URL:-}"
+              V="$(sec "$K")"; [ -n "$V" ] && export "$K=$V"
+              [ "$1" = cloudflare ] && export CLOUDFLARE_API_KEY="$V"
+              exec /tmp/litellm-venv/bin/litellm --config /tmp/litellm/litellm.yaml --host 127.0.0.1 --port 4000 ) >> /tmp/litellm.log 2>&1 &
+            GW_PID=$!
+            for i in $(seq 1 60); do curl -sf -o /dev/null http://127.0.0.1:4000/health/liveliness && return 0; sleep 2; done
+            return 1
+          }
+          AUTH=(ANTHROPIC_API_KEY="$AK")
+          if [ -n "$ENGINE_PROVIDER" ]; then
+            if gw_start "$ENGINE_PROVIDER" "$ENGINE_MODEL" "$ENGINE_MODEL_LIGHT"; then
+              AUTH=(ANTHROPIC_BASE_URL=http://127.0.0.1:4000 ANTHROPIC_AUTH_TOKEN="$MK"); ENG_USED="$ENGINE_PROVIDER"
+            elif [ -n "$AK" ]; then
+              echo "engine gateway ($ENGINE_PROVIDER) did not start -> Claude"; tail -n 20 /tmp/litellm.log 2>/dev/null || true
+              python3 tools/engine_supabase.py warn "मुख्य AI ($ENGINE_PROVIDER) सुरू झाले नाही — अभ्यास Claude ने केला." || true
+            else
+              tail -n 20 /tmp/litellm.log 2>/dev/null || true
+              echo "मुख्य AI ($ENGINE_PROVIDER) सुरू झाले नाही — Settings मधील त्याची key / मॉडेल-नाव तपासा, नंतर पुन्हा तयार करा." > /tmp/fail_reason.txt
+              SKIP_MAIN=1
+            fi
+          fi
+
+          # ---- Study part 1 in parallel (A: another provider via tools/part1_vision.py, else the Claude helper) ----
           P1_PID=""
-          if [ -s /tmp/case/pages/pages.json ]; then
+          if [ -s /tmp/case/pages/pages.json ] && [ -z "$SKIP_MAIN" ]; then
             P1_PROMPT="$(cat tools/ENGINE_PART1_PROMPT.md)
 
           PAGES=/tmp/case/pages
@@ -209,11 +265,13 @@ jobs:
           OUT=/tmp/work"
             (
               rc1=0
-              if [ "$PART1_PROVIDER" = "gemini" ] && [ -n "$(sec GEMINI_API_KEY)" ]; then
-                GEMINI_API_KEY="$(sec GEMINI_API_KEY)" timeout -k 30 60m python3 tools/gemini_part1.py /tmp/case/pages /tmp/work \
-                  --model "$GEMINI_MODEL" > /tmp/work/part1.log 2> /tmp/work/part1.err &
+              if [ "$PART1_PROVIDER" != "claude" ]; then
+                K=$(pkey "$PART1_PROVIDER")
+                env "$K=$(sec "$K")" CLOUDFLARE_ACCOUNT_ID="${CLOUDFLARE_ACCOUNT_ID:-}" OLLAMA_BASE_URL="${OLLAMA_BASE_URL:-}" PART1_MODEL="${PART1_MODEL:-}" \
+                  timeout -k 30 60m python3 tools/part1_vision.py /tmp/case/pages /tmp/work --provider "$PART1_PROVIDER" \
+                  > /tmp/work/part1.log 2> /tmp/work/part1.err &
               else
-                timeout -k 60 100m "${ERUN[@]}" ANTHROPIC_API_KEY="$AK" "${INDIR[@]}" claude -p "$P1_PROMPT" --dangerously-skip-permissions \
+                timeout -k 60 100m "${ERUN[@]}" "${AUTH[@]}" "${INDIR[@]}" claude -p "$P1_PROMPT" --dangerously-skip-permissions \
                   --max-turns 120 --tools "Bash,Read,Write" --output-format json "${MARGS[@]}" > /tmp/work/part1_result.json 2> /tmp/work/part1.err &
               fi
               echo $! > /tmp/work/part1.pid
@@ -260,47 +318,34 @@ jobs:
           ARGS=(-p "$PROMPT" --dangerously-skip-permissions --max-turns 400 --output-format json
                 --agents /tmp/work/agents.json --tools "Bash,Read,Write,Edit,Glob,Grep,Agent" "${MARGS[@]}")
           rc=0
-          timeout -k 60 150m "${ERUN[@]}" ANTHROPIC_API_KEY="$AK" "${INDIR[@]}" claude "${ARGS[@]}" > /tmp/claude.json 2> /tmp/claude.err || rc=$?
-          echo "claude exit $rc"; tail -n 20 /tmp/claude.err || true
+          if [ -z "$SKIP_MAIN" ]; then
+            timeout -k 60 150m "${ERUN[@]}" "${AUTH[@]}" "${INDIR[@]}" claude "${ARGS[@]}" > /tmp/claude.json 2> /tmp/claude.err || rc=$?
+            echo "main run (${ENG_USED:-claude}) exit $rc"; tail -n 20 /tmp/claude.err || true
+          else
+            rc=1; : > /tmp/claude.json; : > /tmp/claude.err
+          fi
 
-          # ---- C: fallback provider when Claude failed on the provider side ----
-          FB_USED=""
-          if [ -n "$FALLBACK_PROVIDER" ] && python3 tools/engine_supabase.py fallback_ok /tmp/claude.json /tmp/claude.err "$rc"; then
-            echo "Claude failed on the provider side -> fallback $FALLBACK_PROVIDER ($FALLBACK_MODEL / $FALLBACK_MODEL_LIGHT)"
+          # ---- C: fallback provider when the main run failed on the provider side ----
+          if [ -z "$SKIP_MAIN" ] && [ -n "$FALLBACK_PROVIDER" ] && [ "$FALLBACK_PROVIDER" != "$ENG_USED" ] \
+             && python3 tools/engine_supabase.py fallback_ok /tmp/claude.json /tmp/claude.err "$rc"; then
+            echo "main run failed on the provider side -> fallback $FALLBACK_PROVIDER ($FALLBACK_MODEL / $FALLBACK_MODEL_LIGHT)"
             cp /tmp/claude.json /tmp/claude.first.json 2>/dev/null || true; cp /tmp/claude.err /tmp/claude.first.err 2>/dev/null || true
-            FB_OK=1
-            python3 -m venv /tmp/litellm-venv && pip download -q --no-deps --only-binary=:all: -d /tmp/litellm-dl "litellm==$LITELLM_VERSION" \
-              && W=$(ls /tmp/litellm-dl/litellm-"$LITELLM_VERSION"-*manylinux_2_28_x86_64.whl) \
-              && echo "$LITELLM_WHEEL_SHA256  $W" | sha256sum -c - \
-              && /tmp/litellm-venv/bin/pip install -q "$W[proxy]" || FB_OK=0
-            if [ "$FB_OK" = 1 ]; then
-              python3 tools/engine_supabase.py litellm_config /tmp/litellm.yaml || FB_OK=0
-            fi
-            if [ "$FB_OK" = 1 ]; then
-              MK="sk-local-$(head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n')"
-              echo "::add-mask::$MK"
-              ( export LITELLM_MASTER_KEY="$MK"
-                case "$FALLBACK_PROVIDER" in gemini) export GEMINI_API_KEY="$(sec GEMINI_API_KEY)" ;; openai) export OPENAI_API_KEY="$(sec OPENAI_API_KEY)" ;; esac
-                exec /tmp/litellm-venv/bin/litellm --config /tmp/litellm.yaml --host 127.0.0.1 --port 4000 ) > /tmp/litellm.log 2>&1 &
-              LL_PID=$!
-              FB_OK=0
-              for i in $(seq 1 60); do curl -sf -o /dev/null http://127.0.0.1:4000/health/liveliness && { FB_OK=1; break; }; sleep 2; done
-            fi
-            if [ "$FB_OK" = 1 ]; then
+            if gw_start "$FALLBACK_PROVIDER" "$FALLBACK_MODEL" "$FALLBACK_MODEL_LIGHT"; then
               # start the main run again from a clean slate (keep only part 1 and the run set-up files)
               sudo find /tmp/out -mindepth 1 -delete
               find /tmp/work -mindepth 1 -maxdepth 1 ! -name 'study_part1.*' ! -name 'part1*' ! -name agents.json ! -name TOOL_DOCS.md -exec sudo rm -rf {} +
+              rm -f /tmp/litellm_cost.jsonl   # cost of the fallback run only (the failed run is in claude.first.json)
               rc=0
               timeout -k 60 150m "${ERUN[@]}" ANTHROPIC_BASE_URL=http://127.0.0.1:4000 ANTHROPIC_AUTH_TOKEN="$MK" \
                 "${INDIR[@]}" claude "${ARGS[@]}" > /tmp/claude.json 2> /tmp/claude.err || rc=$?
-              echo "fallback claude exit $rc"; tail -n 20 /tmp/claude.err || true
+              echo "fallback run exit $rc"; tail -n 20 /tmp/claude.err || true
               FB_USED="$FALLBACK_PROVIDER"
-              kill "$LL_PID" 2>/dev/null || true
             else
               echo "fallback gateway could not start"; tail -n 20 /tmp/litellm.log 2>/dev/null || true
-              python3 tools/engine_supabase.py warn "राखीव AI ($FALLBACK_PROVIDER) सुरू झाले नाही — Claude ची त्रुटी कायम." || true
+              python3 tools/engine_supabase.py warn "राखीव AI ($FALLBACK_PROVIDER) सुरू झाले नाही — मुख्य AI ची त्रुटी कायम." || true
             fi
           fi
+          gw_stop
 
           P1_ARGS=()
           if [ -n "$P1_PID" ]; then
@@ -309,7 +354,8 @@ jobs:
               [ -s /tmp/work/part1.pid ] && kill -TERM "$(cat /tmp/work/part1.pid)" 2>/dev/null
             fi
             wait "$P1_PID" || true
-            P1_ARGS=(--part1 /tmp/work/part1_result.json)
+            # a Claude helper that went through the gateway is already in the gateway cost file
+            if [ "$PART1_PROVIDER" != "claude" ] || [ -z "$ENG_USED" ]; then P1_ARGS=(--part1 /tmp/work/part1_result.json); fi
             tail -n 5 /tmp/work/part1.err || true
           fi
           T1=$(date +%s)
@@ -317,18 +363,29 @@ jobs:
           sudo chown -R "$ME" "${OWNED[@]}" /tmp/work
           sudo umount /srv/engine || true
           mv /tmp/CLAUDE.md.repo CLAUDE.md
-          if [ -n "$FB_USED" ]; then
-            python3 tools/engine_supabase.py warn "राखीव AI ($FB_USED: $FALLBACK_MODEL / $FALLBACK_MODEL_LIGHT) ने अभ्यास केला — Claude उपलब्ध नव्हते. सर्व तपासण्या लागू; तरीही दर्जा काळजीपूर्वक पाहा. खर्च Claude दराने नोंदला (अंदाजे)." || true
+          if [ -n "$SKIP_MAIN" ]; then
+            python3 tools/engine_supabase.py fail "$(cat /tmp/fail_reason.txt)"; exit 1
           fi
-          python3 tools/engine_supabase.py claude_result /tmp/claude.json /tmp/claude.err "$rc" "${P1_ARGS[@]}" --wall "$((T1 - T0))" \
+          GW_ARGS=()
+          USED="${FB_USED:-$ENG_USED}"
+          if [ -n "$USED" ]; then
+            touch /tmp/litellm_cost.jsonl   # no successful answer = $0 (not Claude Code's Claude-priced estimate)
+            GW_ARGS=(--gateway-cost /tmp/litellm_cost.jsonl --gateway-provider "$USED")
+            if [ -n "$FB_USED" ]; then W="राखीव AI ($FB_USED: $FALLBACK_MODEL / $FALLBACK_MODEL_LIGHT) ने अभ्यास केला — मुख्य AI उपलब्ध नव्हते."
+            else W="मुख्य अभ्यास $ENG_USED ($ENGINE_MODEL / $ENGINE_MODEL_LIGHT) ने केला — Claude ने नव्हे."; fi
+            python3 tools/engine_supabase.py warn "$W सर्व तपासण्या लागू; दर्जा काळजीपूर्वक पाहा; गोपनीयता-अटी: Settings मधील तक्ता." || true
+          fi
+          python3 tools/engine_supabase.py claude_result /tmp/claude.json /tmp/claude.err "$rc" "${P1_ARGS[@]}" "${GW_ARGS[@]}" --wall "$((T1 - T0))" \
             --status /tmp/out/status.json
       # H2: the reviewer's own /tmp/work/review.json (hashes of the approved spec / part 0) and the CLI's modelUsage
       # (MODEL_REVIEW really ran) are checked before verify_outputs runs
       - name: Verify outputs (verify_outputs.py must print ALL OK)
         run: python3 tools/engine_supabase.py verify /tmp/out /tmp/case --review /tmp/work --claude /tmp/claude.json
-      # verbatim guard for the cheap-tier extracts (related + Study part 3) on the delivered files: warning lines only
-      - name: Check extracts (extract_check.py, non-fatal)
-        run: python3 tools/engine_supabase.py extracts /tmp/out /tmp/work/spec.json /tmp/work/study.json /tmp/work/pkgpages || true
+      # final verbatim guard (QUALITY_AUDIT §7 M) on the delivered files: the run loops until EXTRACTS OK, so a MISMATCH
+      # in `related` / Study part 3 here is real -> the case fails (Marathi reason) and this step stops the job before
+      # the upload. Unverifiable extracts and the note body's “…” quotes (new check) are warning lines only.
+      - name: Check extracts (extract_check.py; mismatch fails the case)
+        run: python3 tools/engine_supabase.py extracts /tmp/out /tmp/work/spec.json /tmp/work/study.json /tmp/work/pkgpages
       - name: Upload outputs and finish
         run: python3 tools/engine_supabase.py finish /tmp/out
       - name: Record failure

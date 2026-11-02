@@ -70,7 +70,7 @@ D14. (02.11.2026, Abhi: "पहिले तीन H मुद्दे दु�
 D15. (02.11.2026, Abhi: "AI साठी A व C") **Other providers** (research: docs/AI_PROVIDERS_RESEARCH.md). Settings: secrets
     `gemini_api_key`, `openai_api_key`; plain `part1_provider` (''|claude|gemini), `gemini_model`, `fallback_provider`
     (''|gemini|openai), `fallback_model`, `fallback_model_light`. A key leaves the Worker only when its provider is chosen.
-    **A:** `tools/gemini_part1.py` writes Study part 1 (one request per page, runner user; result in the Claude result
+    **A:** `tools/part1_vision.py` (was gemini_part1.py) writes Study part 1 (one request per page, runner user; result in the Claude result
     format for cost lines); part1check gate unchanged. **C:** when the main Claude run fails on the provider side
     (`engine_supabase.py fallback_ok`), LiteLLM 1.105.1 (wheel sha256-checked) is started as the runner on 127.0.0.1:4000
     and the main run is repeated through it (all Claude model names → fallback models); warning on the case; all gates
@@ -92,3 +92,13 @@ Q3. Second AI provider as fallback — default: none.
 7. Live deploy — DONE 01.11.2026 (Abhi's accounts; URL and Supabase project above). First live runs ~10 min, $2.28–3.32
    (all on Opus, before D10/D11). Expected with tiers $1.0–1.8 — not yet measured. Later UX: auto-reload after deploys,
    Marathi errors, duplicate C R notice, live ETA from real run times.
+D16. (02.11.2026, Abhi: "विविध एआय मॉडेल्सचे एपीआय की प्रोव्हाइड करण्याची फॅसिलिटी ठेवा, फ्री मॉडेल पण युज करता आले पाहिजे")
+    **Providers:** gemini, openai, openrouter, groq, mistral, cerebras, cloudflare (Workers AI; + account id), ollama (own
+    server URL, key optional) — Settings keys `<p>_api_key` (cloudflare_api_token), plain `engine_provider` /
+    `engine_model(_light)`, `fallback_provider` / `fallback_model(_light)`, `part1_provider` / `part1_model`,
+    `cloudflare_account_id`, `ollama_base_url`. A key leaves the Worker only for a chosen provider; the Anthropic key is
+    not required when another provider runs the engine. **Engine:** `ENGINE_PROVIDER` runs the whole engine through the
+    LiteLLM gateway from the start; fallback as D15 for any provider ≠ the engine's; part 1 via `tools/part1_vision.py`
+    (Gemini native or OpenAI-compatible chat API). Real cost per answer from `tools/litellm_cost.py` (LiteLLM price table
+    by the provider model; free = $0; checked: Gemini 2.5 Pro/Flash exact). All gates unchanged. Free models: research
+    docs/AI_PROVIDERS_RESEARCH.md §5 — none is both big enough and confidential except own Ollama; Settings shows the table.

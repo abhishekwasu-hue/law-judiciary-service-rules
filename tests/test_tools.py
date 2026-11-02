@@ -158,6 +158,39 @@ class TestPkg3AndHighlight(TmpCase):
         r, _ = self.build("2-1")
         self.assertNotEqual(r.returncode, 0)
 
+    def test_proposal_page_stamp_no_fill(self):
+        # §4.13: a bottom-centre page no. on the proposal scan stays visible; the stamp moves to a clear spot, no fill
+        if not os.path.exists(GR_PDF):
+            self.skipTest("GR PDF not in checkout")
+        d = pymupdf.open(); pg = d.new_page(); h = pg.rect.height
+        pg.insert_text((pg.rect.width / 2 - 10, h - 10), "- 7 -", fontsize=11)
+        prop = os.path.join(self.tmp, "proposal.pdf"); d.save(prop); d.close()
+        enc = os.path.join(self.tmp, "enc.json")
+        jdump([{"path": GR_PDF, "pages": "1", "label": "GR"}], enc)
+        out = os.path.join(self.tmp, "o.pdf")
+        r = run([os.path.join(TOOLS, "pkg3.py"), prop, enc, out])
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        d = pymupdf.open(out)
+        p0 = d[0]
+        self.assertEqual([x for x in p0.get_drawings() if x.get("fill")], [], "filled shape on a proposal page")
+        strip = " ".join(p0.get_text("text", clip=pymupdf.Rect(0, h - 24, p0.rect.width, h)).split())
+        self.assertIn("- 7 -", strip)
+        self.assertIn("पृ. 1 / 2", strip)
+        st = [b for b in p0.get_text("words") if b[4] == "पृ."]
+        self.assertTrue(st and st[0][0] > p0.rect.width / 2 + 20, st)   # moved off the bottom centre
+        self.assertIn("पृ. 2 / 2", " ".join(d[1].get_text("text", clip=pymupdf.Rect(0, d[1].rect.height - 24,
+                                                                                    d[1].rect.width, d[1].rect.height)).split()))
+
+    def test_duplicate_label_refused(self):
+        if not os.path.exists(GR_PDF):
+            self.skipTest("GR PDF not in checkout")
+        prop = self.make_proposal()
+        enc = os.path.join(self.tmp, "enc.json")
+        jdump([{"path": GR_PDF, "pages": "1", "label": "GR"}, {"path": GR_PDF, "pages": "1", "label": "GR"}], enc)
+        r = run([os.path.join(TOOLS, "pkg3.py"), prop, enc, os.path.join(self.tmp, "o.pdf")])
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("duplicate enclosure label", r.stdout + r.stderr)
+
     def test_box_mark_refused(self):
         if not os.path.exists(GR_PDF):
             self.skipTest("GR PDF not in checkout")
@@ -266,6 +299,21 @@ class TestOldCasesText(TmpCase):
         txt = read_text(os.path.join(self.tmp, "out", "t", "001.txt"))
         self.assertIn("वेतननिश्चिती टिप्पणी", txt)
         self.assertIn("अ | ब", txt)
+
+
+class TestGrRequestCode(TmpCase):
+    def test_invalid_code_rejected_no_file(self):
+        # QUALITY_AUDIT §7 L: a `code` must be 16-20 digits before it becomes pdf/gr/<code>.pdf (no path tricks, no fetch)
+        os.makedirs(os.path.join(self.tmp, "tools"))
+        with open(os.path.join(self.tmp, "tools", "gr-request.txt"), "w", encoding="utf-8") as f:
+            f.write("# requests\ncode ../../x\ncode 12345\n# done\n")
+        r = run([os.path.join(TOOLS, "gr_request.py")], cwd=self.tmp)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertEqual(r.stdout.count("rejected: invalid GR code"), 2, r.stdout)
+        self.assertEqual(sorted(os.listdir(os.path.join(self.tmp, "pdf", "gr"))), ["INDEX.tsv"])
+        with open(os.path.join(self.tmp, "tools", "gr-request.txt"), encoding="utf-8") as f:
+            todo = f.read().split("# done")[0]
+        self.assertNotIn("code ", todo)   # moved to '# done', not retried
 
 
 if __name__ == "__main__":

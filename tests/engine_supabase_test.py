@@ -300,7 +300,9 @@ import engine_supabase as es
 
 c = es.engine_config({})
 check(c == {"MODEL": "claude-opus-5-5", "MODEL_LIGHT": "claude-haiku-5-5", "MODEL_REVIEW": "claude-opus-5-5", "MODEL_STRONG": "",
-            "EFFORT": "medium", "BUDGET_USD": "0.75", "PART1_PROVIDER": "claude", "GEMINI_MODEL": "gemini-2.5-flash", "FALLBACK_PROVIDER": "", "FALLBACK_MODEL": "", "FALLBACK_MODEL_LIGHT": ""},
+            "EFFORT": "medium", "BUDGET_USD": "0.75", "ENGINE_PROVIDER": "", "ENGINE_MODEL": "", "ENGINE_MODEL_LIGHT": "",
+            "PART1_PROVIDER": "claude", "PART1_MODEL": "", "GEMINI_MODEL": "gemini-2.5-flash", "FALLBACK_PROVIDER": "", "FALLBACK_MODEL": "", "FALLBACK_MODEL_LIGHT": "",
+            "CLOUDFLARE_ACCOUNT_ID": "", "OLLAMA_BASE_URL": ""},
       f"config: defaults (drafter, light Haiku, reviewer Opus, no strong tier, soft budget 0.75) {c}")
 c = es.engine_config({"model": "claude-sonnet-5-5", "model_review": "claude-opus-5-5"})
 check(c["MODEL"] == "claude-sonnet-5-5" and c["MODEL_REVIEW"] == "claude-opus-5-5" and c["MODEL_LIGHT"] == "claude-haiku-5-5",
@@ -327,15 +329,30 @@ r = subprocess.run([sys.executable, TOOL, "config", cfgf], capture_output=True, 
                    env={k: v for k, v in os.environ.items() if not k.startswith("SUPABASE")})
 check(r.returncode == 0 and r.stdout.splitlines() == ["MODEL=claude-opus-5-5", "MODEL_LIGHT=claude-haiku-5-5", "MODEL_REVIEW=claude-opus-5-5", "MODEL_STRONG=",
       "EFFORT=medium", "BUDGET_USD=0.90",
-      "PART1_PROVIDER=claude", "GEMINI_MODEL=gemini-2.5-flash", "FALLBACK_PROVIDER=", "FALLBACK_MODEL=", "FALLBACK_MODEL_LIGHT="] and "sk-secret" not in r.stdout, f"config CLI: KEY=VALUE lines, no secret, no Supabase env ({r.stdout!r} {r.stderr[:200]})")
+      "ENGINE_PROVIDER=", "ENGINE_MODEL=", "ENGINE_MODEL_LIGHT=", "PART1_PROVIDER=claude", "PART1_MODEL=", "GEMINI_MODEL=gemini-2.5-flash",
+      "FALLBACK_PROVIDER=", "FALLBACK_MODEL=", "FALLBACK_MODEL_LIGHT=", "CLOUDFLARE_ACCOUNT_ID=", "OLLAMA_BASE_URL="] and "sk-secret" not in r.stdout, f"config CLI: KEY=VALUE lines, no secret, no Supabase env ({r.stdout!r} {r.stderr[:200]})")
 r = subprocess.run([sys.executable, TOOL, "config", os.path.join(tmp, "absent.json")], capture_output=True, text=True, encoding="utf-8")
 check(r.returncode == 0 and "MODEL=claude-opus-5-5" in r.stdout, "config CLI: unreadable file -> defaults")
 
 # --- other providers (A: part 1 on Gemini; C: fallback through LiteLLM) — Abhi 02.11.2026
 pc = es.provider_config
 check(pc({"part1_provider": "gemini"})["PART1_PROVIDER"] == "claude", "A: gemini part 1 needs a Gemini key")
-check(pc({"part1_provider": "gemini", "gemini_api_key": "k", "gemini_model": "gemini-2.5-pro"}) | {} ==
-      {"PART1_PROVIDER": "gemini", "GEMINI_MODEL": "gemini-2.5-pro", "FALLBACK_PROVIDER": "", "FALLBACK_MODEL": "", "FALLBACK_MODEL_LIGHT": ""}, "A: gemini part 1 + model")
+c = pc({"part1_provider": "gemini", "gemini_api_key": "k", "gemini_model": "gemini-2.5-pro"})
+check(c["PART1_PROVIDER"] == "gemini" and c["PART1_MODEL"] == "gemini-2.5-pro" and c["FALLBACK_PROVIDER"] == "" and c["ENGINE_PROVIDER"] == "",
+      f"A: gemini part 1 + model (older gemini_model setting) {c}")
+# various providers, free models included (Abhi 02.11.2026)
+c = pc({"engine_provider": "openrouter", "openrouter_api_key": "k", "fallback_provider": "openrouter"})
+check(c["ENGINE_PROVIDER"] == "openrouter" and c["ENGINE_MODEL"] == "nvidia/nemotron-3.5-super-vl:free" and c["ENGINE_MODEL_LIGHT"] == "google/gemma-4-31b:free"
+      and c["FALLBACK_PROVIDER"] == "", f"engine on OpenRouter free models; fallback = same provider -> off {c}")
+check(pc({"engine_provider": "cloudflare", "cloudflare_api_token": "t"})["ENGINE_PROVIDER"] == "" and
+      pc({"engine_provider": "cloudflare", "cloudflare_api_token": "t", "cloudflare_account_id": "a" * 32})["ENGINE_PROVIDER"] == "cloudflare",
+      "Cloudflare needs token + account id")
+c = pc({"engine_provider": "ollama", "ollama_base_url": "https://gpu.office.example:11434/", "engine_model": "gemma4:31b", "part1_provider": "ollama", "part1_model": "gemma4:12b"})
+check(c["ENGINE_PROVIDER"] == "ollama" and c["OLLAMA_BASE_URL"] == "https://gpu.office.example:11434" and c["ENGINE_MODEL"] == "gemma4:31b"
+      and c["PART1_PROVIDER"] == "ollama" and c["PART1_MODEL"] == "gemma4:12b", f"Ollama: URL only, models as given {c}")
+check(pc({"engine_provider": "ollama", "ollama_base_url": "file:///etc"})["ENGINE_PROVIDER"] == "" and
+      pc({"engine_provider": "groq", "groq_api_key": "k", "engine_model": "../../x"})["ENGINE_MODEL"] == "gpt-oss-120b",
+      "bad Ollama URL -> off; unsafe model name -> provider default")
 check(pc({"fallback_provider": "openai"})["FALLBACK_PROVIDER"] == "" and pc({"fallback_provider": "x", "x_api_key": "k"})["FALLBACK_PROVIDER"] == "",
       "C: fallback needs a known provider and its key")
 c = pc({"fallback_provider": "gemini", "gemini_api_key": "k", "fallback_model": "$(id)", "fallback_model_light": "gemini-2.5-flash-lite"})
@@ -365,9 +382,24 @@ routes = {d["model_name"]: d["litellm_params"]["model"] for d in lc["model_list"
 check(routes == {"claude-sonnet-5-5": "gemini/gemini-2.5-pro", "claude-opus-5-5": "gemini/gemini-2.5-pro",
                  "claude-haiku-5-5": "gemini/gemini-2.5-flash", "claude-*": "gemini/gemini-2.5-flash"}
       and all(d["litellm_params"]["api_key"] == "os.environ/GEMINI_API_KEY" for d in lc["model_list"])
+      and lc["litellm_settings"]["callbacks"] == "litellm_cost.handler"
       and lc["general_settings"]["master_key"] == "os.environ/LITELLM_MASTER_KEY", f"C: LiteLLM routes, keys only by env name {routes}")
 lc = json.loads(es.litellm_config({**conf, "FALLBACK_PROVIDER": "openai", "FALLBACK_MODEL": "gpt-6.1-sol", "FALLBACK_MODEL_LIGHT": "gpt-5.4-mini"}))
 check(lc["model_list"][0]["litellm_params"] == {"model": "openai/gpt-6.1-sol", "api_key": "os.environ/OPENAI_API_KEY"}, "C: OpenAI routes")
+lc = json.loads(es.litellm_config(conf, "ollama", "gemma4:31b", "gemma4:12b"))
+check(lc["model_list"][0]["litellm_params"] == {"model": "ollama_chat/gemma4:31b", "api_base": "os.environ/OLLAMA_BASE_URL"}, "Ollama route: api_base by env name, no key")
+lc = json.loads(es.litellm_config(conf, "cloudflare", "@cf/x", "@cf/y"))
+check(lc["model_list"][0]["litellm_params"] == {"model": "cloudflare/@cf/x", "api_key": "os.environ/CLOUDFLARE_API_KEY"}, "Cloudflare route")
+# real cost from the gateway callback replaces Claude Code's Claude-priced estimate
+gcf = os.path.join(tmp, "gw_cost.jsonl")
+open(gcf, "w").write('{"model": "gemma-4-31b:free", "cost": 0, "in": 1000, "out": 100}\n{"model": "nemotron", "cost": 0.0, "in": 5, "out": 5}\nnot json\n')
+check(es.gateway_cost(gcf) == {"gemma-4-31b:free": 0.0, "nemotron": 0.0} and es.gateway_cost(os.path.join(tmp, "absent")) is None, "gateway_cost: sums per model, bad lines skipped")
+jgw = os.path.join(tmp, "gw_claude.json")
+json.dump({"type": "result", "subtype": "success", "num_turns": 30, "total_cost_usd": 3.5, "modelUsage": {"claude-opus-5-5": {"costUSD": 3.5}}}, open(jgw, "w"))
+run_row.update(state="running", warnings=[])
+r = run("claude_result", jgw, os.path.join(tmp, "absent.err"), "0", "--gateway-cost", gcf, "--gateway-provider", "openrouter")
+check(r.returncode == 0 and run_row["cost_usd"] == 0 and any("openrouter:gemma-4-31b:free $0.00" in w for w in run_row["warnings"]),
+      f"claude_result via gateway: provider cost stored (free = $0), not the Claude estimate ({run_row.get('cost_usd')} {run_row['warnings']})")
 
 ag = es.agents_json({"MODEL": "claude-sonnet-5-5", "MODEL_LIGHT": "claude-haiku-5-5", "MODEL_REVIEW": "claude-opus-5-5", "MODEL_STRONG": ""})
 check(set(ag) == {"drafter", "study_writer", "related_writer", "reviewer"} and ag["drafter"]["model"] == "claude-sonnet-5-5"
@@ -444,7 +476,7 @@ check([w for w in run_row["warnings"] if w.startswith("मॉडेल: ")] == l
 r = claude({"type": "result", "subtype": "error_max_budget_usd", "is_error": True, "num_turns": 12, "total_cost_usd": 0.8})
 check(r.returncode == 1 and run_row["step"].startswith("खर्च-मर्यादा ओलांडली"), f"claude_result budget stop: Marathi reason ({run_row['step']})")
 
-# --- extracts: final verbatim guard -> non-fatal "मॉडेल: उतारा-तपासणी" warning lines
+# --- extracts: final verbatim guard -> mismatch fails the case; unverifiable / note-body quotes = warning lines
 FONTF = next((f for f in ("/usr/share/fonts/truetype/freefont/FreeSerif.ttf", "/usr/share/fonts/opentype/freefont/FreeSerif.otf",
                           "C:/Windows/Fonts/mangal.ttf", "C:/Windows/Fonts/Nirmala.ttf") if os.path.exists(f)), None)
 try:
@@ -460,17 +492,26 @@ if pymupdf and FONTF:
     spx = os.path.join(tmp, "spec_x.json")
     json.dump({"related": [{"heading": "GR", "text": ["“" + LINE.replace("नवीन", "जुनी") + "”"], "source": "(पॅकेज PDF पृ. 2)"}]},
               open(spx, "w", encoding="utf-8"), ensure_ascii=False)
-    run_row.update(state="done", warnings=[])
+    run_row.update(state="running", step="तपासणी चालू", warnings=[])
     r = run("extracts", ox, spx, os.path.join(tmp, "absent_study.json"))
-    check(r.returncode == 0 and run_row["state"] == "done" and len(run_row["warnings"]) == 1
-          and run_row["warnings"][0].startswith("मॉडेल: उतारा-तपासणी — 1 उतारे मूळ PDF शी जुळले नाहीत"),
-          f"extracts: mismatch -> warning only, case stays done ({run_row['warnings']} {r.stderr[:200]})")
+    check(r.returncode == 1 and run_row["state"] == "failed" and run_row["step"].startswith("उतारा-तपासणी अयशस्वी — 1 उतारे")
+          and "related[1]" in run_row["step"],
+          f"extracts: final mismatch in related -> case failed with a Marathi reason ({run_row['step']} {r.stderr[:200]})")
     json.dump({"related": [{"heading": "GR", "text": ["“" + LINE + "”"], "source": "(पॅकेज PDF पृ. 2)"}]},
               open(spx, "w", encoding="utf-8"), ensure_ascii=False)
-    run_row.update(warnings=[])
+    run_row.update(state="running", step="तपासणी चालू", warnings=[])
     r = run("extracts", ox, spx, os.path.join(tmp, "absent_study.json"))
-    check(r.returncode == 0 and run_row["warnings"] == [] and not os.path.exists(os.path.join(ox, ".extracts.json")),
+    check(r.returncode == 0 and run_row["state"] == "running" and run_row["warnings"] == []
+          and not os.path.exists(os.path.join(ox, ".extracts.json")),
           f"extracts: all match -> no warning, no scratch file left ({run_row['warnings']})")
+    # note body “…” quotes: checked against the cited पृ.N/प.वि. page, WARNING only (new check)
+    json.dump({"note": {"first": "पत्रास अनुसरुन सादर.", "paras": ["शासन निर्णयात “" + LINE.replace("नवीन", "जुनी") + "” अशी तरतूद आहे (पृ.2/प.वि.)."]},
+               "related": [{"heading": "GR", "text": ["“" + LINE + "”"], "source": "(पॅकेज PDF पृ. 2)"}]},
+              open(spx, "w", encoding="utf-8"), ensure_ascii=False)
+    r = run("extracts", ox, spx, os.path.join(tmp, "absent_study.json"))
+    check(r.returncode == 0 and run_row["state"] == "running" and len(run_row["warnings"]) == 1
+          and run_row["warnings"][0].startswith("मॉडेल: उतारा-तपासणी — नोंदीतील 1 अवतरणे मूळ PDF शी जुळली नाहीत"),
+          f"extracts: note-body quote mismatch -> warning only ({run_row['warnings']} {r.stderr[:200]})")
 else:
     print("skip  extracts (pymupdf or Devanagari font missing)")
 
@@ -522,6 +563,27 @@ r = gate(good, used)
 check(r.returncode == 0 and run_row["state"] == "running", f"review gate: approved, hashes match, Opus usage present -> verify runs ({r.stderr[:200]})")
 r = run("verify", out, work, "--review", rd, "--claude", cjf, VERIFY_SCRIPT=fake, MODEL_REVIEW="claude-haiku-5-5", MODEL_LIGHT="claude-haiku-5-5")
 check(r.returncode == 0, "review gate: reviewer = orchestrator model -> usage check skipped (hashes still checked)")
+
+# --- verify re-runs part1check on the FINAL Study part 1 (study.json "भाग 1") vs facts.json (QUALITY_AUDIT §7 M)
+run_row.update(warnings=[])
+r = gate(good, used)
+check(r.returncode == 0 and any("facts.json नाही" in w for w in run_row["warnings"]),
+      f"verify part1: facts.json absent -> warning only ({run_row['warnings']})")
+json.dump(facts, open(os.path.join(rd, "facts.json"), "w", encoding="utf-8"), ensure_ascii=False)
+stj = os.path.join(rd, "study.json")
+json.dump({"parts": [{"heading": "भाग 0 — ब्रीफिंग", "blocks": []}, p1]}, open(stj, "w", encoding="utf-8"), ensure_ascii=False)
+r = gate(good, used)
+check(r.returncode == 0 and run_row["state"] == "running" and "PART1 OK" in r.stdout, f"verify part1: final part 1 matches facts -> OK ({r.stderr[:200]})")
+json.dump({"parts": [{"heading": "भाग 0 — ब्रीफिंग", "blocks": []}, p1b]}, open(stj, "w", encoding="utf-8"), ensure_ascii=False)
+if os.path.exists(argf): os.remove(argf)
+r = gate(good, used)
+check(r.returncode == 1 and run_row["state"] == "failed" and run_row["step"].startswith("भाग 1 (मराठी रूपांतर) तथ्यांशी जुळला नाही")
+      and "06.08.2026" not in run_row["step"] and "05.08.2026" in run_row["step"] and not os.path.exists(argf),
+      f"verify part1: mismatch -> failed before verify_outputs ({run_row['step'][:160]})")
+os.remove(stj)
+json.dump(p1, open(os.path.join(rd, "study_part1.json"), "w", encoding="utf-8"), ensure_ascii=False)
+r = gate(good, used)
+check(r.returncode == 0 and "PART1 OK" in r.stdout, "verify part1: no study.json -> study_part1.json checked")
 
 srv.shutdown()
 print("ALL TESTS PASSED")

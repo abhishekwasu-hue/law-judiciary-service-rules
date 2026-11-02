@@ -92,6 +92,37 @@ class ExtractCheck(unittest.TestCase):
         r = xc.check(self.pdf, self.spec(["“" + GR_LINE + "”"], "3"), None, ocr_dir=od, no_ocr=True)
         self.assertEqual(r[0]["status"], "ok_ocr")
 
+    def test_note_body_quotes_warn_only(self):
+        self.assertEqual(xc.note_pages("(पृ.2/प.वि.) व पृ. 4 ते 6 / प.वि. तसेच पृ.8,9/प.वि.; पृ.      /प.वि."), [2, 4, 5, 6, 8, 9])
+        bad = GR_LINE.replace("नवीन", "जुनी")
+        spec = {"note": {"first": "पत्रास अनुसरुन सादर.",
+                         "paras": ["तरतूद “" + GR_LINE + "” अशी आहे (पृ.2/प.वि.).", "तरतूद “" + bad + "” (पृ.2/प.वि.)."]}}
+        self.assertEqual(self.run_check(spec), [])          # note body is checked only with note_body=True
+        r = self.run_check(spec, note_body=True)
+        self.assertEqual([(x["where"], x["status"], x.get("warn_only")) for x in r],
+                         [("नोंद परि. 2", "ok", True), ("नोंद परि. 3", "mismatch", True)])
+        self.assertEqual(xc.model_log(r), [])                 # never sent back as a failing unit
+        sp = os.path.join(self.tmp, "note_spec.json"); wj(sp, spec)
+        out = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "extract_check.py"), self.pdf, "--spec", sp,
+                              "--note-body", "--no-ocr"], capture_output=True, text=True, encoding="utf-8")
+        self.assertEqual(out.returncode, 0, out.stdout + out.stderr)
+        self.assertIn("WARN MISMATCH नोंद परि. 3", out.stdout)
+        self.assertIn("EXTRACTS OK", out.stdout)
+
+    def test_stale_ocr_ignored(self):
+        # OCR made from an earlier package build (pages.json pdf_sha256 differs) must not verify the new package
+        od = os.path.join(self.tmp, "ocr_stale"); os.makedirs(od, exist_ok=True)
+        with io.open(os.path.join(od, "p-03.ocr.txt"), "w", encoding="utf-8") as f:
+            f.write(GR_LINE)
+        with io.open(os.path.join(od, "pages.json"), "w", encoding="utf-8") as f:
+            json.dump({"pdf_sha256": "0" * 64}, f)
+        r = xc.check(self.pdf, self.spec(["“" + GR_LINE + "”"], "3"), None, ocr_dir=od, no_ocr=True)
+        self.assertEqual(r[0]["status"], "unverifiable", r)
+        with io.open(os.path.join(od, "pages.json"), "w", encoding="utf-8") as f:
+            json.dump({"pdf_sha256": xc.sha256_file(self.pdf)}, f)
+        r = xc.check(self.pdf, self.spec(["“" + GR_LINE + "”"], "3"), None, ocr_dir=od, no_ocr=True)
+        self.assertEqual(r[0]["status"], "ok_ocr", r)
+
     def test_garbled_page_ocr(self):
         self.assertTrue(xc.garbled(" ".join(GARBLED)) and not xc.garbled(GR_LINE + GR_LINE2))
         r = self.run_check(self.spec(["“" + GR_LINE + "”"], "6"))

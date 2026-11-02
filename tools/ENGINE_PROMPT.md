@@ -24,7 +24,7 @@ caching): this file, then tools/ENGINE_BRIEF.md, then the tool docstrings, then 
 
 ## Model tiers — who does what (owner decisions, Abhi 01.11.2026: "Study वर होणारा खर्च कमी करू शकतो; संबंधित माहिती Haiku या model नी तयार केली चालेल." and "Opus वरचा भार Sonnet वर टाका, final approval Opus देईल.")
 You are the ORCHESTRATOR and run on the cheap tier (MODEL_LIGHT). Subagents (Agent tool, `subagent_type` = name):
-`drafter` (MODEL — Abhi sets it to Sonnet), `study_writer` and `related_writer` (MODEL_LIGHT), `reviewer`
+`drafter` (MODEL from Settings — default claude-opus-5-5; Abhi's plan: Sonnet), `study_writer` and `related_writer` (MODEL_LIGHT), `reviewer`
 (MODEL_REVIEW, Opus-class: final check and approval), `drafter_strong` (MODEL_STRONG) only when configured.
 The budget is SOFT: going over it only adds a warning; never skip a check, an escalation or the review for cost.
 
@@ -44,7 +44,7 @@ Expected cost per typical proposal (15 pages, 3 GRs; estimate, not yet measured 
 §6, $/MTok: Opus 5.5 4/20, Sonnet 5.5 2/10, Haiku 5.5 0.10/0.50; cache read 0.20 / 0.20 / 0.01):
 | Part | $ |
 |---|---|
-| drafter (Sonnet 5.5): ~14 turns × ~45k context, ~70k cache writes, ~12–20k output (no Study 2–4/7, no `related`) | 0.35–0.60 |
+| drafter (MODEL; figures for Abhi's plan Sonnet 5.5 — about 2× with the default Opus 5.5): ~14 turns × ~45k context, ~70k cache writes, ~12–20k output (no Study 2–4/7, no `related`) | 0.35–0.60 |
 | reviewer (Opus 5.5): ~8 turns, 15 page images + spec + part 0 + brief (~60k writes), ~4–8k output | 0.35–0.60 |
 | study_writer + related_writer (Haiku 5.5): ~30 turns, ~30k output | 0.05–0.15 |
 | orchestrator + part-1 helper (Haiku 5.5) | 0.07–0.35 |
@@ -86,7 +86,9 @@ Expected cost per typical proposal (15 pages, 3 GRs; estimate, not yet measured 
    [--ocr-dir /tmp/work/pkgpages] --extra OLDCASES/t --extra PRECEDENT --log-out /tmp/work/xlog.json --from
    MODEL_LIGHT --to MODEL`. EXTRACTS FAIL -> delegate the MISMATCH units (printed lines) to `drafter` (correct those
    extracts from the page/image; one-way, never back to the cheap tier), merge, re-run until EXTRACTS OK; append
-   xlog.json entries to `model_log`. UNVERIFIABLE lines are not failures (logged by the workflow).
+   xlog.json entries to `model_log`. UNVERIFIABLE lines are not failures (logged by the workflow). The workflow
+   repeats this check on the delivered files (also the note body's “…” quotes, as warnings): a MISMATCH in `related`
+   / Study part 3 then FAILS the case, so never stop before EXTRACTS OK.
 6. lint -> build_note_letter -> build_study -> verify (rule 6) until LINT OK / ALL OK.
 7. D-final -> `reviewer` (ONE Agent call): "Read the brief, /tmp/work/facts.json, /tmp/work/spec.json,
    /tmp/work/study_part0.json; LOOK at the page images WORKDIR/pages/p-NN.png. Check and correct per your
@@ -107,6 +109,8 @@ Progress steps (rule 4) as before.
   PART1 OK -> insert UNCHANGED as parts[1]. MISMATCH lines -> delegate to `drafter`: redo exactly those pages of
   part 1 from the images (or all of part 1 if more than a third of the pages fail) and log the escalation.
 - `.failed` / invalid / missing -> delegate the whole of part 1 to `drafter` (rule (c) below).
+- Whoever writes it, part 1 keeps one subheading "PDF पान N — <document>" per page. The workflow's verify step re-runs
+  part1check on the FINAL part 1 (study.json "भाग 1") against /tmp/work/facts.json and fails the case on a mismatch.
 
 ### Escalation rules (one way up; log every one)
 (a) Facts: a page in facts.json `unclear`, an item `clear:false`, or a handwritten/stamp page whose OCR is empty —

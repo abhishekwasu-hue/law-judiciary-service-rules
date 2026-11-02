@@ -1,9 +1,9 @@
-"""tools/gemini_part1.py against a local mock of the Gemini generateContent API (no network, no key)."""
+"""tools/part1_vision.py (Gemini native + OpenAI-compatible providers) against a local mock of the Gemini generateContent API (no network, no key)."""
 import json, os, subprocess, sys, threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-TOOL = os.path.join(ROOT, "tools", "gemini_part1.py")
+TOOL = os.path.join(ROOT, "tools", "part1_vision.py")
 
 
 def serve(handler_fn):
@@ -93,3 +93,36 @@ def test_no_key_and_bad_model_name(tmp_path):
     r = run(tmp_path, f"http://127.0.0.1:{srv.server_address[1]}", extra=("--model", "../../x"))
     srv.shutdown()
     assert r.returncode == 0 and seen[0]["path"].endswith("/gemini-2.5-flash:generateContent"), "unsafe model name -> default"
+
+
+def compat_resp(i):
+    page = {"document": "पत्र", "file_page": "", "blocks": [{"type": "para", "text": f"दि. 0{i}.08.2026"}]}
+    return {"choices": [{"message": {"content": "```json\n" + json.dumps(page, ensure_ascii=False) + "\n```"}}], "usage": {"prompt_tokens": 900, "completion_tokens": 100}}
+
+
+def test_openai_compatible_provider(tmp_path):
+    srv, seen = serve(lambda n, b: (400, {"error": "response_format unsupported"}) if n == 1 else (200, compat_resp(n)))
+    pages(tmp_path, 1)
+    env = dict(os.environ, OPENROUTER_API_KEY="sk-or", PART1_BASE=f"http://127.0.0.1:{srv.server_address[1]}", GEMINI_RETRY_WAIT="0", PYTHONIOENCODING="utf-8")
+    r = subprocess.run([sys.executable, TOOL, str(tmp_path / "pages"), str(tmp_path / "out"), "--provider", "openrouter"], env=env, capture_output=True, text=True, encoding="utf-8")
+    srv.shutdown()
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert seen[0]["path"] == "/chat/completions" and "response_format" in seen[0]["body"] and "response_format" not in seen[1]["body"], "retried without response_format"
+    b = seen[1]["body"]
+    assert b["model"] == "google/gemma-4-31b:free" and b["messages"][1]["content"][0]["image_url"]["url"].startswith("data:image/png;base64,")
+    p1 = json.loads((tmp_path / "out" / "study_part1.json").read_text(encoding="utf-8"))
+    assert {"para": "दि. 02.08.2026"} in p1["blocks"], "code fence stripped, JSON parsed (2nd call answered)"
+    res = json.loads((tmp_path / "out" / "part1_result.json").read_text(encoding="utf-8"))
+    assert res["total_cost_usd"] == 0 and res["modelUsage"]["google/gemma-4-31b:free"]["inputTokens"] == 900 and "price unknown" in res["result"]
+
+
+def test_cloudflare_needs_account_and_ollama_needs_url(tmp_path):
+    pages(tmp_path, 1)
+    env = dict(os.environ, CLOUDFLARE_API_TOKEN="t", GEMINI_RETRY_WAIT="0", PYTHONIOENCODING="utf-8")
+    env.pop("CLOUDFLARE_ACCOUNT_ID", None); env.pop("PART1_BASE", None)
+    r = subprocess.run([sys.executable, TOOL, str(tmp_path / "pages"), str(tmp_path / "out"), "--provider", "cloudflare"], env=env, capture_output=True, text=True, encoding="utf-8")
+    assert r.returncode == 1 and "CLOUDFLARE_ACCOUNT_ID" in (tmp_path / "out" / "study_part1.failed").read_text(encoding="utf-8")
+    (tmp_path / "out" / "study_part1.failed").unlink()
+    env.pop("OLLAMA_BASE_URL", None)
+    r = subprocess.run([sys.executable, TOOL, str(tmp_path / "pages"), str(tmp_path / "out"), "--provider", "ollama"], env=env, capture_output=True, text=True, encoding="utf-8")
+    assert r.returncode == 1 and "OLLAMA_BASE_URL" in (tmp_path / "out" / "study_part1.failed").read_text(encoding="utf-8"), "ollama runs without a key but needs its URL"

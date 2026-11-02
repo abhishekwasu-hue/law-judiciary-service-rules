@@ -13,10 +13,34 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262   # v4.4.0
+        with: { fetch-depth: 1, persist-credentials: false }   # the commit step authenticates itself
       - run: python3 tools/gr_request.py
-      - run: |
+      # Same commit block as process-proposal.yml: our ONE commit is replayed onto the fetched tip (rebase --onto);
+      # pdf/gr/INDEX.tsv and tools/gr-request.txt merge by union (an engine run may append at the same time).
+      # A failed push fails this job (no silent loss of fetched GRs).
+      - name: Commit fetched GRs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}   # this step only (checkout keeps no credentials)
+        run: |
+          set -u
+          AUTH="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
+          G=(git -c "http.https://github.com/.extraheader=$AUTH")
           git config user.name github-actions; git config user.email actions@github.com
-          git add pdf/gr tools/gr-request.txt
-          git commit -m "GR request: fetched" || exit 0
-          for i in 1 2 3; do git pull --rebase origin main && git push && break || sleep 5; done
+          printf 'pdf/gr/INDEX.tsv merge=union\ntools/gr-request.txt merge=union\n' >> .git/info/attributes
+          git add -- pdf/gr tools/gr-request.txt
+          git diff --cached --quiet && exit 0
+          git commit -q -m "GR request: fetched" || exit 0
+          ok=0
+          for i in 1 2 3; do
+            if "${G[@]}" fetch -q --depth 1 origin "$GITHUB_REF_NAME" &&
+               git rebase -q --autostash --onto FETCH_HEAD HEAD~1 &&
+               "${G[@]}" push -q origin "HEAD:$GITHUB_REF_NAME"; then ok=1; break; fi
+            git rebase --abort 2>/dev/null || true
+            sleep 5
+          done
+          if [ "$ok" != 1 ]; then
+            echo "::error::fetched GRs were NOT pushed to $GITHUB_REF_NAME"
+            exit 1
+          fi
+          echo "pushed: $(git log -1 --format=%h)"

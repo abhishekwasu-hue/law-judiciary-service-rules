@@ -30,11 +30,16 @@ Commands:
                       else status.json `proposal_pages`; original name from <workdir>/case.json, so a real file name
                       such as CR66_Proposal_with_GRs.pdf is accepted). Not ALL OK -> fail with the FAIL lines.
                       status.json `review.approved` must be true (final reviewer, MODEL_REVIEW), else fail.
+                      --review <work dir> [--claude <claude.json>]: review_gate (review.json hashes + modelUsage) and
+                      part1check re-run on the FINAL Study part 1 (<work>/study.json part "भाग 1", else
+                      study_part1.json) vs <work>/facts.json: mismatch -> fail; facts.json absent -> warning only.
   extracts <outdir> <spec.json> <study.json> [<ocr dir>]
-                      tools/extract_check.py on the delivered `related` + Study part 3 vs the package PDF; non-fatal:
-                      "मॉडेल: उतारा-तपासणी — …" warning lines for mismatched / unverifiable extracts.
+                      tools/extract_check.py on the delivered `related` + Study part 3 vs the package PDF: a MISMATCH
+                      fails the case (Marathi reason; the run already looped until EXTRACTS OK); unverifiable extracts
+                      and the note body's “…” quotes (--note-body, new check) are "मॉडेल: उतारा-तपासणी — …" warnings.
   config <cfg.json>   (local) the non-secret run settings from the Worker's /api/engine/config JSON as KEY=VALUE
-                      lines for $GITHUB_ENV: MODEL (main tier, every quality-critical task; default claude-opus-5-5),
+                      lines for $GITHUB_ENV: MODEL (main tier = drafter, every quality-critical task; from Settings,
+                      default claude-opus-5-5; Abhi's plan: Sonnet),
                       MODEL_LIGHT (mechanical tier + orchestrating session; default claude-haiku-5-5), MODEL_STRONG
                       (optional one-way escalation tier; default off), MODEL_REVIEW (final reviewer/approver;
                       default claude-opus-5-5), EFFORT (default medium), BUDGET_USD (SOFT,
@@ -200,8 +205,14 @@ def storage_name(n):
     return "file" + (ext if re.fullmatch(r"\.[a-z0-9]{1,8}", ext) else "")
 
 
+# The ONE definition of the upload system's random file-name prefix (INSTRUCTIONS §4.16, e.g. "11ae057d-"); also used by
+# tools/verify_outputs.py. 8 hex characters + "-", at least one of them a letter a-f (case-insensitive), so a real name
+# that starts with a date ("20261101-CR130.pdf") is kept.
+UPLOAD_PREFIX = re.compile(r"^(?=[0-9a-f]{0,7}[a-f])[0-9a-f]{8}-", re.I)
+
+
 def strip_upload_prefix(n):
-    return re.sub(r"^[0-9a-f]{8}-", "", n)
+    return UPLOAD_PREFIX.sub("", n)
 
 
 def package_pdfs(out):
@@ -358,7 +369,8 @@ MODEL_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:@\[\]/-]{1,99}")
 def engine_config(cfg):
     """Non-secret run settings from the Worker config dict (keys model, model_light, model_review, model_strong,
     effort, budget_usd); every missing/invalid value -> DEFAULTS. Tiers (Abhi, 01.11.2026): MODEL = drafter (facts from
-    the page images, letter-or-not, note body + letter, GR choice for the note, Study part 0; Abhi sets it to Sonnet),
+    the page images, letter-or-not, note body + letter, GR choice for the note, Study part 0; MODEL from Settings (default claude-opus-5-5;
+    Abhi's plan: Sonnet)),
     MODEL_LIGHT = cheap tier (orchestrator, tools, builds, lint/verify fixes, Study parts 1-7 except 0, note `related`),
     MODEL_REVIEW = final reviewer/approver (Opus-class; checks and minimally corrects note + letter + part 0; the run
     is not "done" without its approval), MODEL_STRONG = optional one-way escalation tier above MODEL
@@ -395,22 +407,56 @@ def engine_config(cfg):
 # part1check). C: when the Claude run fails on the provider side (credit, key, overloaded, API error), the same engine
 # run is repeated through a local LiteLLM gateway on the fallback provider. Paid API keys only (free tiers: no
 # confidential data — Gemini terms). Defaults below are used when the Settings value is empty or invalid.
-FALLBACK_DEFAULTS = {"gemini": ("gemini-2.5-pro", "gemini-2.5-flash"), "openai": ("gpt-6.1-sol", "gpt-5.4-mini")}
-PROVIDER_MODEL_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{1,80}")
+# Providers reachable through the LiteLLM gateway (Worker AI_PROVIDERS; research docs/AI_PROVIDERS_RESEARCH.md):
+# LiteLLM model prefix, env name of its key, default (main, light) models. `ollama` = the office's own model server.
+PROVIDERS = {
+    "gemini": ("gemini/", "GEMINI_API_KEY", ("gemini-2.5-pro", "gemini-2.5-flash")),
+    "openai": ("openai/", "OPENAI_API_KEY", ("gpt-6.1-sol", "gpt-5.4-mini")),
+    "openrouter": ("openrouter/", "OPENROUTER_API_KEY", ("nvidia/nemotron-3.5-super-vl:free", "google/gemma-4-31b:free")),
+    "groq": ("groq/", "GROQ_API_KEY", ("gpt-oss-120b", "qwen3.8-27b")),
+    "mistral": ("mistral/", "MISTRAL_API_KEY", ("mistral-medium-latest", "mistral-small-latest")),
+    "cerebras": ("cerebras/", "CEREBRAS_API_KEY", ("gpt-oss-120b", "qwen-3.8-27b")),
+    "cloudflare": ("cloudflare/", "CLOUDFLARE_API_TOKEN", ("@cf/meta/llama-4-scout-17b-16e-instruct", "@cf/meta/llama-4-scout-17b-16e-instruct")),
+    "ollama": ("ollama_chat/", "OLLAMA_API_KEY", ("gemma4:31b", "gemma4:12b")),
+}
+SETTINGS_KEY = {"cloudflare": "cloudflare_api_token"}  # Settings key name when not "<provider>_api_key"
+FALLBACK_DEFAULTS = {p: v[2] for p, v in PROVIDERS.items()}  # kept for older callers/tests
+PROVIDER_MODEL_RE = re.compile(r"@?[A-Za-z0-9][A-Za-z0-9._:/@-]{1,100}")
+URL_RE = re.compile(r"https?://[A-Za-z0-9.-]+(:\d+)?(/[A-Za-z0-9._~/-]*)?")
+
+
+def provider_ready(cfg, p):
+    s = lambda k: cfg.get(k).strip() if isinstance(cfg.get(k), str) else ""
+    if p not in PROVIDERS: return False
+    if p == "ollama": return bool(URL_RE.fullmatch(s("ollama_base_url")))
+    if p == "cloudflare" and not re.fullmatch(r"[0-9a-f]{32}", s("cloudflare_account_id")): return False
+    return bool(s(SETTINGS_KEY.get(p, f"{p}_api_key")))
 
 
 def provider_config(cfg):
-    """PART1_PROVIDER (claude|gemini — gemini only with a Gemini key), GEMINI_MODEL, FALLBACK_PROVIDER (''|gemini|openai
-    — only with that provider's key), FALLBACK_MODEL, FALLBACK_MODEL_LIGHT. Keys themselves are never printed."""
+    """Provider choices (keys themselves are never printed): ENGINE_PROVIDER ('' = Claude, else the provider that runs the
+    whole engine through the gateway), ENGINE_MODEL(_LIGHT); FALLBACK_PROVIDER ('' or a provider ≠ ENGINE_PROVIDER, used when
+    the main run fails on the provider side), FALLBACK_MODEL(_LIGHT); PART1_PROVIDER (claude or a provider) + PART1_MODEL
+    (GEMINI_MODEL kept for older settings); CLOUDFLARE_ACCOUNT_ID, OLLAMA_BASE_URL. A provider counts only when its key
+    (Ollama: its URL; Cloudflare: also the account id) is set; invalid model names -> the provider's defaults."""
     s = lambda k: cfg.get(k).strip() if isinstance(cfg.get(k), str) else ""
-    m = lambda k, d: s(k) if PROVIDER_MODEL_RE.fullmatch(s(k)) else d
-    p1 = "gemini" if s("part1_provider") == "gemini" and s("gemini_api_key") else "claude"
-    fb = s("fallback_provider")
-    if fb not in FALLBACK_DEFAULTS or not s(f"{fb}_api_key"):
-        fb = ""
-    main_d, light_d = FALLBACK_DEFAULTS.get(fb, ("", ""))
-    return {"PART1_PROVIDER": p1, "GEMINI_MODEL": m("gemini_model", "gemini-2.5-flash"), "FALLBACK_PROVIDER": fb,
-            "FALLBACK_MODEL": m("fallback_model", main_d) if fb else "", "FALLBACK_MODEL_LIGHT": m("fallback_model_light", light_d) if fb else ""}
+    m = lambda k, d: s(k) if PROVIDER_MODEL_RE.fullmatch(s(k)) and ".." not in s(k) else d
+    pick = lambda k: s(k) if provider_ready(cfg, s(k)) else ""
+    ep, fb, p1 = pick("engine_provider"), pick("fallback_provider"), pick("part1_provider")
+    if fb == ep: fb = ""
+    em, el = PROVIDERS[ep][2] if ep else ("", "")
+    fm, fl = PROVIDERS[fb][2] if fb else ("", "")
+    if p1 == "gemini":
+        p1m = m("part1_model", "") or m("gemini_model", "gemini-2.5-flash")
+    elif p1:
+        p1m = m("part1_model", "")
+    else:
+        p1m = ""
+    return {"ENGINE_PROVIDER": ep, "ENGINE_MODEL": m("engine_model", em) if ep else "", "ENGINE_MODEL_LIGHT": m("engine_model_light", el) if ep else "",
+            "PART1_PROVIDER": p1 or "claude", "PART1_MODEL": p1m, "GEMINI_MODEL": m("gemini_model", "gemini-2.5-flash"),
+            "FALLBACK_PROVIDER": fb, "FALLBACK_MODEL": m("fallback_model", fm) if fb else "", "FALLBACK_MODEL_LIGHT": m("fallback_model_light", fl) if fb else "",
+            "CLOUDFLARE_ACCOUNT_ID": s("cloudflare_account_id") if re.fullmatch(r"[0-9a-f]{32}", s("cloudflare_account_id")) else "",
+            "OLLAMA_BASE_URL": s("ollama_base_url").rstrip("/") if URL_RE.fullmatch(s("ollama_base_url")) else ""}
 
 
 def provider_failure(res, err, rc):
@@ -426,14 +472,24 @@ def provider_failure(res, err, rc):
                           r"econnrefused|econnreset|etimedout|connection error|fetch failed|network error", low))
 
 
-def litellm_config(conf):
-    """LiteLLM proxy config (YAML text; JSON is valid YAML) for the fallback run: every Claude model name the engine
-    uses (MODEL, MODEL_REVIEW, MODEL_STRONG -> FALLBACK_MODEL; MODEL_LIGHT and any other claude-* -> FALLBACK_MODEL_LIGHT)
-    is routed to the fallback provider. The provider key is read by the proxy from its own env (never written here)."""
-    fb = conf["FALLBACK_PROVIDER"]
-    pre, keyenv = {"gemini": ("gemini/", "GEMINI_API_KEY"), "openai": ("openai/", "OPENAI_API_KEY")}[fb]
-    dep = lambda name, target: {"model_name": name, "litellm_params": {"model": pre + target, "api_key": "os.environ/" + keyenv}}
-    main, light = conf["FALLBACK_MODEL"], conf["FALLBACK_MODEL_LIGHT"]
+def litellm_config(conf, provider=None, main=None, light=None):
+    """LiteLLM proxy config (YAML text; JSON is valid YAML): every Claude model name the engine uses (MODEL, MODEL_REVIEW,
+    MODEL_STRONG -> main; MODEL_LIGHT and any other claude-* -> light) is routed to `provider` (default: the fallback
+    provider of `conf`). Keys/URLs are read by the proxy from its own env by NAME (never written here). Cost of every
+    answer is appended by tools/litellm_cost.py (callback) to $LITELLM_COST_FILE."""
+    provider = provider or conf["FALLBACK_PROVIDER"]
+    main = main or conf["FALLBACK_MODEL"]; light = light or conf["FALLBACK_MODEL_LIGHT"]
+    pre, keyenv, _ = PROVIDERS[provider]
+    def dep(name, target):
+        lp = {"model": pre + target}
+        if provider == "ollama":
+            lp["api_base"] = "os.environ/OLLAMA_BASE_URL"
+            if os.environ.get("OLLAMA_API_KEY"): lp["api_key"] = "os.environ/OLLAMA_API_KEY"
+        elif provider == "cloudflare":
+            lp["api_key"] = "os.environ/CLOUDFLARE_API_KEY"  # LiteLLM's name; the workflow sets it from CLOUDFLARE_API_TOKEN
+        else:
+            lp["api_key"] = "os.environ/" + keyenv
+        return {"model_name": name, "litellm_params": lp}
     names = []
     for k in ("MODEL", "MODEL_REVIEW", "MODEL_STRONG"):
         if conf.get(k) and conf[k] not in names: names.append(conf[k])
@@ -441,9 +497,24 @@ def litellm_config(conf):
     if conf.get("MODEL_LIGHT") and conf["MODEL_LIGHT"] not in names:
         ml.append(dep(conf["MODEL_LIGHT"], light))
     ml.append(dep("claude-*", light))
-    return json.dumps({"model_list": ml, "litellm_settings": {"drop_params": True, "num_retries": 3, "request_timeout": 600},
+    return json.dumps({"model_list": ml,
+                       "litellm_settings": {"drop_params": True, "num_retries": 3, "request_timeout": 600, "callbacks": "litellm_cost.handler"},
                        "router_settings": {"disable_cooldowns": True},
                        "general_settings": {"master_key": "os.environ/LITELLM_MASTER_KEY"}}, indent=1)
+
+
+def gateway_cost(path):
+    """Sum of tools/litellm_cost.py lines ({"model", "cost", "in", "out"}) -> {model: cost}; None when the file is absent."""
+    if not path or not os.path.exists(path): return None
+    out = {}
+    for line in open(path, encoding="utf-8", errors="replace"):
+        try:
+            r = json.loads(line)
+        except ValueError:
+            continue
+        c = r.get("cost")
+        out[str(r.get("model") or "?")] = out.get(str(r.get("model") or "?"), 0.0) + (float(c) if isinstance(c, (int, float)) and not isinstance(c, bool) else 0.0)
+    return out
 
 
 def cmd_fallback_ok(args):
@@ -458,11 +529,13 @@ def cmd_fallback_ok(args):
 
 
 def cmd_litellm_config(args):
+    """litellm_config <out.yaml> [<provider> <main model> <light model>] (default: the fallback provider from env)."""
     conf = {k: os.environ.get(k, "").strip() for k in ("MODEL", "MODEL_LIGHT", "MODEL_REVIEW", "MODEL_STRONG",
                                                          "FALLBACK_PROVIDER", "FALLBACK_MODEL", "FALLBACK_MODEL_LIGHT")}
-    if conf["FALLBACK_PROVIDER"] not in FALLBACK_DEFAULTS or not conf["FALLBACK_MODEL"] or not conf["FALLBACK_MODEL_LIGHT"]:
-        print("litellm_config: no fallback provider", file=sys.stderr); sys.exit(2)
-    open(args[0], "w", encoding="utf-8").write(litellm_config(conf))
+    prov, main, light = (args[1:4] + ["", "", ""])[:3] if len(args) >= 4 else (conf["FALLBACK_PROVIDER"], conf["FALLBACK_MODEL"], conf["FALLBACK_MODEL_LIGHT"])
+    if prov not in PROVIDERS or not PROVIDER_MODEL_RE.fullmatch(main or "") or not PROVIDER_MODEL_RE.fullmatch(light or ""):
+        print("litellm_config: no usable provider / model", file=sys.stderr); sys.exit(2)
+    open(args[0], "w", encoding="utf-8").write(litellm_config(conf, prov, main, light))
 
 
 def cmd_config(path):
@@ -649,16 +722,24 @@ def add_warnings(lines):
 def cmd_claude_result(args):
     args = list(args)
     part1 = wall = status = None
-    for flag in ("--part1", "--wall", "--status"):
+    gw = gw_prov = None
+    for flag in ("--part1", "--wall", "--status", "--gateway-cost", "--gateway-provider"):
         if flag in args:
             k = args.index(flag); v = args[k + 1] if k + 1 < len(args) else ""; del args[k:k + 2]
             if flag == "--part1": part1 = v
             elif flag == "--status": status = v
+            elif flag == "--gateway-cost": gw = v
+            elif flag == "--gateway-provider": gw_prov = v
             else:
                 try: wall = float(v)
                 except ValueError: wall = None
     res = read_claude_json(args[0]) if args else None
     p1 = read_claude_json(part1) if part1 else None
+    gc = gateway_cost(gw)
+    if res is not None and gc is not None:
+        # the run went through the LiteLLM gateway: real cost by provider model (Claude Code priced it as Claude)
+        res = dict(res, total_cost_usd=round(sum(gc.values()), 4),
+                   modelUsage={(f"{gw_prov}:" if gw_prov else "") + m: {"costUSD": c} for m, c in gc.items()})
     err = ""
     if len(args) > 1 and os.path.exists(args[1]):
         err = open(args[1], encoding="utf-8", errors="replace").read()[-4000:]
@@ -744,6 +825,40 @@ def review_gate(review_dir, claude_json=None):
     return None
 
 
+def part1_gate(work_dir):
+    """QUALITY_AUDIT §7 M: part1check re-run by the workflow (not only by the model) on the FINAL Study part 1 — the
+    "भाग 1" part of <work>/study.json (the build_study input), else <work>/study_part1.json — against the drafter's
+    <work>/facts.json. -> (None, None) OK; ("warn", text) facts/part 1 absent; ("fail", Marathi reason)."""
+    fp = os.path.join(work_dir, "facts.json")
+    if not os.path.exists(fp):
+        return "warn", "भाग 1 तपासणी (part1check) झाली नाही — facts.json नाही"
+    try:
+        facts = json.load(open(fp, encoding="utf-8-sig"))
+    except Exception as e:
+        return "fail", f"facts.json वाचता आली नाही ({str(e)[:80]})"
+    p1 = None
+    sp = os.path.join(work_dir, "study.json")
+    if os.path.exists(sp):
+        try:
+            study = json.load(open(sp, encoding="utf-8-sig"))
+        except Exception as e:
+            return "fail", f"study.json वाचता आली नाही ({str(e)[:80]})"
+        p1 = next((p for p in (study.get("parts") or []) if isinstance(p, dict)
+                   and str(p.get("heading", "")).startswith("भाग 1")), None) if isinstance(study, dict) else None
+        if p1 is None:
+            return "fail", "study.json मध्ये भाग 1 नाही"
+    else:
+        try:
+            p1 = json.load(open(os.path.join(work_dir, "study_part1.json"), encoding="utf-8-sig"))
+        except Exception:
+            return "warn", "भाग 1 तपासणी (part1check) झाली नाही — study.json / study_part1.json नाही"
+    bad = part1_check(facts, p1)
+    if bad:
+        more = f"; … (+{len(bad) - 4})" if len(bad) > 4 else ""
+        return "fail", f"भाग 1 (मराठी रूपांतर) तथ्यांशी जुळला नाही — {'; '.join(bad[:4])}{more}"
+    return None, None
+
+
 def cmd_verify(args):
     args = list(args)
     review_dir = claude_json = None
@@ -768,6 +883,14 @@ def cmd_verify(args):
         why = review_gate(review_dir, claude_json)
         if why:
             return cmd_fail(f"अंतिम पडताळणी (reviewer) मान्यता नाही — {why} — पुन्हा तयार करा."[:500])
+        kind, why = part1_gate(review_dir)
+        if kind == "fail":
+            return cmd_fail(f"{why} — पुन्हा तयार करा."[:500])
+        if kind == "warn":
+            print("verify:", why)
+            add_warnings([why])
+        else:
+            print("verify: PART1 OK")
     prefix = str(st.get("prefix") or "").strip()
     if not prefix:
         sf = glob.glob(os.path.join(out, "*_Study.docx"))
@@ -817,8 +940,10 @@ def cmd_verify(args):
 
 def cmd_extracts(args):
     """extracts <outdir> <spec.json> <study.json> [<ocr dir>] — final verbatim guard (tools/extract_check.py) on the
-    delivered `related` + Study part 3 against the package PDF; non-fatal: mismatched / unverifiable extracts become
-    "मॉडेल: उतारा-तपासणी — …" warning lines (the run already sent mismatches back to the drafter)."""
+    delivered `related` + Study part 3 (+ the note body's “…” quotes, --note-body) against the package PDF.
+    The run already loops until EXTRACTS OK, so a final MISMATCH in `related` / Study part 3 is real -> the case FAILS
+    (Marathi reason, cmd_fail; nothing is uploaded). Unverifiable extracts (scan / garbled text layer) and every
+    note-body result (new check, warn_only) are only "मॉडेल: उतारा-तपासणी — …" warning lines."""
     out, spec, study = args[:3]
     try:
         st = json.load(open(os.path.join(out, "status.json"), encoding="utf-8"))
@@ -832,10 +957,10 @@ def cmd_extracts(args):
         pkg = pp[0] if len(pp) == 1 else ""
     if not pkg:
         return add_warnings(["मॉडेल: उतारा-तपासणी — पॅकेज PDF सापडली नाही, तपासणी झाली नाही"])
-    cmd = [sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "extract_check.py"), pkg]
+    cmd = [sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "extract_check.py"), pkg, "--note-body"]
     cmd += ["--spec", spec] if os.path.exists(spec) else []
     cmd += ["--study", study] if os.path.exists(study) else []
-    if len(cmd) == 2:
+    if len(cmd) == 3:
         return add_warnings(["मॉडेल: उतारा-तपासणी — spec/study सापडले नाहीत, तपासणी झाली नाही"])
     cmd += ["--ocr-dir", args[3]] if len(args) > 3 and os.path.isdir(args[3]) else []
     rj = os.path.join(out, ".extracts.json")
@@ -847,15 +972,23 @@ def cmd_extracts(args):
         return add_warnings([f"मॉडेल: उतारा-तपासणी — साधन चालले नाही (exit {r.returncode})"])
     finally:
         if os.path.exists(rj): os.remove(rj)
-    bad = [x for x in recs if x.get("status") == "mismatch"]
-    unv = [x for x in recs if x.get("status") == "unverifiable"]
+    main_r = [x for x in recs if not x.get("warn_only")]
+    note_r = [x for x in recs if x.get("warn_only")]
+    bad = [x for x in main_r if x.get("status") == "mismatch"]
+    unv = [x for x in main_r if x.get("status") == "unverifiable"]
+    nbad = [x for x in note_r if x.get("status") == "mismatch"]
+    nunv = [x for x in note_r if x.get("status") == "unverifiable"]
+    where = lambda xs: "; ".join(sorted({str(x.get("where")) for x in xs}))[:180]
     lines = []
-    if bad:
-        lines.append(f"मॉडेल: उतारा-तपासणी — {len(bad)} उतारे मूळ PDF शी जुळले नाहीत ("
-                     + "; ".join(sorted({str(x.get('where')) for x in bad}))[:180] + ")")
     if unv:
         lines.append(f"मॉडेल: उतारा-तपासणी — {len(unv)} उतारे पडताळता आले नाहीत (स्कॅन/विस्कळीत मजकूर-स्तर)")
+    if nbad:
+        lines.append(f"मॉडेल: उतारा-तपासणी — नोंदीतील {len(nbad)} अवतरणे मूळ PDF शी जुळली नाहीत ({where(nbad)}) — तपासावे")
+    if nunv:
+        lines.append(f"मॉडेल: उतारा-तपासणी — नोंदीतील {len(nunv)} अवतरणे पडताळता आली नाहीत (पृ.N/प.वि. नाही / स्कॅन)")
     add_warnings(lines)
+    if bad:
+        cmd_fail(f"उतारा-तपासणी अयशस्वी — {len(bad)} उतारे मूळ PDF शी जसेच्या तसे जुळले नाहीत ({where(bad)}) — पुन्हा तयार करा."[:500])
 
 
 def cmd_warn(text):
@@ -904,7 +1037,7 @@ def main(a):
         return cmd_part1check(a[1:])
     if len(a) >= 2 and a[0] == "fallback_ok":
         return cmd_fallback_ok(a[1:])
-    if len(a) == 2 and a[0] == "litellm_config":
+    if len(a) in (2, 5) and a[0] == "litellm_config":
         return cmd_litellm_config(a[1:])
     if len(a) < 2 or a[0] not in ("fetch", "step", "log_url", "finish", "fail", "claude_result", "verify", "warn",
                                   "extracts"):
@@ -927,7 +1060,7 @@ def main(a):
     except SystemExit:
         raise
     except Exception as e:
-        if c in ("fetch", "finish", "claude_result", "verify"):
+        if c in ("fetch", "finish", "claude_result", "verify", "extracts"):
             cmd_fail(f"{c}: {e}")
         print(f"engine_supabase {c}: {e}", file=sys.stderr); sys.exit(1)
 

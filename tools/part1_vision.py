@@ -1,22 +1,36 @@
 #!/usr/bin/env python3
-"""Study part 1 ("भाग 1 — प्रस्तावाचे मराठी रूपांतर") on Google Gemini — option A (Abhi, 02.11.2026;
+"""Study part 1 ("भाग 1 — प्रस्तावाचे मराठी रूपांतर") on another AI provider — option A (Abhi, 02.11.2026;
 docs/AI_PROVIDERS_RESEARCH.md). Replaces the cheap-tier Claude helper of the engine run when Settings
-part1_provider = gemini and a Gemini key is set. The output is checked exactly like the Claude helper's: the workflow
+part1_provider names a provider (gemini = native Gemini API; openai, openrouter, groq, mistral, cerebras, cloudflare,
+ollama = their OpenAI-compatible chat API with an image) and its key / URL is set. The output is checked exactly like the Claude helper's: the workflow
 validates the JSON shape, and the main run's `engine_supabase.py part1check` compares every number, date and name per
 page with the drafter's own reading of the images; pages that do not match are redone by the drafter. Uses the PAID
 Gemini API only: Google's terms say "Do not submit sensitive, confidential, or personal information to the Unpaid
 Services" (ai.google.dev/gemini-api/terms) — a free-tier key must not be used for proposals.
 
-Usage:  python3 tools/gemini_part1.py <pages dir> <out dir> [--model gemini-2.5-flash]
+Usage:  python3 tools/part1_vision.py <pages dir> <out dir> [--provider gemini] [--model <name>]
   <pages dir>  tools/prep_pages.py output (pages.json, p-NN.png, p-NN.txt, p-NN.ocr.txt)
   <out dir>    writes study_part1.json + study_part1.done (or study_part1.failed with a reason) and
                part1_result.json = a Claude-Code-like result {type, subtype, is_error, num_turns, total_cost_usd,
                modelUsage{<model>: {costUSD, inputTokens, outputTokens}}} so the engine's cost/model lines work as is.
-Env: GEMINI_API_KEY (required), GEMINI_MODEL (default model), GEMINI_BASE / GEMINI_RETRY_WAIT (tests only).
+Env: <PROVIDER>_API_KEY (GEMINI_API_KEY, OPENAI_API_KEY, OPENROUTER_API_KEY, GROQ_API_KEY, MISTRAL_API_KEY,
+CEREBRAS_API_KEY, CLOUDFLARE_API_TOKEN; OLLAMA_API_KEY optional), CLOUDFLARE_ACCOUNT_ID, OLLAMA_BASE_URL; PART1_MODEL /
+GEMINI_MODEL (default model); PART1_BASE / GEMINI_BASE / GEMINI_RETRY_WAIT (tests only). Price is known only for the
+Gemini models below; other providers record tokens with cost 0 and a note (free models cost nothing).
 Stdlib only (runs on the runner without extra packages). One request per page; 3 tries on 429/5xx/network errors."""
 import base64, json, os, re, sys, time, urllib.error, urllib.request
 
 DEFAULT_MODEL = "gemini-2.5-flash"
+# OpenAI-compatible chat endpoints (…/chat/completions) and a default vision model per provider (02.11.2026)
+OPENAI_COMPAT = {
+    "openai": ("https://api.openai.com/v1", "OPENAI_API_KEY", "gpt-5.4-mini"),
+    "openrouter": ("https://openrouter.ai/api/v1", "OPENROUTER_API_KEY", "google/gemma-4-31b:free"),
+    "groq": ("https://api.groq.com/openai/v1", "GROQ_API_KEY", "qwen3.8-27b"),
+    "mistral": ("https://api.mistral.ai/v1", "MISTRAL_API_KEY", "mistral-small-latest"),
+    "cerebras": ("https://api.cerebras.ai/v1", "CEREBRAS_API_KEY", "qwen-3.8-27b"),
+    "cloudflare": ("https://api.cloudflare.com/client/v4/accounts/{account}/ai/v1", "CLOUDFLARE_API_TOKEN", "@cf/meta/llama-4-scout-17b-16e-instruct"),
+    "ollama": ("{ollama}/v1", "OLLAMA_API_KEY", "gemma4:12b"),
+}
 # USD per 1M tokens (input, output incl. thinking), paid tier, ai.google.dev/gemini-api/docs/pricing (read 02.11.2026;
 # 3.x Flash prices valid to 31.12.2026). Unknown model -> cost 0 with a note (tokens still recorded).
 PRICES = {"gemini-2.5-flash": (0.30, 2.50), "gemini-2.5-flash-lite": (0.10, 0.40), "gemini-2.5-pro": (1.25, 10.00),
@@ -49,7 +63,7 @@ SCHEMA = {"type": "OBJECT", "properties": {
 
 
 def call(model, key, parts, tries=3):
-    base = os.environ.get("GEMINI_BASE", "https://generativelanguage.googleapis.com").rstrip("/")
+    base = (os.environ.get("PART1_BASE") or os.environ.get("GEMINI_BASE") or "https://generativelanguage.googleapis.com").rstrip("/")
     body = {"systemInstruction": {"parts": [{"text": SYSTEM}]}, "contents": [{"role": "user", "parts": parts}],
             "generationConfig": {"temperature": 0, "responseMimeType": "application/json", "responseSchema": SCHEMA}}
     data = json.dumps(body, ensure_ascii=False).encode("utf-8")
@@ -63,6 +77,56 @@ def call(model, key, parts, tries=3):
         except urllib.error.HTTPError as e:
             msg = e.read()[:300].decode("utf-8", "replace")
             err = f"HTTP {e.code}: {msg}"
+            if e.code not in (429, 500, 502, 503, 504): break
+        except (urllib.error.URLError, TimeoutError, OSError) as e:
+            err = f"network: {e}"
+        if i + 1 < tries: time.sleep(float(os.environ.get("GEMINI_RETRY_WAIT") or 5) * (i + 1))
+    raise RuntimeError(err or "no response")
+
+
+JSON_HINT = ('Answer with ONE JSON object only (no code fence): {"document": "...", "file_page": "...", "blocks": '
+             '[{"type": "para", "text": "..."} | {"type": "bullets", "items": ["..."]} | {"type": "table", "rows": [["..", ".."]]}]}')
+
+
+def compat_base(provider):
+    base, _, _ = OPENAI_COMPAT[provider]
+    if os.environ.get("PART1_BASE"):
+        return os.environ["PART1_BASE"].rstrip("/")
+    acct = os.environ.get("CLOUDFLARE_ACCOUNT_ID", "").strip()
+    oll = os.environ.get("OLLAMA_BASE_URL", "").strip().rstrip("/")
+    if "{account}" in base and not re.fullmatch(r"[0-9a-f]{32}", acct):
+        raise RuntimeError("CLOUDFLARE_ACCOUNT_ID missing")
+    if "{ollama}" in base and not re.match(r"https?://", oll):
+        raise RuntimeError("OLLAMA_BASE_URL missing")
+    return base.replace("{account}", acct).replace("{ollama}", oll)
+
+
+def call_compat(provider, model, key, img_b64, text, tries=3):
+    """OpenAI-compatible /chat/completions with one PNG; JSON object answer. -> Gemini-shaped dict for page_blocks."""
+    url = compat_base(provider) + "/chat/completions"
+    body = {"model": model, "temperature": 0, "response_format": {"type": "json_object"},
+            "messages": [{"role": "system", "content": SYSTEM + "\n" + JSON_HINT},
+                         {"role": "user", "content": [{"type": "image_url", "image_url": {"url": "data:image/png;base64," + img_b64}},
+                                                      {"type": "text", "text": text}]}]}
+    err = ""
+    for i in range(tries):
+        h = {"Content-Type": "application/json"}
+        if key: h["Authorization"] = f"Bearer {key}"
+        req = urllib.request.Request(url, data=json.dumps(body, ensure_ascii=False).encode("utf-8"), method="POST", headers=h)
+        try:
+            with urllib.request.urlopen(req, timeout=300) as r:
+                j = json.loads(r.read())
+            msg = ((j.get("choices") or [{}])[0].get("message") or {}).get("content") or ""
+            if isinstance(msg, list): msg = "".join(str(x.get("text", "")) for x in msg if isinstance(x, dict))
+            msg = re.sub(r"^\s*```(?:json)?\s*|\s*```\s*$", "", str(msg))
+            u = j.get("usage") or {}
+            return {"candidates": [{"content": {"parts": [{"text": msg}]}}],
+                    "usageMetadata": {"promptTokenCount": u.get("prompt_tokens") or 0, "candidatesTokenCount": u.get("completion_tokens") or 0}}
+        except urllib.error.HTTPError as e:
+            m = e.read()[:300].decode("utf-8", "replace")
+            err = f"HTTP {e.code}: {m}"
+            if e.code == 400 and "response_format" in body:  # some servers do not take response_format
+                body.pop("response_format"); continue
             if e.code not in (429, 500, 502, 503, 504): break
         except (urllib.error.URLError, TimeoutError, OSError) as e:
             err = f"network: {e}"
@@ -103,10 +167,15 @@ def main(argv):
     if len(argv) < 2:
         print(__doc__); return 2
     pages_dir, out = argv[0], argv[1]
-    model = (argv[argv.index("--model") + 1] if "--model" in argv else "") or os.environ.get("GEMINI_MODEL") or DEFAULT_MODEL
-    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{1,80}", model):
-        model = DEFAULT_MODEL
-    key = os.environ.get("GEMINI_API_KEY", "").strip()
+    provider = (argv[argv.index("--provider") + 1] if "--provider" in argv else "") or "gemini"
+    if provider != "gemini" and provider not in OPENAI_COMPAT:
+        provider = "gemini"
+    default = DEFAULT_MODEL if provider == "gemini" else OPENAI_COMPAT[provider][2]
+    model = (argv[argv.index("--model") + 1] if "--model" in argv else "") or os.environ.get("PART1_MODEL") or (
+        os.environ.get("GEMINI_MODEL") if provider == "gemini" else "") or default
+    if not re.fullmatch(r"@?[A-Za-z0-9][A-Za-z0-9._:/@-]{1,100}", model) or ".." in model:
+        model = default
+    key = os.environ.get("GEMINI_API_KEY" if provider == "gemini" else OPENAI_COMPAT[provider][1], "").strip()
     os.makedirs(out, exist_ok=True)
     t0 = time.time()
     tin = tout = calls = 0
@@ -122,11 +191,11 @@ def main(argv):
         json.dump(res, open(result_path, "w", encoding="utf-8"), ensure_ascii=False)
         if not ok:
             open(os.path.join(out, "study_part1.failed"), "w", encoding="utf-8").write(reason[:300] + "\n")
-        print(("PART1 GEMINI OK" if ok else "PART1 GEMINI FAILED: " + reason[:200]) + f" | {model} | calls {calls} | in {tin} out {tout} | ${cost}")
+        print((f"PART1 {provider.upper()} OK" if ok else f"PART1 {provider.upper()} FAILED: " + reason[:200]) + f" | {model} | calls {calls} | in {tin} out {tout} | ${cost}")
         return 0 if ok else 1
 
-    if not key:
-        return finish(False, "GEMINI_API_KEY missing")
+    if not key and provider != "ollama":
+        return finish(False, ("GEMINI_API_KEY" if provider == "gemini" else OPENAI_COMPAT[provider][1]) + " missing")
     try:
         info = json.load(open(os.path.join(pages_dir, "pages.json"), encoding="utf-8"))
         files = info["files"]
@@ -145,7 +214,10 @@ def main(argv):
         cross = f"PDF page {n} of {len(files)}.\n\nText layer (cross-check only):\n{txt or '(none)'}\n\nOCR (cross-check only):\n{ocr or '(none)'}"
         try:
             calls += 1
-            resp = call(model, key, [{"inlineData": {"mimeType": "image/png", "data": img}}, {"text": cross}])
+            if provider == "gemini":
+                resp = call(model, key, [{"inlineData": {"mimeType": "image/png", "data": img}}, {"text": cross}])
+            else:
+                resp = call_compat(provider, model, key, img, cross)
             doc, fpage, pb, i_t, o_t = page_blocks(resp)
         except Exception as e:
             return finish(False, f"page {n}: {str(e)[:250]}")

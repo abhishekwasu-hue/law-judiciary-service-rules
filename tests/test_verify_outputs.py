@@ -231,6 +231,43 @@ class VerifyOutputs(unittest.TestCase):
         self.rename_pkg(d, "renamed.pdf")
         self.must_fail(d, "package file name", pkg="renamed.pdf", extra=("--original-name", "CR66_Proposal_with_GRs.pdf"))
 
+    def test_original_name_date_prefix_kept(self):
+        # a real name starting with an 8-digit date is not an upload prefix (only 8 hex chars with a letter a-f are)
+        d = self.case("orig_date")
+        self.rename_pkg(d, "20261101-CR130.pdf")
+        rc, out = self.run_verify(d, pkg="20261101-CR130.pdf", extra=("--original-name", "20261101-CR130.pdf"))
+        self.assertEqual(rc, 0, out)
+        d = self.case("orig_date_bad")
+        self.rename_pkg(d, "CR130.pdf")
+        self.must_fail(d, "package file name", pkg="CR130.pdf", extra=("--original-name", "20261101-CR130.pdf"))
+
+    def write_status(self, d, **st):
+        with open(os.path.join(d, "status.json"), "w", encoding="utf-8") as f:
+            json.dump({"state": "done", **st}, f, ensure_ascii=False)
+
+    def test_letter_needed_agrees(self):
+        d = self.case("ln_ok")
+        self.write_status(d, letter_needed=True)
+        rc, out = self.run_verify(d)
+        self.assertEqual(rc, 0, out)
+        self.assertIn("OK: status.json letter_needed", out)
+
+    def test_letter_needed_false_but_letter(self):
+        d = self.case("ln_false")
+        self.write_status(d, letter_needed=False)
+        self.must_fail(d, "letter_needed false but the Note_and_Letter has a letter")
+
+    def test_letter_needed_missing(self):
+        d = self.case("ln_missing")
+        self.write_status(d)
+        self.must_fail(d, "letter_needed not true/false")
+
+    def test_letter_needed_true_but_no_letter(self):
+        d = self.case("ln_noletter")
+        build_note(self.spec_with(lambda s: s.pop("letter")), d)
+        self.write_status(d, letter_needed=True)
+        self.must_fail(d, "letter_needed true but the Note_and_Letter has no letter")
+
     def test_mark_not_found(self):
         d = self.case("mark")
         build_pkg(os.path.join(d, PKGNAME), mark_status={"label": "GR", "pdf_page": 17, "status": "TEXT NOT FOUND (scanned?) - give box"})

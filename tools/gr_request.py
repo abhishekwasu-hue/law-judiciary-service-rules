@@ -5,6 +5,8 @@ Requests: tools/gr-request.txt, one per line:
   search <date_from> <date_to> <words...>            e.g.  search 2019-09-11 2019-09-11 ठोक भरपाई
   dept <date_from> <date_to> <department words>      e.g.  dept 2022-04-19 2022-04-19 Law Judiciary   (all GRs of that dept on those dates, max 15)
     (searches title/description in the archive.org mirror of gr.maharashtra.gov.in; downloads at most 5 matches)
+A code (from a `code` line or a search hit) must be 16-20 digits (re.fullmatch); anything else is rejected with a
+logged line ("rejected: invalid code") and moved to '# done' — it never becomes a file path or URL.
 Output: pdf/gr/<code>.pdf  +  pdf/gr/INDEX.tsv (code, date, department, title, request).
 Processed lines are moved to the '# done' section so they are not fetched again. A request that found nothing or hit an
 error ("not found" / "no match" / "error") stays in the to-do list with a counter (`  #retry=N`) and is tried again on the
@@ -32,7 +34,11 @@ def row(code, m, req):
     date = str(m.get("date", ""))[:10] or (f"{code[:4]}-{code[4:6]}-{code[6:8]}" if re.fullmatch(r"\d{16,20}", code) else "")
     clean = lambda v: str(v).replace("\t", " ").replace("\n", " ")
     return f"{code}\t{date}\t{clean(subj)}\t{clean(m.get('title', ''))}\t{clean(req)}\n"
+CODE_RE = re.compile(r"\d{16,20}")  # a GR सांकेतांक; the only thing ever put into pdf/gr/<code>.pdf or a URL
 def save(code, req, m=None):
+    if not CODE_RE.fullmatch(str(code)):
+        print(f"rejected: invalid GR code {str(code)[:40]!r} (need 16-20 digits) in request {req[:80]!r}")
+        return "rejected: invalid code (need 16-20 digits)"
     if code in have: return "exists"
     data = None
     for u in (f"https://gr.maharashtra.gov.in/Site/Upload/Government%20Resolutions/Marathi/{code}.pdf",
