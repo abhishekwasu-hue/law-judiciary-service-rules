@@ -4,12 +4,16 @@ Env: SUPABASE_URL, SUPABASE_SERVICE_KEY, CASE_ID, RUN_ID (keys come from the Wor
 Commands ("deliver with warnings", Abhi 02.11.2026: drafts are never thrown away — only HARD problems fail a case):
   fetch <workdir>     ALL proposal uploads: the NEWEST (by created_at, version, id) is "the proposal" ->
                       <workdir>/in/proposal/<original_name>; every other proposal name -> in/extra_doc/ + a warning
-                      (A1 H13); newest version of each extra_doc / reply file -> in/<kind>/<original_name>. A proposal
+                      (A1 H13); newest version of each extra_doc / reply / approval / court_notice file ->
+                      in/<kind>/<original_name> (approval, court_notice: C28, 03.11.2026). case.json "outputs" = the
+                      drafts ticked for this run (runs.outputs in DRAFT_KEYS order; null = column missing or not set =
+                      the engine's own choice) and "reminder_next" (§4.21 N: 1 + earlier done runs that ticked "reminder"). A proposal
                       that is not a PDF or is password-protected is refused at once (Marathi reason, no model run).
                       <workdir>/case.json (case row, files, run, instructions); runs: state=running, started_at, step.
   case_meta <out.json> [<workdir>]
                       runner-side, right after fetch: {proposal_original_name (newest proposal row in Supabase),
-                      proposal_pages (page count of the fetched proposal PDF, null if unreadable)} — for verify --case-meta.
+                      proposal_pages (page count of the fetched proposal PDF, null if unreadable), outputs (runs.outputs,
+                      as in case.json)} — for verify --case-meta.
   step "<text>"       runs.step = text (live progress).
   log_url <url>       runs.log_url = url (Actions run page).
   finish <outdir>     <outdir>/status.json + one *_Study.docx, one *_Note_and_Letter.docx (several, e.g. PREFIX changed:
@@ -22,7 +26,9 @@ Commands ("deliver with warnings", Abhi 02.11.2026: drafts are never thrown away
                       "मसुदा तयार", activity run_done. status.json state not "done" -> fail with ONLY its Marathi summary.
                       Optional outputs (02.11.2026, docs/COURT_AND_ORDERS_RESEARCH.md B7–B9): *_Order_Draft.docx ->
                       kind "order_draft", *_Parawise.docx -> kind "parawise" (same ASCII key style), uploaded when
-                      present (status.json `outputs_extra` = ["order_draft", "parawise"] or [{"kind", "file"}]: a
+                      present (status.json `outputs_extra` = ["order_draft", "parawise"] or [{"kind", "file"}]; C28 draft
+                      keys gr / corrigendum / circular / memo / notification count as order_draft, letter / reminder are
+                      in the Note_and_Letter; a
                       listed kind whose file is absent -> warning); absence is fine; more than one of a kind, or a refused upload (enum value missing until
                       migration 0006 is applied) -> a runs.warnings line, never a failure.
   claude_result <claude.json> [<stderr file>] [<exit code>] [--part1 <part1.json>] [--part1-no-cost] [--first <first.json>]
@@ -45,7 +51,9 @@ Commands ("deliver with warnings", Abhi 02.11.2026: drafts are never thrown away
                       `proposal_pages`, else map.json). FAIL lines are classified: HARD (exit 1, case failed) = an output
                       missing / unreadable ("… opens"), internal ids / repo paths (confidentiality), annotations on the
                       proposal pages, or verify_outputs itself not running; every other FAIL -> a runs.warnings line
-                      "पडताळणी अपूर्ण — <check>: <detail>" (exit 0). "ALL OK" printed when clean.
+                      "पडताळणी अपूर्ण — <check>: <detail>" (exit 0). "ALL OK" printed when clean. C28: every draft
+                      ticked in runs.outputs (--case-meta `outputs`, else case.json) must exist — a missing one is a
+                      SOFT warning "पडताळणी अपूर्ण — निवडलेला मसुदा तयार झाला नाही: <label>" (§4.26).
                       --review: review_gate (review.json + hashes; a "reviewer" subagent in the CLI's subagent statistics,
                       else MODEL_REVIEW in modelUsage) — not approved / hash mismatch / review.json missing -> warning
                       "अंतिम पडताळणी (Opus) मान्यता नाही — वापरण्यापूर्वी तपासा: <reason>"; reviewer = drafter or
@@ -74,7 +82,15 @@ Commands ("deliver with warnings", Abhi 02.11.2026: drafts are never thrown away
                       (If the run is already failed, the earlier, more specific reason is kept.)"""
 import datetime, glob, json, mimetypes, os, re, subprocess, sys, urllib.error, urllib.parse, urllib.request
 
-INPUT_KINDS = ("proposal", "extra_doc", "reply")
+INPUT_KINDS = ("proposal", "extra_doc", "reply", "approval", "court_notice")   # approval / court_notice: C28 (03.11.2026)
+# C28 "कोणते मसुदे हवेत?" (INSTRUCTIONS §4.28, 03.11.2026): the drafts the user ticked for a run (runs.outputs), fixed order
+DRAFT_KEYS = ("letter", "reminder", "gr", "corrigendum", "circular", "memo", "notification", "parawise")
+DRAFT_LABEL = {"letter": "पत्र", "reminder": "स्मरणपत्र", "gr": "शासन निर्णय", "corrigendum": "शुद्धिपत्रक",
+               "circular": "परिपत्रक", "memo": "ज्ञापन", "notification": "अधिसूचना", "parawise": "परिच्छेदनिहाय उत्तर"}
+ORDER_KEYS = ("gr", "corrigendum", "circular", "memo", "notification")
+# body heading paragraph that tools/build_order.py writes for each order type (BODY_HEAD there; kept equal)
+ORDER_HEAD = {"gr": "शासन निर्णय :-", "corrigendum": "शासन शुद्धिपत्रक :-", "circular": "परिपत्रक :-",
+              "memo": "ज्ञापन :-", "notification": "अधिसूचना"}
 MIME = {".pdf": "application/pdf", ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"}
 
 
@@ -187,7 +203,23 @@ def newest_proposal(files):
 
 def inputs_of(files):
     p = newest_proposal(files)
-    return ([p] if p else []) + newest(files, ("extra_doc", "reply"))
+    return ([p] if p else []) + newest(files, ("extra_doc", "reply", "approval", "court_notice"))
+
+
+def norm_outputs(v):
+    """runs.outputs -> the ticked draft keys in the fixed order (DRAFT_KEYS), or None (column missing / null = legacy
+    automatic choice, C28). Unknown keys are dropped (the Worker validates them)."""
+    if not isinstance(v, list):
+        return None
+    got = {x for x in v if isinstance(x, str)}
+    return [k for k in DRAFT_KEYS if k in got]
+
+
+def reminder_next(runs, this_run):
+    """§4.21 number of the next स्मरणपत्र: 1 + earlier DONE runs of the case whose ticked outputs had "reminder"."""
+    n = sum(1 for r in runs or [] if str(r.get("id")) != str(this_run) and r.get("state") == "done"
+            and "reminder" in (norm_outputs(r.get("outputs")) or []))
+    return n + 1
 
 
 def older_proposals(files):
@@ -254,8 +286,15 @@ def cmd_fetch(work):
     if older:
         warns.append(f"प्रस्तावाच्या {len(older) + 1} फाइल अपलोड आहेत — नवीनतम '{prop[0]['original_name']}' प्रस्ताव म्हणून घेतली; "
                      f"इतर ({', '.join(o['original_name'] for o in older)}) अतिरिक्त कागदपत्र म्हणून वाचल्या"[:300])
-    info = {"case": case, "run": {"id": run["id"], "instructions": run.get("instructions") or ""},
+    outputs = norm_outputs(run.get("outputs"))   # absent column (migration 0008 not applied) -> None
+    try:
+        runs = rest("GET", f"runs?case_id=eq.{CASE}&select=*&order=id.asc") or []
+    except Exception:
+        runs = []
+    info = {"case": case, "run": {"id": run["id"], "instructions": run.get("instructions") or "", "outputs": outputs},
             "instructions": run.get("instructions") or "",
+            "outputs": outputs,
+            "reminder_next": reminder_next(runs, run["id"]),
             "proposal_original_name": prop[0]["original_name"],
             "inputs": got,
             "files": [{k: f[k] for k in ("id", "kind", "original_name", "version", "storage_path", "created_at")} for f in files]}
@@ -287,7 +326,11 @@ def cmd_case_meta(args):
                 pages = len(d)
         except Exception as e:
             print(f"engine_supabase case_meta: pages not read ({e})", file=sys.stderr)
-    meta = {"proposal_original_name": name, "proposal_pages": pages}
+    try:
+        run = (rest("GET", f"runs?id=eq.{RUN}&select=*") or [{}])[0]
+    except Exception:
+        run = {}
+    meta = {"proposal_original_name": name, "proposal_pages": pages, "outputs": norm_outputs(run.get("outputs"))}
     d = os.path.dirname(os.path.abspath(outp))
     os.makedirs(d, exist_ok=True)
     json.dump(meta, open(outp, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
@@ -392,10 +435,15 @@ def listed_extras(st):
     v = st.get("outputs_extra") if isinstance(st, dict) else None
     out = {}
     for x in v if isinstance(v, list) else []:
-        if isinstance(x, str):
-            out[x] = None
-        elif isinstance(x, dict) and isinstance(x.get("kind"), str):
-            out[x["kind"]] = x.get("file") or x.get("name")
+        k, f = (x, None) if isinstance(x, str) else ((x.get("kind"), x.get("file") or x.get("name")) if isinstance(x, dict) else (None, None))
+        if not isinstance(k, str):
+            continue
+        # C28: draft keys -> upload kinds (order kinds -> order_draft; letter / reminder live in the Note_and_Letter)
+        k = "order_draft" if k in ORDER_KEYS else k
+        if k in ("letter", "reminder"):
+            continue
+        if k not in out or (f and not out[k]):
+            out[k] = f
     return out
 
 
@@ -1280,6 +1328,34 @@ def map_proposal_pages(pkg):
         return None
 
 
+def docx_paragraphs(path):
+    """Paragraph texts of a .docx (stdlib: zipfile + regex on word/document.xml); [] when unreadable."""
+    import zipfile, html
+    try:
+        with zipfile.ZipFile(path) as z:
+            xml = z.read("word/document.xml").decode("utf-8", "replace")
+    except Exception:
+        return []
+    return [html.unescape("".join(re.findall(r"<w:t(?:\s[^>]*)?>([^<]*)</w:t>", p)))
+            for p in re.findall(r"<w:p[ >].*?</w:p>", xml, re.S)]
+
+
+def missing_drafts(out, prefix, outputs):
+    """C28 (§4.28): ticked draft keys whose draft is not in OUTDIR -> Marathi labels. letter: a letter without a
+    "स्मरणपत्र-N" heading in <PREFIX>_Note_and_Letter.docx; reminder: a "स्मरणपत्र-N" letter there; order kinds: the
+    body heading of that type in <PREFIX>_Order_Draft.docx; parawise: <PREFIX>_Parawise.docx."""
+    if not outputs:
+        return []
+    nl = [t.strip() for t in docx_paragraphs(os.path.join(out, f"{prefix}_Note_and_Letter.docx"))]
+    letters = sum(1 for t in nl if re.match(r"क्रमांक\s*:?\s*-", t))
+    reminders = sum(1 for t in nl if re.fullmatch(r"स्मरणपत्र-\d+", t))
+    od = {t.strip() for t in docx_paragraphs(os.path.join(out, f"{prefix}_Order_Draft.docx"))}
+    have = {"letter": letters - reminders > 0, "reminder": reminders > 0,
+            "parawise": os.path.exists(os.path.join(out, f"{prefix}_Parawise.docx"))}
+    have.update({k: ORDER_HEAD[k] in od for k in ORDER_KEYS})
+    return [DRAFT_LABEL[k] for k in outputs if k in have and not have[k]]
+
+
 def cmd_verify(args):
     """verify <outdir> [<workdir>] [--review <work dir>] [--claude <claude.json>] [--case-meta <meta.json>]
     HARD problems fail the case (exit 1); SOFT problems become "पडताळणी अपूर्ण — <check>: <detail>" warnings (exit 0)."""
@@ -1328,11 +1404,17 @@ def cmd_verify(args):
         pkg = pp[0] if len(pp) == 1 else ""
     pages = None
     orig = ""
+    ticked = None   # C28: runs.outputs (runner-written case_meta first; case.json otherwise)
     if case_meta:
         orig, pages = read_case_meta(case_meta)
+        try:
+            ticked = norm_outputs(json.load(open(case_meta, encoding="utf-8-sig")).get("outputs"))
+        except Exception:
+            ticked = None
     elif work:
         try:
             cj = json.load(open(os.path.join(work, "case.json"), encoding="utf-8"))
+            ticked = norm_outputs(cj.get("outputs"))
             orig = safe_name(str(cj.get("proposal_original_name") or ""))
             if orig == "file": orig = ""
             src = next(os.path.join(work, f["local_path"]) for f in cj["inputs"] if f["kind"] == "proposal")
@@ -1365,6 +1447,8 @@ def cmd_verify(args):
         # the tool itself did not run through: confidentiality is not confirmed -> hard
         errl = (r.stderr or "").strip().splitlines()
         hard = [("verify_outputs", errl[-1] if errl else f"exit {r.returncode}")]
+    for lab in missing_drafts(out, prefix, ticked):   # §4.26: SOFT, never a failure
+        warns.append(soft_line("निवडलेला मसुदा तयार झाला नाही", lab))
     if soft:
         warns += [soft_line(c, d) for c, d in soft[:8]]
         if len(soft) > 8: warns.append(f"{SOFT_PREFIX}आणखी {len(soft) - 8} तपासण्या")

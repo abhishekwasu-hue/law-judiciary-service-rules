@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """lint_order.py <spec.json>
-Pre-build lint of spec["order"] (format: tools/build_order.py docstring; layout decisions B1-B7 in
+Pre-build lint of spec["order"] and of each item of spec["orders"] (list, INSTRUCTIONS §4.28, 03.11.2026 — several
+order drafts in one run; problems of item i are reported at "orders[i].…") (format: tools/build_order.py docstring; layout decisions B1-B7 in
 docs/COURT_AND_ORDERS_RESEARCH.md). Prints one line per problem "<JSON path>: <rule> — <detail>"; "LINT OK" and exit 0
 when there is none, exit 1 otherwise. Warnings are printed "WARN <JSON path>: <message>" and never change the exit code.
 Functions: lint_order(spec) -> [problems], lint_order_warnings(spec) -> [warnings].
@@ -78,11 +79,37 @@ def own_text(o):
     return out
 
 
+def orders_of(spec):
+    """[(path, order)]: "order" -> ("order", o); "orders" (§4.28) -> ("orders[i]", o) — tools/build_order.py order."""
+    if not isinstance(spec, dict):
+        return []
+    out = [("order", spec["order"])] if spec.get("order") not in (None, "", {}) else []
+    os_ = spec.get("orders")
+    if isinstance(os_, list):
+        out += [(f"orders[{i}]", o) for i, o in enumerate(os_)]
+    return out
+
+
+def _rebase(msgs, path):
+    """messages of lint_one ("order.…" / "order: …") -> at the item's own JSON path."""
+    return [path + m[len("order"):] if m.startswith("order") else m for m in msgs]
+
+
 def lint_order(spec):
+    if not isinstance(spec, dict) or (spec.get("order") in (None, "", {}) and not spec.get("orders")):
+        return ["order: structure — spec has no 'order' object (or 'orders' list)"]
     P = []
-    o = spec.get("order") if isinstance(spec, dict) else None
+    if "orders" in spec and not isinstance(spec["orders"], list):
+        P.append("orders: structure — must be a list of order objects (§4.28)")
+    for path, o in orders_of(spec):
+        P += _rebase(lint_one(o), path)
+    return P
+
+
+def lint_one(o):
+    P = []
     if not isinstance(o, dict):
-        return ["order: structure — spec has no 'order' object"]
+        return ["order: structure — not an order object"]
     t = o.get("type")
     if t not in TYPES:
         return [f"order.type: type — '{t}' not one of {list(TYPES)}"]
@@ -170,9 +197,14 @@ def lint_order(spec):
 
 
 def lint_order_warnings(spec):
-    o = spec.get("order") if isinstance(spec, dict) else None
-    if not isinstance(o, dict):
-        return []
+    W = []
+    for path, o in orders_of(spec):
+        if isinstance(o, dict):
+            W += _rebase(warn_one(o), path)
+    return W
+
+
+def warn_one(o):
     W = [f"{path}: {m}" for path, x, _ in own_text(o) for m in lint_spec.warn_hits(x)]
     if o.get("type") in ("gr", "memo") and not _s(o.get("concurrence")):
         W.append("order.concurrence: no concurrence para — specimen para 3 (Finance concurrence or delegated powers; NPM परि.-23/25)")

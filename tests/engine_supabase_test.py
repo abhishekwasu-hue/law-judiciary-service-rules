@@ -325,7 +325,7 @@ try:
     cm2 = os.path.join(tmp, "cm2", "meta.json")
     r = run("case_meta", cm2, work)
     m2 = json.load(open(cm2, encoding="utf-8"))
-    check(r.returncode == 0 and m2 == {"proposal_original_name": PROP, "proposal_pages": 3}, f"case_meta: name + pages ({m2} {r.stderr[:200]})")
+    check(r.returncode == 0 and m2 == {"proposal_original_name": PROP, "proposal_pages": 3, "outputs": None}, f"case_meta: name + pages ({m2} {r.stderr[:200]})")
 except ImportError:
     print("skip  verify page count (pymupdf not installed)")
 run_row.update(state="running", step="तपासणी चालू", warnings=[])
@@ -796,6 +796,78 @@ r = run("finish", o5, OUTPUT_MAX_BYTES="10")
 check(r.returncode == 1 and run_row["state"] == "failed" and "MB पेक्षा मोठी" in run_row["step"] and len(DB["case_files"]) == nrows
       and not [l for l in LOG if l["m"] == "POST" and l["path"].startswith("/storage/")]
       and any(w.startswith("फाइल खूप मोठी") for w in run_row["warnings"]), f"finish: over the size limit -> warning + clear failure, nothing uploaded ({run_row['step']})")
+
+# --- C28 (03.11.2026, INSTRUCTIONS §4.28): ticked drafts (runs.outputs), file kinds approval / court_notice
+import zipfile
+def mini_docx(path, paras):
+    body = "".join(f"<w:p><w:r><w:t>{t}</w:t></w:r></w:p>" for t in paras)
+    with zipfile.ZipFile(path, "w") as z:
+        z.writestr("word/document.xml", '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+                   f"<w:body>{body}</w:body></w:document>")
+DB["case_files"] += [
+    {"id": 51, "case_id": 7, "kind": "approval", "storage_path": "proposals/7/approval/v1/file.pdf", "original_name": "वित्त मान्यता.pdf", "version": 1, "created_at": "9"},
+    {"id": 52, "case_id": 7, "kind": "court_notice", "storage_path": "proposals/7/court_notice/v1/file.pdf", "original_name": "नोटीस.pdf", "version": 1, "created_at": "9"}]
+STORE["proposals/7/approval/v1/file.pdf"] = b"%PDF approval"; STORE["proposals/7/court_notice/v1/file.pdf"] = b"%PDF notice"
+DB["runs"].append({"id": 9, "case_id": 7, "state": "done", "outputs": ["reminder", "letter"]})
+saved_outputs = run_row.get("outputs", "absent")
+run_row["outputs"] = ["notification", "letter", "bogus", "letter"]
+work6 = os.path.join(tmp, "case6")
+r = run("fetch", work6)
+cj6 = json.load(open(os.path.join(work6, "case.json"), encoding="utf-8"))
+check(r.returncode == 0 and open(os.path.join(work6, "in", "approval", "वित्त मान्यता.pdf"), "rb").read() == b"%PDF approval"
+      and os.path.exists(os.path.join(work6, "in", "court_notice", "नोटीस.pdf"))
+      and {f["kind"] for f in cj6["inputs"]} >= {"approval", "court_notice"}, f"C28 fetch: approval + court_notice -> in/<kind>/ ({r.stderr[:200]})")
+check(cj6["outputs"] == ["letter", "notification"] and cj6["run"]["outputs"] == ["letter", "notification"],
+      f"C28 fetch: case.json outputs = ticked keys, fixed order, unknown dropped ({cj6['outputs']})")
+check(cj6["reminder_next"] == 2, f"C28 fetch: reminder_next = 1 + earlier runs with a reminder ({cj6['reminder_next']})")
+run_row.pop("outputs")   # column missing (migration 0008 not applied) -> null = legacy automatic choice
+r = run("fetch", work6)
+cj6 = json.load(open(os.path.join(work6, "case.json"), encoding="utf-8"))
+check(r.returncode == 0 and cj6["outputs"] is None and cj6["reminder_next"] == 2, "C28 fetch: no outputs column -> outputs null")
+run_row["outputs"] = ["gr"]
+cm6 = os.path.join(tmp, "cm6", "meta.json")
+r = run("case_meta", cm6, work6)
+check(r.returncode == 0 and json.load(open(cm6, encoding="utf-8"))["outputs"] == ["gr"], "C28 case_meta: outputs from the runs row")
+# finish: outputs_extra with draft keys -> one order_draft upload, letter / reminder ignored, no warning
+out6 = os.path.join(tmp, "out6"); os.makedirs(out6)
+for n in ("CR130_2026_Study.docx", "CR130_2026_Note_and_Letter.docx", NEWP, "CR130_2026_Order_Draft.docx"):
+    open(os.path.join(out6, n), "wb").write(b"x" + n.encode())
+json.dump({"state": "done", "summary": "s", "outputs_extra": ["letter", "reminder", "gr", {"kind": "notification", "file": "CR130_2026_Order_Draft.docx"}]},
+          open(os.path.join(out6, "status.json"), "w", encoding="utf-8"), ensure_ascii=False)
+run_row.update(state="running", warnings=[]); LOG.clear()
+r = run("finish", out6)
+ups = [l["path"] for l in LOG if l["m"] == "POST" and l["path"].startswith("/storage/v1/object/")]
+check(r.returncode == 0 and run_row["state"] == "done" and sum("/order_draft/" in u for u in ups) == 1 and len(ups) == 4
+      and not run_row["warnings"], f"C28 finish: draft keys -> one order_draft upload, no warning ({ups} {run_row['warnings']})")
+# verify: a ticked draft that was not made = SOFT warning naming it (never a failure)
+out7 = os.path.join(tmp, "out7"); os.makedirs(out7)
+open(os.path.join(out7, "CR130_2026_Study.docx"), "wb").write(b"x"); open(os.path.join(out7, PROP), "wb").write(b"%PDF")
+mini_docx(os.path.join(out7, "CR130_2026_Note_and_Letter.docx"), ["विधि व न्याय विभाग/का.6", "क्रमांक:-संकिर्ण-2026/979/प्र.क्र.130/का.6"])
+mini_docx(os.path.join(out7, "CR130_2026_Order_Draft.docx"), ["महाराष्ट्र शासन", "शासन निर्णय :-"])
+json.dump({"state": "done", "prefix": "CR130_2026", "package_pdf": PROP, "proposal_pages": 5, "review": {"approved": True, "changes": 0}},
+          open(os.path.join(out7, "status.json"), "w", encoding="utf-8"), ensure_ascii=False)
+cm7 = os.path.join(tmp, "cm7.json")
+json.dump({"proposal_original_name": PROP, "proposal_pages": 5, "outputs": ["letter", "reminder", "gr", "notification", "parawise"]},
+          open(cm7, "w", encoding="utf-8"), ensure_ascii=False)
+run_row.update(state="running", step="तपासणी चालू", warnings=[])
+r = run("verify", out7, "--case-meta", cm7, VERIFY_SCRIPT=fake)
+miss = [w for w in run_row["warnings"] if "निवडलेला मसुदा तयार झाला नाही" in w]
+check(r.returncode == 0 and run_row["state"] == "running"
+      and sorted(m.rsplit(": ", 1)[1] for m in miss) == sorted(["स्मरणपत्र", "अधिसूचना", "परिच्छेदनिहाय उत्तर"])
+      and all(m.startswith("पडताळणी अपूर्ण — ") for m in miss), f"C28 verify: missing ticked drafts -> soft warnings ({run_row['warnings']})")
+json.dump({"proposal_original_name": PROP, "proposal_pages": 5, "outputs": ["letter", "gr"]}, open(cm7, "w", encoding="utf-8"))
+run_row.update(warnings=[])
+r = run("verify", out7, "--case-meta", cm7, VERIFY_SCRIPT=fake)
+check(r.returncode == 0 and not run_row["warnings"] and "verify: ALL OK" in r.stdout, f"C28 verify: all ticked drafts made -> no warning ({run_row['warnings']})")
+json.dump({"proposal_original_name": PROP, "proposal_pages": 5, "outputs": None}, open(cm7, "w", encoding="utf-8"))
+r = run("verify", out7, "--case-meta", cm7, VERIFY_SCRIPT=fake)
+check(r.returncode == 0 and not run_row["warnings"], "C28 verify: outputs null (legacy) -> no draft check")
+check(es0.norm_outputs(None) is None and es0.norm_outputs(["parawise", "x", "letter"]) == ["letter", "parawise"]
+      and es0.listed_extras({"outputs_extra": ["gr", "memo", "letter", {"kind": "parawise", "file": "P.docx"}]}) == {"order_draft": None, "parawise": "P.docx"},
+      "C28 norm_outputs / listed_extras mapping")
+DB["runs"].pop(); DB["case_files"] = [f for f in DB["case_files"] if f["id"] not in (51, 52)]
+if saved_outputs == "absent": run_row.pop("outputs", None)
+else: run_row["outputs"] = saved_outputs
 
 srv.shutdown()
 print("ALL TESTS PASSED")

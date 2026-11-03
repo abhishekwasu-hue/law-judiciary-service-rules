@@ -3,13 +3,17 @@
 Draft of a Government order of the Section (शासन निर्णय / शासन शुद्धिपत्रक / शासन परिपत्रक / ज्ञापन / अधिसूचना) ->
 <outdir>/<PREFIX>_Order_Draft.docx (+ <PREFIX>_Order_Draft.pdf preview via LibreOffice, warning only if absent).
 First runs tools/lint_order.py on the spec and stops (exit 1, problems printed) on errors; --no-lint or env LINT_SKIP=1
-skips it. Exit 1 when the spec has no "order" key or a built text run is not DVOT-SurekhMR (ascii/hAnsi/cs/eastAsia).
+skips it. Exit 1 when the spec has no "order" / "orders" key or a built text run is not DVOT-SurekhMR
+(ascii/hAnsi/cs/eastAsia).
+Several drafts (INSTRUCTIONS §4.28, 03.11.2026 — e.g. a शासन निर्णय and an अधिसूचना ticked together): spec "orders":
+[{order}, {order}, …] (each in the "order" format below; a single "order" is still accepted, and "order" + "orders" are
+built in that order). ONE <PREFIX>_Order_Draft.docx; each order after the first starts on a new page.
 
 Layout: docs/COURT_AND_ORDERS_RESEARCH.md decisions B1-B7 — official specimens (NPM परिशिष्ट 23-26; GADT 12.5-12.19,
 R4 §2) filled with the Section's own wording (R3 (b)). Page setup and styles from tools/templates/LETTER_TEMPLATE.docx
 (no letterhead logo: an order is not a letter); margins A4 2.5 / 2.0 / 1.5 / 1.5 cm.
 
-spec.json (only the "order" key is read; other keys such as "note" may sit beside it):
+spec.json (only the "order" / "orders" keys are read; other keys such as "note" may sit beside them):
 {"order": {
   "type": "gr" | "corrigendum" | "circular" | "memo" | "notification",
   "subject": "...बाबत.",                          # printed on top (GR / शुद्धिपत्रक / परिपत्रक) or top centre (ज्ञापन);
@@ -191,9 +195,31 @@ def copies_block(D, head, copies):
         D.p(f"{i}.\t{c.strip()}", left=Cm(1.2), first=Cm(-0.8), after=1)
 
 
+def orders_of(spec):
+    """The order objects of a spec in build order: "order", then each of "orders" (§4.28)."""
+    if not isinstance(spec, dict):
+        return []
+    out = [spec["order"]] if isinstance(spec.get("order"), dict) else []
+    return out + [o for o in (spec.get("orders") if isinstance(spec.get("orders"), list) else []) if isinstance(o, dict)]
+
+
 def build(o, out):
-    t = o["type"]
+    build_many([o], out, o.get("doc_author"))
+
+
+def build_many(orders, out, author=None):
+    """ONE docx: the orders one after the other, each after the first on a new page (§4.28)."""
     D = Doc()
+    for i, o in enumerate(orders):
+        n0 = len(D.d.paragraphs)
+        build_into(D, o)
+        if i and len(D.d.paragraphs) > n0:
+            D.d.paragraphs[n0].paragraph_format.page_break_before = True   # paragraph property (see english_block)
+    D.d.save(out); clean_docx(out, author)
+
+
+def build_into(D, o):
+    t = o["type"]
     if t != "notification":
         subject_block(D, o, centre=(t == "memo"))
     heading_block(D, o)
@@ -240,7 +266,6 @@ def build(o, out):
     copies_block(D, COPIES_HEAD[t], o.get("copies"))
     if t == "notification" and isinstance(o.get("english"), dict):
         english_block(D, o["english"])
-    D.d.save(out); clean_docx(out, o.get("doc_author"))
 
 
 def english_block(D, e):
@@ -301,9 +326,9 @@ def preview(out, outdir):
 def main(spec_path, outdir, pre, do_lint=True):
     with open(spec_path, encoding="utf-8-sig") as f:
         spec = json.load(f)
-    o = spec.get("order") if isinstance(spec, dict) else None
-    if not isinstance(o, dict):
-        print(f"{spec_path}: no \"order\" key — nothing to build (tools/build_order.py docstring)", file=sys.stderr)
+    orders = orders_of(spec)
+    if not orders:
+        print(f"{spec_path}: no \"order\" / \"orders\" key — nothing to build (tools/build_order.py docstring)", file=sys.stderr)
         return 1
     if do_lint:
         import lint_order
@@ -315,13 +340,13 @@ def main(spec_path, outdir, pre, do_lint=True):
         if probs:
             print("LINT FAILED — fix spec.json (tools/lint_order.py); nothing built", file=sys.stderr)
             return 1
-    elif o.get("type") not in TYPES:
+    elif any(o.get("type") not in TYPES for o in orders):
         print(f"order.type must be one of {TYPES}", file=sys.stderr); return 1
     os.makedirs(outdir, exist_ok=True)
     out = os.path.join(outdir, f"{pre}_Order_Draft.docx")
-    build(dict(o, doc_author=o.get("doc_author") or spec.get("doc_author")), out)
+    build_many(orders, out, next((o["doc_author"] for o in orders if o.get("doc_author")), None) or spec.get("doc_author"))
     bad = bad_font_runs(out)
-    print(out, o["type"], "bad-font runs:", bad)
+    print(out, "+".join(o["type"] for o in orders), "bad-font runs:", bad)
     pdf = preview(out, outdir)
     if pdf:
         print(pdf)

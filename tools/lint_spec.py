@@ -25,7 +25,10 @@ Rules (spec.json)
   - note.first ends with "सादर."
   - last note para (note.closing if not blank, else the last text item of note.paras) is one of the SOP forms:
     "सबब, … पत्राचे प्रारूप पृ.  /प.वि. वर मान्यतेस्तव सादर. मान्य झाल्यास पत्र निर्गमित करण्यात येईल." or
-    "सबब, … वित्त विभागाच्या मान्यतेस्तव सादर करण्यात येत आहे." or (order draft, 02.11.2026, docs/COURT_AND_ORDERS_RESEARCH.md
+    "सबब, … वित्त विभागाच्या मान्यतेस्तव सादर करण्यात येत आहे." or (several drafts, INSTRUCTIONS §4.28, 03.11.2026)
+    "सबब, … पत्राचे प्रारूप व शासन निर्णयाचे प्रारूप पृ.  /प.वि. वर मान्यतेस्तव सादर." (two or more of पत्राचे / स्मरणपत्राचे /
+    <order kinds below>, the first optionally followed by "प्रारूप", then "," / "व", any words, the last kind + "प्रारूप(े)";
+    optionally "मान्य झाल्यास … निर्गमित करण्यात येईल / येतील.") or (order draft, 02.11.2026, docs/COURT_AND_ORDERS_RESEARCH.md
     R3 (c), B7) "सबब, … <शासन निर्णयाचे / शुद्धिपत्रकाचे / परिपत्रकाचे / ज्ञापनाचे / अधिसूचनेचे / आदेशाचे> प्रारूप पृ.  /प.वि. वर
     मान्यतेस्तव सादर." or "सबब, … अधिसूचनेची मराठी व इंग्रजी प्रारूपे पृ.  /प.वि. वर मान्यतेस्तव सादर." (optionally "… मान्य झाल्यास … निर्गमित करण्यात येईल.")
     or (02.11.2026, audit A1 H5 — SOP Step 3 routes) "सबब, … <वित्त / सामान्य प्रशासन / सार्वजनिक आरोग्य> विभागाच्या
@@ -33,7 +36,7 @@ Rules (spec.json)
     Format-2) "… सार्वजनिक आरोग्य विभागास विनंती करण्यास हरकत नसावी. (मान्यतेस्तव सादर.)" or (approval within the department,
     no draft) "सबब, … मान्यतेस्तव सादर." or (file closure) "सबब, … नस्ती बंद करण्यास मान्यता असावी."; a bare note.closing
     "मान्यतेस्तव सादर." is read together with the last para
-  - spec "order" / "parawise" (optional, 02.11.2026): CLI only — tools/lint_order.py lint_order(spec) /
+  - spec "order" / "orders" (§4.28) / "parawise" (optional, 02.11.2026): CLI only — tools/lint_order.py lint_order(spec) /
     tools/lint_parawise.py lint_parawise(spec) are imported lazily and their lines added; a missing module is a
     "WARN" line, never an error (lint_extras)
   - note.signers == INSTRUCTIONS §4.6 chain (+ "अ.मु.स. (वित्त)" last); "अ.मु.स. (वित्त)" present <=> the last para sends
@@ -43,6 +46,8 @@ Rules (spec.json)
     (use ':-'), 'करून' not 'करुन', 'प्रारूप' not 'प्रारुप', 'अनुसरून' not 'अनुसरुन', one space after 'दि.' / 'क्र.' / 'प्र. क्र.' in running text
     (file/letter nos. and other tokens with '/' or '-' left exactly); missing-info para starts
     "प्रस्तावासोबत खालील माहिती उपलब्ध नाही:-"
+  - "letter" (one object) and / or "letters" (list, INSTRUCTIONS §4.28, 03.11.2026: e.g. a letter and a स्मरणपत्र in one
+    run; paths letters[i].…): every rule below applies to each letter; "letter" + "letters" together is an error
   - letter (when present): ref_no संकिर्ण-<year>/<file no>/प्र.क्र.<n>/का.6 ("संकीर्ण-" also accepted; "____" blanks);
     to, subject, refs present; intro starts "उपरोक्त विषयाबाबत संदर्भाधीन", contains "आपणांस कळविण्यात येते की," and ends
     with ":-" when there are points; "ही विनंती" only in an information-request letter (points / table / reminder, or the
@@ -68,6 +73,8 @@ WARN level (spec.json; note body and letter, text outside quotes; related and si
   - L12 नियम 14: halant before an abbreviation dot ("एम्.ए.", "पीएच्.डी.") -> "एम.ए.", "पीएच.डी."
   - L13 नियम 3 (आदरार्थी): त्याने/तिने -> त्यांनी, त्याचे/तिचे -> त्यांचे, त्याला/तिला -> त्यांना, त्याच्या/तिच्या -> त्यांच्या
   - L14 नियम 1–4 (अनुस्वार): "आपणास" -> "आपणांस"; "यांनां" / "यानां" -> "यांना"
+  - §4.28 (03.11.2026): the note's last para names every draft in the spec (letter "पत्राचे", reminder "स्मरणपत्राचे",
+    order kinds "शासन निर्णयाचे / शुद्धिपत्रकाचे / …", parawise "परिच्छेदनिहाय"; drafts_unnamed)
 Rules (study.json): parts with headings भाग 0 … भाग 7 (--allow-missing-part1: भाग 1 may be absent); no internal ids;
   पृ. references as above ("“…”" skipped).
 The constants and check functions below are the ONE definition shared with tools/verify_outputs.py."""
@@ -117,7 +124,15 @@ LAST_PHD_RE = re.compile(r"^(?:सबब\s*,|.*विचारात\s+घेत
                          rf"करण्यास\s+हरकत\s+नसावी\s*\.(?:\s*मान्यतेस्तव\s+{_SADAR})?$", re.S)
 LAST_DEPT_APPROVAL_RE = re.compile(rf"^सबब\s*,(?!.*प्रार[ुू]प).*(?:मान्यतेस्तव|मान्यतेसाठी)\s+{_SADAR}$", re.S)
 LAST_CLOSE_RE = re.compile(r"^सबब\s*,.*(?:नस्ती\s*बंद|नस्तीबंद)[^.]*(?:मान्यता\s+असावी|मान्यतेस्तव\s+सादर|सादर)\s*\.$", re.S)
-LAST_FORMS = (LAST_LETTER_RE, LAST_FIN_RE, LAST_ORDER_RE, LAST_DEPT_RE, LAST_PHD_RE, LAST_DEPT_APPROVAL_RE, LAST_CLOSE_RE)
+# INSTRUCTIONS §4.28 (03.11.2026, Abhi: "user multiple option choose karel"): one last para naming every draft made, e.g.
+# "सबब, … पत्राचे प्रारूप व शासन निर्णयाचे प्रारूप पृ.      /प.वि. वर मान्यतेस्तव सादर." (two or more drafts)
+_DRAFT_KIND = (r"(?:(?:शासन\s+)?(?:निर्णयाचे|शुद्धिपत्रकाचे|परिपत्रकाचे|ज्ञापनाचे|अधिसूचनेचे|आदेशाचे)|पत्राचे|पत्रांचे|"
+               r"स्मरणपत्राचे|अधिसूचनेची\s+मराठी\s+व\s+इंग्रजी)")
+_DRAFT_ITEM = rf"{_DRAFT_KIND}(?:\s+प्रारूपे?)?"
+LAST_COMBINED_RE = re.compile(rf"^सबब\s*,.*{_DRAFT_ITEM}(?:\s*,\s*|\s+व\s+)[^.]{{0,160}}?{_DRAFT_KIND}\s+प्रारूपे?\s+"
+                              r"पृ\.[^/]{0,40}/\s*प\.वि\.\s*वर\s+मान्यतेस्तव\s+सादर(?:\s+करण्यात\s+येत\s+आहे)?\s*\."
+                              r"(?:\s*मान्य\s+झाल्यास\s+[^.]{0,160}निर्गमित\s+करण्यात\s+(?:येईल|येतील)\s*\.)?$", re.S)
+LAST_FORMS = (LAST_LETTER_RE, LAST_COMBINED_RE, LAST_FIN_RE, LAST_ORDER_RE, LAST_DEPT_RE, LAST_PHD_RE, LAST_DEPT_APPROVAL_RE, LAST_CLOSE_RE)
 BARE_CLOSING_RE = re.compile(r"^(?:प्रस्ताव\s+)?मान्यतेस्तव\s+सादर\s*\.?$")   # Format-1/2: "मान्यतेस्तव सादर." as its own line
 # अ.मु.स. (वित्त) route (§4.6, §8.3 "फक्त नस्ती वित्त/सा.आ.वि. कडे जाताना"): the last para sends the file to Finance or to PHD
 _ROUTE_TAIL = rf"(?:च्या\s+{_ACTION}|स\s+(?:पुन:श्च\s+)?विनंती|कडे\s+(?:पाठवि|सादर))"
@@ -392,6 +407,22 @@ def dj_copy(place):
     return f"प्रमुख जिल्हा व सत्र न्यायाधीश, जिल्हा व सत्र न्यायालय, {place} {COPY_END}"
 
 
+def letters_of(spec):
+    """[(path, letter)]: "letter" -> ("letter", L); "letters" (list, §4.28) -> ("letters[i]", L) — the order of
+    tools/mkdocs.py letters_of."""
+    if not isinstance(spec, dict):
+        return []
+    out = [("letter", spec["letter"])] if spec.get("letter") else []
+    ls = spec.get("letters")
+    if isinstance(ls, list):
+        out += [(f"letters[{i}]", x) for i, x in enumerate(ls) if x]
+    return out
+
+
+def letter_strings(spec):
+    return [x for path, L in letters_of(spec) for x in strings(L, path)]
+
+
 def banned_hits(text):
     return [w for w in BANNED if w in text]
 
@@ -540,8 +571,7 @@ def lint_spec(spec, pages=None):
     n = spec["note"]
     body = [x for k in ("first", "paras", "sub", "closing") if k in n for x in strings(n[k], f"note.{k}")]
     related = list(strings(spec.get("related", []), "related"))
-    L = spec.get("letter")
-    letter = list(strings(L, "letter")) if L else []
+    letter = letter_strings(spec)
     signers = list(strings(n.get("signers", []), "note.signers"))
 
     for path, t in body + related + letter + signers:
@@ -567,7 +597,8 @@ def lint_spec(spec, pages=None):
     for path, t in letter:
         P += [f"{path}: {m}" for m in style_hits(t, letter=True)]
     # §4.23: the letter's address-like fields (to, refs, copies) are not checked (audit A1, 02.11.2026)
-    for path, t in body + [(pth, t) for pth, t in letter if not re.match(r"letter\.(?:to|refs|copies)(?:\[|$)", pth)]:
+    for path, t in body + [(pth, t) for pth, t in letter
+                           if not re.match(r"letters?(?:\[\d+\])?\.(?:to|refs|copies)(?:\[|$)", pth)]:
         P += [f"{path}: {m}" for m in ma_hits(t)]
     rel_own = [(pth, t) for pth, t in related if not re.search(r"\.text(\[|$)", pth)]  # extracts (.text) are verbatim
     for path, t in body + letter + rel_own:
@@ -591,14 +622,7 @@ def lint_spec(spec, pages=None):
     paras = n.get("paras", [])
     if not isinstance(paras, list):
         P.append("note.paras: structure — must be a list"); paras = []
-    closing = n.get("closing")
-    idx = [i for i, x in enumerate(paras) if isinstance(x, str)]
-    lpath, last = (f"note.paras[{idx[-1]}]", paras[idx[-1]]) if idx else ("note.paras", "")
-    if isinstance(closing, str) and closing.strip():
-        if BARE_CLOSING_RE.match(ns(closing)) and idx:   # Format-1/2: "… हरकत नसावी." + "मान्यतेस्तव सादर." line
-            lpath, last = "note.closing", last + " " + closing
-        else:
-            lpath, last = "note.closing", closing
+    lpath, last = last_para(n)
     lastn = ns(last)
     if not any(r.match(lastn) for r in LAST_FORMS):
         P.append(f"{lpath}: last para — not one of the SOP forms ('सबब, … पत्राचे प्रारूप पृ.  /प.वि. वर मान्यतेस्तव सादर. "
@@ -616,54 +640,107 @@ def lint_spec(spec, pages=None):
     P += [f"note.signers: signer chain (§4.6) — {x}" for x in signer_problems(sg, has_ams)]
     P += [f"{lpath}: अ.मु.स. (वित्त) <=> Finance last para — {x}" for x in finance_problems(lastn, has_ams)]
 
-    # letter
-    if L:
-        if not isinstance(L, dict):
-            return P + ["letter: structure — must be an object"]
-        rn = L.get("ref_no")
-        if not isinstance(rn, str) or not REF_NO.fullmatch(rn.strip()):
-            P.append(f"letter.ref_no: ref no. — not संकिर्ण-<year>/<file no>/प्र.क्र.<n>/का.6: '{rn}'")
-        for k in ("to", "refs"):
-            v = L.get(k)
-            if not isinstance(v, list) or not any(isinstance(x, str) and x.strip() for x in v):
-                P.append(f"letter.{k}: letter field — '{k}' missing or empty")
-        if not isinstance(L.get("subject"), str) or not L["subject"].strip():
-            P.append("letter.subject: letter field — 'subject' missing or empty")
-        intro = L.get("intro")
-        if not isinstance(intro, str) or not intro.strip():
-            P.append("letter.intro: letter field — 'intro' missing or empty")
-        else:
-            it = ns(intro)
-            if not it.startswith(INTRO_START):
-                P.append(f"letter.intro: intro wording — must start with '{INTRO_START}'")
-            if INTRO_HAS not in it:
-                P.append(f"letter.intro: intro wording — must contain '{INTRO_HAS}'")
-            if requests_info(L, it) and REQUEST not in unquoted(it):
-                P.append(f"letter.intro: पत्राची भाषा — माहिती मागताना '…, {REQUEST}.' अशी विनंतीपूर्वक मांडणी हवी (§4.18)")
-            if L.get("points") and not it.endswith(":-"):
-                P.append("letter.intro: intro wording — must end with ':-' before the points")
-        # §4.21 स्मरणपत्र
-        if L.get("reminder"):
-            r0 = (L.get("refs") or [""])[0] if isinstance(L.get("refs"), list) else ""
-            if REMINDER_REF not in ns(str(r0)):
-                P.append(f"letter.refs[0]: स्मरणपत्र (§4.21) — संदर्भ '{REMINDER_REF} दि. __'")
-            if isinstance(intro, str) and (REMINDER_HAS not in intro or REQUEST not in intro):
-                P.append(f"letter.intro: स्मरणपत्र (§4.21) — '… माहिती {REMINDER_HAS} आहे. … {REQUEST}.'")
-        # §4.22 via the High Court, information from a District Judge -> copy line
-        to_txt = " ".join(x for x in (L.get("to") or []) if isinstance(x, str))
-        if "उच्च न्यायालय" in to_txt:
-            copies = [ns(x) for x in (L.get("copies") or []) if isinstance(x, str)]
-            for place in {m.group(1) for path, t in letter for m in DJ_FROM_RE.finditer(ns(unquoted(t)))}:
-                if not any(place in c and c.endswith(COPY_END) for c in copies):
-                    P.append(f"letter.copies: प्रत (§4.22) — '{dj_copy(place)}'")
-        pts = L.get("points") if isinstance(L.get("points"), list) else []
-        for i, pt in enumerate(pts):
-            if isinstance(pt, dict) and isinstance(pt.get("table"), list):
-                for r, row in enumerate(pt["table"][1:], 1):
-                    for c, cell in enumerate(row if isinstance(row, list) else []):
-                        if isinstance(cell, str) and DOC_RE.search(unquoted(cell)):
-                            P.append(f"letter.points[{i}].table[{r}][{c}]: {DOC_MSG} — '{DOC_INTRO}'")
+    # letters ("letter" and / or "letters", §4.28)
+    if spec.get("letter") and spec.get("letters"):
+        P.append("letters: structure — give either 'letter' or 'letters' (list), not both (§4.28)")
+    if "letters" in spec and not isinstance(spec.get("letters"), (list, type(None))):
+        P.append("letters: structure — must be a list of letter objects (§4.28)")
+    for lp, L in letters_of(spec):
+        P += lint_letter(L, lp)
     return P
+
+
+def lint_letter(L, lp="letter"):
+    """problems of ONE letter object at JSON path lp ("letter" or "letters[i]")."""
+    P = []
+    if not isinstance(L, dict):
+        return [f"{lp}: structure — must be an object"]
+    rn = L.get("ref_no")
+    if not isinstance(rn, str) or not REF_NO.fullmatch(rn.strip()):
+        P.append(f"{lp}.ref_no: ref no. — not संकिर्ण-<year>/<file no>/प्र.क्र.<n>/का.6: '{rn}'")
+    for k in ("to", "refs"):
+        v = L.get(k)
+        if not isinstance(v, list) or not any(isinstance(x, str) and x.strip() for x in v):
+            P.append(f"{lp}.{k}: letter field — '{k}' missing or empty")
+    if not isinstance(L.get("subject"), str) or not L["subject"].strip():
+        P.append(f"{lp}.subject: letter field — 'subject' missing or empty")
+    intro = L.get("intro")
+    if not isinstance(intro, str) or not intro.strip():
+        P.append(f"{lp}.intro: letter field — 'intro' missing or empty")
+    else:
+        it = ns(intro)
+        if not it.startswith(INTRO_START):
+            P.append(f"{lp}.intro: intro wording — must start with '{INTRO_START}'")
+        if INTRO_HAS not in it:
+            P.append(f"{lp}.intro: intro wording — must contain '{INTRO_HAS}'")
+        if requests_info(L, it) and REQUEST not in unquoted(it):
+            P.append(f"{lp}.intro: पत्राची भाषा — माहिती मागताना '…, {REQUEST}.' अशी विनंतीपूर्वक मांडणी हवी (§4.18)")
+        if L.get("points") and not it.endswith(":-"):
+            P.append(f"{lp}.intro: intro wording — must end with ':-' before the points")
+    # §4.21 स्मरणपत्र
+    if L.get("reminder"):
+        r0 = (L.get("refs") or [""])[0] if isinstance(L.get("refs"), list) else ""
+        if REMINDER_REF not in ns(str(r0)):
+            P.append(f"{lp}.refs[0]: स्मरणपत्र (§4.21) — संदर्भ '{REMINDER_REF} दि. __'")
+        if isinstance(intro, str) and (REMINDER_HAS not in intro or REQUEST not in intro):
+            P.append(f"{lp}.intro: स्मरणपत्र (§4.21) — '… माहिती {REMINDER_HAS} आहे. … {REQUEST}.'")
+    # §4.22 via the High Court, information from a District Judge -> copy line
+    to_txt = " ".join(x for x in (L.get("to") or []) if isinstance(x, str))
+    if "उच्च न्यायालय" in to_txt:
+        copies = [ns(x) for x in (L.get("copies") or []) if isinstance(x, str)]
+        for place in {m.group(1) for path, t in strings(L, lp) for m in DJ_FROM_RE.finditer(ns(unquoted(t)))}:
+            if not any(place in c and c.endswith(COPY_END) for c in copies):
+                P.append(f"{lp}.copies: प्रत (§4.22) — '{dj_copy(place)}'")
+    pts = L.get("points") if isinstance(L.get("points"), list) else []
+    for i, pt in enumerate(pts):
+        if isinstance(pt, dict) and isinstance(pt.get("table"), list):
+            for r, row in enumerate(pt["table"][1:], 1):
+                for c, cell in enumerate(row if isinstance(row, list) else []):
+                    if isinstance(cell, str) and DOC_RE.search(unquoted(cell)):
+                        P.append(f"{lp}.points[{i}].table[{r}][{c}]: {DOC_MSG} — '{DOC_INTRO}'")
+    return P
+
+
+def last_para(n):
+    """(JSON path, text) of the note's last para: note.closing if not blank (a bare "मान्यतेस्तव सादर." read together
+    with the last text item of note.paras), else the last text item of note.paras."""
+    paras = n.get("paras", []) if isinstance(n.get("paras", []), list) else []
+    closing = n.get("closing")
+    idx = [i for i, x in enumerate(paras) if isinstance(x, str)]
+    lpath, last = (f"note.paras[{idx[-1]}]", paras[idx[-1]]) if idx else ("note.paras", "")
+    if isinstance(closing, str) and closing.strip():
+        if BARE_CLOSING_RE.match(ns(closing)) and idx:   # Format-1/2: "… हरकत नसावी." + "मान्यतेस्तव सादर." line
+            lpath, last = "note.closing", last + " " + closing
+        else:
+            lpath, last = "note.closing", closing
+    return lpath, last
+
+
+# §4.28 (03.11.2026): the note's last para names every draft made — spec draft -> words that name it (WARN level)
+ORDER_NAMES = {"gr": ("निर्णयाचे",), "corrigendum": ("शुद्धिपत्रकाचे",), "circular": ("परिपत्रकाचे",),
+               "memo": ("ज्ञापनाचे",), "notification": ("अधिसूचनेचे", "अधिसूचनेची")}
+
+
+def drafts_unnamed(spec):
+    """Drafts in the spec ("letter"/"letters", "order"/"orders", "parawise") that the note's last para does not name."""
+    if not isinstance(spec, dict) or not isinstance(spec.get("note"), dict):
+        return []
+    last = ns(unquoted(last_para(spec["note"])[1]))
+    miss = []
+    for lp, L in letters_of(spec):
+        rem = isinstance(L, dict) and L.get("reminder")
+        words = ("स्मरणपत्राचे", "पत्राचे", "पत्रांचे") if rem else ("पत्राचे", "पत्रांचे")
+        if not any(w in last for w in words):
+            miss.append(f"{lp} ({'स्मरणपत्र' if rem else 'पत्र'})")
+    orders = ([spec["order"]] if isinstance(spec.get("order"), dict) else []) + \
+             [o for o in (spec.get("orders") if isinstance(spec.get("orders"), list) else []) if isinstance(o, dict)]
+    for o in orders:
+        words = ORDER_NAMES.get(o.get("type"), ())
+        if words and not any(w in last for w in words):
+            miss.append(f"order {o.get('type')}")
+    if spec.get("parawise") and "परिच्छेदनिहाय" not in last:
+        miss.append("parawise (परिच्छेदनिहाय अभिप्राय)")
+    return miss
 
 
 def lint_warnings(spec):
@@ -672,9 +749,11 @@ def lint_warnings(spec):
         return []
     n = spec["note"]
     body = [x for k in ("first", "paras", "sub", "closing") if k in n for x in strings(n[k], f"note.{k}")]
-    L = spec.get("letter")
-    letter = list(strings(L, "letter")) if L else []
-    return [f"{path}: {m}" for path, t in body + letter for m in warn_hits(t)]
+    letter = letter_strings(spec)
+    W = [f"{path}: {m}" for path, t in body + letter for m in warn_hits(t)]
+    W += [f"{last_para(n)[0]}: last para — does not name the draft {d} (§4.28: name every draft made, e.g. "
+          f"'पत्राचे प्रारूप व शासन निर्णयाचे प्रारूप पृ.      /प.वि. वर मान्यतेस्तव सादर.')" for d in drafts_unnamed(spec)]
+    return W
 
 
 def lint_study(study, pages=None, allow_missing_part1=False):
@@ -697,8 +776,8 @@ def lint_study(study, pages=None, allow_missing_part1=False):
 
 
 # spec key -> tools/<module>.py, error function, optional WARN-level function names
-EXTRA_LINTS = (("order", "lint_order", ("lint_order_warnings", "warnings_order")),
-               ("parawise", "lint_parawise", ("warnings_parawise", "lint_parawise_warnings")))
+EXTRA_LINTS = ((("order", "orders"), "lint_order", ("lint_order_warnings", "warnings_order")),   # "orders": §4.28
+               (("parawise",), "lint_parawise", ("warnings_parawise", "lint_parawise_warnings")))
 _IN_EXTRA = []
 
 
@@ -716,9 +795,11 @@ def lint_extras(spec):
         sys.path.insert(0, here)
     _IN_EXTRA.append(1)
     try:
-        for key, mod, wnames in EXTRA_LINTS:
-            if spec.get(key) in (None, "", [], {}):
+        for keys, mod, wnames in EXTRA_LINTS:
+            keys = (keys,) if isinstance(keys, str) else keys   # one key or a tuple of keys
+            if all(spec.get(k) in (None, "", [], {}) for k in keys):
                 continue
+            key = "/".join(k for k in keys if spec.get(k) not in (None, "", [], {}))
             try:
                 module = importlib.import_module(mod)
                 fn = getattr(module, mod)

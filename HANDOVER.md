@@ -43,7 +43,14 @@
   doc_author/DOC_AUTHOR, created=modified=build time, revision 1, no stale stats); PDF metadata blank. Research: docs/AI_TELLS.md
   (77 office notes + 90 letters vs our 6 samples). Evidence: docs/ai-tells-cr131-before-after.png. Tests 293 passed.
 
+- 03.11.2026 (Abhi: "letter, shasan nirnay ase option … user multiple option choose karel"; "default letter asel"; plan approved "ok tayar kra"):
+  INSTRUCTIONS §4.28 — per run the user ticks drafts (पत्र default; स्मरणपत्र, शासन निर्णय, शुद्धिपत्रक, परिपत्रक, ज्ञापन, अधिसूचना,
+  परिच्छेदनिहाय उत्तर); suggestions by case stage (approval -> GR, reply -> none, no reply -> reminder, court notice -> parawise+letter);
+  upload file types reply/approval/court_notice. runs.outputs (migration 0008); spec "orders": [..] (one Order_Draft.docx, new page each)
+  and "letters": [..] (letter + reminder). Tests 309 passed; worker 21/21.
+
 ## Pending
+11. **Migration 0008** (runs.outputs + file kinds approval/court_notice) — Abhi to apply in the SQL editor, then deploy (app part already on main).
 10. **AI-tells decisions — DECIDED 03.11.2026 (Abhi: "Default thewa, 4 madhe स्रोत/जसाच्या तसा kadha"): bracketed defaults final; (4) the words "स्रोत"/"जसाच्या तसा" removed from drafts (§4.27 (आ), lint) — docs/AI_TELLS.md:** (1) Word author name (DOC_AUTHOR) [empty];
    (2) signer forms "का.अ.(…)" / "अवर सचिव, महाराष्ट्र शासन" as in office files vs §4.5/§4.6 [current]; (3) subject/reference
    fully bold+centre (§4.10) vs office (label only bold) [current — Abhi 03.11.2026: "3 ठळक", full line bold stays]; (4) "संबंधित माहिती" block + words "स्रोत"/"जसाच्या तसा" (office

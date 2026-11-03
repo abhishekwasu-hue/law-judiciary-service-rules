@@ -29,7 +29,10 @@ spec.json:
    "copies": ["प्रमुख जिल्हा व सत्र न्यायाधीश, जिल्हा व सत्र न्यायालय, ठाणे यांना आवश्यक कार्यवाहीसाठी"]
                       # optional — "प्रत : <each>" above "प्रत : निवड नस्ती" (INSTRUCTIONS §4.22: letter via the High Court
                       # asking information from a District Judge)
- }
+ },
+ "letters": [{...}, {...}]   # optional (INSTRUCTIONS §4.28, 03.11.2026) — several letters in one run, e.g. a letter and a
+                      # स्मरणपत्र (each the same format as "letter"); built after "letter" (if both are given) in this order:
+                      # <PREFIX>_Letter.docx, <PREFIX>_Letter_2.docx, … — build_note_letter.py puts each on a new page
 }"""
 import re
 import sys, json, copy, os
@@ -164,10 +167,22 @@ def build_note(spec, out):
                 add(body, sect, numbered, d, f"\t({src})", left=Cm(0.8))
     nomirror(d); d.save(out); clean_docx(out, spec.get("doc_author"))
 
-def build_letter(spec, out):
+def letters_of(spec):
+    """The letters of a spec in build order: "letter" (one object), then each of "letters" (list; §4.28)."""
+    out = [spec["letter"]] if isinstance(spec, dict) and spec.get("letter") else []
+    ls = spec.get("letters") if isinstance(spec, dict) else None
+    return out + [x for x in (ls if isinstance(ls, list) else []) if x]
+
+
+def letter_file(od, pre, i):
+    """i = 0-based position in letters_of(): <PREFIX>_Letter.docx, <PREFIX>_Letter_2.docx, …"""
+    return os.path.join(od, f"{pre}_Letter.docx" if i == 0 else f"{pre}_Letter_{i + 1}.docx")
+
+
+def build_letter(spec, out, L=None):
     from docx.shared import Cm
     d = docx.Document(LET_T); body, P, sect = fresh(d); fix_styles(d)
-    L = spec["letter"]
+    L = spec["letter"] if L is None else L
     # 0..4 letterhead (0 holds the two logo drawings) ; 5 ref/date ; 6 blank
     from docx.text.paragraph import Paragraph as _P
     for i in range(0, 4):
@@ -222,5 +237,5 @@ def build_letter(spec, out):
 if __name__ == "__main__":
     spec = json.load(open(sys.argv[1], encoding="utf-8-sig")); od, pre = sys.argv[2], sys.argv[3]
     build_note(spec, os.path.join(od, f"{pre}_Note.docx"))
-    if spec.get("letter"): build_letter(spec, os.path.join(od, f"{pre}_Letter.docx"))
+    for i, L in enumerate(letters_of(spec)): build_letter(spec, letter_file(od, pre, i), L)
     print("ok", pre)

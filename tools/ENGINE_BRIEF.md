@@ -149,10 +149,13 @@ Sources: GR22 = मराठी भाषा विभाग GR कपासू-
   record — no record basis -> "____" + warning) + letter to
   the GP/AGP forwarding it. Essential facts missing -> info-letter first [I4.15], no `parawise`. Rule 58(4): to the GP
   within two weeks / before the notice date — hearing date in Study part 0. Signers [I4.6] (B10).
-- Order draft: spec `order` (gr / corrigendum / circular / memo / notification) ONLY when the record shows the decision
-  or concurrence in hand, or the instruction asks (B7). Last para (c): "सबब, … शासन निर्णयाचे (ज्ञापनाचे /
+- Order draft: spec `order` (gr / corrigendum / circular / memo / notification; several: `orders` [..]) ONLY when the
+  record shows the decision or concurrence in hand, or the instruction / `outputs` asks (B7). Last para (c): "सबब, … शासन निर्णयाचे (ज्ञापनाचे /
   शुद्धिपत्रकाचे / परिपत्रकाचे / अधिसूचनेचे) प्रारूप पृ.      /प.वि. वर मान्यतेस्तव सादर." (notification: "अधिसूचनेची मराठी व इंग्रजी
   प्रारूपे पृ. …")
+- [I4.28] case.json `outputs` (ticked drafts; null = decide as above): EXACTLY those beside note/Study/package ([] = note
+  only); letter + reminder -> spec `letters` [..]; last para names every draft ("… पत्राचे प्रारूप व शासन निर्णयाचे
+  प्रारूप पृ.      /प.वि. वर मान्यतेस्तव सादर."); warnings: ENGINE_PROMPT "Drafts ticked by the user".
 - Missing petition no./date/संकेतांक etc. -> "____" + `warnings`; never stop. Build: tools/build_parawise.py,
   tools/build_order.py (lint_spec.py lints both keys). status.json `outputs_extra`.
 

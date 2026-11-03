@@ -3,10 +3,12 @@
 First runs the pre-build lint (tools/lint_spec.py) on spec.json and stops with exit 1 (problems printed) if it finds any;
 --no-lint or env LINT_SKIP=1 skips it (test fixtures that build deliberately bad files).
 spec.json -> <outdir>/<PREFIX>_Note_and_Letter.docx (note; if spec has "letter": the letter follows in its OWN section on a
-new page, keeping LETTER_TEMPLATE's page setup — margins etc. — while the note keeps NOTE_TEMPLATE's).
+new page, keeping LETTER_TEMPLATE's page setup — margins etc. — while the note keeps NOTE_TEMPLATE's). Several letters
+(spec "letters": [..], e.g. a letter and a स्मरणपत्र; INSTRUCTIONS §4.28, 03.11.2026): each in its own section on a new page,
+in the order of mkdocs.letters_of ("letter" first, then "letters").
 Uses tools/mkdocs.py (Section templates, tables supported) + docxcompose.
 Checks: every text run is DVOT-SurekhMR in all four rFonts attributes (ascii/hAnsi/cs/eastAsia); with a letter, 2 sections
-whose margins equal the two templates. Exit code 1 if a check fails.
+whose margins equal the two templates (one letter section per letter). Exit code 1 if a check fails.
 Also writes <outdir>/<PREFIX>_Note_and_Letter.pdf preview if LibreOffice (soffice) is available (warning only if absent/failed)."""
 import os, sys, subprocess, tempfile, shutil, copy, json
 import docx
@@ -59,9 +61,15 @@ def main(spec, outdir, pre):
         note = docx.Document(os.path.join(tmp, f"{pre}_Note.docx"))
         out = os.path.join(outdir, f"{pre}_Note_and_Letter.docx")
         os.makedirs(outdir, exist_ok=True)
-        lp = os.path.join(tmp, f"{pre}_Letter.docx")
-        has_letter = os.path.exists(lp)
-        (compose(note, docx.Document(lp)) if has_letter else note).save(out)
+        from mkdocs import letter_file
+        lps = []
+        while os.path.exists(letter_file(tmp, pre, len(lps))):
+            lps.append(letter_file(tmp, pre, len(lps)))
+        has_letter = bool(lps)
+        doc = note
+        for lp in lps:   # each letter: its own section, new page (§4.28)
+            doc = compose(doc, docx.Document(lp))
+        doc.save(out)
         try:
             author = json.load(open(spec, encoding="utf-8-sig")).get("doc_author")
         except Exception:
@@ -76,12 +84,12 @@ def main(spec, outdir, pre):
     secs = d.sections
     want = [margins(docx.Document(os.path.join(TPL, "NOTE_TEMPLATE.docx")).sections[0])]
     if has_letter:
-        want.append(margins(docx.Document(os.path.join(TPL, "LETTER_TEMPLATE.docx")).sections[0]))
+        want += [margins(docx.Document(os.path.join(TPL, "LETTER_TEMPLATE.docx")).sections[0])] * len(lps)
     got = [margins(s) for s in secs]
     if got != want:
         ok = False
         print("FAIL: section page setup", got, "!= templates", want, file=sys.stderr)
-    print(out, "letter" if has_letter else "NO letter", "sections:", len(secs), "bad-font runs:", bad)
+    print(out, f"{len(lps)} letter(s)" if has_letter else "NO letter", "sections:", len(secs), "bad-font runs:", bad)
     soffice = shutil.which("soffice") or shutil.which("soffice.exe")
     if soffice:
         rc, err = soffice_pdf(soffice, out, outdir)

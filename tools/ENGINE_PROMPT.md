@@ -8,7 +8,9 @@ caching): this file, then tools/ENGINE_BRIEF.md, then the tool docstrings, then 
 ## Inputs
 - `WORKDIR/case.json`: `case` (cr_no, cr_year, file_no, subject, category, employee_name, post, office, received_from,
   received_via, inward_date, stage), `instructions`, `proposal_original_name`, `inputs` (each with `kind`,
-  `original_name`, `version`, `local_path` relative to WORKDIR), `files` (all earlier files of the case, metadata only).
+  `original_name`, `version`, `local_path` relative to WORKDIR), `files` (all earlier files of the case, metadata only),
+  `outputs` (the drafts the user ticked for THIS run, or null — section "Drafts ticked by the user") and
+  `reminder_next` (§4.21 number of the next स्मरणपत्र).
 - `WORKDIR/in/proposal/<original name>` = the proposal PDF. More than one PDF there (e.g. a scan split in two): read ALL
   of them; the package's proposal = `proposal_original_name`; every other proposal PDF is handled like an extra_doc
   (below) + warning "पडताळणी अपूर्ण — प्रस्तावाच्या <k> PDF फाइल्स आल्या; '<name>' संलग्नक म्हणून जोडली — तपासा"
@@ -16,7 +18,10 @@ caching): this file, then tools/ENGINE_BRIEF.md, then the tool docstrings, then 
   `WORKDIR/in/reply/` = the office's answer to this Section's earlier information-request letter — read it as part of
   the record and prepare the NEXT note on the basis of the proposal + the reply (PROPOSAL_SOP Step 3: letter only if
   essential information is still missing; otherwise the note goes onward for approval).
-- Reply / extra_doc / additional proposal PDFs IN THE PACKAGE (02.11.2026, A1): they are the FIRST entries of
+  `WORKDIR/in/approval/` = Finance / GAD approval or concurrence received (वित्त/सा.प्र.वि. मान्यता) — the record for an
+  order draft (B7); `WORKDIR/in/court_notice/` = a court notice (GP/AGP/HC/MAT) — court mode below. Both are read and
+  enclosed like a reply (C28, 03.11.2026).
+- Reply / approval / court_notice / extra_doc / additional proposal PDFs IN THE PACKAGE (02.11.2026, A1): they are the FIRST entries of
   enclosures.json, in upload order (all pages `"pages": ""`, label e.g. "प्राप्त उत्तर दि. __" / "अतिरिक्त कागदपत्र",
   no marks), then the GR pages. So reply pages follow the proposal pages in the package; cite them by their package
   page "पृ.N/प.वि." from `<pdf>.map.json`, never an invented N. A reply that is not a PDF (jpg/docx) is cited by its
@@ -78,8 +83,9 @@ Expected cost per typical proposal (15 pages, 3 GRs; estimate, not yet measured 
    /tmp/work/enclosures.json (pkg3 format; marks = exact text lines unique on the page), /tmp/work/spec.json (note +
    letter, `related` = []; पृ.N computed from the package order: proposal pages 1..n, then the enclosure pages in
    order), /tmp/work/study_part0.json (part 0 as a build_study part), /tmp/work/status_core.json (summary,
-   letter_needed, essential_points, grs_attached, grs_missing, case) — in spec.json also `parawise` / `order` when
-   the brief's court / order-draft rules call for them — and /tmp/work/related_plan.md (which GR/rule/
+   letter_needed, essential_points, grs_attached, grs_missing, case) — the drafts = case.json `outputs` <list or
+   null> (section "Drafts ticked by the user": `letters` / `orders` / `parawise`; null -> also `parawise` / `order`
+   when the brief's court / order-draft rules call for them) — and /tmp/work/related_plan.md (which GR/rule/
    precedent paras the note's `related` should carry, with file + page; no quotes needed). List unclear pages in
    facts.json `unclear`."
    facts.json = `{"pages": n, "facts": [{"file": "proposal", "page": N, "document": "...", "items": [{"what": "...",
@@ -107,7 +113,7 @@ Expected cost per typical proposal (15 pages, 3 GRs; estimate, not yet measured 
    as written), warning "पडताळणी अपूर्ण — उतारा मूळ पानाशी जुळला नाही: <where, पृ.>", go on.
    UNVERIFIABLE lines are not failures. The workflow repeats this check on the delivered files and reports what is
    left as warnings.
-6. lint -> build_note_letter [-> build_parawise / build_order when spec has `parawise` / `order`] -> build_study ->
+6. lint -> build_note_letter [-> build_parawise / build_order when spec has `parawise` / `order` / `orders`] -> build_study ->
    write a draft OUTDIR/status.json (rule 9, without `review`) -> verify (rule 6). Fix ladder: Escalation (b); its end
    state: rule 9. A PREFIX change (C R found later) -> delete the old-PREFIX files in OUTDIR before rebuilding.
 7. D-final -> `reviewer` (ONE Agent call): "Read the brief, /tmp/work/facts.json, /tmp/work/spec.json,
@@ -177,6 +183,34 @@ the run variables. The reviewer's corrections go to status.json `review.correcti
   Read the tool .py files or the full rule files, except a grep of one exact item on a real doubt.
 - Never Read the same file twice. Give subagents file paths, never paste file contents into the delegation.
 
+## Drafts ticked by the user — `outputs` (C28, INSTRUCTIONS §4.28, 03.11.2026)
+Abhi, 03.11.2026: "letter, shasan nirnay ase option sudhha asayla pahije, jenekarun user multiple option choose karel
+tyachya demand nusar"; "default letter asel". case.json `outputs` = list of keys in this order: letter (पत्र), reminder
+(स्मरणपत्र), gr (शासन निर्णय), corrigendum (शुद्धिपत्रक), circular (परिपत्रक), memo (ज्ञापन), notification (अधिसूचना),
+parawise (परिच्छेदनिहाय उत्तर). The Study, the note and the package PDF are ALWAYS made.
+- `outputs` null (old app / column missing) -> today's behaviour: the drafter decides letter / order / parawise by the
+  rules below and Step 3.
+- `outputs` a list (also `[]` = note only) -> make EXACTLY those drafts besides the note; tell the drafter the list in D1:
+  - letter ticked but no essential information missing (§4.15) -> a letter fitting the demand (reply / forwarding /
+    intimation — not an information request; no "ही विनंती" needed) + warning
+    "पडताळणी अपूर्ण — पत्र: माहिती-मागणी आवश्यक नाही (§4.15); मागणीनुसार पत्र तयार केले".
+  - letter NOT ticked but essential information missing -> no letter; the note says what is missing; warning
+    "पडताळणी अपूर्ण — माहिती कमी — पत्र सुचवले (निवडलेले नाही)".
+  - reminder -> a letter with `reminder: <reminder_next>` (§4.21: "स्मरणपत्र-N", same file no., refs[0] "या कार्यासनाचे
+    समक्रमांकाचे पत्र दि. __", the reminder intro). Letter and reminder both ticked -> spec `letters`: [letter, reminder]
+    (instead of `letter`; build_note_letter.py puts each on a new page in the one Note_and_Letter).
+  - gr / corrigendum / circular / memo / notification -> spec `orders`: [{order}, …] in the ticked order (one ticked: `order`
+    or `orders` with one item); build_order.py writes ONE `<PREFIX>_Order_Draft.docx`, each order on a new page. Ticked
+    without Finance/GAD concurrence (or the decision) on record -> still drafted (unknown references "____") + warning
+    "पडताळणी अपूर्ण — शासन निर्णय: वित्त/सा.प्र.वि. सहमती अभिलेखावर नाही (B7)".
+  - parawise -> spec `parawise` (court mode below; build_parawise.py).
+  - The note's last para names every draft made, e.g. "सबब, … पत्राचे प्रारूप व शासन निर्णयाचे प्रारूप पृ.      /प.वि. वर
+    मान्यतेस्तव सादर." (lint_spec accepts the combined form; "अ.मु.स. (वित्त)" only on a Finance route, as before).
+  - §4.27 applies to every draft (no warning / AI words inside; unknown -> "____").
+- status.json `outputs_extra` lists every draft made besides the note, by key or kind, e.g. `["letter", "reminder", "gr",
+  {"kind": "order_draft", "file": "<PREFIX>_Order_Draft.docx"}]`. The workflow's verify warns (never fails, §4.26)
+  "पडताळणी अपूर्ण — निवडलेला मसुदा तयार झाला नाही: <label>" for a ticked draft that is not in the files.
+
 ## Court cases and order drafts — two optional outputs (02.11.2026; docs/COURT_AND_ORDERS_RESEARCH.md B1–B10)
 Abhi, 02.11.2026: "court case aslyas parawise tayar krne note ani letter tayar krne"; "shasan nirnayacha masuda tayar
 kne, adhisuchna, dhynapan tayar krne". Both live in the SAME spec.json as the note (the `drafter` writes them in D1, the
@@ -207,9 +241,9 @@ on the page images):
   Study part 0 (अ)/(आ) states the hearing date and that limit; (ऐ) the action.
 - Signers: the §4.6 chain (B10, Abhi to confirm).
 
-**Order drafts** (B7) — spec `order` (type gr / corrigendum / circular / memo / notification) ONLY when the record shows
-the decision or concurrence is in hand (Finance / GAD concurrence received, approval given, a reply that completes the
-case) or `instructions` asks for it. Otherwise no `order` (a Finance/GAD note or a letter instead — Step 3). GR for
+**Order drafts** (B7) — spec `order` (type gr / corrigendum / circular / memo / notification; several: `orders` [..])
+ONLY when the record shows the decision or concurrence is in hand (Finance / GAD concurrence received, approval given, a
+reply that completes the case) or `instructions` asks for it or `outputs` ticks it (section above). Otherwise no `order` (a Finance/GAD note or a letter instead — Step 3). GR for
 general orders; ज्ञापन for a sanction to named/limited officers (GADT 12.10, 12.12); शुद्धिपत्रक to correct an issued
 order; अधिसूचना for statutory notifications (B6: Marathi + English). Concurrence para with the Finance/GAD reference as
 in the record (R3). The note's last para then (lint form (c), R3 (c)): "सबब, … <शासन निर्णयाचे / ज्ञापनाचे /
@@ -312,7 +346,8 @@ Step 0 is done by the workflow:
  "case": {"cr_no": "130", "cr_year": 2026, "file_no": "संकीर्ण-2026/979/प्र.क्र.130/का.6", "subject": "<as on the निर्देशपत्र>",
           "category": "<one of: वेतननिश्चिती, भत्ते, निवृत्तीवेतन, जुनी पेन्शन, विशेष वेतन, विमा/GPF, सेवा, न्यायिक वेतन, वैद्यकीय, इतर>"}}
 ```
-   `outputs_extra` = the optional files built (section "Court cases and order drafts"), `[]` when none.
+   `outputs_extra` = the optional files / drafts built (sections "Drafts ticked by the user", "Court cases and order
+   drafts"), `[]` when none.
    `prefix`, `package_pdf`, `proposal_pages` = exactly the PREFIX, package file name and proposal page count you gave
    verify_outputs.py (rule 6); the workflow re-runs it with these.
    Terminal states (02.11.2026, Abhi: "drafts must never be thrown away"; "punha ase bug yayla nko"):

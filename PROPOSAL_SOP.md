@@ -57,6 +57,13 @@ Trigger: Abhi says "प्रस्ताव कक्षातील नवी�
   - Finance (वित्त विभागाच्या मान्यतेस्तव), adding "अ.मु.स. (वित्त)" to the signers — model: CR66 sample;
   - or GAD (सा.प्र.वि.);
   - or a reply letter on the basis of an existing opinion.
+- **Drafts ticked by Abhi (INSTRUCTIONS §4.28, 03.11.2026 — "कोणते मसुदे हवेत?"):** case.json / the desk choice `outputs`
+  (letter, reminder, gr, corrigendum, circular, memo, notification, parawise). Given → make EXACTLY those besides the note
+  (Study, note, package always; nothing ticked → note only); null → decide as above. Letter ticked but nothing essential
+  missing → a letter fitting the demand (reply / forwarding / intimation) + warning; letter not ticked but essential
+  information missing → no letter + warning "माहिती कमी — पत्र सुचवले (निवडलेले नाही)". Letter + reminder → spec
+  `letters` [letter, reminder] (one Note_and_Letter, each on a new page); several orders → spec `orders` [..] (one
+  Order_Draft, each on a new page). The last para names every draft made.
 
 ## Step 4 — Write the note (टिप्पणी) — spec.json
 Copy the structure of the nearest sample in `samples/specs/` and fill your facts. Rules:
@@ -98,10 +105,13 @@ Both are optional keys of the same spec.json; engine detail: tools/ENGINE_PROMPT
     <PREFIX>` → `<PREFIX>_Parawise.docx`; letter to the GP/AGP forwarding it.
   - Essential facts missing → information letter first (§4.15).
   - Rule 58(4): to the GP within two weeks of receipt / before the date in the notice; the hearing date goes in Study part 0.
-- **Order drafts** (B7: only when the decision / Finance-GAD concurrence is on record, or Abhi asks): spec `order`
-  (gr / corrigendum / circular / memo / notification) → `python3 tools/build_order.py spec.json <outdir> <PREFIX>` →
-  `<PREFIX>_Order_Draft.docx`. Note's last para: "सबब, … शासन निर्णयाचे (ज्ञापनाचे / शुद्धिपत्रकाचे / परिपत्रकाचे /
-  अधिसूचनेचे) प्रारूप पृ.      /प.वि. वर मान्यतेस्तव सादर."
+- **Order drafts** (B7: only when the decision / Finance-GAD concurrence is on record, or Abhi asks — ticking it in
+  "कोणते मसुदे हवेत?" is asking; without concurrence on record it is still drafted + warning, §4.28): spec `order`
+  (gr / corrigendum / circular / memo / notification), or `orders` [..] for several (§4.28; model
+  samples/specs/ORDER_multi_example.json) → `python3 tools/build_order.py spec.json <outdir> <PREFIX>` →
+  ONE `<PREFIX>_Order_Draft.docx` (each order on a new page). Note's last para: "सबब, … शासन निर्णयाचे (ज्ञापनाचे /
+  शुद्धिपत्रकाचे / परिपत्रकाचे / अधिसूचनेचे) प्रारूप पृ.      /प.वि. वर मान्यतेस्तव सादर."; several drafts in one para,
+  e.g. "सबब, … पत्राचे प्रारूप व शासन निर्णयाचे प्रारूप पृ.      /प.वि. वर मान्यतेस्तव सादर." (lint_spec.py).
 - Unknown details (petition no., date, संकेतांक, Gazette part) → "____"; never stop.
 - Checks: `tools/lint_spec.py` (calls tools/lint_order.py / tools/lint_parawise.py), `tools/verify_outputs.py` (fonts,
   ids, repo paths, पृ. ranges of both files). App: kinds `order_draft` / `parawise` (Supabase migration 0006).
