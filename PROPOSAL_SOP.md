@@ -137,6 +137,7 @@ Both are optional keys of the same spec.json; engine detail: tools/ENGINE_PROMPT
    - likely questions from seniors, with answers.
    - Optional simple chart: a matplotlib PNG with a Devanagari font. No charts in the note or letter.
 2. **Parts 1–7** per tools/PROPOSAL_PROMPT.md: Marathi rendering page-wise, gist, provisions (verbatim + source), doubts, note draft, letter draft, verification note.
+3. **Final warnings (Abhi 03.11.2026):** at finish the engine writes the run's final warnings into the Study, end of भाग 7, under "अंतिम तपासणीचे इशारे (वापरण्यापूर्वी तपासा)" (`tools/study_warnings.py append`; model/cost lines owner-only, kept in the app) — never with the note/letter.
 
 ## Step 7 — Verify (must print ALL OK)
 `python3 tools/verify_outputs.py <outdir> <PREFIX> "<package pdf>" <number of proposal pages>`. It prints one line per check (01.11.2026 सुसंगती; tests: `tests/test_verify_outputs.py`):

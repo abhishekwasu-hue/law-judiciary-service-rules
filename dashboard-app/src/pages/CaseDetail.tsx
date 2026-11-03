@@ -9,7 +9,7 @@ import { ApiError, api, humanError } from '../lib/api';
 import type { Activity, Case, CaseFile, Letter, Member } from '../lib/types';
 import { Chip, Empty, Field, Modal, Skeleton, Spinner } from '../components/ui';
 import { useToast } from '../components/Toast';
-import { CriticalWarnings, useRuns } from '../components/RunProgress';
+import { StudyWarningsLine, useRuns } from '../components/RunProgress';
 import { BriefingTab, HistoryTab, LettersTab, NoteTab, PackageTab, StudyTab } from './CaseTabs';
 
 const TABS = [
@@ -247,9 +247,8 @@ export default function CaseDetail() {
             </div>
           ))}
         </dl>
+        <StudyWarningsLine run={runs?.find(r => r.state === 'done')} studyHref="?tab=study" className="no-print" />
       </header>
-
-      <CriticalWarnings run={runs?.find(r => r.state === 'done')} />
 
       {loadErr && (
         <div className="no-print flex flex-wrap items-center justify-between gap-3 rounded-lg bg-red-100 p-3 font-semibold text-red-900 dark:bg-red-900/40 dark:text-red-100" role="alert">

@@ -67,6 +67,19 @@ export function runWarningTexts(warnings: unknown): string[] {
   return asArray(warnings).map(textOf).map(x => x.trim()).filter(x => x && !x.startsWith('मॉडेल:'));
 }
 export const criticalWarnings = (warnings: unknown) => runWarningTexts(warnings).filter(isCriticalWarning);
+/** Owner-only run lines (model routing, cost, AI provider) — same rule as tools/study_warnings.py OWNER_ONLY_PREFIXES. */
+export const OWNER_ONLY_PREFIXES = ['मॉडेल:', 'खर्च', 'मुख्य AI', 'राखीव AI'];
+export const isOwnerOnlyLine = (w: string) => OWNER_ONLY_PREFIXES.some(p => w.trim().startsWith(p));
+/** The warnings the engine writes into the Study (end of भाग 7) at finish (Abhi 03.11.2026: "हे इशारे नोटिंग मध्ये नको"):
+ *  every run warning except the owner-only lines, whitespace-normalised, duplicates once (tools/study_warnings.study_lines). */
+export function studyWarningTexts(warnings: unknown): string[] {
+  const out: string[] = [];
+  for (const w of asArray(warnings).map(textOf)) {
+    const t = w.replace(/\s+/g, ' ').trim();
+    if (t && !isOwnerOnlyLine(t) && !out.includes(t)) out.push(t);
+  }
+  return out;
+}
 
 /** "CR131_2026_Note_and_Letter.docx" → "C R 131/2026" (engine output names carry the C R). */
 export function crFromFileName(name: string | null | undefined): string | null {

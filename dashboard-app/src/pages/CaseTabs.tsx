@@ -8,7 +8,7 @@ import { diffLines, type DiffLine } from '../lib/diff';
 import type { Activity, CaseFile, Letter, Run } from '../lib/types';
 import { Chip, Empty, Field, Modal, Section, Skeleton, SkeletonRows, Spinner } from '../components/ui';
 import { useToast } from '../components/Toast';
-import RunProgress, { RunCost, RunWarnings } from '../components/RunProgress';
+import RunProgress, { OwnerRunLines, RunCost } from '../components/RunProgress';
 import PdfViewer from '../components/PdfViewer';
 import DocxView, { docxParagraphs } from '../components/DocxView';
 import type { CaseCtx } from './CaseDetail';
@@ -155,7 +155,7 @@ export function BriefingTab({ ctx }: { ctx: CaseCtx }) {
               <div className="mt-2">{run.letter_needed == null ? '—' : run.letter_needed ? <Chip tone="amber">आवश्यक</Chip> : <Chip tone="green">आवश्यक नाही</Chip>}</div>
               <div className="mt-3 text-sm text-slate-500">प्रक्रिया तयार: {fmtDateTime(run.finished_at)}</div>
               <RunCost run={run} />
-              <div className="mt-2"><RunWarnings run={run} withCritical={false} /></div>
+              <div className="mt-2"><OwnerRunLines run={run} /></div>
             </div>
           </div>
           {points.length > 0 && (

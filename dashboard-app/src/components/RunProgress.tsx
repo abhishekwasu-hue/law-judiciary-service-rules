@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { sb } from '../lib/supabase';
 import type { Run } from '../lib/types';
 import { RUN_STATE_LABEL, RUN_STEPS, STALE_REASON, isStale, runTone } from '../lib/constants';
-import { asArray, cleanReason, criticalWarnings, fmtDateTime, isCriticalWarning, textOf } from '../lib/format';
+import { asArray, cleanReason, criticalWarnings, fmtDateTime, isOwnerOnlyLine, studyWarningTexts, textOf } from '../lib/format';
 import { useAuth } from '../lib/auth';
 import { Chip, Progress, Spinner } from './ui';
 
@@ -168,47 +169,50 @@ export function RunEta({ run }: { run: Run }) {
 /** Engine model-routing lines in `runs.warnings` start with this prefix (not real warnings). */
 const MODEL_PREFIX = 'मॉडेल:';
 
-/** "पडताळणी अपूर्ण — …" / "अंतिम पडताळणी (Opus) मान्यता नाही — …": the run is done but its outputs were not fully
- *  checked — a red card above the downloads (case page) and in the run progress (engine contract 02.11.2026). */
-export function CriticalWarnings({ run, className = '' }: { run: Run | undefined; className?: string }) {
-  const w = run ? criticalWarnings(run.warnings) : [];
-  if (!w.length) return null;
+/** Abhi 03.11.2026 ("हे इशारे नोटिंग मध्ये नको … स्टडी … फाईल … त्याच्यामध्ये द्या"): a finished run's warnings are written
+ *  into the Study (end of भाग 7, tools/study_warnings.py) — the case page shows only this one neutral line.
+ *  `studyHref`: link to the Study tab (case page); without it plain text. */
+export function StudyWarningsLine({ run, studyHref, className = '' }: { run: Run | undefined; studyHref?: string; className?: string }) {
+  const n = run && run.state === 'done' ? studyWarningTexts(run.warnings).length : 0;
+  if (!n) return null;
+  const text = `तपासणीचे ${n} मुद्दे अभ्यास-फाइलमध्ये (भाग 7 शेवटी) — वापरण्यापूर्वी पाहा`;
   return (
-    <div className={`rounded-lg border-2 border-red-400 bg-red-50 px-3 py-2 text-red-900 dark:border-red-700 dark:bg-red-950/50 dark:text-red-100 ${className}`} role="alert">
-      <div className="font-bold">⚠ फाइल तयार, पण तपासणी पूर्ण नाही — वापरण्यापूर्वी स्वतः तपासा</div>
-      <ul className="mt-1 list-disc space-y-1 break-words pl-5 [overflow-wrap:anywhere]">
-        {w.map((x, i) => <li key={i}>{x}</li>)}
-      </ul>
+    <div className={`text-sm text-slate-600 dark:text-slate-300 break-words [overflow-wrap:anywhere] ${className}`}>
+      ⓘ {studyHref ? <Link className="font-semibold text-navy-600 underline-offset-2 hover:underline dark:text-navy-200" to={studyHref}>{text}</Link> : text}
     </div>
   );
 }
 
-/** Plain warnings (amber) + the owner's model list. `withCritical`: also the red card (off where the page shows it already). */
-export function RunWarnings({ run, withCritical = true }: { run: Run; withCritical?: boolean }) {
+/** Owner-only run lines (model routing, cost, AI provider): a collapsed list for the owner, never printed. */
+export function OwnerRunLines({ run }: { run: Run }) {
   const { me } = useAuth();
-  const all = asArray(run.warnings).map(textOf).map(x => x.trim()).filter(Boolean);
-  const models = all.filter(x => x.startsWith(MODEL_PREFIX)).map(x => x.slice(MODEL_PREFIX.length).trim());
-  const w = all.filter(x => !x.startsWith(MODEL_PREFIX) && !isCriticalWarning(x));
-  // model-routing list: owner-only, never printed
-  const showModels = me?.role === 'owner' && models.length > 0;
-  const crit = withCritical && criticalWarnings(run.warnings).length > 0;
-  if (!w.length && !showModels && !crit) return null;
+  if (me?.role !== 'owner') return null;
+  const lines = asArray(run.warnings).map(textOf).map(x => x.trim()).filter(x => x && isOwnerOnlyLine(x))
+    .map(x => (x.startsWith(MODEL_PREFIX) ? x.slice(MODEL_PREFIX.length).trim() : x));
+  if (!lines.length) return null;
+  return (
+    <details className="no-print rounded-lg bg-slate-100 px-3 py-2 text-sm text-slate-700 dark:bg-navy-800 dark:text-slate-200">
+      <summary className="cursor-pointer font-semibold">मॉडेल-वापर ({lines.length})</summary>
+      <ul className="mt-1 space-y-0.5 break-words [overflow-wrap:anywhere]">
+        {lines.map((x, i) => <li key={i}>• {x}</li>)}
+      </ul>
+    </details>
+  );
+}
+
+/** A run's warnings: finished run -> the neutral Study line (the warnings are in the Study); a run still going or failed
+ *  (no Study yet) -> the plain list; plus the owner's list. */
+export function RunWarnings({ run, studyHref }: { run: Run; studyHref?: string }) {
+  const w = run.state === 'done' ? [] : studyWarningTexts(run.warnings);
   return (
     <>
-      {withCritical && <CriticalWarnings run={run} />}
+      <StudyWarningsLine run={run} studyHref={studyHref} />
       {w.length > 0 && (
         <ul className="space-y-1 rounded-lg bg-amber-100 px-3 py-2 text-sm text-amber-900 dark:bg-amber-900/40 dark:text-amber-100">
           {w.map((x, i) => <li key={i} className="break-words [overflow-wrap:anywhere]">⚠ {x}</li>)}
         </ul>
       )}
-      {showModels && (
-        <details className="no-print rounded-lg bg-slate-100 px-3 py-2 text-sm text-slate-700 dark:bg-navy-800 dark:text-slate-200">
-          <summary className="cursor-pointer font-semibold">मॉडेल-वापर ({models.length})</summary>
-          <ul className="mt-1 space-y-0.5 break-words">
-            {models.map((x, i) => <li key={i}>• {x}</li>)}
-          </ul>
-        </details>
-      )}
+      <OwnerRunLines run={run} />
     </>
   );
 }
@@ -248,7 +252,6 @@ export default function RunProgress({ run, retryHint }: { run: Run; retryHint?: 
         </div>
         <RunCost run={run} />
       </div>
-      <CriticalWarnings run={run} />
       <Progress pct={failed ? 100 : pct} tone={failed ? 'red' : run.state === 'done' ? 'green' : 'blue'} active={active} label={`प्रक्रिया क्र. ${run.id} — ${stale ? 'वेळ संपली' : stateText(run.state)}`} />
       <ol className="grid grid-cols-4 gap-1 text-center text-xs sm:grid-cols-7 sm:text-sm">
         {RUN_STEPS.map((s, i) => {
@@ -279,7 +282,7 @@ export default function RunProgress({ run, retryHint }: { run: Run; retryHint?: 
           {retryHint && <div className="mt-1 text-sm">{retryHint}</div>}
         </div>
       )}
-      <RunWarnings run={run} withCritical={false} />
+      <RunWarnings run={run} />
     </div>
   );
 }
