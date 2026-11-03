@@ -18,7 +18,10 @@ let monthRuns = [];
 let activeRuns = [];
 const spendQueries = [];
 const configTaken = new Set();
-let configColumn = true;          // false = migration 0005 not applied (PostgREST 42703)
+let configColumn = true;
+let outputsColumn = true;         // false = migration 0008 not applied (runs.outputs missing)
+const runInserts = [];
+let kindEnum08 = true;            // false = migration 0008 not applied (file_kind lacks approval / court_notice)          // false = migration 0005 not applied (PostgREST 42703)
 let membersInsert = 'ok';         // 'conflict' = a parallel first request already inserted (409 23505)
 const cases = [{ id: 40, cr_no: '21', cr_year: 2026 }];
 let caseInsertRace = false;       // true = unique violation on insert although the pre-check found nothing
@@ -65,7 +68,11 @@ globalThis.fetch = async (u, opt = {}) => {
     caseRows[id] = { ...caseRows[id], ...JSON.parse(opt.body) }; return res([caseRows[id]]);
   }
   if (u.startsWith(`${SB}/rest/v1/case_files?case_id=eq.7&kind=eq.proposal`)) return res([{ id: 1 }]);
-  if (u === `${SB}/rest/v1/runs`) return res([{ id: 55, case_id: 7 }], 201);
+  if (u === `${SB}/rest/v1/runs`) {
+    const row = JSON.parse(opt.body); runInserts.push(row);
+    if ('outputs' in row && !outputsColumn) return res({ code: 'PGRST204', message: "Could not find the 'outputs' column of 'runs' in the schema cache" }, 400);
+    return res([{ id: 55, ...row }], 201);
+  }
   if (u.startsWith(`${SB}/rest/v1/runs?created_at=gte.`) && !opt.method) { spendQueries.push(u); return res(monthRuns); }
   if (u.startsWith(`${SB}/rest/v1/runs?case_id=eq.`) && u.includes('state=in.(queued,running)') && !opt.method) return res(activeRuns.filter(r => u.includes(`case_id=eq.${r.case_id}&`)));
   if (u.startsWith(`${SB}/rest/v1/runs?id=eq.`) && u.endsWith('&config_taken_at=is.null') && opt.method === 'PATCH') {
@@ -86,9 +93,15 @@ globalThis.fetch = async (u, opt = {}) => {
   if (u.startsWith(`${SB}/rest/v1/cases?id=eq.8&select=id`)) return res([]);
   if (u.startsWith(`${SB}/rest/v1/case_files?case_id=eq.7&kind=eq.extra_doc`)) return res([]);
   if (u.startsWith(`${SB}/rest/v1/case_files?case_id=eq.7&kind=eq.reply`)) return res([]);
+  if (u.startsWith(`${SB}/rest/v1/case_files?case_id=eq.7&kind=eq.approval`)) return res([{ version: 1 }]);
+  if (u.startsWith(`${SB}/rest/v1/case_files?case_id=eq.7&kind=eq.court_notice`)) return res([]);
   if (u.startsWith(`${SB}/rest/v1/case_files?id=eq.1&`)) return res([{ storage_path: 'outputs/7/study/v1/a.docx', original_name: 'a.docx' }]);
   if (u.startsWith(`${SB}/rest/v1/case_files?id=eq.2&`)) return res([{ storage_path: 'backups/7/x', original_name: 'x' }]);
-  if (u === `${SB}/rest/v1/case_files` && opt.method === 'POST') return res([{ id: 9, ...JSON.parse(opt.body) }], 201);
+  if (u === `${SB}/rest/v1/case_files` && opt.method === 'POST') {
+    const row = JSON.parse(opt.body);
+    if (!kindEnum08 && ['approval', 'court_notice'].includes(row.kind)) return res({ code: '22P02', message: `invalid input value for enum file_kind: "${row.kind}"` }, 400);
+    return res([{ id: 9, ...row }], 201);
+  }
   if (u.startsWith(`${SB}/storage/v1/object/sign/`)) return res({ signedURL: '/object/sign/x?token=t' });
   if (u.startsWith(`${SB}/storage/v1/object/`)) {
     if (storageTooBig) return res({ statusCode: '413', error: 'Payload too large', message: 'The object exceeded the maximum allowed size' }, 400);
@@ -665,4 +678,61 @@ test('HTML responses carry CSP with frame-ancestors self; नस्ती page k
   const ncsp = n.headers.get('content-security-policy');
   assert.match(ncsp, /script-src 'self' 'unsafe-inline' 'unsafe-eval'/); assert.match(ncsp, /frame-ancestors 'self'/);
   assert.equal((await call('/assets/a.js')).headers.get('content-security-policy'), null);
+});
+
+test('C28: /api/run outputs — validated, deduped, fixed order; 400 Marathi; missing column → insert without it', async () => {
+  const owner = { authorization: 'Bearer owner-jwt' };
+  monthRuns = []; activeRuns = [];
+  const run = b => call('/api/run', { method: 'POST', headers: owner, body: JSON.stringify({ case_id: 7, ...b }) });
+  runInserts.length = 0;
+  let r = await run({ outputs: ['parawise', 'gr', 'letter', 'gr'] });
+  assert.equal(r.status, 200, await r.clone().text());
+  assert.deepEqual(runInserts.at(-1).outputs, ['letter', 'gr', 'parawise'], 'dedupe + fixed order');
+  assert.deepEqual((await r.json()).outputs, ['letter', 'gr', 'parawise']);
+  r = await run({ outputs: [] });
+  assert.deepEqual(runInserts.at(-1).outputs, [], 'empty = note only');
+  await run({});
+  assert.ok(!('outputs' in runInserts.at(-1)), 'missing field → legacy run (no outputs column written)');
+  await run({ outputs: null });
+  assert.ok(!('outputs' in runInserts.at(-1)), 'null → legacy');
+  const n = runInserts.length;
+  for (const bad of [['letter', 'x'], 'letter', [1], { a: 1 }, ['LETTER']]) {
+    r = await run({ outputs: bad });
+    assert.equal(r.status, 400, JSON.stringify(bad));
+    assert.deepEqual(await r.json(), { error: 'मसुद्यांची निवड चुकीची — पान पुन्हा उघडा' });
+  }
+  assert.equal(runInserts.length, n, 'nothing inserted for a bad selection');
+  // migration 0008 not applied: the run still starts, without outputs, and the activity log says so
+  outputsColumn = false; acts.length = 0;
+  try {
+    const before = calls.filter(c => c.u.endsWith('/dispatches')).length;
+    r = await run({ outputs: ['letter'] });
+    assert.equal(r.status, 200, await r.clone().text());
+    assert.equal(runInserts.length, n + 2, 'first insert refused, second without the column');
+    assert.ok(!('outputs' in runInserts.at(-1)));
+    assert.equal(calls.filter(c => c.u.endsWith('/dispatches')).length, before + 1, 'dispatched');
+    const a = acts.find(x => x.action === 'run_started');
+    assert.equal(a.detail.outputs_dropped, true);
+  } finally { outputsColumn = true; }
+});
+
+test('C28: upload accepts the kinds approval and court_notice; unknown kind refused', async () => {
+  const owner = { authorization: 'Bearer owner-jwt' };
+  const up = kind => call(`/api/upload?case_id=7&kind=${kind}`, { method: 'POST', headers: { ...owner, 'x-file-name': encodeURIComponent('मान्यता.pdf'), 'content-type': 'application/pdf' }, body: 'x' });
+  for (const k of ['approval', 'court_notice']) {
+    const r = await up(k); const j = await r.json();
+    assert.equal(r.status, 200, JSON.stringify(j)); assert.equal(j.kind, k);
+    assert.equal(j.version, k === 'approval' ? 2 : 1, 'version counted per kind');
+    assert.match(j.storage_path, new RegExp(`^proposals/7/${k}/v`));
+    assert.equal(j.letter_updated, null, 'only a reply touches letters');
+  }
+  assert.equal((await up('study')).status, 400, 'output kinds cannot be uploaded');
+  kindEnum08 = false;
+  try {
+    const r = await up('court_notice');
+    assert.equal(r.status, 409);
+    assert.match((await r.json()).error, /migration 0008/);
+    assert.equal((await up('extra_doc')).status, 200, 'old kinds unaffected');
+  } finally { kindEnum08 = true; }
+  assert.equal((await up('foo')).status, 400);
 });

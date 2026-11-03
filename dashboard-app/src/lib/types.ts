@@ -20,6 +20,8 @@ export interface Run {
   cost_usd?: number | string | null; num_turns?: number | null; duration_s?: number | string | null; warnings?: unknown;
   // migration 20261102000007_run_last_step.sql: last progress text before the run ended (red marker of a failed run)
   last_step?: string | null;
+  // migration 20261103000008_run_outputs.sql: drafts ticked for this run (DraftKey[]); null = legacy (engine decided)
+  outputs?: string[] | null;
 }
 export interface Letter {
   id: number; case_id: number; ref_no: string | null; addressed_to: string | null; sent_date: string | null;

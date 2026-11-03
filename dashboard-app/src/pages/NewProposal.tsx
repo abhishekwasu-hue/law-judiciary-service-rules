@@ -2,16 +2,21 @@ import { useEffect, useRef, useState, type DragEvent, type FormEvent } from 'rea
 import { Link } from 'react-router-dom';
 import { ApiError, api, budgetReachedText, fmtUsd, getSpend, humanError, spendBlocked, uploadFile, type Spend } from '../lib/api';
 import { useAuth, useCanWrite } from '../lib/auth';
-import { CATEGORIES, PRIORITIES, isStale } from '../lib/constants';
+import { CATEGORIES, INPUT_KINDS, INPUT_KIND_LABEL, PRIORITIES, isStale, type DraftKey, type InputKind } from '../lib/constants';
+import { sameDrafts, suggestDrafts } from '../lib/drafts';
 import { crLabel, fmtBytes } from '../lib/format';
 import { guessSubject } from '../lib/pdf';
 import type { Case, Run } from '../lib/types';
 import { Field, Progress, Section, Spinner } from '../components/ui';
 import { useToast } from '../components/Toast';
 import RunProgress, { useRuns } from '../components/RunProgress';
+import DraftPicker from '../components/DraftPicker';
 
 const MAX = 50 * 1024 * 1024;
-interface Up { file: File; kind: 'proposal' | 'extra_doc'; pct: number; state: 'wait' | 'up' | 'ok' | 'err'; err?: string }
+/** Types for the other files (the proposal has its own drop zone). */
+const EXTRA_KINDS = INPUT_KINDS.filter(k => k !== 'proposal');
+interface Extra { file: File; kind: InputKind }
+interface Up { file: File; kind: InputKind; pct: number; state: 'wait' | 'up' | 'ok' | 'err'; err?: string }
 
 function DropZone({ label, hint, accept, multiple, onFiles }: { label: string; hint: string; accept: string; multiple?: boolean; onFiles: (f: File[]) => void }) {
   const [over, setOver] = useState(false);
@@ -50,8 +55,13 @@ export default function NewProposal() {
   // same test as the Worker: spend + active runs at their estimate (reserved_usd)
   const overBudget = !!spend && spendBlocked(spend);
   const [proposal, setProposal] = useState<File | null>(null);
-  const [extras, setExtras] = useState<File[]>([]);
+  const [extras, setExtras] = useState<Extra[]>([]);
   const [f, setF] = useState({ cr_no: '', cr_year: '', file_no: '', subject: '', category: '', priority: 'सामान्य', instructions: '' });
+  // "कोणते मसुदे हवेत?": follows the suggestion (from the file types) until the user changes a chip
+  const suggestion = suggestDrafts(extras.map(x => ({ kind: x.kind })), []);
+  const [drafts, setDraftsRaw] = useState<DraftKey[] | null>(null); // null = untouched → the suggestion
+  const chosen = drafts ?? suggestion.keys;
+  const setDrafts = (v: DraftKey[]) => setDraftsRaw(sameDrafts(v, suggestion.keys) ? null : v);
   const [busy, setBusy] = useState(false);
   const [ups, setUps] = useState<Up[]>([]);
   const [created, setCreated] = useState<Case | null>(null);
@@ -107,7 +117,7 @@ export default function NewProposal() {
   function addExtras(files: File[]) {
     const ok = files.filter(x => x.size <= MAX);
     if (ok.length < files.length) toast('50 MB पेक्षा मोठ्या फाइल वगळल्या', 'err');
-    setExtras(s => [...s, ...ok]);
+    setExtras(s => [...s, ...ok.map(file => ({ file, kind: 'extra_doc' as InputKind }))]);
   }
 
   async function submit(e: FormEvent) {
@@ -138,7 +148,7 @@ export default function NewProposal() {
         setCreated(c);
         setDupId(null);
       }
-      const list: Up[] = [{ file: proposal, kind: 'proposal', pct: 0, state: 'wait' }, ...extras.map(x => ({ file: x, kind: 'extra_doc' as const, pct: 0, state: 'wait' as const }))];
+      const list: Up[] = [{ file: proposal, kind: 'proposal', pct: 0, state: 'wait' }, ...extras.map(x => ({ file: x.file, kind: x.kind, pct: 0, state: 'wait' as const }))];
       // a retry skips files already uploaded — matched by the File object itself, not by list position
       const prevOk = (u: Up) => ups.find(p => p.state === 'ok' && p.file === u.file && p.kind === u.kind);
       setUps(list.map(u => prevOk(u) ?? u));
@@ -154,9 +164,9 @@ export default function NewProposal() {
         }
       }
       try {
-        const started = await api<{ id: number }>('/api/run', { body: { case_id: c.id, instructions: f.instructions.trim() || undefined } });
+        const started = await api<{ id: number; outputs_dropped?: boolean }>('/api/run', { body: { case_id: c.id, instructions: f.instructions.trim() || undefined, outputs: chosen } });
         setPendingRun(started.id);
-        toast('अभ्यास सुरू झाला');
+        toast(started.outputs_dropped ? 'अभ्यास सुरू झाला — मसुदे-निवड लागू झाली नाही (migration 0008 बाकी)' : 'अभ्यास सुरू झाला');
       } catch (x) {
         if (x instanceof ApiError && x.message === 'run_active') {
           setPendingRun(Number((x.data as { run_id?: number } | undefined)?.run_id) || null);
@@ -181,6 +191,7 @@ export default function NewProposal() {
   function reset() {
     setProposal(null);
     setExtras([]);
+    setDraftsRaw(null);
     setF({ cr_no: '', cr_year: '', file_no: '', subject: '', category: '', priority: 'सामान्य', instructions: '' });
     setUps([]);
     setCreated(null);
@@ -231,7 +242,7 @@ export default function NewProposal() {
           </Section>
         </div>
       )}
-      <form onSubmit={submit} className="grid gap-5 lg:grid-cols-2">
+      <form onSubmit={submit} className="grid gap-5 lg:grid-cols-2 [&>*]:min-w-0">
         <Section title="फाइल">
           <div className="space-y-4">
             {proposal ? (
@@ -245,13 +256,22 @@ export default function NewProposal() {
             ) : (
               <DropZone label="प्रस्ताव PDF येथे ओढा" hint="एकच PDF • कमाल 50 MB • फाइलनाव जसेच्या तसे राहील • फोटो असल्यास आधी PDF करा" accept="application/pdf,.pdf" onFiles={pickProposal} />
             )}
-            <DropZone label="इतर कागदपत्रे (ऐच्छिक)" hint="PDF / Word / प्रतिमा" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" multiple onFiles={addExtras} />
+            <DropZone label="इतर फाइल (ऐच्छिक)" hint="उत्तर / मान्यता / न्यायालयीन नोटीस / इतर • PDF / Word / प्रतिमा • प्रकार खाली निवडा" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" multiple onFiles={addExtras} />
             {extras.length > 0 && (
               <ul className="space-y-1">
                 {extras.map((x, i) => (
-                  <li key={i} className="flex items-center justify-between gap-2 rounded-lg bg-slate-100 px-3 py-1 dark:bg-navy-800">
-                    <span className="truncate" title={x.name}>{x.name} <span className="text-sm text-slate-500">({fmtBytes(x.size)})</span></span>
-                    {!busy && !locked && <button type="button" className="btn-ghost min-w-tap px-2" onClick={() => setExtras(s => s.filter((_, j) => j !== i))} aria-label="काढा">✕</button>}
+                  <li key={i} className="space-y-1 rounded-lg bg-slate-100 px-3 py-2 dark:bg-navy-800">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="min-w-0 truncate" title={x.file.name}>{x.file.name} <span className="text-sm text-slate-500">({fmtBytes(x.file.size)})</span></span>
+                      {!busy && !locked && <button type="button" className="btn-ghost min-w-tap px-2" onClick={() => setExtras(s => s.filter((_, j) => j !== i))} aria-label="काढा">✕</button>}
+                    </div>
+                    <label className="flex items-center gap-2 text-sm">
+                      <span className="shrink-0 font-semibold">प्रकार</span>
+                      <select className="input min-h-tap py-1" disabled={busy || locked} value={x.kind}
+                        onChange={e => { const kind = e.target.value as InputKind; setExtras(s => s.map((y, j) => (j === i ? { ...y, kind } : y))); }}>
+                        {EXTRA_KINDS.map(k => <option key={k} value={k}>{INPUT_KIND_LABEL[k]}</option>)}
+                      </select>
+                    </label>
                   </li>
                 ))}
               </ul>
@@ -286,6 +306,7 @@ export default function NewProposal() {
               <textarea className="input min-h-[72px]" value={f.instructions} onChange={set('instructions')}
                 placeholder={'उदा. • पत्रात फक्त सेवापुस्तकाची प्रत मागवा\n• पत्र नको; नस्ती वित्त विभागाकडे पाठवा\n• पान 7 वरील हस्तलिखित शेरा नीट वाचा'} />
             </Field>
+            <DraftPicker value={chosen} onChange={setDrafts} suggestion={suggestion} disabled={busy || running || done} />
             {done && created ? (
               <Link className="btn-accent flex w-full items-center justify-center py-3 text-xl" to={`/cases/${created.id}?tab=note`}>
                 तयार फाइल पाहा →

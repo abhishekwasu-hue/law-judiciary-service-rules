@@ -1,6 +1,8 @@
 import { lazy, Suspense, useMemo, useRef, useState, type FormEvent } from 'react';
 import { ApiError, api, downloadFile, humanError, uploadFile } from '../lib/api';
-import { ACTION_LABEL, EXTRA_OUTPUT_KINDS, FIELD_LABEL, FILE_KIND_LABEL, LETTER_STATUSES, RUN_STATE_LABEL, TONE_HEX, runActive, runTone } from '../lib/constants';
+import { ACTION_LABEL, EXTRA_OUTPUT_KINDS, FIELD_LABEL, FILE_KIND_LABEL, INPUT_KINDS, INPUT_KIND_LABEL, LETTER_STATUSES, RUN_STATE_LABEL, TONE_HEX, draftsText, runActive, runTone, type DraftKey, type InputKind } from '../lib/constants';
+import { sameDrafts, suggestDrafts } from '../lib/drafts';
+import DraftPicker from '../components/DraftPicker';
 import { asArray, cleanReason, daysBetween, fmtDate, fmtDateTime, isCriticalWarning, textOf, todayISO } from '../lib/format';
 import { diffLines, type DiffLine } from '../lib/diff';
 import type { Activity, CaseFile, Letter, Run } from '../lib/types';
@@ -72,9 +74,14 @@ function RunBanner({ ctx }: { ctx: CaseCtx }) {
   );
 }
 
-export function ReRun({ ctx, title = 'सुधारणा करून पुन्हा तयार करा', preset = '' }: { ctx: CaseCtx; title?: string; preset?: string }) {
+export function ReRun({ ctx, title = 'सुधारणा करून पुन्हा तयार करा', preset = '', presetDrafts }: { ctx: CaseCtx; title?: string; preset?: string; presetDrafts?: DraftKey[] }) {
   const toast = useToast();
   const [text, setText] = useState(preset);
+  // "कोणते मसुदे हवेत?": the suggestion from the case's files and runs until the user changes a chip
+  const suggestion = suggestDrafts(ctx.files, ctx.runs);
+  const [drafts, setDraftsRaw] = useState<DraftKey[] | null>(presetDrafts ?? null);
+  const chosen = drafts ?? suggestion.keys;
+  const setDrafts = (v: DraftKey[]) => setDraftsRaw(sameDrafts(v, suggestion.keys) ? null : v);
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState<number | null>(null); // dispatched run whose Realtime row is not here yet (H3)
   const r = latestRun(ctx.runs);
@@ -84,10 +91,11 @@ export function ReRun({ ctx, title = 'सुधारणा करून पु�
     e.preventDefault();
     setBusy(true);
     try {
-      const started = await api<{ id: number }>('/api/run', { body: { case_id: ctx.c.id, instructions: text.trim() || undefined } });
+      const started = await api<{ id: number; outputs_dropped?: boolean }>('/api/run', { body: { case_id: ctx.c.id, instructions: text.trim() || undefined, outputs: chosen } });
       setPending(started.id);
-      toast('प्रक्रिया पुन्हा सुरू झाली');
+      toast(started.outputs_dropped ? 'प्रक्रिया सुरू झाली — मसुदे-निवड लागू झाली नाही (migration 0008 बाकी)' : 'प्रक्रिया पुन्हा सुरू झाली');
       setText('');
+      setDraftsRaw(null);
     } catch (x) {
       if (x instanceof ApiError && x.message === 'run_active') setPending(Number((x.data as { run_id?: number } | undefined)?.run_id) || null);
       toast(humanError(x), 'err');
@@ -96,7 +104,8 @@ export function ReRun({ ctx, title = 'सुधारणा करून पु�
     }
   }
   return (
-    <form onSubmit={go} className="space-y-2">
+    <form onSubmit={go} className="space-y-3">
+      <DraftPicker value={chosen} onChange={setDrafts} suggestion={suggestion} disabled={busy || running} />
       <Field label={title} hint="ही सूचना पाळून संपूर्ण अभ्यास पुन्हा तयार होतो (कायमच्या नियमांच्या मर्यादेत).">
         <textarea className="input min-h-[80px]" placeholder="उदा. पत्रात फक्त सेवापुस्तकाची प्रत मागवा…" value={text} onChange={e => setText(e.target.value)} />
       </Field>
@@ -302,7 +311,7 @@ export function PackageTab({ ctx }: { ctx: CaseCtx }) {
   const shown = pkg || proposal;
   const [jump, setJump] = useState<{ page: number; at: number } | undefined>();
   const grs = asArray(latestDone(ctx.runs)?.grs_attached).map(grItem);
-  const inputs = ctx.files.filter(f => f.kind === 'proposal' || f.kind === 'extra_doc' || f.kind === 'reply');
+  const inputs = ctx.files.filter(f => (INPUT_KINDS as readonly string[]).includes(f.kind));
   const multiProposal = ctx.files.filter(f => f.kind === 'proposal').length > 1;
 
   async function openGr(code: string) {
@@ -355,6 +364,7 @@ export function PackageTab({ ctx }: { ctx: CaseCtx }) {
             )}
           </Section>
           <Section title="मूळ कागदपत्रे">
+            {ctx.canWrite && <AddFile ctx={ctx} />}
             <ul className="space-y-2">
               {inputs.map(f => (
                 <li key={f.id} className="flex items-center justify-between gap-2">
@@ -369,6 +379,41 @@ export function PackageTab({ ctx }: { ctx: CaseCtx }) {
           </Section>
         </div>
       </div>
+    </div>
+  );
+}
+
+/** "फाइल जोडा" on a case: type selector (प्रस्ताव / उत्तर / मान्यता / न्यायालयीन नोटीस / इतर) + file picker (C28). */
+function AddFile({ ctx }: { ctx: CaseCtx }) {
+  const toast = useToast();
+  const [kind, setKind] = useState<InputKind>('extra_doc');
+  const [pct, setPct] = useState<number | null>(null);
+  const ref = useRef<HTMLInputElement>(null);
+  async function up(file: File) {
+    if (file.size > 50 * 1024 * 1024) return toast('फाइल 50 MB पेक्षा मोठी', 'err');
+    setPct(0);
+    try {
+      await uploadFile(ctx.c.id, kind, file, setPct);
+      toast(`${INPUT_KIND_LABEL[kind]} अपलोड झाले — मसुदे हवे असल्यास "पुन्हा तयार करा"`);
+      await Promise.all([ctx.reloadFiles(), ctx.reloadLetters(), ctx.reloadActivity()]);
+    } catch (x) {
+      toast(humanError(x), 'err');
+    } finally {
+      setPct(null);
+    }
+  }
+  return (
+    <div className="mb-3 flex flex-wrap items-center gap-2 border-b border-slate-200 pb-3 dark:border-navy-800">
+      <label className="flex min-w-0 flex-1 items-center gap-2 text-sm">
+        <span className="shrink-0 font-semibold">प्रकार</span>
+        <select className="input min-w-0 py-1" value={kind} disabled={pct !== null} onChange={e => setKind(e.target.value as InputKind)}>
+          {INPUT_KINDS.map(k => <option key={k} value={k}>{INPUT_KIND_LABEL[k]}</option>)}
+        </select>
+      </label>
+      <button type="button" className="btn-ghost" disabled={pct !== null} onClick={() => ref.current?.click()}>
+        {pct !== null ? <><Spinner /> {pct}%</> : '⬆ फाइल जोडा'}
+      </button>
+      <input ref={ref} type="file" hidden accept={kind === 'proposal' ? 'application/pdf,.pdf' : '.pdf,.doc,.docx,.jpg,.jpeg,.png'} onChange={e => { const x = e.target.files?.[0]; e.target.value = ''; if (x) void up(x); }} />
     </div>
   );
 }
@@ -533,6 +578,7 @@ export function LettersTab({ ctx }: { ctx: CaseCtx }) {
           <ReRun
             ctx={ctx}
             title="प्रक्रियेसाठी सूचना"
+            presetDrafts={['reminder']}
             preset={`पत्र क्र. ${reminderFor.ref_no || '—'}, दि. ${fmtDate(reminderFor.sent_date)} (${reminderFor.addressed_to || ''}) याचे उत्तर अप्राप्त — स्मरणपत्राचा मसुदा तयार करा.`}
           />
         )}
@@ -557,7 +603,7 @@ export function activityText(x: Activity): string {
   switch (x.action) {
     case 'stage_changed': return `${textOf(d.from)} → ${textOf(d.to)}`;
     case 'file_uploaded': return `${FILE_KIND_LABEL[String(d.kind)] || textOf(d.kind)}: ${textOf(d.name)} (आवृत्ती ${textOf(d.version)})`;
-    case 'run_started': return [run, d.instructions ? `सूचना: ${textOf(d.instructions)}` : ''].filter(Boolean).join(' • ');
+    case 'run_started': return [run, d.outputs_dropped ? 'मसुदे-निवड लागू झाली नाही (migration 0008 बाकी)' : draftsText(d.outputs) && `मसुदे: ${draftsText(d.outputs)}`, d.instructions ? `सूचना: ${textOf(d.instructions)}` : ''].filter(Boolean).join(' • ');
     case 'run_done': {
       const files = asArray(d.files).map(f => (f && typeof f === 'object' ? textOf((f as { name?: unknown }).name) : textOf(f))).filter(Boolean);
       return [run, files.length ? `फाइल: ${files.join(', ')}` : ''].filter(Boolean).join(' • ');
@@ -594,7 +640,7 @@ export function HistoryTab({ ctx }: { ctx: CaseCtx }) {
       at: x.finished_at || x.started_at || x.created_at,
       key: `r${x.id}`,
       title: `प्रक्रिया क्र. ${x.id}: ${x.state === 'done' ? 'तयार' : RUN_STATE_LABEL[x.state] || x.state}`,
-      text: [x.state === 'failed' ? cleanReason(x.step) : x.step, x.instructions && `सूचना: ${x.instructions}`].filter(Boolean).join(' • '),
+      text: [x.state === 'failed' ? cleanReason(x.step) : x.step, draftsText(x.outputs) && `मसुदे: ${draftsText(x.outputs)}`, x.instructions && `सूचना: ${x.instructions}`].filter(Boolean).join(' • '),
       who: x.created_by ? ctx.members.get(x.created_by) || '' : '',
       tone: runTone(x.state),
     }));

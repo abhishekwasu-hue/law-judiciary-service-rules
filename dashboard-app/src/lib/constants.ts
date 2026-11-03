@@ -72,8 +72,30 @@ export const RUN_STEPS: { key: string; label: string }[] = [
 export const FILE_KIND_LABEL: Record<string, string> = {
   proposal: 'प्रस्ताव', extra_doc: 'इतर कागदपत्र', study: 'अभ्यास', note_letter: 'टिप्पणी व पत्र',
   package_pdf: 'GR सह प्रस्ताव', gr: 'GR', reply: 'उत्तर',
+  approval: 'मान्यता (वित्त/सा.प्र.वि.)', court_notice: 'न्यायालयीन नोटीस',
   order_draft: 'शासन आदेश-मसुदा', parawise: 'परिच्छेदनिहाय अभिप्राय (इंग्रजी)',
 };
+
+/** Files the user uploads, with the type selector's short labels (C28; migration 0008 adds approval / court_notice). */
+export const INPUT_KINDS = ['proposal', 'reply', 'approval', 'court_notice', 'extra_doc'] as const;
+export type InputKind = (typeof INPUT_KINDS)[number];
+export const INPUT_KIND_LABEL: Record<InputKind, string> = {
+  proposal: 'प्रस्ताव', reply: 'उत्तर', approval: 'मान्यता', court_notice: 'न्यायालयीन नोटीस', extra_doc: 'इतर',
+};
+
+/** "कोणते मसुदे हवेत?" (C28) — keys in the Worker's fixed order (DRAFT_KEYS); stored in runs.outputs. */
+export const DRAFT_KEYS = ['letter', 'reminder', 'gr', 'corrigendum', 'circular', 'memo', 'notification', 'parawise'] as const;
+export type DraftKey = (typeof DRAFT_KEYS)[number];
+export const DRAFT_LABEL: Record<DraftKey, string> = {
+  letter: 'पत्र', reminder: 'स्मरणपत्र', gr: 'शासन निर्णय', corrigendum: 'शुद्धिपत्रक', circular: 'परिपत्रक', memo: 'ज्ञापन',
+  notification: 'अधिसूचना', parawise: 'परिच्छेदनिहाय उत्तर',
+};
+/** Labels of a runs.outputs value: null = legacy run (nothing shown), [] = note only. */
+export function draftsText(v: unknown): string {
+  if (!Array.isArray(v)) return '';
+  const l = DRAFT_KEYS.filter(k => v.includes(k)).map(k => DRAFT_LABEL[k]);
+  return l.length ? l.join(', ') : 'फक्त नोंद';
+}
 
 /** Optional engine outputs (02.11.2026, migration 0006): shown with the note when the engine produced them. */
 export const EXTRA_OUTPUT_KINDS = ['order_draft', 'parawise'] as const;

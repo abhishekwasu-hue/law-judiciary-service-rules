@@ -1,5 +1,6 @@
 // Calls to the Cloudflare Worker (/api/*, same origin). Auth: Bearer <supabase access_token>.
 import { hasSupabase, sb } from './supabase';
+import type { InputKind } from './constants';
 
 export class ApiError extends Error {
   constructor(public status: number, message: string, public data?: unknown) {
@@ -132,7 +133,7 @@ export async function api<T = unknown>(path: string, opt: { method?: string; bod
 }
 
 /** Raw-body upload with progress (XHR so upload.onprogress works). */
-export async function uploadFile(caseId: number, kind: 'proposal' | 'extra_doc' | 'reply', file: File, onProgress?: (pct: number) => void): Promise<{ id: number }> {
+export async function uploadFile(caseId: number, kind: InputKind, file: File, onProgress?: (pct: number) => void): Promise<{ id: number }> {
   const t = await token();
   return new Promise((resolve, reject) => {
     const x = new XMLHttpRequest();

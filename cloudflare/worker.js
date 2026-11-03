@@ -28,7 +28,12 @@ const LETTER_STATUS = ['मसुदा', 'पाठवले', 'उत्तर
 const DEFAULT_RUN_USD = 0.75;                   // estimate for a running run when nothing better is known
 const isId = v => /^\d+$/.test(String(v ?? ''));
 const ALL_KEYS = [...SECRET_KEYS, ...PLAIN_KEYS];
-const FILE_KINDS = ['proposal', 'extra_doc', 'reply'];
+// upload kinds (C28, migration 0008: approval = वित्त/सा.प्र.वि. मान्यता, court_notice = न्यायालयीन नोटीस)
+const FILE_KINDS = ['proposal', 'extra_doc', 'reply', 'approval', 'court_notice'];
+// drafts the user can tick for a run (C28 "कोणते मसुदे हवेत?"), in this fixed order; stored in runs.outputs
+const DRAFT_KEYS = ['letter', 'reminder', 'gr', 'corrigendum', 'circular', 'memo', 'notification', 'parawise'];
+const KIND_NOT_READY = 'हा फाइल-प्रकार अजून सुरू नाही (मालकाने migration 0008 लागू करावे) — "इतर" निवडा';
+const BAD_OUTPUTS = 'मसुद्यांची निवड चुकीची — पान पुन्हा उघडा';
 const MAX_UPLOAD = 50 * 1024 * 1024;
 const SIGN_BUCKETS = ['proposals', 'outputs', 'gr-library'];
 // Run token (D4): created at dispatch, sent to GitHub in the payload. Single use for /api/engine/config (the secrets);
@@ -187,6 +192,15 @@ async function takeConfig(cfg, runId) {
 
 // Duplicate C R: same year and same number ignoring leading zeros ("021" = "21"); cr_no is stored as given.
 // exceptId: the case being edited (PATCH) is not its own duplicate.
+// POST /api/run `outputs`: undefined/null = legacy run (engine decides) → null; otherwise an array of DRAFT_KEYS,
+// deduplicated and put in the fixed order ([] = note only). Anything else → { error }.
+export function normOutputs(v) {
+  if (v === undefined || v === null) return { value: null };
+  if (!Array.isArray(v) || v.length > 32 || v.some(k => typeof k !== 'string' || !DRAFT_KEYS.includes(k))) return { error: BAD_OUTPUTS };
+  return { value: DRAFT_KEYS.filter(k => v.includes(k)) };
+}
+const missingColumn = (e, col) => e instanceof DbError && (e.code === '42703' || e.code === 'PGRST204' || (new RegExp(col).test(e.detail) && /does not exist|could not find/i.test(e.detail)));
+
 async function findCrDup(db, crNo, crYear, exceptId = null) {
   if (crNo == null || crNo === '' || crYear == null || crYear === '') return null;
   const n = String(crNo).trim().replace(/^0+(?=\d)/, '');
@@ -546,7 +560,17 @@ async function route(req, env, url) {
       if (String(e.message) === 'file over 50 MB') return bad('file over 50 MB', 413);
       throw e;
     }
-    const [f] = await db.rest('case_files', { method: 'POST', body: JSON.stringify({ case_id: caseId, kind, storage_path: `proposals/${path}`, original_name: name, version, uploaded_by: user.id }) });
+    let f;
+    try {
+      [f] = await db.rest('case_files', { method: 'POST', body: JSON.stringify({ case_id: caseId, kind, storage_path: `proposals/${path}`, original_name: name, version, uploaded_by: user.id }) });
+    } catch (e) {
+      // approval / court_notice before migration 0008: enum value missing (22P02 invalid input value for enum file_kind)
+      if (e instanceof DbError && ['approval', 'court_notice'].includes(kind) && (e.code === '22P02' || /enum/i.test(e.detail))) {
+        console.log(`file_kind ${kind} missing (apply migration 0008)`);
+        return bad(KIND_NOT_READY, 409);
+      }
+      throw e;
+    }
     await log(cfg, caseId, user.id, 'file_uploaded', { kind, name, version });
     let letter_updated = null, pending_letters = 0;
     if (kind === 'reply') {
@@ -565,12 +589,14 @@ async function route(req, env, url) {
     return json({ ...f, letter_updated, pending_letters });
   }
 
-  // POST /api/run {case_id, instructions} → runs row + dispatch
+  // POST /api/run {case_id, instructions, outputs?} → runs row + dispatch. outputs (C28): ticked drafts, DRAFT_KEYS only
   if (p === '/api/run' && M === 'POST') {
     if (!canWrite(user)) return bad('read-only', 403);
     if (!cfg.github_repo || !cfg.github_token || !engineReady(cfg)) return bad('Settings: GitHub repo/token and the AI key (Anthropic or the chosen engine provider) needed', 412);
-    const { case_id, instructions } = await req.json();
+    const { case_id, instructions, outputs: outputsRaw } = await req.json();
     if (!isId(case_id)) return bad('case_id required');
+    const outs = normOutputs(outputsRaw);
+    if (outs.error) return bad(outs.error);
     const has = await db.rest(`case_files?case_id=eq.${case_id}&kind=eq.proposal&select=id&limit=1`);
     if (!has.length) return bad('upload the proposal PDF first');
     // monthly limit: once this month's spend reached it, no new run is dispatched (runs already going finish)
@@ -582,7 +608,17 @@ async function route(req, env, url) {
     const since = new Date(Date.now() - STALE_MS).toISOString();
     const active = await db.rest(`runs?case_id=eq.${case_id}&state=in.(queued,running)&created_at=gt.${encodeURIComponent(since)}&select=id&order=created_at.desc&limit=1`);
     if (active && active.length) return json({ error: 'run_active', run_id: active[0].id }, 409);
-    const [run] = await db.rest('runs', { method: 'POST', body: JSON.stringify({ case_id, instructions: instructions || null, created_by: user.id }) });
+    const runRow = { case_id, instructions: instructions || null, created_by: user.id };
+    let run;
+    try {
+      [run] = await db.rest('runs', { method: 'POST', body: JSON.stringify(outs.value === null ? runRow : { ...runRow, outputs: outs.value }) });
+    } catch (e) {
+      // migration 0008 not applied: the run is never refused for that — insert without the column (legacy behaviour)
+      if (outs.value === null || !missingColumn(e, 'outputs')) throw e;
+      console.log(`runs.outputs column missing (apply migration 0008); run for case ${case_id} inserted without outputs`);
+      [run] = await db.rest('runs', { method: 'POST', body: JSON.stringify(runRow) });
+      run = { ...run, outputs_dropped: true };
+    }
     try {
       await dispatchRun(env, cfg, run, url.origin);
     } catch (e) {
@@ -592,7 +628,7 @@ async function route(req, env, url) {
       return json({ error: 'dispatch_failed', reason: DISPATCH_REASON, run_id: run.id }, 502);
     }
     await db.rest(`cases?id=eq.${case_id}`, { method: 'PATCH', body: JSON.stringify({ stage: 'अभ्यास चालू' }) });
-    await log(cfg, case_id, user.id, 'run_started', { run_id: run.id, instructions: instructions || '' });
+    await log(cfg, case_id, user.id, 'run_started', { run_id: run.id, instructions: instructions || '', outputs: outs.value, ...(run.outputs_dropped ? { outputs_dropped: true } : {}) });
     return json(run);
   }
 
