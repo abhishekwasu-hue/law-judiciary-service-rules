@@ -1,0 +1,34 @@
+{
+ "id": "law-desk6",
+ "label": "विधि व न्याय विभाग, कार्यासन-6",
+ "department": "विधि व न्याय विभाग",
+ "desk": "का.6",
+ "note_header": "विधि व न्याय विभाग/का.6",
+ "signers": ["का. अ. (श्रीम. कऱ्हाडे)", "अ.स. (श्री. वडनेरकर)", "उ.वि.स. नि. उ.स. (श्री. बोंद्रे)", "प्र.स. व वि.प. (श्री. खटी)"],
+ "finance_signer": "अ.मु.स. (वित्त)",
+ "letter": {
+  "office": ["विधि व न्याय विभाग,", "हुतात्मा राजगुरु चौक, मादाम कामा मार्ग, मंत्रालय, मुंबई-४०००३२."],
+  "phone": "०२२-२२793230",
+  "email": "lnjd.desk6-mh@mah.gov.in",
+  "ref_pattern": "(?:संकिर्ण|संकीर्ण)-[0-9]{4}/(?:[0-9]+|_{2,})/प्र\\.क्र\\.(?:[0-9]+|_{2,})/का\\.6",
+  "ref_hint": "संकिर्ण-<year>/<file no>/प्र.क्र.<n>/का.6",
+  "sign_name": "( राजेश वडनेरकर )",
+  "sign_post": "अवर सचिव ,महाराष्ट्र शासन",
+  "copy_file": "निवड नस्ती"
+ },
+ "order": {
+  "department": "विधि व न्याय विभाग,",
+  "office": "हुतात्मा राजगुरु चौक, मादाम कामा मार्ग, मंत्रालय, मुंबई-400 032",
+  "ref_pattern": "(?:संकिर्ण|संकीर्ण)-[0-9]{4}/(?:[0-9]+|_{2,})/प्र\\.क्र\\.(?:[0-9]+|_{2,})/का\\.6",
+  "ref_hint": "संकिर्ण-<year>/<file no or ____>/प्र.क्र.<n or ____>/का.6",
+  "copy_file": "निवड नस्ती (कार्यासन-6)",
+  "signer": {"name": "( राजेश वडनेरकर )", "designation": "अवर सचिव, महाराष्ट्र शासन"},
+  "signer_notification": {"name": "( ____ )", "designation": "उप विधि सल्लागार-नि-उप सचिव"},
+  "notification_department": "विधि व न्याय विभाग",
+  "english": {
+   "office": ["Law and Judiciary Department,", "Hutatma Rajguru Chowk, Madam Cama Marg,", "Mantralaya, Mumbai-400 032."],
+   "department": "Law and Judiciary Department",
+   "signer": {"name": "( ____ )", "designation": "Deputy Legal Adviser-cum-Deputy Secretary"}
+  }
+ }
+}

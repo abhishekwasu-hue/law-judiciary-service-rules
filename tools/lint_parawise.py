@@ -20,7 +20,9 @@ Errors
   - remarks only a cryptic word ("denied", "not admitted", "admitted", "no comments", "noted", "not denied",
     "denied and not admitted", "matter of record", …) — Rule 58 Note (ii)
   - recommendation not "oppose" / "not oppose" / "____"; recommendation_reason empty (not required with "____")
-  - background / enclosures not a list of str; verification not a bool
+  - background not a list of str / table items, enclosures not a list of str; verification not a bool;
+    relief_sought present but not a string; a background table item ({"title"?, "table"}) not 2-6 columns of
+    plain-text rows (INSTRUCTIONS §4.30, 03.11.2026)
   - internal ids / repo paths anywhere (lint_spec.id_hits / repo_hits)
   - C27 (02.11.2026): "पॅकेज" anywhere; outside quotes "package PDF", "warning", "TODO", the other warning / working words
     and the AI words (lint_spec.draft_word_hits)
@@ -30,6 +32,11 @@ Warnings
   - remarks shorter than 8 words (Note (ii): "elaborate factual position")
   - no enclosures (Note (ii): "invariably accompanied by copies of relevant notifications, rules and orders")
   - background empty; para label not of the forms "1", "1 to 3", "1-3", "1, 2", optionally followed by "(…)"
+  - INSTRUCTIONS §4.30 (03.11.2026, owner: raise the quality of our drafts): contempt-prone / order-like wording toward
+    the court in the Department's own text (remarks, background, recommendation_reason; not the averment or
+    relief_sought summaries of the petition, not “…” quotes) — e.g. "erroneous judgment", "the Court failed to", "illegal order",
+    "perverse", "the Court must" — with a respectful form to use instead (CONTEMPT_PRONE; common drafting usage,
+    basis: Contempt of Courts Act, 1971, s. 2(c); WARNING only, never an error)
 """
 import json
 import os
@@ -53,6 +60,24 @@ CRYPTIC_PREFIX = re.compile(r"^(?:the\s+)?(?:contents?|averments?|allegations?|s
 DEV_RE = re.compile(r"[ऀ-ॿ]")
 PARA_RE = re.compile(r"\d+[A-Za-z]?(?:\s*(?:to|-|–|,|and)\s*\d+[A-Za-z]?)*(?:\s*\([^)]*\))?")
 MIN_WORDS = 8
+TABLE_COLS = (2, 6)
+# §4.30 (03.11.2026): short list of contempt-prone / order-like phrases toward a court (common drafting usage; basis
+# Contempt of Courts Act, 1971, s. 2(c) "scandalises … the authority of any court"). WARN only: (regex, respectful form).
+_CT = r"(?:hon'?ble\s+|learned\s+)?(?:high\s+)?(?:court|tribunal|bench|judge)"
+CONTEMPT_PRONE = [
+    (re.compile(r"\berroneous(?:ly)?\s+(?:judg(?:e)?ment|order|decision|finding|direction)s?\b", re.I),
+     "'with respect, the Department submits that the order may be reconsidered in view of <rule/GR/fact>'"),
+    (re.compile(_CT + r"\s+(?:has\s+|had\s+)?(?:failed|ignored|overlooked|erred|misread|misdirected)\b", re.I),
+     "'it is respectfully submitted that <fact/provision> was not placed before the Hon'ble Court'"),
+    (re.compile(r"\b(?:illegal|unlawful|void|bad\s+in\s+law)\s+(?:judg(?:e)?ment|order|direction|decision)s?\b", re.I),
+     "'the Department respectfully submits that the order is not in accordance with <rule/GR>'"),
+    (re.compile(r"\b(?:perverse|biased|absurd|non-application\s+of\s+mind|without\s+(?:any\s+)?application\s+of\s+mind)\b",
+                re.I),
+     "state the factual / legal position respectfully, without characterising the order"),
+    (re.compile(_CT + r"\s+(?:must|should|shall|is\s+directed\s+to|ought\s+to)\b", re.I),
+     "'the Hon'ble Court may be pleased to …' (a request, never an order)"),
+]
+OWN_TEXT_KEYS = ("remarks", "background", "recommendation_reason")   # relief_sought = the petitioner's prayer (like the averment)
 
 
 BLANK_RE = re.compile(r"^_{2,}$")
@@ -75,6 +100,29 @@ def cryptic(remarks):
     return t in CRYPTIC or t == ""
 
 
+def contempt_hits(text):
+    """§4.30: (phrase found, respectful form) for each CONTEMPT_PRONE pattern outside quotes."""
+    u = lint_spec.unquoted(text or "")
+    return [(m.group(0), fix) for rx, fix in CONTEMPT_PRONE for m in [rx.search(u)] if m]
+
+
+def _bg_table_problem(it):
+    """None when a background item is a valid §4.30 table {"title"?: str, "table": [[str…]…]}, else the reason."""
+    if set(it) - {"title", "table"}:
+        return f"unknown keys {sorted(set(it) - {'title', 'table'})}"
+    if "title" in it and not isinstance(it["title"], str):
+        return "title must be a string"
+    rows = it.get("table")
+    if not isinstance(rows, list) or len(rows) < 2 or not all(isinstance(r, list) for r in rows):
+        return "table must be a list of at least 2 rows (header + data), each a list"
+    n = len(rows[0])
+    if not TABLE_COLS[0] <= n <= TABLE_COLS[1]:
+        return f"{n} columns — use {TABLE_COLS[0]} to {TABLE_COLS[1]}"
+    if any(len(r) != n for r in rows) or not all(isinstance(c, str) for r in rows for c in r):
+        return "every row needs the header's column count, plain-text cells"
+    return None
+
+
 def _strings(pw):
     return list(lint_spec.strings(pw, "parawise"))
 
@@ -93,10 +141,21 @@ def lint_parawise(spec):
     rs = pw.get("respondents")
     if not isinstance(rs, list) or not rs or not all(_txt(r) for r in rs):
         P.append("parawise.respondents: required field — non-empty list of respondent names")
-    for k in ("background", "enclosures"):
-        v = pw.get(k, [])
-        if not isinstance(v, list) or not all(isinstance(x, str) for x in v):
-            P.append(f"parawise.{k}: structure — must be a list of strings")
+    enc = pw.get("enclosures", [])
+    if not isinstance(enc, list) or not all(isinstance(x, str) for x in enc):
+        P.append("parawise.enclosures: structure — must be a list of strings")
+    bg = pw.get("background", [])
+    if not isinstance(bg, list):
+        P.append("parawise.background: structure — must be a list of strings (or §4.30 table items)")
+    else:
+        for i, x in enumerate(bg):
+            if isinstance(x, str):
+                continue
+            why = _bg_table_problem(x) if isinstance(x, dict) else "must be a string or a table item"
+            if why:
+                P.append(f"parawise.background[{i}]: structure — {why} (§4.30 table: {{\"title\", \"table\"}})")
+    if "relief_sought" in pw and not isinstance(pw["relief_sought"], str):
+        P.append("parawise.relief_sought: structure — must be a string (§4.30: the relief prayed for, in brief)")
     if "verification" in pw and not isinstance(pw["verification"], bool):
         P.append("parawise.verification: structure — must be true/false (default false: the GP drafts the counter "
                  "affidavit, Rule 58(6))")
@@ -159,6 +218,15 @@ def warnings_parawise(spec):
                  "rules and orders")
     if not pw.get("background"):
         W.append("parawise.background: brief facts empty")
+    for k in OWN_TEXT_KEYS:   # §4.30: respectful language toward the court (own text only, not the averments)
+        src = [(f"parawise.paras[{i}].{k}", it.get(k)) for i, it in enumerate(pw.get("paras") or [])
+               if isinstance(it, dict)] if k == "remarks" else list(lint_spec.strings(pw.get(k), f"parawise.{k}"))
+        for path, t in src:
+            if not isinstance(t, str):
+                continue
+            for phrase, fix in contempt_hits(t):
+                W.append(f"{path}: contempt-prone wording '{phrase}' — use respectful language toward the Court "
+                         f"(§4.30), e.g. {fix}")
     return W
 
 

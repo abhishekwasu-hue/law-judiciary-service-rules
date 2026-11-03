@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""verify_outputs.py <outdir> <PREFIX> "<package pdf>" <proposal pages> [--original-name NAME]
+"""verify_outputs.py <outdir> <PREFIX> "<package pdf>" <proposal pages> [--original-name NAME] [--desk ID]
 Quality gate for one proposal's three outputs (PROPOSAL_SOP.md Step 7; rules INSTRUCTIONS.md §4).
 Prints one line per check ("OK: ..." / "FAIL: ...", plus "WARN: ..." lines that never fail) and "ALL OK" only when
 every check passes; exit code 1 otherwise.
@@ -46,6 +46,9 @@ Checks
   - intro paragraph (starting "उपरोक्त विषयाबाबत") contains "ही विनंती" outside quotes (§4.18) when the letter asks for
     information (lint_spec.requests_info: a table / numbered points, a reminder, or "… उपलब्ध करून देण्यात यावी")
   - "आपला," present, signature "आपली," absent ("आपली पत्रे" in संदर्भ is allowed); lines "( राजेश वडनेरकर )", "अवर सचिव ,महाराष्ट्र शासन", "प्रत : निवड नस्ती"
+ Desk (C30, 03.11.2026): the signer chain, finance signer, ref no. form, letterhead e-mail (checked only when the
+  profile has one; a blank "____" is fine) and the letter's ending lines come from the desk profile tools/desks/<id>.json:
+  --desk ID, else the profile whose note_header is the note's first line, else law-desk6 (the Desk-6 values above)
  status.json (when <outdir>/status.json exists): `letter_needed` is true/false and true <=> a letter is present
  Study: headings भाग 0 … भाग 7
  Optional outputs (02.11.2026; only when the file exists — absent = no line, ALL OK unaffected):
@@ -56,6 +59,7 @@ Checks
   - file name is the original proposal name (not *_Proposal_with_GRs.pdf); with --original-name NAME: the file name must
     equal NAME minus a random upload prefix like "11ae057d-" (engine_supabase.strip_upload_prefix: 8 hex characters
     with at least one letter a-f, so "20261101-CR130.pdf" is kept as is; the *_Proposal_with_GRs.pdf ban is then skipped, §4.16)
+    or its disk-safe short form (engine_supabase.fs_name: names over 200 UTF-8 bytes cut + "~<6 hex>", NAME_MAX)
   - every page carries exactly "पृ. i / N" in the bottom 40 pt strip; bookmarks present
   - <pdf>.map.json: proposal pages == <proposal pages>; total pages == proposal + enclosure pages (no separator pages);
     no mark with status "TEXT NOT FOUND" / "page not included" or hits == 0 (works with or without per-mark "hits")
@@ -84,12 +88,13 @@ THEME_ATTRS = ("asciiTheme", "hAnsiTheme", "cstheme", "eastAsiaTheme")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 # shared rule definitions — ONE copy, in tools/lint_spec.py (pre-build lint uses the same rules)
 from lint_spec import (AMS, BANNED, BARE_CLOSING_RE, FIN, ID_RE, LH_EMAIL, RELATED, REF_NO, REPO_RE, REQUEST,  # noqa: E402,F401
-                       MISSING_FORM, MISSING_HEAD, SIGNERS, banned_hits, finance_problems, heading_problems, id_hits,
+                       MISSING_FORM, MISSING_HEAD, SIGNERS, banned_hits, desk_signers, finance_problems, heading_problems, id_hits,
                        lang_hits, ma_hits, ns, num, part_no, ref_problems, repo_hits, requests_info, signer_problems,
                        style_hits, unquoted, warn_hits, PKG_WORD, draft_word_hits, related_source_problems)
 INTRO_HEAD = "उपरोक्त विषयाबाबत"  # letter intro paragraph (lint_spec.INTRO_START begins with it)
 from clean_meta import docx_meta_problems, pdf_meta_problems  # noqa: E402 — C27 §4 (no tool / AI trace in metadata)
-from engine_supabase import strip_upload_prefix  # noqa: E402 — the ONE upload-prefix rule (§4.16)
+import desk as _desk  # noqa: E402 — C30 (03.11.2026): desk profiles tools/desks/<id>.json
+from engine_supabase import strip_upload_prefix, name_forms  # noqa: E402 — the ONE upload-prefix rule (§4.16) + NAME_MAX short form
 
 results = []
 
@@ -204,12 +209,20 @@ def letter_body_for_ma(texts):
 
 def letter_info(blocks, letter_txt):
     """What lint_spec.requests_info needs from a built letter: points (a table or numbered "1)" points) / reminder."""
-    pts = any(b["kind"] == "tbl" for b in blocks) or any(re.match(r"\s*[0-9०-९]+\s*\)", b["text"]) for b in blocks)
+    if any(b["kind"] == "tbl" for b in blocks):
+        pts = [{"table": []}]
+    else:   # numbered points ("1) …" / "1. …"); they ask only with ask wording (lint_spec.points_ask, C30)
+        pts = [b["text"] for b in blocks if b["kind"] == "p" and re.match(r"\s*[0-9०-९]+\s*[).]", b["text"])]
     return {"points": pts, "reminder": "स्मरणपत्र-" in letter_txt}
 
 
 def main(argv):
-    argv = list(argv); orig = None
+    argv = list(argv); orig = None; desk_arg = None
+    if "--desk" in argv:   # C30: desk profile id (else detected from the note's header line, else law-desk6)
+        i = argv.index("--desk")
+        if i + 1 >= len(argv):
+            print(__doc__); return 2
+        desk_arg = argv[i + 1]; del argv[i:i + 2]
     if "--original-name" in argv:
         i = argv.index("--original-name")
         if i + 1 >= len(argv):
@@ -329,17 +342,24 @@ def main(argv):
             for x in warn_hits(t):
                 warn(f"{where}: {x}")
 
-        # signer chain + Finance
+        # signer chain + Finance (C30: the desk profile's chain — --desk, else detected from the note header line)
         ne = [b for b in bl[:note_end] if b["kind"] == "p" and ns(b["text"])]
         ntexts = [ns(b["text"]) for b in ne]
-        has_ams = AMS in ntexts
+        did = desk_arg or _desk.detect_desk(ntexts[:1]) or _desk.DEFAULT_DESK
+        try:
+            dk = _desk.load_desk(did)
+        except ValueError as e:
+            check("desk profile", [str(e)]); dk = _desk.load_desk(None)
+        print(f"OK: desk profile — {dk['id']}")
+        D_SIGNERS, D_AMS = desk_signers(dk)
+        has_ams = D_AMS in ntexts
         k = 0
-        while k < len(ntexts) and ntexts[len(ntexts) - 1 - k] in SIGNERS + [AMS]:
+        while k < len(ntexts) and ntexts[len(ntexts) - 1 - k] in D_SIGNERS + [D_AMS]:
             k += 1
         sig_start = len(ntexts) - k
         tail = ntexts[sig_start:]
-        sp = signer_problems(tail, has_ams)
-        stray = [t for t in ntexts[:sig_start] if t in SIGNERS + [AMS]]
+        sp = signer_problems(tail, has_ams, dk)
+        stray = [t for t in ntexts[:sig_start] if t in D_SIGNERS + [D_AMS]]
         if stray: sp.append(f"signer lines outside the signer block: {stray}")
         check("note signer chain (§4.6)", sp)
         numbered = [t for t in ntexts[:sig_start] if re.match(r"[0-9०-९]+\.", t)]
@@ -347,7 +367,7 @@ def main(argv):
         # a separate closing line "मान्यतेस्तव सादर." (spec note.closing, Format-1/2) belongs to the last para (as in lint_spec)
         if numbered and sig_start and BARE_CLOSING_RE.match(ntexts[sig_start - 1]):
             last = last + " " + ntexts[sig_start - 1]
-        check("अ.मु.स. (वित्त) <=> Finance last para", finance_problems(last, has_ams))
+        check("अ.मु.स. (वित्त) <=> Finance last para", finance_problems(last, has_ams, dk))
 
         # status.json `letter_needed` (engine; reported to the app) must agree with the built file
         sj = os.path.join(out, "status.json")
@@ -373,9 +393,11 @@ def main(argv):
             lt = [ns(p.text) for p in lp]
             pr = []
             if kram is None: pr.append("'क्रमांक :-' line missing")
-            elif not REF_NO.search(bl[kram]["text"]): pr.append(f"ref no. not संकिर्ण-<year>/<file no>/प्र.क्र.<n>/का.6: '{ns(bl[kram]['text'])}'")
+            elif not _desk.letter_ref_re(dk).search(bl[kram]["text"]):
+                pr.append(f"ref no. not {dk['letter']['ref_hint']}: '{ns(bl[kram]['text'])}'")
             if prati is None: pr.append("'प्रति,' missing")
-            if LH_EMAIL not in letter_txt: pr.append(f"letterhead e-mail {LH_EMAIL} missing")
+            lh_email = (dk["letter"].get("email") or "").strip()   # checked only when the profile has one (C30)
+            if lh_email and lh_email not in letter_txt: pr.append(f"letterhead e-mail {lh_email} missing")
             check("letter ref no. / letterhead", pr)
             prev = lstart - 1
             while prev > 0 and not ns(bl[prev]["text"]) and not bl[prev]["brk"]:
@@ -402,8 +424,8 @@ def main(argv):
             if "आपला," not in lt: en.append("'आपला,' line missing")
             if any(re.fullmatch(r"आपली\s*,?", t) for t in lt) or re.search(r"आपली\s*,", letter_txt):
                 en.append("signature 'आपली,' present (must be 'आपला,')")  # "आपली पत्रे" in संदर्भ is grammatical
-            for line in ("( राजेश वडनेरकर )", "अवर सचिव ,महाराष्ट्र शासन", "प्रत : निवड नस्ती"):
-                if line not in lt: en.append(f"line '{line}' missing")
+            for line in _desk.letter_end_lines(dk):   # C30: signature / post / copy line of the desk profile
+                if ns(line) not in lt: en.append(f"line '{ns(line)}' missing")
             check("letter ending (§4.5)", en)
 
     # ---------------- optional outputs (order draft, parawise) ----------------
@@ -428,7 +450,7 @@ def main(argv):
         if orig is not None:  # §4.16: the original name is kept even if it looks machine-made
             want = strip_upload_prefix(os.path.basename(orig))
             check("package file name = original proposal name",
-                  [] if os.path.basename(pkg) in (want, os.path.basename(orig))
+                  [] if os.path.basename(pkg) in name_forms(orig)
                   else [f"'{os.path.basename(pkg)}' != original name '{want}'"])
         else:
             check("package file name = original proposal name",

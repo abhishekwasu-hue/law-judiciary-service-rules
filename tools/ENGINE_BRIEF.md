@@ -25,7 +25,8 @@ content; section 0 wins over every ask / discuss / stop line (no interaction in 
 - [I1.3] Only official Govt of India / Maharashtra GRs, rules, court orders; no third-party sources (confidential).
 - [I1.4] Never guess. In the Study: unreadable text -> "अस्पष्ट" (part 1 "[अस्पष्ट]"); a source not readable / not
   available -> "वाचन अपूर्ण / उपलब्ध नाही". Drafts: "____" [I4.27].
-- [I3] All government text in Devanagari Marathi (only an affidavit / parawise reply in English). Fewest words.
+- [I3] All government text in Devanagari Marathi (only an affidavit / parawise reply in English). No padding; the note
+  body is DETAILED [I4.29]; letters concise [I4.15].
 - [I5] Precedent library first for the same subject: quote earlier Finance/GAD opinions with ref no./date verbatim;
   never decide "take opinion again / not" yourself; old-case names/diagnoses -> "____".
 
@@ -38,6 +39,9 @@ content; section 0 wins over every ask / discuss / stop line (no interaction in 
    register/ (00-INDEX.md) [I1.5], service-rules/, precedent-library/ (00-INDEX first), old-case index (earlier
    Finance/GAD opinion, earlier file of the same employee). Read the GR page before quoting; quote verbatim with no., date,
    page, para. Court orders: api.sci.gov.in, bombayhighcourt.nic.in only.
+   Research BEFORE drafting [I4.29]: every applicable GR/circular para, rule (pdf/, register/, service-rules/) and
+   every SC/HC judgment cited in a GR or the proposal; official sources only [I1.3], fetch per [I4.14] (judgments:
+   the two sites above); quote from the original page. Not found -> Study part 4 + warning, never in the note.
 3. [I4.14] GR missing -> fetch it yourself, without asking: lines `code <सांकेतांक>` / `search <from> <to> <words>` /
    `dept …` in tools/gr-request.txt, then `python3 tools/gr_request.py` (gr.maharashtra.gov.in;
    archive.org collection maharashtragr; last 2 code digits = dept: 05 Finance, 12 L&J). Only the GRs needed; add them to the package.
@@ -60,9 +64,35 @@ content; section 0 wins over every ask / discuss / stop line (no interaction in 
 - [I4.3] Desk sample format (note of C R 66-2025, letter with letterhead logo); ready-made; only the proposal's
   facts and the precedents' language; no extra information.
 - Para 1: "<authority> यांच्या पृ.__/प.वि. वरील दि. __ रोजीच्या पत्रास अनुसरून सादर." (or "…पत्रासोबत प्राप्त …
-  पत्रास अनुसरून सादर."). Short numbered paras. Facts/posts/periods/amounts in TABLES:
+  पत्रास अनुसरून सादर."). Numbered paras, detailed [I4.29]. Facts/posts/periods/amounts in TABLES:
   `{"table": [[...],[...]], "bold_last": true}` in note.paras. GR text verbatim in “ ” + "(पृ.N/प.वि.)". Earlier
   record of the same matter = a fact with its reference.
+- [I4.29] DETAILED note (Abhi 03.11.2026: "note khupch short jhali detail asayla pahije"; model
+  samples/specs/HTE_2026_overpayment-waiver_finance-concurrence.json). Facts and verbatim text only, no opinion
+  [I1.1]; no fact, condition, amount, date or authority's point of the proposal left out. Elements in order, each
+  where it applies (skip, never invent): (1) para 1 cites EVERY covering letter (authority, no., date, पृ.N/प.वि.);
+  (2) background/service table; (3) documents that create the issue (e.g. an appointment-order condition) verbatim;
+  (4) benefit/amount/period tables, with the proposal's break-up + total; (5) each authority's letter (AG,
+  Lokayukta, HC …): no., date, page + the relevant part verbatim; (6) present status; (7) complaint/court/
+  Lokayukta timeline with dates and time limits; (8) replies to this dept's earlier queries, point-wise;
+  (9) every applicable GR/circular para + rules + SC/HC judgments verbatim in the BODY (no., date, para, पृ.N/प.वि.),
+  with a table "अट / प्रस्तावातील स्थिती / पृ." where a provision lists conditions (status = proposal facts only,
+  else "प्रस्तावात अशी वस्तुस्थिती नमूद नाही."); (10) "उपरोक्त वस्तुस्थिती पुढीलप्रमाणे आहे:-" + numbered facts
+  from the paras above; (11) the exact demand: amount (figures and words), provision, person + action after
+  approval; (12) the drafts sent with it [I4.28]. Sentences stay short [I4.18]; `related` keeps full extracts.
+  The reviewer checks each element and that nothing of the proposal is left out.
+- [I4.30] Quality checks INSIDE the existing drafts (Abhi 03.11.2026: "fakt aaplya noting drafting cha darja
+  wadhwaycha aahe"; no new draft type, part or workflow): (1) every demand, contention and condition of the
+  proposal/petition (each para + prayer) is dealt with; (2) no contradiction of dates, amounts, names, posts, nos.
+  across proposal, note, letter, orders, parawise; conflicting facts in the proposal itself: both, with पृ.N/प.वि.,
+  no conclusion (remark: Study 4/7); (3) right after para 1, one short sentence stating the demand/relief (parawise:
+  `relief_sought`); (4) State GR/rule/notification text in its ORIGINAL language, never translated (parawise: Marathi
+  GR text in “…”); (5) respectful, request-form language to courts/authorities, nothing reading as contempt or an
+  order ("erroneous judgment", "court failed", "illegal order", "the Court must": lint_parawise WARN); (6) chronology/
+  service/amounts as a table where clearer (parawise: `background` table item); (7) GP/AGP, Desk-Officer, other-dept
+  opinions recorded as they are (no., date, पृ.N/प.वि.), never treated as binding; nothing beyond the record.
+  Reviewer: checks (1)–(7), minimal fixes; review.json `coverage` [["<demand/condition>", "<where: para / पृ.N>",
+  "हाताळले" | "नाही"]] and `contradictions` ["<what: A (पृ.) / B (पृ.)>"] ([] = none) go to Study part 7, never the note.
 - Page refs: only "पृ.N/प.वि.", N = page of the returned PDF (proposal 1..n, then reply/extra PDFs, then GR pages;
   from <pdf>.map.json). Reply pages: cite their package page, never an invented N.
   No repo paths, no internal ids (z6_0235 …).
@@ -133,10 +163,10 @@ Sources: GR22 = मराठी भाषा विभाग GR कपासू-
   "शासनाने … मान्यता देण्यात आली" [GADT p.58, 60–61; RP p.190–192]. Passive/विध्यर्थ verb agrees with the object:
   "माहिती … देण्यात यावी", "कागदपत्रे … यावीत"; several objects -> the last [GADT p.61; RP p.176–177].
 - Noting [GADT 4.14 p.12–13; GADM 26(4) p.11]: paper and its reference -> issue -> rule/GR and earlier decisions ->
-  financial burden -> missing information -> proposal. Numbered short paras, one point each; simple sentences, one
+  financial burden -> missing information -> proposal. Numbered paras, one point each (detail [I4.29]); simple sentences, one
   idea each; no "या संबंधात", "असे म्हणता येईल की", "हे नमूद करता येईल की" [GADM 26(7)–(8) p.11]. Suggest, never
   opine [GADM 26(5)]; no ornate/vague words [GADT 4.16(2) p.13]; big figures in tables [GADT 4.13(14) p.12].
-- Drafting: clear, brief, no repetition [GADM 51(1) p.21]; subject in every letter incl. reminders [GADM 53(3) p.22];
+- Drafting (letters/orders): clear, brief, no repetition [GADM 51(1) p.21]; subject in every letter incl. reminders [GADM 53(3) p.22];
   information asked as numbered points / a form [GADT 11.1(12) p.28]. Persons and officers in respectful plural:
   "यांनी", "त्यांचे", never "त्याने/तिचे" [R3].
 - Checks: tools/lint_spec.py, tools/verify_outputs.py.
@@ -165,6 +195,7 @@ Sources: GR22 = मराठी भाषा विभाग GR कपासू-
 - [I4.1] One Word file: note, then the letter on a new page with letterhead:
   `python3 tools/build_note_letter.py spec.json OUTDIR PREFIX` (look at its PDF preview).
 - [I4.2] Font DVOT-SurekhMR in every Word file (ascii/hAnsi/cs/eastAsia); builders set it, never override.
+- [I4.16] Package file name = case.json `package_file` (the original name; shortened by the tool only when too long for the disk).
 - [I4.7][I4.11][SOP5] Package: `python3 tools/pkg3.py <proposal.pdf> enclosures.json "OUTDIR/<original name>"`:
   proposal scan first (untouched), then ONLY the relevant original GR/rule/order pages (page 1 with no./date + the
   quoted paras' pages); no separator/title/index pages; "पृ. N / एकूण" stamps; bookmarks; YELLOW highlight on

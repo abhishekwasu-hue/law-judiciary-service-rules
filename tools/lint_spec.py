@@ -75,6 +75,9 @@ WARN level (spec.json; note body and letter, text outside quotes; related and si
   - L14 नियम 1–4 (अनुस्वार): "आपणास" -> "आपणांस"; "यांनां" / "यानां" -> "यांना"
   - §4.28 (03.11.2026): the note's last para names every draft in the spec (letter "पत्राचे", reminder "स्मरणपत्राचे",
     order kinds "शासन निर्णयाचे / शुद्धिपत्रकाचे / …", parawise "परिच्छेदनिहाय"; drafts_unnamed)
+Desk (C30, 03.11.2026): spec "desk" names the profile tools/desks/<id>.json (absent = law-desk6, the Desk-6 values above);
+  the signer chain, the finance signer (in place of "अ.मु.स. (वित्त)") and the letter ref_no form come from it; an unknown
+  desk id is an error ("desk: desk profile — …").
 Rules (study.json): parts with headings भाग 0 … भाग 7 (--allow-missing-part1: भाग 1 may be absent); no internal ids;
   पृ. references as above ("“…”" skipped).
 The constants and check functions below are the ONE definition shared with tools/verify_outputs.py."""
@@ -83,6 +86,12 @@ import re
 import sys
 
 # ---------------- shared rule definitions (also used by verify_outputs.py) ----------------
+import os as _os
+sys.path.insert(0, _os.path.dirname(_os.path.abspath(__file__)))
+import desk as _desk  # noqa: E402 — C30 (03.11.2026): desk profiles tools/desks/<id>.json (spec "desk", default law-desk6)
+_D0 = _desk.load_desk(None)
+# the default desk's chain as literals (tests/test_engine_brief.py parses them); = tools/desks/law-desk6.json signers /
+# finance_signer (tests/test_desks.py checks); per spec: desk_signers(desk)
 SIGNERS = ["का. अ. (श्रीम. कऱ्हाडे)", "अ.स. (श्री. वडनेरकर)", "उ.वि.स. नि. उ.स. (श्री. बोंद्रे)", "प्र.स. व वि.प. (श्री. खटी)"]
 AMS = "अ.मु.स. (वित्त)"
 FIN = "वित्त विभागाच्या मान्यतेस्तव"
@@ -96,11 +105,12 @@ D = r"[0-9०-९]+"
 NUMLIST = rf"{D}(?:\s*(?:-|–|ते|,)\s*{D})*"
 REF_LOOSE = re.compile(r"पृ\.((?:(?!पृ\.)[^/\n]){0,40}?)/\s*प\.वि\.")   # inner part never holds another "पृ." (C27: "पृ. 22, नियम … (पृ.31/प.वि.)")
 REF_PKG = re.compile(rf"पॅकेज PDF\s*पृ\.\s*({NUMLIST})")
-REF_NO = re.compile(r"(?:संकिर्ण|संकीर्ण)-[0-9]{4}/(?:[0-9]+|_{2,})/प्र\.क्र\.(?:[0-9]+|_{2,})/का\.6")   # blanks "____" when the C R / file no. is not in the proposal (ENGINE_PROMPT rule 5); both spellings: the file no. is
+REF_NO = _desk.letter_ref_re(_D0)   # default desk (profile letter.ref_pattern): संकिर्ण|संकीर्ण-<year>/<file no>/प्र.क्र.<n>/का.6;
+# blanks "____" when the C R / file no. is not in the proposal (ENGINE_PROMPT rule 5); both spellings: the file no. is
 # copied as the निर्देशपत्र writes it ("संकीर्ण-2026/979/…" or "संकिर्ण-…") — audit A1, 02.11.2026
 QUOTE_RE = re.compile(r"“[^”]*”")
 PART_RE = re.compile(r"\s*भाग\s*([0-9०-९])(?![0-9०-९])")
-LH_EMAIL = "lnjd.desk6-mh@mah.gov.in"
+LH_EMAIL = _D0["letter"]["email"]   # default desk; per desk: profile letter.email ("" = not known, not checked)
 # last-para forms (PROPOSAL_SOP Step 4), tolerant of the wording between the fixed parts
 LAST_LETTER_RE = re.compile(r"^सबब\s*,.*पत्राचे\s+प्रारूप\s+पृ\.[^/]{0,40}/\s*प\.वि\.\s*वर\s+मान्यतेस्तव\s+सादर\s*\.\s*"
                             r"मान्य\s+झाल्यास\s+पत्र\s+निर्गमित\s+करण्यात\s+येईल\s*\.$", re.S)
@@ -227,7 +237,25 @@ def requests_info(letter, intro):
     or the intro asks ("… उपलब्ध करून देण्यात यावी"). A reply / forwarding / conveying letter ("… कळविण्यात येते की, …"
     with no request) needs no "ही विनंती" (audit A1, 02.11.2026)."""
     L = letter if isinstance(letter, dict) else {}
-    return bool(L.get("points") or L.get("reminder") or ASK_RE.search(unquoted(intro or "")))
+    return bool(points_ask(L.get("points")) or L.get("reminder") or ASK_RE.search(unquoted(intro or "")))
+
+
+# 03.11.2026 (C30, §4.28 (अ)): an intimation / status letter (e.g. the present status to the Lokayukta office) has
+# numbered points that only state facts; points count as a request only when they hold a table or ask wording
+POINT_ASK_RE = re.compile(r"उपलब्ध\s+करून|पाठविण्यात\s+याव|कळविण्यात\s+याव|मागविण्यात")
+
+
+def points_ask(points):
+    """True when letter points ask for something: a table (data to fill in, §4.20) or ask wording (POINT_ASK_RE)
+    outside quotes. points: the spec list ({"table"} / str items); True = a legacy "has points" flag."""
+    if points is True:
+        return True
+    for pt in points if isinstance(points, list) else []:
+        if isinstance(pt, dict) and pt.get("table") is not None:
+            return True
+        if isinstance(pt, str) and POINT_ASK_RE.search(unquoted(pt)):
+            return True
+    return False
 
 
 def style_hits(text, letter=False):
@@ -357,6 +385,23 @@ MA_DESIG_BEFORE = re.compile(r"(?:प्रबंधक|निबंधक|र�
 MA_DOUBLE_RE = re.compile(r"मा\.\s?मा\.|(?:प्रशासकीय|मुख्य)\s+मा\.\s?न्यायमूर्ती")
 
 
+VS_RE = re.compile(r"विरुद्ध|(?<![A-Za-z])(?:v|vs|V|Vs|VS)\.?(?=\s)|(?<![A-Za-z])versus(?![A-Za-z])")
+
+
+def case_title_party(t, start, end, reach=80):
+    """True when t[start:end] (e.g. "उच्च न्यायालय") is a party name in a case title "<A> विरुद्ध <B>" (also "v." / "vs" /
+    "versus"): "विरुद्ध" within `reach` characters after it (party A) or before it (party B) with no bracket, line break
+    or "।" between — e.g. "(पंजाब व हरियाणा उच्च न्यायालय व इतर विरुद्ध जगदेव सिंग)" (§4.23 does not apply to party names)."""
+    stop = re.compile(r"[()\n।]")
+    after = t[end:end + reach]
+    cut = stop.search(after)
+    if VS_RE.search(after[:cut.start()] if cut else after):
+        return True
+    before = t[max(0, start - reach):start]
+    cuts = list(stop.finditer(before))
+    return bool(VS_RE.search(before[cuts[-1].end():] if cuts else before))
+
+
 def _ma_spans(t, court=True):
     out = []
     for m in MA_JUDGE_RE.finditer(t):
@@ -365,6 +410,8 @@ def _ma_spans(t, court=True):
     if court:
         for m in MA_COURT_RE.finditer(t):
             before = t[max(0, m.start() - 70):m.start()]
+            if case_title_party(t, m.start(), m.end()):   # a party in a case title "<A> विरुद्ध <B>" (C30, 03.11.2026)
+                continue
             if not MA_BEFORE.search(before[-5:]) and not MA_DESIG_BEFORE.search(before):
                 out.append((m.start(), m.group(0)))
     return sorted(out)
@@ -520,10 +567,17 @@ def repo_hits(text):
     return sorted(set(mt.group(0) for mt in REPO_RE.finditer(text)))
 
 
-def signer_problems(tail, has_ams):
-    """tail = the signer lines in order (§4.6)."""
-    exp = SIGNERS + ([AMS] if has_ams else [])
-    return [] if list(tail) == exp else [f"signer block {list(tail)} != {exp}"]
+def desk_signers(desk=None):
+    """(signer chain, finance signer) of a desk profile (dict or id; None = law-desk6), whitespace-normalised like ns()."""
+    p = desk if isinstance(desk, dict) else _desk.load_desk(desk)
+    return [ns(x) for x in p["signers"]], ns(p["finance_signer"])
+
+
+def signer_problems(tail, has_ams, desk=None):
+    """tail = the signer lines in order (§4.6; the desk profile's chain, C30)."""
+    sg, ams = desk_signers(desk)
+    exp = sg + ([ams] if has_ams else [])
+    return [] if [ns(x) for x in tail] == exp else [f"signer block {list(tail)} != {exp}"]
 
 
 def finance_route(last):
@@ -533,8 +587,9 @@ def finance_route(last):
     return FIN in t or bool(FIN_ROUTE_RE.search(t) or PHD_ROUTE_RE.search(t))
 
 
-def finance_problems(last, has_ams):
+def finance_problems(last, has_ams, desk=None):
     fin = finance_route(last)
+    AMS = desk_signers(desk)[1]
     return [] if fin == has_ams else [f"'{AMS}' {'present' if has_ams else 'absent'} but last para "
                                       f"{'sends' if fin else 'does not send'} the file to वित्त विभाग / सार्वजनिक आरोग्य विभाग "
                                       f"('{FIN}' / '… अभिप्रायास्तव' / '… विभागास विनंती'; §4.6, §8.3)"]
@@ -569,6 +624,10 @@ def lint_spec(spec, pages=None):
     if not isinstance(spec, dict) or not isinstance(spec.get("note"), dict):
         return ["note: structure — spec has no 'note' object"]
     n = spec["note"]
+    try:   # C30: the desk profile (spec "desk"); an unknown id is an error and the default desk's rules are used
+        dk = _desk.desk_of(spec)
+    except ValueError as e:
+        P.append(f"desk: desk profile — {e}"); dk = _D0
     body = [x for k in ("first", "paras", "sub", "closing") if k in n for x in strings(n[k], f"note.{k}")]
     related = list(strings(spec.get("related", []), "related"))
     letter = letter_strings(spec)
@@ -636,9 +695,9 @@ def lint_spec(spec, pages=None):
     if not isinstance(sg, list):
         P.append("note.signers: signer chain (§4.6) — missing"); sg = []
     sg = [ns(x) if isinstance(x, str) else x for x in sg]
-    has_ams = AMS in sg
-    P += [f"note.signers: signer chain (§4.6) — {x}" for x in signer_problems(sg, has_ams)]
-    P += [f"{lpath}: अ.मु.स. (वित्त) <=> Finance last para — {x}" for x in finance_problems(lastn, has_ams)]
+    has_ams = desk_signers(dk)[1] in sg
+    P += [f"note.signers: signer chain (§4.6) — {x}" for x in signer_problems(sg, has_ams, dk)]
+    P += [f"{lpath}: अ.मु.स. (वित्त) <=> Finance last para — {x}" for x in finance_problems(lastn, has_ams, dk)]
 
     # letters ("letter" and / or "letters", §4.28)
     if spec.get("letter") and spec.get("letters"):
@@ -646,18 +705,19 @@ def lint_spec(spec, pages=None):
     if "letters" in spec and not isinstance(spec.get("letters"), (list, type(None))):
         P.append("letters: structure — must be a list of letter objects (§4.28)")
     for lp, L in letters_of(spec):
-        P += lint_letter(L, lp)
+        P += lint_letter(L, lp, dk)
     return P
 
 
-def lint_letter(L, lp="letter"):
-    """problems of ONE letter object at JSON path lp ("letter" or "letters[i]")."""
+def lint_letter(L, lp="letter", desk=None):
+    """problems of ONE letter object at JSON path lp ("letter" or "letters[i]"); desk = profile (dict / id; None = law-desk6)."""
     P = []
     if not isinstance(L, dict):
         return [f"{lp}: structure — must be an object"]
+    dl = (desk if isinstance(desk, dict) else _desk.load_desk(desk))["letter"]
     rn = L.get("ref_no")
-    if not isinstance(rn, str) or not REF_NO.fullmatch(rn.strip()):
-        P.append(f"{lp}.ref_no: ref no. — not संकिर्ण-<year>/<file no>/प्र.क्र.<n>/का.6: '{rn}'")
+    if not isinstance(rn, str) or not re.fullmatch(dl["ref_pattern"], rn.strip()):
+        P.append(f"{lp}.ref_no: ref no. — not {dl['ref_hint']}: '{rn}'")
     for k in ("to", "refs"):
         v = L.get(k)
         if not isinstance(v, list) or not any(isinstance(x, str) and x.strip() for x in v):

@@ -18,6 +18,8 @@ Rules
   - the tool adds the Governor line ("महाराष्ट्राचे राज्यपाल यांच्या आदेशानुसार व नावाने,"), the website line and the
     body headings: operative / preamble must not contain them
   - copies: last item contains "निवड नस्ती"
+  - desk (C30, 03.11.2026): spec "desk" / order "desk" -> tools/desks/<id>.json: the ref_no form (order.ref_pattern) and
+    the copy-line hint come from the profile (absent = law-desk6, the form above); an unknown desk id is an error
   - memo: operative[0] in the specimen form ("… असे कळविण्याचा मला आदेश आहे." or "… यांना कळविण्यात येते की, …")
   - notification: operative[0] cites the enabling provision ("…कलम … अन्वये / द्वारे प्रदान करण्यात आलेल्या
     अधिकारांचा वापर करून …" — GADT 12.17); english.operative[0] "In exercise of the powers conferred by …"
@@ -36,9 +38,10 @@ import os, re, sys, json
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import lint_spec  # noqa: E402  (reused, not edited)
+import desk as _desk  # noqa: E402 — C30 (03.11.2026): desk profiles tools/desks/<id>.json
 
 TYPES = ("gr", "corrigendum", "circular", "memo", "notification")
-REF_RE = re.compile(r"^(?:संकिर्ण|संकीर्ण)-[0-9]{4}/(?:[0-9]+|_{2,})/प्र\.क्र\.(?:[0-9]+|_{2,})/का\.6$")
+REF_RE = re.compile("^(?:" + _desk.load_desk(None)["order"]["ref_pattern"] + ")$")   # default desk (law-desk6)
 DATE_RE = re.compile(r"^(?:[0-9_]{2}\.[0-9_]{2}\.[0-9]{4}|(?:[0-9]{1,2}|_{2,})\s+[ऀ-ॿ]+,\s*[0-9]{4})$")
 GOV = "राज्यपाल यांच्या आदेशानुसार"
 WEB = "www.maharashtra.gov.in"
@@ -101,15 +104,25 @@ def lint_order(spec):
     P = []
     if "orders" in spec and not isinstance(spec["orders"], list):
         P.append("orders: structure — must be a list of order objects (§4.28)")
+    try:   # C30: spec "desk" (an order's own "desk" wins); unknown id -> error, default desk's rules used
+        sdk = _desk.desk_id_of(spec); _desk.load_desk(sdk)
+    except ValueError as e:
+        P.append(f"desk: desk profile — {e}"); sdk = None
     for path, o in orders_of(spec):
-        P += _rebase(lint_one(o), path)
+        P += _rebase(lint_one(o, sdk), path)
     return P
 
 
-def lint_one(o):
+def lint_one(o, desk=None):
     P = []
     if not isinstance(o, dict):
         return ["order: structure — not an order object"]
+    did = o.get("desk") if isinstance(o.get("desk"), str) and o["desk"].strip() else desk
+    try:
+        dk = _desk.load_desk(did)["order"]
+    except ValueError as e:
+        P.append(f"order.desk: desk profile — {e}"); dk = _desk.load_desk(None)["order"]
+    ref_re = re.compile("^(?:" + dk["ref_pattern"] + ")$")
     t = o.get("type")
     if t not in TYPES:
         return [f"order.type: type — '{t}' not one of {list(TYPES)}"]
@@ -121,8 +134,8 @@ def lint_one(o):
             P.append(f"order.{key}: required for {t} — missing or empty")
         return ok
 
-    if need("ref_no") and not REF_RE.match(o["ref_no"].strip()):
-        P.append(f"order.ref_no: क्रमांक — '{o['ref_no']}' not 'संकिर्ण-<year>/<file no or ____>/प्र.क्र.<n or ____>/का.6'")
+    if need("ref_no") and not ref_re.match(o["ref_no"].strip()):
+        P.append(f"order.ref_no: क्रमांक — '{o['ref_no']}' not '{dk['ref_hint']}'")
     if need("date") and not DATE_RE.match(o["date"].strip()):
         P.append(f"order.date: दिनांक — '{o['date']}' not '__.__.2026' / '____ <month>, 2026'")
     if t != "notification": need("subject")
@@ -150,7 +163,7 @@ def lint_one(o):
         P.append("order.signer: signer — {name, designation} strings")
     copies = [c for c in (o.get("copies") or []) if _s(c)]
     if copies and SELECT not in copies[-1]:
-        P.append(f"order.copies: प्रत list — last item must be '{SELECT} (कार्यासन-6)'")
+        P.append(f"order.copies: प्रत list — last item must be '{dk['copy_file']}'")
     for path, x in list(_texts(o.get("operative"), "order.operative")) + list(_texts(o.get("preamble"), "order.preamble")):
         if GOV in x:
             P.append(f"{path}: Governor line — added by the tool; remove it")

@@ -24,7 +24,13 @@ drafts the counter affidavit):
   "department": "Law and Judiciary Department",   # optional; default = this; used in the title
   "subject": "... (English)",
   "prepared_for": "Assistant Government Pleader, High Court of Judicature at Bombay, Bench at Aurangabad",
-  "background": ["brief facts (English)", ...],
+  "relief_sought": "... (English, in brief: what the petitioner prays for)",   # optional (03.11.2026, INSTRUCTIONS §4.30): printed
+                                              # after "Submitted to" as "Relief sought:" so the reader sees the demand first
+  "background": ["brief facts (English)", ...,
+                 {"title": "Chronology", "table": [["Date", "Event"], ["__.__.____", "..."]]}],
+                                              # optional (03.11.2026, INSTRUCTIONS §4.30): a background item may be a table (chronology,
+                                              # service, amounts; first row = header, 2-6 columns, plain text cells);
+                                              # tables are not numbered, string items keep their (1), (2) … numbers
   "paras": [{"para": "1" | "1 to 3", "averment": "brief", "remarks": "elaborate factual position with rule/GR refs"}],
   "enclosures": ["Copy of Government Resolution ... dated ...", ...],     # Rule 58(4) / Note (ii)
   "recommendation": "oppose" | "not oppose", "recommendation_reason": "...",
@@ -164,6 +170,26 @@ def remarks_table(d, paras):
     return t
 
 
+def facts_table(d, item):
+    """INSTRUCTIONS §4.30 (03.11.2026): an optional table inside "1. Brief facts" — {"title"?: str, "table": [[header…], [row…], …]}."""
+    if _s(item.get("title")):
+        para(d, item["title"].strip(), bold=True, left=1.0, before=2, after=2, keep=True)
+    rows = item["table"]; n = len(rows[0]); w = 15.5 / n
+    t = d.add_table(rows=len(rows), cols=n)
+    t.alignment = WD_TABLE_ALIGNMENT.CENTER; t.autofit = False; borders(t)
+    for i, row in enumerate(rows):
+        for j in range(n):
+            cell_text(t.cell(i, j), row[j] if j < len(row) else "", bold=(i == 0), align=WA.CENTER if i == 0 else WA.LEFT)
+            t.cell(i, j).width = Cm(w)
+    repeat_header(t.rows[0])
+    para(d, after=2)
+    return t
+
+
+def _s(x):
+    return x.strip() if isinstance(x, str) else ""
+
+
 def footer_page_no(section):
     p = section.footer.paragraphs[0]; p.alignment = WA.CENTER
     setfont(p.add_run("Page "), 10)
@@ -190,13 +216,20 @@ def build(spec, out):
     rs = [r.strip() for r in pw["respondents"]]
     party(d, [f"{i}. {r}" for i, r in enumerate(rs, 1)] if len(rs) > 1 else rs, "Respondent(s)")
     para(d, TITLE.format(n=pw["respondent_no"].strip(), dept=dept), bold=True, align=WA.CENTER, before=10, after=8)
-    for lab, key in (("Subject", "subject"), ("Submitted to", "prepared_for")):
+    heads = [("Subject", "subject"), ("Submitted to", "prepared_for")]
+    if _s(pw.get("relief_sought")):
+        heads.append(("Relief sought", "relief_sought"))   # §4.30: the demand / relief stated first
+    for lab, key in heads:
         p = para(d, align=WA.JUSTIFY, left=3.0, first=-3.0, after=4)
         setfont(p.add_run(f"{lab}:\t"), 12, True); setfont(p.add_run(pw[key].strip()), 12)
-    # 1. Brief facts
+    # 1. Brief facts (strings numbered; §4.30 table items unnumbered)
     para(d, SECTIONS[0], bold=True, before=8, after=4, keep=True)
-    bg = [b for b in pw.get("background") or [] if b.strip()]
-    for i, b in enumerate(bg, 1):
+    bg = [b for b in pw.get("background") or [] if (isinstance(b, dict) and b.get("table")) or _s(b)]
+    i = 0
+    for b in bg:
+        if isinstance(b, dict):
+            facts_table(d, b); continue
+        i += 1
         p = para(d, align=WA.JUSTIFY, left=1.0, first=-0.75, after=4)
         setfont(p.add_run(f"({i})\t{b.strip()}"), 12)
     if not bg:

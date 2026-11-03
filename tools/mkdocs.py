@@ -14,6 +14,8 @@ spec.json:
    "signers": ["का. अ. (श्रीम. कऱ्हाडे)", "अ.स. (श्री. वडनेरकर)", "उ.वि.स. नि. उ.स. (श्री. बोंद्रे)", "प्र.स. व वि.प. (श्री. खटी)"]
               # add "अ.मु.स. (वित्त)" only when the file goes to Finance (INSTRUCTIONS §4.6)
  },
+ "desk": "law-desk6",      # optional (C30, 03.11.2026) — desk profile tools/desks/<id>.json (note header, signer chain,
+                           # letterhead lines, phone / e-mail, ref no. form, signature, copy line); absent = law-desk6
  "doc_author": "<name>",   # optional — Word author / last-modified-by (else env DOC_AUTHOR, else empty); tools/clean_meta.py
  "related": [ {"heading": "<GR/नियम/पूर्वोदाहरण शीर्षक>", "text": ["<verbatim extract paragraph>", "..."], "source": "<क्रमांक, दिनांक, पृ., परि.>"} ],   # शेवटी 'संबंधित माहिती'
  "letter": {   # optional — omit when no letter is needed (note only)
@@ -40,6 +42,7 @@ import docx
 from docx.oxml.ns import qn
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from clean_meta import clean_docx  # noqa: E402 — C27 §4: blank core/app properties
+from desk import desk_of, contact_line, sign_name as _sign_name, blank as _blank  # noqa: E402 — C30 desk profiles
 
 FONT = "DVOT-SurekhMR"
 T = os.path.join(os.path.dirname(os.path.abspath(__file__)), "templates")
@@ -134,7 +137,7 @@ def build_note(spec, out):
     # prototypes from final version in the sample (items 38..53)
     hdr, first, numbered, close = P[38], P[39], P[40], P[46]
     sign = P[48]; blank = P[47]
-    add(body, sect, hdr, d, "विधि व न्याय विभाग/का.6")
+    add(body, sect, hdr, d, desk_of(spec)["note_header"])
     add(body, sect, first, d, " \t" + n["first"])
     k = 2
     subs = n.get("sub", {})
@@ -183,10 +186,18 @@ def build_letter(spec, out, L=None):
     from docx.shared import Cm
     d = docx.Document(LET_T); body, P, sect = fresh(d); fix_styles(d)
     L = spec["letter"] if L is None else L
+    dk = desk_of(spec)["letter"]   # C30: the desk profile (tools/desks/<id>.json; spec "desk", default law-desk6)
     # 0..4 letterhead (0 holds the two logo drawings) ; 5 ref/date ; 6 blank
     from docx.text.paragraph import Paragraph as _P
-    for i in range(0, 4):
+    for i in range(0, 2):
         body_el = copy.deepcopy(P[i]); sect.addprevious(body_el)
+        for r in _P(body_el, d).runs: setfont(r)
+    # department / address lines: the template paragraph itself when the profile line equals it (Desk-6), else its text
+    for j, line in enumerate(dk["office"]):
+        proto = P[2] if j == 0 else P[3]
+        body_el = copy.deepcopy(proto); sect.addprevious(body_el)
+        if ("".join(r.text for r in _P(proto, d).runs)) != line:
+            settext(body_el, line, d)
         for r in _P(body_el, d).runs: setfont(r)
     em = copy.deepcopy(P[4]); sect.addprevious(em)
     from docx.text.paragraph import Paragraph
@@ -194,7 +205,7 @@ def build_letter(spec, out, L=None):
     if pe.runs:
         r0 = pe.runs[0]
         for r in pe.runs[1:]: r._element.getparent().remove(r._element)
-        r0.text = "दूरध्वनी क्र. :- ०२२-२२793230\t\t\t\t   Email ID :- lnjd.desk6-mh@mah.gov.in"; setfont(r0)
+        r0.text = contact_line(desk_of(spec)); setfont(r0)   # unknown phone / e-mail -> "____"
     rem = L.get("reminder")
     if rem:  # §4.21 स्मरणपत्र: heading above the क्रमांक line (the Section's old reminders, e.g. C R 170/2024)
         n_rem = int(rem) if str(rem).isdigit() and int(rem) > 0 else 1
@@ -226,12 +237,12 @@ def build_letter(spec, out, L=None):
     if L.get("closing"): add(body, sect, P[17], d, "\t" + L["closing"])
     add(body, sect, P[18], d, "\t\t\t\t\t\t\t      \t     आपला,")
     add(body, sect, P[19], d, "")
-    add(body, sect, P[20], d, "\t\t\t\t\t\t\t         ( राजेश वडनेरकर )")
-    add(body, sect, P[21], d, "\t\t\t\t\t\t       अवर सचिव ,महाराष्ट्र शासन")
+    add(body, sect, P[20], d, "\t\t\t\t\t\t\t         " + _sign_name(dk.get("sign_name")))
+    add(body, sect, P[21], d, "\t\t\t\t\t\t       " + _blank(dk.get("sign_post")))
     if L.get("enclosure"): add(body, sect, P[17], d, L["enclosure"])
     for cp in L.get("copies") or []:  # §4.22
         if isinstance(cp, str) and cp.strip(): add(body, sect, P[17], d, "प्रत : " + cp.strip())
-    add(body, sect, P[17], d, "प्रत : निवड नस्ती")
+    add(body, sect, P[17], d, "प्रत : " + dk["copy_file"])
     nomirror(d); d.save(out); clean_docx(out, spec.get("doc_author"))
 
 if __name__ == "__main__":

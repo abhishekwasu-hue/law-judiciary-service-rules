@@ -211,7 +211,8 @@ jobs:
       # fallback provider — only when at least 30 minutes remain (job budget), else a warning. The case then carries a
       # warning; all gates (lint, extract_check, reviewer, verify) still apply.
       # Model tiers (Abhi 01.11.2026; table in tools/ENGINE_PROMPT.md): the orchestrating session runs on MODEL_LIGHT
-      # (mechanical work); `drafter` on MODEL (facts from page images, letter decision, GR choice for the note, note +
+      # (mechanical work); `drafter` on MODEL_REVIEW, else MODEL (C30 03.11.2026: the detailed note is drafted by Opus;
+      # tools/engine_supabase.py drafter_model) (research, facts from page images, letter decision, GR choice, note +
       # letter, Study part 0); `study_writer` / `related_writer` on MODEL_LIGHT (Study parts 2-4, 7, 5-6 copied; note
       # `related`) — extracts machine-checked by tools/extract_check.py, mismatches back to `drafter`; `reviewer` on
       # MODEL_REVIEW (Opus-class) = final check + approval (/tmp/work/review.json with hashes; checked by the verify step);

@@ -42,19 +42,21 @@ caching): this file, then tools/ENGINE_BRIEF.md, then the tool docstrings, then 
 
 ## Model tiers — who does what (owner decisions, Abhi 01.11.2026: "Study वर होणारा खर्च कमी करू शकतो; संबंधित माहिती Haiku या model नी तयार केली चालेल." and "Opus वरचा भार Sonnet वर टाका, final approval Opus देईल.")
 You are the ORCHESTRATOR and run on the cheap tier (MODEL_LIGHT). Subagents (Agent tool, `subagent_type` = name):
-`drafter` (MODEL from Settings — default claude-opus-5-5; Abhi's plan: Sonnet), `study_writer` and `related_writer` (MODEL_LIGHT), `reviewer`
-(MODEL_REVIEW, Opus-class: final check and approval), `drafter_strong` (MODEL_STRONG) only when configured.
+`drafter` (MODEL_REVIEW, Opus-class — Abhi 03.11.2026, C30: "note khupch short jhali detail asayla pahije", the note is
+drafted by Opus; MODEL only when MODEL_REVIEW is empty), `study_writer` and `related_writer` (MODEL_LIGHT), `reviewer`
+(MODEL_REVIEW, Opus-class: final check and approval), `drafter_strong` (MODEL_STRONG) only when configured and
+different from the drafter's model. MODEL (Settings "model") no longer drives a subagent by default.
 The budget is SOFT: going over it only adds a warning; never skip a check, an escalation or the review for cost.
 
 | Task | Agent (tier) | Quality guard |
 |---|---|---|
 | Text layer / OCR read, GR citations list, GR search + fetch (gr_request.py), precedent grep, candidate GR page text | you (MODEL_LIGHT) | finding/fetching only; nothing quoted or decided by you |
-| Facts list from the page IMAGES (numbers, dates, names, stamps, handwriting) | drafter (MODEL) | every page image at 110 dpi; reviewer re-reads |
-| Letter or not; GR choice for the note body + enclosures.json marks; note body + letter (spec without `related`); Study part 0 | drafter (MODEL) | lint; reviewer checks and approves |
+| Facts list from the page IMAGES (numbers, dates, names, stamps, handwriting) | drafter (MODEL_REVIEW) | every page image at 110 dpi; reviewer re-reads |
+| Research of the applicable GR paras / rules / cited SC-HC judgments from the original pages; letter or not; GR choice for the note body + enclosures.json marks; DETAILED note body (brief [I4.29], 12 elements) + concise letter (spec without `related`); Study part 0 | drafter (MODEL_REVIEW) | lint; reviewer checks each [I4.29] element and approves |
 | Note `related` ("संबंधित माहिती (संदर्भासाठी)") — verbatim GR/rule/precedent extracts + source + "(पृ.N/प.वि.)" (none when not in the package; §4.27) | related_writer (MODEL_LIGHT) | `extract_check.py`: each extract must occur on its cited package page; mismatches -> drafter |
 | Study parts 2, 3, 4, 7; parts 5–6 = exact copies of the spec's note / letter text (never redrafted) | study_writer (MODEL_LIGHT) | part 3 by `extract_check.py` (mismatches -> drafter); lint; parts 5–6 copied by you from spec |
 | Study part 1 page rendering | helper run (MODEL_LIGHT), then `part1check` vs the drafter's facts | kept only when every number/date/name matches; failing pages -> drafter |
-| Final review: every number/date/name of note, letter, part 0 vs the images; INSTRUCTIONS §4 incl. §4.18; letter-or-not; language; minimal direct corrections | reviewer (MODEL_REVIEW) | 1 review + 1 re-review max; not approved -> delivered with warning (Order step 7) |
+| Final review: every number/date/name of note, letter, part 0 vs the images; INSTRUCTIONS §4 incl. §4.18 and §4.29 (each element present where it applies; no fact/condition of the proposal left out); §4.30 checks (coverage table + contradiction scan -> Study part 7; relief line; original-language provisions; respectful language; others' opinions as recorded); letter-or-not; language; minimal direct corrections | reviewer (MODEL_REVIEW) | 1 review + 1 re-review max; not approved -> delivered with warning (Order step 7) |
 | pkg3 / highlight / build_note_letter / build_study / lint / verify / extract_check runs; page numbers from map.json | you (MODEL_LIGHT) | scripts; LINT OK, ALL OK, EXTRACTS OK |
 | Fixing lint/verify/extract lines | you 2 attempts -> drafter 2 -> drafter_strong 1 (if set) | then "पडताळणी अपूर्ण" warning and go on (rule 9) |
 
@@ -62,27 +64,31 @@ Expected cost per typical proposal (15 pages, 3 GRs; estimate, not yet measured 
 §6, $/MTok: Opus 5.5 4/20, Sonnet 5.5 2/10, Haiku 5.5 0.10/0.50; cache read 0.20 / 0.20 / 0.01):
 | Part | $ |
 |---|---|
-| drafter (MODEL; figures for Abhi's plan Sonnet 5.5 — about 2× with the default Opus 5.5): ~14 turns × ~45k context, ~70k cache writes, ~12–20k output (no Study 2–4/7, no `related`) | 0.35–0.60 |
+| drafter (MODEL_REVIEW = Opus 5.5 since C30, 03.11.2026; was 0.35–0.60 on Sonnet 5.5): ~14 turns × ~45k context, ~70k cache writes, ~20–30k output for the detailed note (no Study 2–4/7, no `related`) | 0.70–1.40 |
 | reviewer (Opus 5.5): ~8 turns, 15 page images + spec + part 0 + brief (~60k writes), ~4–8k output | 0.35–0.60 |
 | study_writer + related_writer (Haiku 5.5): ~30 turns, ~30k output | 0.05–0.15 |
 | orchestrator + part-1 helper (Haiku 5.5) | 0.07–0.35 |
 | escalations (extract mismatches, part-1 pages, content fixes) when needed | 0–0.30 |
-| **Total** | **≈ 0.8–2.0, typical ≈ 1.2** (previous tier design 1.0–1.8, typical ≈ 1.4; all-Opus 2.3–3.3) |
+| **Total** | **≈ 1.2–2.8, typical ≈ 1.8** (estimate after C30 Opus drafter; Sonnet drafter 0.8–2.0; all-Opus 2.3–3.3; live run #8 $2.80) |
 
 ### Order
 1. Read the TEXT of all pages in ONE Bash call (`.txt` where `has_text_layer`, else `.ocr.txt`), case.json, inputs.
    Do SOP Step 2 search work: list the GRs/rules/orders cited (from the text), look them up (pdf/gr/INDEX.tsv,
    register/, service-rules/, pdf/), fetch missing ones (brief rules; tools/gr_request.py), grep OLDCASES and
-   PRECEDENT for the subject. Write `/tmp/work/candidates.md`: per candidate GR — code, date, title, repo path, and
+   PRECEDENT for the subject. Also list every SC/HC judgment cited in a GR or the proposal and fetch it from the official
+   sites only (api.sci.gov.in, bombayhighcourt.nic.in; brief [I1.3]) and the rules the GRs refer to (pdf/, register/,
+   service-rules/). Write `/tmp/work/candidates.md`: per candidate GR — code, date, title, repo path, and
    the text of the pages that may hold the needed para (pymupdf text, page numbers); precedent hits (file, lines).
    Never decide which GR applies or quote anything yourself.
 2. D1 -> `drafter` (ONE Agent call; give paths, not content): "Read the brief and TOOL_DOCS. LOOK at every proposal
    page image WORKDIR/pages/p-NN.png (full 110 dpi; several Reads per message); reply PDFs likewise. Write
    /tmp/work/facts.json (format below) — every number/date/name/amount from the IMAGE, `clear:false` where not sure.
-   Using /tmp/work/candidates.md, the GR PDFs and precedents: decide letter or not, select the GR pages, write
+   RESEARCH FIRST (brief [I4.29]): from candidates.md, the GR PDFs, rules and judgments find every applicable para and
+   read it on the original page; quote verbatim. Then: decide letter or not, select the GR pages, write
    /tmp/work/enclosures.json (pkg3 format; marks = exact text lines unique on the page), /tmp/work/spec.json (note +
    letter, `related` = []; पृ.N computed from the package order: proposal pages 1..n, then the enclosure pages in
-   order), /tmp/work/study_part0.json (part 0 as a build_study part), /tmp/work/status_core.json (summary,
+   order; the note body DETAILED per brief [I4.29] — the 12 elements where they apply, nothing of the proposal left
+   out, short sentences, the brief's [I4.30] quality checks; the letter concise [I4.15]), /tmp/work/study_part0.json (part 0 as a build_study part), /tmp/work/status_core.json (summary,
    letter_needed, essential_points, grs_attached, grs_missing, case) — the drafts = case.json `outputs` <list or
    null> (section "Drafts ticked by the user": `letters` / `orders` / `parawise`; null -> also `parawise` / `order`
    when the brief's court / order-draft rules call for them) — and /tmp/work/related_plan.md (which GR/rule/
@@ -106,7 +112,7 @@ Expected cost per typical proposal (15 pages, 3 GRs; estimate, not yet measured 
    text copied from spec) + part 6 (letter text copied from spec) + part 7. Run
    `python3 tools/extract_check.py "OUTDIR/<package>" --spec /tmp/work/spec.json --study /tmp/work/study.json
    [--ocr-dir /tmp/work/pkgpages] --extra OLDCASES/t --extra PRECEDENT --extra register --extra service-rules
-   [--extra <each GR/rule PDF quoted but not enclosed>] --log-out /tmp/work/xlog.json --from MODEL_LIGHT --to MODEL`.
+   [--extra <each GR/rule PDF quoted but not enclosed>] --log-out /tmp/work/xlog.json --from MODEL_LIGHT --to <drafter model: MODEL_REVIEW, else MODEL>`.
    EXTRACTS FAIL -> delegate the MISMATCH units (printed lines) to `drafter` (correct those extracts from the
    page/image; one-way, never back to the cheap tier), merge, re-run; append xlog.json entries to `model_log`. Cap:
    2 drafter rounds (+1 `drafter_strong` if set). Still MISMATCH -> keep the unit unchanged (its source ending stays
@@ -118,9 +124,15 @@ Expected cost per typical proposal (15 pages, 3 GRs; estimate, not yet measured 
    state: rule 9. A PREFIX change (C R found later) -> delete the old-PREFIX files in OUTDIR before rebuilding.
 7. D-final -> `reviewer` (ONE Agent call): "Read the brief, /tmp/work/facts.json, /tmp/work/spec.json,
    /tmp/work/study_part0.json; LOOK at the page images WORKDIR/pages/p-NN.png. Check and correct per your
-   definition; after your edits run `python3 tools/lint_spec.py /tmp/work/spec.json` until LINT OK, then write the
+   definition (incl. brief [I4.29]: each element present where it applies, no fact/condition of the proposal left out;
+   brief [I4.30]: checks (1)–(7), and write review.json `coverage` + `contradictions`); after your edits run `python3 tools/lint_spec.py /tmp/work/spec.json` until LINT OK, then write the
    hashes and /tmp/work/review.json." If `changes` > 0: copy the corrected part 0 / note / letter text into
-   study.json (parts 0, 5, 6), then lint -> build -> extract_check -> verify again. Copy review.json into status.json
+   study.json (parts 0, 5, 6), then lint -> build -> extract_check -> verify again.
+   Always (also with `changes` 0; INSTRUCTIONS §4.30, Abhi 03.11.2026): append to study.json part 7 the blocks
+   {"subheading": "मागण्या / अटी — पूर्तता व विसंगती (अंतिम तपासणी)"}, {"table": [["मागणी / अट", "कोठे हाताळली",
+   "स्थिती"]] + review.json `coverage` rows} and {"bullets": `contradictions`} (none -> {"para": "विसंगती आढळली नाही."};
+   no `coverage` -> {"para": "पूर्तता-तक्ता उपलब्ध नाही."} + warning "पडताळणी अपूर्ण — पूर्तता-तक्ता (reviewer) नाही"),
+   then build_study -> verify. Never in the note or letter (§4.27). The study is not hashed; spec / part 0 stay untouched. Copy review.json into status.json
    `review` = {"approved", "changes", "corrections"[, "reason"]}.
    Caps (02.11.2026, Abhi: drafts are never thrown away): at most 1 review + 1 re-review per run.
    - approved false -> ONE redraft round: `drafter` gets the reviewer's `reason` (and `redraft` points) and fixes
@@ -170,7 +182,7 @@ Never move a task down. Budget is SOFT: never skip an escalation for cost; the w
 "खर्च अंदाजापेक्षा जास्त — माहितीसाठी" (not an error).
 Log in status.json `model_log` (list): `{"task": "<Marathi, e.g. भाग 1 पान 3>", "from": "<model id>", "to": "<model id>",
 "reason": "<Marathi, e.g. हस्तलेख अस्पष्ट / lint 2 वेळा अयशस्वी / part1check जुळले नाही / उतारा मूळ PDF शी जुळला नाही>"}`
-— also the fixed routing: `{"task": "तथ्ये, नोंद, पत्र, भाग 0", "from": "", "to": MODEL, "reason": "मसुदा"}`,
+— also the fixed routing: `{"task": "तथ्ये, नोंद, पत्र, भाग 0", "from": "", "to": <the drafter's model = MODEL_REVIEW, else MODEL>, "reason": "मसुदा"}`,
 `{"task": "भाग 1-7 (0 वगळून), संबंधित माहिती, साधने", "from": "", "to": MODEL_LIGHT, "reason": "स्वस्त स्तर; उतारे यंत्र-तपासणी"}`
 and `{"task": "अंतिम पडताळणी व मान्यता", "from": "", "to": MODEL_REVIEW, "reason": "अंतिम मान्यता"}`. Model ids are in
 the run variables. The reviewer's corrections go to status.json `review.corrections` (the workflow prints them as
@@ -236,6 +248,11 @@ on the page images):
   applies). Last para (lint form (a)): "सबब, रिट याचिका क्र. ____ मधील परिच्छेदनिहाय अभिप्राय (इंग्रजी) व ते <सहायक
   सरकारी वकील> यांना पाठविण्याबाबतच्या पत्राचे प्रारूप पृ.      /प.वि. वर मान्यतेस्तव सादर. मान्य झाल्यास पत्र
   निर्गमित करण्यात येईल."
+- Parawise quality (INSTRUCTIONS §4.30, Abhi 03.11.2026; brief [I4.30]): `relief_sought` = the prayer in brief
+  (printed "Relief sought:"); a chronology / service / amounts table as a `background` item {"title", "table"} where it
+  is clearer; every para AND the prayer answered; State GR/rule text quoted in its original language (Marathi in “…”,
+  never translated); respectful wording to the Court (lint_parawise WARN "contempt-prone wording" -> rephrase); GP/AGP
+  or other-department opinions stated as recorded, not as binding.
 - Essential facts missing (§4.15) -> NO `parawise`; the information-letter first (to the HC / District Court as usual).
 - Time limit: Rule 58(4) — papers to the GP within two weeks of receipt, in any case before the date in the notice.
   Study part 0 (अ)/(आ) states the hearing date and that limit; (ऐ) the action.
@@ -317,6 +334,8 @@ Step 0 is done by the workflow:
      strip only a random upload prefix like `11ae057d-`). Never invent a new name such as `<PREFIX>_Proposal_with_GRs.pdf`
      — but when the original name itself looks machine-made (e.g. the uploaded file really is `CR66_Proposal_with_GRs.pdf`
      or `..._0001.pdf`), keep it exactly as uploaded; never "correct" it.
+     The local file name to use = case.json `package_file` (that original name; shortened by the tool only when too long
+     for the disk, NAME_MAX 255 bytes — the user still downloads it under the full name).
    Exactly one .pdf in OUTDIR besides `*_Note_and_Letter.pdf` / `*_Study.pdf` / `*_Order_Draft.pdf` / `*_Parawise.pdf` previews.
 6. Verify (SOP Step 7): `python3 tools/verify_outputs.py OUTDIR <PREFIX> "OUTDIR/<original name>" <proposal pages> --original-name "<proposal_original_name>"`
    must print ALL OK; fix by the ladder (Escalation (b), end state (d)). The second read of every number and date in
@@ -337,11 +356,11 @@ Step 0 is done by the workflow:
  "grs_attached": [{"code": "<सांकेतांक or rule-book name>", "date": "DD.MM.YYYY", "title": "<title>", "pages": "<package pages, e.g. 12-14>"}],
  "grs_missing": [{"date": "DD.MM.YYYY", "title": "<title as cited>"}],
  "prefix": "CR130_2026",
- "package_pdf": "<the package PDF file name in OUTDIR = proposal_original_name>",
+ "package_pdf": "<the package PDF file name in OUTDIR = case.json package_file>",
  "proposal_pages": 7,
  "outputs_extra": [],
  "warnings": ["पडताळणी अपूर्ण — <what, where>"],
- "model_log": [{"task": "तथ्ये, नोंद, पत्र, भाग 0", "from": "", "to": "<MODEL>", "reason": "मसुदा"}],
+ "model_log": [{"task": "तथ्ये, नोंद, पत्र, भाग 0", "from": "", "to": "<MODEL_REVIEW>", "reason": "मसुदा"}],
  "review": {"approved": true, "changes": 1, "corrections": ["<Marathi: what the reviewer changed>"]},
  "case": {"cr_no": "130", "cr_year": 2026, "file_no": "संकीर्ण-2026/979/प्र.क्र.130/का.6", "subject": "<as on the निर्देशपत्र>",
           "category": "<one of: वेतननिश्चिती, भत्ते, निवृत्तीवेतन, जुनी पेन्शन, विशेष वेतन, विमा/GPF, सेवा, न्यायिक वेतन, वैद्यकीय, इतर>"}}

@@ -3,16 +3,19 @@
 Env: SUPABASE_URL, SUPABASE_SERVICE_KEY, CASE_ID, RUN_ID (keys come from the Worker at run time, masked; never stored).
 Commands ("deliver with warnings", Abhi 02.11.2026: drafts are never thrown away — only HARD problems fail a case):
   fetch <workdir>     ALL proposal uploads: the NEWEST (by created_at, version, id) is "the proposal" ->
-                      <workdir>/in/proposal/<original_name>; every other proposal name -> in/extra_doc/ + a warning
+                      <workdir>/in/proposal/<original_name> (every local name via fs_name: > 200 UTF-8 bytes -> cut
+                      + "~<sha1 6 hex>", NAME_MAX 255 bytes); every other proposal name -> in/extra_doc/ + a warning
                       (A1 H13); newest version of each extra_doc / reply / approval / court_notice file ->
                       in/<kind>/<original_name> (approval, court_notice: C28, 03.11.2026). case.json "outputs" = the
                       drafts ticked for this run (runs.outputs in DRAFT_KEYS order; null = column missing or not set =
-                      the engine's own choice) and "reminder_next" (§4.21 N: 1 + earlier done runs that ticked "reminder"). A proposal
+                      the engine's own choice), "reminder_next" (§4.21 N: 1 + earlier done runs that ticked "reminder") and "desk" (C30:
+                      cases.desk, the desk profile tools/desks/<id>.json; missing column / null -> "law-desk6"; also in
+                      case_meta, and verify passes it as --desk). A proposal
                       that is not a PDF or is password-protected is refused at once (Marathi reason, no model run).
                       <workdir>/case.json (case row, files, run, instructions); runs: state=running, started_at, step.
   case_meta <out.json> [<workdir>]
                       runner-side, right after fetch: {proposal_original_name (newest proposal row in Supabase),
-                      proposal_pages (page count of the fetched proposal PDF, null if unreadable), outputs (runs.outputs,
+                      package_file, proposal_pages (page count of the fetched proposal PDF, null if unreadable), outputs (runs.outputs,
                       as in case.json)} — for verify --case-meta.
   step "<text>"       runs.step = text (live progress).
   note "<text>"       an INFORMATION line (not a warning) appended to runs.warnings with the UI's info prefix "मॉडेल: "
@@ -75,8 +78,9 @@ Commands ("deliver with warnings", Abhi 02.11.2026: drafts are never thrown away
                       (optional one-way escalation tier; default off), MODEL_REVIEW (final reviewer/approver;
                       default claude-opus-5-5), EFFORT (default medium), BUDGET_USD (SOFT,
                       default 0.75 — information only, never stops or degrades the run). Invalid values -> defaults.
-  agents <out.json>   (local) Claude Code --agents JSON: drafter (MODEL), study_writer + related_writer
-                      (MODEL_LIGHT), reviewer (MODEL_REVIEW) [+ drafter_strong (MODEL_STRONG)].
+  agents <out.json>   (local) Claude Code --agents JSON: drafter (MODEL_REVIEW, else MODEL — C30 03.11.2026: the
+                      note is drafted by Opus), study_writer + related_writer (MODEL_LIGHT), reviewer (MODEL_REVIEW)
+                      [+ drafter_strong (MODEL_STRONG, when it differs from the drafter's model)].
   part1check <facts.json> <study_part1.json>
                       (local) cheap-tier Study part 1 vs the main tier's facts: every number/date (and Devanagari
                       name/post) of a page must occur in that page's part-1 text; facts with "file" other than "proposal"
@@ -185,6 +189,47 @@ def safe_name(n):
     return n if n not in ("", ".", "..") else "file"
 
 
+# Linux NAME_MAX = 255 BYTES and Devanagari is 3 bytes a character: a long Marathi subject as the file name ("[Errno 36]
+# File name too long", live run 03.11.2026). Every LOCAL path made from an uploaded name goes through fs_name; the full
+# name stays in case.json / case_files.original_name (downloads, INSTRUCTIONS §4.16). 200 bytes leave room for
+# " (2)", ".map.json" and tool suffixes.
+FS_NAME_MAX = 200
+
+
+def fs_name(name, limit=FS_NAME_MAX):
+    """Basename of `name` that fits the disk: unchanged when its UTF-8 length <= limit; else the stem is cut on a
+    character boundary and "~" + 6 hex of sha1(full basename) goes before the extension (deterministic)."""
+    import hashlib
+    b = safe_name(str(name))
+    if len(b.encode("utf-8")) <= limit:
+        return b
+    stem, ext = os.path.splitext(b)
+    if len(ext.encode("utf-8")) > 16:
+        stem, ext = b, ""
+    tag = "~" + hashlib.sha1(b.encode("utf-8")).hexdigest()[:6]
+    room = limit - len((tag + ext).encode("utf-8"))
+    cut = stem.encode("utf-8")[:room].decode("utf-8", "ignore").rstrip()
+    return cut + tag + ext
+
+
+def name_forms(name):
+    """Every accepted local / package name of an uploaded `name`: the name, its upload-prefix-stripped form, and the
+    fs_name of both (§4.16 + NAME_MAX)."""
+    b = safe_name(str(name))
+    s = strip_upload_prefix(b)
+    return {b, s, fs_name(b), fs_name(s)}
+
+
+def full_name_of(local, name):
+    """The full original name a local package file stands for: strip_upload_prefix(name) when `local` is it or its
+    fs_name, `name` itself likewise; else `local` unchanged."""
+    b = safe_name(str(name))
+    for full in (strip_upload_prefix(b), b):
+        if local in (full, fs_name(full)):
+            return full
+    return local
+
+
 def newest(files, kinds):
     best = {}
     for f in files:
@@ -255,13 +300,32 @@ def proposal_problem(data):
 
 
 def unique_dst(work, kind, name, taken):
-    dst = os.path.join(work, "in", kind, safe_name(name))
+    dst = os.path.join(work, "in", kind, fs_name(name))
     stem, ext = os.path.splitext(dst)
     k = 2
     while dst in taken:
         dst = f"{stem} ({k}){ext}"; k += 1
     taken.add(dst)
     return dst
+
+
+DEFAULT_DESK = "law-desk6"
+DESK_ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,40}$")   # tools/desk.py ID_RE
+
+
+def case_desk(case):
+    """C30 (03.11.2026): the case's desk profile id — cases.desk (migration 20261103000009_case_desk.sql); a missing
+    column, null, "" or a malformed value -> law-desk6 (tools/desks/law-desk6.json)."""
+    d = case.get("desk") if isinstance(case, dict) else None
+    return d.strip() if isinstance(d, str) and DESK_ID_RE.match(d.strip()) else DEFAULT_DESK
+
+
+def case_desk_of(case_id):
+    """case_desk of a case read from Supabase; the column may not exist yet (migration not applied) -> law-desk6."""
+    try:
+        return case_desk((rest("GET", f"cases?id=eq.{case_id}&select=*") or [{}])[0])
+    except Exception:
+        return DEFAULT_DESK
 
 
 def cmd_fetch(work):
@@ -299,7 +363,12 @@ def cmd_fetch(work):
             "instructions": run.get("instructions") or "",
             "outputs": outputs,
             "reminder_next": reminder_next(runs, run["id"]),
+            "desk": case_desk(case),   # C30: desk profile id (cases.desk; absent column / null -> law-desk6)
             "proposal_original_name": prop[0]["original_name"],
+            "original_name": prop[0]["original_name"],
+            # the package PDF's LOCAL file name: the original name (upload prefix stripped, §4.16), shortened by fs_name
+            # only when too long for the disk; finish stores the full name as case_files.original_name
+            "package_file": fs_name(strip_upload_prefix(safe_name(prop[0]["original_name"]))),
             "inputs": got,
             "files": [{k: f[k] for k in ("id", "kind", "original_name", "version", "storage_path", "created_at")} for f in files]}
     os.makedirs(work, exist_ok=True)
@@ -322,7 +391,7 @@ def cmd_case_meta(args):
         raise RuntimeError("प्रस्ताव PDF अपलोड केलेला नाही")
     name = prop["original_name"]
     pages = None
-    src = os.path.join(work, "in", "proposal", safe_name(name))
+    src = os.path.join(work, "in", "proposal", fs_name(name))
     if os.path.exists(src):
         try:
             import pymupdf
@@ -334,7 +403,11 @@ def cmd_case_meta(args):
         run = (rest("GET", f"runs?id=eq.{RUN}&select=*") or [{}])[0]
     except Exception:
         run = {}
-    meta = {"proposal_original_name": name, "proposal_pages": pages, "outputs": norm_outputs(run.get("outputs"))}
+    meta = {"proposal_original_name": name, "package_file": fs_name(strip_upload_prefix(safe_name(name))),
+            "proposal_pages": pages, "outputs": norm_outputs(run.get("outputs"))}
+    desk = case_desk_of(CASE)
+    if desk != DEFAULT_DESK:   # C30: only another desk is written (law-desk6 = verify's default)
+        meta["desk"] = desk
     d = os.path.dirname(os.path.abspath(outp))
     os.makedirs(d, exist_ok=True)
     json.dump(meta, open(outp, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
@@ -388,9 +461,10 @@ def next_version(kind):
     return prev[0]["version"] + 1 if prev else 1
 
 
-def put_object(kind, p):
-    """Storage upload only (no case_files row) -> {kind, name, version, path}."""
-    name = os.path.basename(p)
+def put_object(kind, p, name=None):
+    """Storage upload only (no case_files row) -> {kind, name, version, path}. `name` = case_files.original_name (default
+    the file's basename; the package passes the FULL original name when its local file is the fs_name form)."""
+    name = name or os.path.basename(p)
     ver = next_version(kind)
     path = f"{CASE}/{kind}/v{ver}/{storage_name(name)}"  # ASCII object key; real name in original_name
     ctype = MIME.get(os.path.splitext(name)[1].lower()) or mimetypes.guess_type(name)[0] or "application/octet-stream"
@@ -491,7 +565,7 @@ def cmd_finish(out):
         want = os.path.join(out, os.path.basename(str(st["package_pdf"])))
         pdfs = [p for p in pdfs if p == want] or pdfs
     prop = newest_proposal(rest("GET", f"case_files?case_id=eq.{CASE}&kind=eq.proposal&select=*") or [])
-    names = {safe_name(prop["original_name"]), strip_upload_prefix(safe_name(prop["original_name"]))} if prop else set()
+    names = name_forms(prop["original_name"]) if prop else set()
     probs = []
     if not study: probs.append("*_Study.docx नाही")
     if not nl: probs.append("*_Note_and_Letter.docx नाही")
@@ -529,7 +603,8 @@ def cmd_finish(out):
     put = []
     try:
         for kind, p in main3:
-            put.append(put_object(kind, p))
+            full = full_name_of(os.path.basename(p), prop["original_name"]) if kind == "package_pdf" and prop else None
+            put.append(put_object(kind, p, full))
     except Exception as e:
         for u in put: drop_object(u["path"])
         return cmd_fail(f"आउटपुट जतन झाले नाही (Storage) — {str(e)[:200]} — पुन्हा तयार करा.")
@@ -877,12 +952,22 @@ REVIEW = (" You are the final approver. LOOK at the proposal page images (WORKDI
           "drafter). You are called at most twice (review + one re-review); a second approved=false is delivered to the "
           "user with your reason as a warning. You never write /tmp/out/status.json and never set any state \"failed\". "
           "The workflow compares the hashes with the delivered files, so nobody may change them after you; a later "
-          "change needs a new review.")
+          "change needs a new review. Detailed note (brief [I4.29], INSTRUCTIONS §4.29): check that each of the 12 "
+          "elements is present where the record has it and that no fact, condition, amount, date or authority's point "
+          "of the proposal is left out; a missing element or fact that the record holds -> add it (verbatim, with "
+          "पृ.N/प.वि.) or approved=false with `redraft` points. Never add opinion; letters stay concise (§4.15). "
+          "Also write \"coverage\" (table: demand/contention/condition → where answered in the note/letter/draft, पृ.) "
+          "and \"contradictions\" (list of conflicting dates/amounts/names/posts across note, letter, drafts and "
+          "proposal, with पृ.) into review.json — for Study part 7 only, never into the note (INSTRUCTIONS §4.30).")
 DRAFTER = (" Never stop or refuse: write every output you can. Missing C R/file no. → PREFIX Case<id>_<year>, ref_no "
            "'संकिर्ण-<year>/____/प्र.क्र.____/का.6'; unclear → 'अस्पष्ट'. Each problem you cannot resolve → report it in "
            "one line starting 'पडताळणी अपूर्ण — <what, where>' for status.json `warnings`. On a redraft request, fix "
            "exactly the reviewer's `reason`/`redraft` points. Year: never copy 2026 from a sample. Rule 58(4)(a) "
-           "recommendation only from the record, else '____'.")
+           "recommendation only from the record, else '____'. Research before drafting (brief [I4.29]): read every "
+           "applicable GR/circular para, rule and SC/HC judgment cited in a GR or the proposal on its original page "
+           "(official sources only) and quote it verbatim. The note body is DETAILED: the 12 elements of [I4.29] where "
+           "they apply, no fact or condition of the proposal left out, short sentences, no opinion; the letter stays "
+           "concise (§4.15, §4.20).")
 WRITER = (" If an extract cannot be matched to its page, report it as 'पडताळणी अपूर्ण — उतारा …'; never invent text.")
 NEVER_STOP = (" Never stop: a missing C R / file no. / date is \"____\", an unreadable page or value is \"अस्पष्ट\", a "
               "GR that cannot be fetched goes to grs_missing — each with a warning line, never a reason to stop, refuse "
@@ -893,10 +978,13 @@ NEVER_STOP = (" Never stop: a missing C R / file no. / date is \"____\", an unre
 
 def agents_json(conf, brief="tools/ENGINE_BRIEF.md"):
     """Claude Code --agents definitions (pinned CLI: description, prompt, model per agent). The orchestrating session
-    runs on MODEL_LIGHT; `drafter` (MODEL) = facts, letter-or-not, note body + letter, Study part 0; `study_writer`
+    runs on MODEL_LIGHT; `drafter` (drafter_model: MODEL_REVIEW when set, else MODEL — Abhi 03.11.2026, C30: "note
+    khupch short jhali detail asayla pahije", the detailed note is drafted by Opus) = research, facts, letter-or-not,
+    DETAILED note body + letter, Study part 0; `study_writer`
     and `related_writer` (MODEL_LIGHT) = Study parts 2-4, 7 (5-6 copied) and the note's `related` extracts, checked by
     tools/extract_check.py (mismatches go back to drafter); `reviewer` (MODEL_REVIEW) = final check + approval;
-    `drafter_strong` (MODEL_STRONG) only when configured. Prompts are fixed text (stable prefix for prompt caching)."""
+    `drafter_strong` (MODEL_STRONG) only when configured and different from the drafter's model. Prompts are fixed
+    text (stable prefix for prompt caching)."""
     base = ("You are a subagent of the Law & Judiciary engine run (one case). The binding rules are " + brief +
             " (read it once, fully) and the tool docstrings in /tmp/work/TOOL_DOCS.md; INSTRUCTIONS.md wins on any doubt"
             " (grep the exact item). Nothing of your own; verbatim quotes with source; unreadable = \"अस्पष्ट\". "
@@ -904,14 +992,16 @@ def agents_json(conf, brief="tools/ENGINE_BRIEF.md"):
             "(files written, open doubts, anything you could not read). Batch independent tool calls in one message; "
             "never read a file twice; limit command output. No git, no questions, never print environment values."
             + NEVER_STOP)
+    dmodel = drafter_model(conf)
     out = {"drafter": {
-        "description": "Drafter. Read facts/numbers/dates/names/handwriting/stamps from the proposal page images; "
-                       "letter-or-not decision; GR selection for the note body and the enclosures; note body and "
-                       "letter spec; the optional spec `order` (order draft) / `parawise` (court remarks, English) "
+        "description": "Drafter (Opus-class). Research the applicable GR paras, rules and cited SC/HC judgments on their "
+                       "original pages; read facts/numbers/dates/names/handwriting/stamps from the proposal page images; "
+                       "letter-or-not decision; GR selection for the note body and the enclosures; DETAILED note body "
+                       "(brief [I4.29], 12 elements) and concise letter spec; the optional spec `order` (order draft) / `parawise` (court remarks, English) "
                        "per the brief's court and order-draft rules; Study part 0; extracts and Study part 1 pages that failed their check; content "
                        "fixes that lint/verify still reports after 2 mechanical attempts.",
-        "prompt": base + DRAFTER, "model": conf["MODEL"]}}
-    if conf.get("MODEL_STRONG"):
+        "prompt": base + DRAFTER, "model": dmodel}}
+    if conf.get("MODEL_STRONG") and conf["MODEL_STRONG"] != dmodel:
         out["drafter_strong"] = {
             "description": "Escalation tier (one-way up, only per the escalation rules): a page or a content problem "
                            "the main tier reported as still unclear / still failing.",
@@ -933,11 +1023,19 @@ def agents_json(conf, brief="tools/ENGINE_BRIEF.md"):
     out["reviewer"] = {
         "description": "Final review and approval (Opus-class). Checks every number/date/name of the note, letter and "
                        "Study part 0 against the page images, the rules (INSTRUCTIONS §4 incl. §4.18, the brief), the "
-                       "letter-or-not decision and the language; corrects spec/part-0 text with minimal edits, runs lint_spec, "
+                       "letter-or-not decision, the detailed-note elements ([I4.29]: nothing of the proposal left out) "
+                       "and the language; corrects spec/part-0 text with minimal edits, runs lint_spec, "
                        "then writes /tmp/work/review.json {approved, changes, corrections[], hashes; reason + redraft "
                        "when not approved}; called at most twice.",
         "prompt": base + REVIEW, "model": conf.get("MODEL_REVIEW") or DEFAULTS["model_review"]}
     return out
+
+
+def drafter_model(conf):
+    """The `drafter` subagent's model (C30, Abhi 03.11.2026: the note is drafted by Opus): MODEL_REVIEW (Opus-class)
+    when set, else MODEL. MODEL stays the Settings value for anything else that names it."""
+    conf = conf if isinstance(conf, dict) else {}
+    return (conf.get("MODEL_REVIEW") or "").strip() or (conf.get("MODEL") or "").strip() or DEFAULTS["model_review"]
 
 
 def cmd_agents(args):
@@ -1242,7 +1340,7 @@ def review_gate(review_dir, claude_json=None, notes=None):
             return f"मान्यतेनंतर {name} बदलली — पुन्हा reviewer ची मान्यता आवश्यक"
     review_model = (os.environ.get("MODEL_REVIEW") or DEFAULTS["model_review"]).strip()
     light = (os.environ.get("MODEL_LIGHT") or DEFAULTS["model_light"]).strip()
-    drafter = (os.environ.get("MODEL") or DEFAULTS["model"]).strip()
+    drafter = drafter_model({"MODEL_REVIEW": review_model, "MODEL": os.environ.get("MODEL") or DEFAULTS["model"]})
     if not claude_json:
         return None
     res = read_claude_json(claude_json)
@@ -1423,16 +1521,20 @@ def cmd_verify(args):
     pages = None
     orig = ""
     ticked = None   # C28: runs.outputs (runner-written case_meta first; case.json otherwise)
+    desk = None     # C30: desk profile id for verify --desk (same sources)
     if case_meta:
         orig, pages = read_case_meta(case_meta)
         try:
-            ticked = norm_outputs(json.load(open(case_meta, encoding="utf-8-sig")).get("outputs"))
+            _cm = json.load(open(case_meta, encoding="utf-8-sig"))
+            ticked = norm_outputs(_cm.get("outputs"))
+            desk = _cm.get("desk")
         except Exception:
             ticked = None
     elif work:
         try:
             cj = json.load(open(os.path.join(work, "case.json"), encoding="utf-8"))
             ticked = norm_outputs(cj.get("outputs"))
+            desk = cj.get("desk")
             orig = safe_name(str(cj.get("proposal_original_name") or ""))
             if orig == "file": orig = ""
             src = next(os.path.join(work, f["local_path"]) for f in cj["inputs"] if f["kind"] == "proposal")
@@ -1441,8 +1543,8 @@ def cmd_verify(args):
                 pages = len(d)
         except Exception as e:
             print(f"engine_supabase verify: proposal pages from status.json ({e})", file=sys.stderr)
-    if orig and pkg and os.path.basename(pkg) == strip_upload_prefix(orig):
-        orig = os.path.basename(pkg)  # the package keeps the name with only the upload prefix stripped
+    if orig and pkg and os.path.basename(pkg) in name_forms(orig):
+        orig = full_name_of(os.path.basename(pkg), orig)  # the package keeps the name with only the upload prefix stripped
     if pages is None and str(st.get("proposal_pages") or "").strip().isdigit():
         pages = int(str(st["proposal_pages"]).strip())
     if not prefix or not pkg:
@@ -1455,6 +1557,8 @@ def cmd_verify(args):
         pages = pages or 0
     script = os.environ.get("VERIFY_SCRIPT") or os.path.join(os.path.dirname(os.path.abspath(__file__)), "verify_outputs.py")
     cmd = [sys.executable, script, out, prefix, pkg, str(pages)] + (["--original-name", orig] if orig else [])
+    if isinstance(desk, str) and DESK_ID_RE.match(desk) and desk != DEFAULT_DESK:   # default: verify's own default
+        cmd += ["--desk", desk]
     r = subprocess.run(cmd, capture_output=True, text=True,
                        encoding="utf-8", errors="replace")
     lines = (r.stdout or "").splitlines()

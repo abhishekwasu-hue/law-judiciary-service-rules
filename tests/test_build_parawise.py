@@ -128,6 +128,38 @@ class TestLintParawise(unittest.TestCase):
         s = copy.deepcopy(self.spec); s["parawise"]["verification"] = "yes"
         self.assertTrue(any("verification" in p for p in LP.lint_parawise(s)))
 
+    def test_contempt_prone_warning_only(self):
+        # §4.30 (03.11.2026): respectful language toward the Court — WARN, never an error; own text only
+        s = copy.deepcopy(self.spec)
+        s["parawise"]["paras"][1]["remarks"] = ("The learned Tribunal failed to consider paragraph ____ of Government "
+                                                "Resolution No. ____ and passed an erroneous judgment; it is an illegal "
+                                                "order and the Court must set it aside.")
+        s["parawise"]["recommendation_reason"] = "The order is perverse."
+        self.assertEqual(LP.lint_parawise(s), [])
+        W = [w for w in LP.warnings_parawise(s) if "contempt-prone" in w]
+        for phrase in ("erroneous judgment", "learned Tribunal failed", "illegal order", "Court must", "perverse"):
+            self.assertTrue(any(f"'{phrase}'" in w for w in W), (phrase, W))
+        # the petitioner's averment / relief and quoted text are not the Department's wording
+        s = copy.deepcopy(self.spec)
+        s["parawise"]["paras"][1]["averment"] = "The Tribunal failed to consider; the illegal order be quashed."
+        s["parawise"]["relief_sought"] = "Quash the illegal order dated __.__.____."
+        s["parawise"]["paras"][2]["remarks"] += " The petitioner alleges “the court failed to consider”."
+        self.assertEqual([w for w in LP.warnings_parawise(s) if "contempt-prone" in w], [])
+
+    def test_relief_and_table_structure(self):
+        # §4.30: optional relief_sought (string) and background table items (2-6 columns, plain-text rows)
+        s = copy.deepcopy(self.spec)
+        s["parawise"]["relief_sought"] = "A direction to grant the ____ benefit with arrears."
+        s["parawise"]["background"].append({"title": "Chronology", "table": [["Date", "Event"], ["__.__.2025", "x"]]})
+        self.assertEqual(LP.lint_parawise(s), [])
+        for bad in ({"table": [["Date"]]}, {"table": [["A", "B"], ["only one"]]}, {"rows": []}, 5,
+                    {"table": [["A", "B"], ["x", 3]]}):
+            with self.subTest(item=bad):
+                t = copy.deepcopy(self.spec); t["parawise"]["background"].append(bad)
+                self.assertTrue(any(p.startswith("parawise.background[4]: structure") for p in LP.lint_parawise(t)))
+        t = copy.deepcopy(self.spec); t["parawise"]["relief_sought"] = ["x"]
+        self.assertTrue(any(p.startswith("parawise.relief_sought:") for p in LP.lint_parawise(t)))
+
     def test_cli(self):
         r = run([os.path.join(TOOLS, "lint_parawise.py"), WP])
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr); self.assertIn("LINT OK", r.stdout)
@@ -198,6 +230,35 @@ class TestBuildParawise(unittest.TestCase):
         self.assertEqual(clean_meta.docx_meta_problems(out), [])   # C27 §4: no python-docx / AI trace
         rf = d.styles["Normal"].element.rPr.rFonts
         self.assertEqual({rf.get(qn("w:" + k)) for k in ("ascii", "hAnsi", "cs", "eastAsia")}, {FONT})
+
+    def test_build_relief_and_facts_table(self):
+        # §4.30 (03.11.2026): "Relief sought:" line after "Submitted to", a chronology table inside Brief facts;
+        # string facts keep their (1), (2) … numbering; the remarks table stays the last table
+        s = load(WP)
+        s["parawise"]["relief_sought"] = "A direction to grant the ____ benefit with effect from __.__.____."
+        s["parawise"]["background"].insert(2, {"title": "Chronology", "table": [
+            ["Date", "Event"], ["__.__.2025", "Representation"], ["__.__.2025", "Forwarded by the High Court"]]})
+        sp = os.path.join(self.tmp, "spec.json")
+        with open(sp, "w", encoding="utf-8") as f:
+            json.dump(s, f, ensure_ascii=False)
+        r = self.build(sp)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        d = docx.Document(os.path.join(self.tmp, "T_Parawise.docx"))
+        paras = [p.text for p in d.paragraphs]
+        i_sub = next(i for i, t in enumerate(paras) if t.startswith("Submitted to:"))
+        self.assertEqual(paras[i_sub + 1], "Relief sought:\t" + s["parawise"]["relief_sought"])
+        self.assertIn("Chronology", paras)
+        self.assertTrue(any(t.startswith("(3)\tThe Law and Judiciary Department informed") for t in paras), paras)
+        self.assertEqual(len(d.tables), 2)
+        self.assertEqual([c.text for c in d.tables[0].rows[0].cells], ["Date", "Event"])
+        self.assertEqual(d.tables[1].rows[0].cells[0].text, "Para No.")
+        self.assertEqual(bad_fonts(d), 0)
+
+    def test_sample_has_no_relief_line(self):
+        r = self.build(WP)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        d = docx.Document(os.path.join(self.tmp, "T_Parawise.docx"))
+        self.assertFalse(any(p.text.startswith("Relief sought") for p in d.paragraphs))
         if shutil.which("soffice"):
             self.assertTrue(os.path.exists(os.path.join(self.tmp, "T_Parawise.pdf")), r.stderr)
 

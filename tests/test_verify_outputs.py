@@ -345,6 +345,24 @@ class VerifyOutputs(unittest.TestCase):
         self.rename_pkg(d, "CR130.pdf")
         self.must_fail(d, "package file name", pkg="CR130.pdf", extra=("--original-name", "20261101-CR130.pdf"))
 
+    def test_original_name_too_long_short_form_ok(self):
+        # NAME_MAX (255 bytes; Devanagari 3 bytes a char): the package carries engine_supabase.fs_name of the original name
+        sys.path.insert(0, TOOLS)
+        from engine_supabase import fs_name, strip_upload_prefix
+        full = "11ae057d-" + "132 2026 मा. शेट्टी आयोगाच्या शिफारशीनुसार दि. 01.04.2026 रोजी कनिष्ठ आणि वरिष्ठ सहायक अधिक्षकांचे वेतन एकवटत असल्यामुळे त्यांच्या वेतननिश्चिती संदर्भात मार्गदर्शन मिळणेबाबत._0001.pdf"
+        self.assertGreater(len(full.encode("utf-8")), 255)
+        short = fs_name(strip_upload_prefix(full))
+        self.assertLessEqual(len(short.encode("utf-8")), 200)
+        d = self.case("orig_long")
+        self.rename_pkg(d, short)
+        for name in (full, strip_upload_prefix(full)):
+            rc, out = self.run_verify(d, pkg=short, extra=("--original-name", name))
+            self.assertEqual(rc, 0, out)
+            self.assertIn("ALL OK", out)
+        d = self.case("orig_long_bad")
+        self.rename_pkg(d, "x" + short)
+        self.must_fail(d, "package file name", pkg="x" + short, extra=("--original-name", full))
+
     def write_status(self, d, **st):
         with open(os.path.join(d, "status.json"), "w", encoding="utf-8") as f:
             json.dump({"state": "done", **st}, f, ensure_ascii=False)

@@ -13,7 +13,9 @@ Layout: docs/COURT_AND_ORDERS_RESEARCH.md decisions B1-B7 — official specimens
 R4 §2) filled with the Section's own wording (R3 (b)). Page setup and styles from tools/templates/LETTER_TEMPLATE.docx
 (no letterhead logo: an order is not a letter); margins A4 2.5 / 2.0 / 1.5 / 1.5 cm.
 
-spec.json (only the "order" / "orders" keys are read; other keys such as "note" may sit beside them):
+Desk (C30, 03.11.2026): spec "desk" (or an order's own "desk") names the profile tools/desks/<id>.json — department,
+address, default signers, English lines (absent = law-desk6; unknown values print "____" / "(          )").
+spec.json (only the "desk", "order" / "orders" keys are read; other keys such as "note" may sit beside them):
 {"order": {
   "type": "gr" | "corrigendum" | "circular" | "memo" | "notification",
   "subject": "...बाबत.",                          # printed on top (GR / शुद्धिपत्रक / परिपत्रक) or top centre (ज्ञापन);
@@ -56,10 +58,14 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 from clean_meta import clean_docx  # noqa: E402 — C27 §4
 from mkdocs import FONT, setfont, fix_styles, nomirror, add_table, LET_T  # noqa: E402
+from desk import load_desk, desk_id_of, blank as _blank, sign_name as _sign_name  # noqa: E402 — C30 desk profiles
 
 TYPES = ("gr", "corrigendum", "circular", "memo", "notification")
-DEPT = "विधि व न्याय विभाग,"
-ADDRESS = "हुतात्मा राजगुरु चौक, मादाम कामा मार्ग, मंत्रालय, मुंबई-400 032"
+# C30 (03.11.2026): department / address / signers / English lines come from the desk profile (tools/desks/<id>.json,
+# spec "desk", default law-desk6); the constants below are the default profile's values (kept for callers and tests)
+_DEFAULT = load_desk(None)["order"]
+DEPT = _DEFAULT["department"]
+ADDRESS = _DEFAULT["office"]
 GOVERNOR = "महाराष्ट्राचे राज्यपाल यांच्या आदेशानुसार व नावाने,"
 GOVERNOR_EN = "By order and in the name of the Governor of Maharashtra,"
 NUMBER_LABEL = {"gr": "शासन निर्णय क्रमांक :- ", "corrigendum": "शासन शुद्धिपत्रक क्रमांक :- ",
@@ -77,13 +83,13 @@ WEBSITE = {
     "notification": "सदर अधिसूचना महाराष्ट्र शासनाच्या www.maharashtra.gov.in या संकेतस्थळावर उपलब्ध करण्यात आली असून तिचा संकेतांक ____ असा आहे. ही अधिसूचना डिजिटल स्वाक्षरीने साक्षांकित करून काढण्यात येत आहे.",
 }
 WEBSITE_DEFAULT = {"gr": True, "corrigendum": True, "circular": True, "memo": False, "notification": False}
-SIGNER_DEFAULT = {"name": "( राजेश वडनेरकर )", "designation": "अवर सचिव, महाराष्ट्र शासन"}          # decision B4
-SIGNER_NOTIF = {"name": "( ____ )", "designation": "उप विधि सल्लागार-नि-उप सचिव"}
-SIGNER_EN = {"name": "( ____ )", "designation": "Deputy Legal Adviser-cum-Deputy Secretary"}
+SIGNER_DEFAULT = dict(_DEFAULT["signer"])          # decision B4
+SIGNER_NOTIF = dict(_DEFAULT["signer_notification"])
+SIGNER_EN = dict(_DEFAULT["english"]["signer"])
 CORR_INSTEAD = "या ऐवजी"
 CORR_CLOSING = "उपरोक्त बदलाव्यतिरिक्त संदर्भाधीन शासन निर्णयातील इतर तरतुदी कायम राहतील."
 KEEP = "कायम राहतील"
-EN_ADDRESS = ["Law and Judiciary Department,", "Hutatma Rajguru Chowk, Madam Cama Marg,", "Mantralaya, Mumbai-400 032."]
+EN_ADDRESS = list(_DEFAULT["english"]["office"])
 SIGN_INDENT = Cm(7.0)
 
 
@@ -92,10 +98,19 @@ def website_on(o):
     return WEBSITE_DEFAULT[o["type"]] if w is None else bool(w)
 
 
-def signer(o):
+def order_desk(o, spec=None):
+    """the desk profile's "order" part for one order: the order's own "desk", else the spec's, else law-desk6."""
+    did = o.get("desk") if isinstance(o, dict) and isinstance(o.get("desk"), str) and o["desk"].strip() else desk_id_of(spec)
+    return load_desk(did)["order"]
+
+
+def signer(o, dk=None):
+    """the order's signer; spec values first, else the desk profile's (unknown name -> "(          )", designation -> "____")."""
+    dk = dk or order_desk(o)
     s = o.get("signer") or {}
-    base = SIGNER_NOTIF if o["type"] == "notification" else SIGNER_DEFAULT
-    return {"name": s.get("name") or base["name"], "designation": s.get("designation") or base["designation"]}
+    base = dk["signer_notification"] if o["type"] == "notification" else dk["signer"]
+    return {"name": s.get("name") or _sign_name(base.get("name")),
+            "designation": s.get("designation") or _blank(base.get("designation"))}
 
 
 class Doc:
@@ -132,8 +147,10 @@ def subject_block(D, o, centre=False):
         D.p(o["subject"].strip(), bold=True, align=WA.CENTER if centre else WA.JUSTIFY, after=10)
 
 
-def heading_block(D, o):
+def heading_block(D, o, dk=None):
     """महाराष्ट्र शासन / विधि व न्याय विभाग, / <number> / address / दिनांक (R3 (b): 010, 041, 006; R4 §2)."""
+    dk = dk or order_desk(o)
+    DEPT, ADDRESS = dk["department"], dk["office"]
     t = o["type"]
     D.p("महाराष्ट्र शासन", bold=True, align=WA.CENTER, after=0, size=13)
     if t == "memo":   # NPM परि.-23: क्रमांक before the department line (Section's memo 116)
@@ -207,22 +224,23 @@ def build(o, out):
     build_many([o], out, o.get("doc_author"))
 
 
-def build_many(orders, out, author=None):
-    """ONE docx: the orders one after the other, each after the first on a new page (§4.28)."""
+def build_many(orders, out, author=None, spec=None):
+    """ONE docx: the orders one after the other, each after the first on a new page (§4.28). spec: for its "desk"."""
     D = Doc()
     for i, o in enumerate(orders):
         n0 = len(D.d.paragraphs)
-        build_into(D, o)
+        build_into(D, o, order_desk(o, spec))
         if i and len(D.d.paragraphs) > n0:
             D.d.paragraphs[n0].paragraph_format.page_break_before = True   # paragraph property (see english_block)
     D.d.save(out); clean_docx(out, author)
 
 
-def build_into(D, o):
+def build_into(D, o, dk=None):
+    dk = dk or order_desk(o)
     t = o["type"]
     if t != "notification":
         subject_block(D, o, centre=(t == "memo"))
-    heading_block(D, o)
+    heading_block(D, o, dk)
     if t == "notification":
         D.p(BODY_HEAD[t], bold=True, align=WA.CENTER, after=8, size=13)
     read_block(D, o.get("read"))
@@ -253,8 +271,8 @@ def build_into(D, o):
         D.p(f"{k}.\t{o['concurrence'].strip()}"); k += 1
     if website_on(o):
         D.p(f"{k}.\t{WEBSITE[t]}"); k += 1
-    sg = signer(o)
-    sign_block(D, GOVERNOR, sg, extra=("विधि व न्याय विभाग",) if t == "notification" else ())
+    sg = signer(o, dk)
+    sign_block(D, GOVERNOR, sg, extra=(_blank(dk.get("notification_department")),) if t == "notification" else ())
     if t == "notification":
         D.p(f"(महाराष्ट्र शासन राजपत्र, {(o.get('gazette_part') or 'भाग ____').strip()} मध्ये प्रसिद्ध करावी.)",
             align=WA.LEFT, after=6)
@@ -265,10 +283,14 @@ def build_into(D, o):
         D.p("", after=4)
     copies_block(D, COPIES_HEAD[t], o.get("copies"))
     if t == "notification" and isinstance(o.get("english"), dict):
-        english_block(D, o["english"])
+        english_block(D, o["english"], dk)
 
 
-def english_block(D, e):
+def english_block(D, e, dk=None):
+    en = (dk or _DEFAULT).get("english") or {}
+    EN_ADDRESS = [x for x in (en.get("office") or []) if isinstance(x, str) and x.strip()] or [_blank(None)]
+    SIGNER_EN = {"name": _sign_name((en.get("signer") or {}).get("name")),
+                 "designation": _blank((en.get("signer") or {}).get("designation"))}
     head = D.p("NOTIFICATION", bold=True, align=WA.CENTER, after=8, size=13)
     head.paragraph_format.page_break_before = True   # (a run-level page break made LibreOffice's converter fail)
     for line in EN_ADDRESS:
@@ -280,7 +302,7 @@ def english_block(D, e):
     numbered(D, ops)
     sg = {"name": (e.get("signer") or {}).get("name") or SIGNER_EN["name"],
           "designation": (e.get("signer") or {}).get("designation") or SIGNER_EN["designation"]}
-    sign_block(D, GOVERNOR_EN, sg, extra=("Law and Judiciary Department",))
+    sign_block(D, GOVERNOR_EN, sg, extra=(_blank(en.get("department")),))
     copies_block(D, "Copy to –", e.get("copies"))
 
 
@@ -344,7 +366,8 @@ def main(spec_path, outdir, pre, do_lint=True):
         print(f"order.type must be one of {TYPES}", file=sys.stderr); return 1
     os.makedirs(outdir, exist_ok=True)
     out = os.path.join(outdir, f"{pre}_Order_Draft.docx")
-    build_many(orders, out, next((o["doc_author"] for o in orders if o.get("doc_author")), None) or spec.get("doc_author"))
+    build_many(orders, out, next((o["doc_author"] for o in orders if o.get("doc_author")), None) or spec.get("doc_author"),
+               spec)
     bad = bad_font_runs(out)
     print(out, "+".join(o["type"] for o in orders), "bad-font runs:", bad)
     pdf = preview(out, outdir)

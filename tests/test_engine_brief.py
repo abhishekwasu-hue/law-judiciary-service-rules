@@ -9,7 +9,7 @@ import unittest
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BRIEF = os.path.join(ROOT, "tools", "ENGINE_BRIEF.md")
 LINT = os.path.join(ROOT, "tools", "lint_spec.py")
-MAX_BYTES = 24576  # 03.11.2026: +[I4.28] ticked drafts (C28, owner instruction "user multiple option choose karel"; no existing rule could be cut without loss) (24 KiB); 02.11.2026: +section 0 "never stop — deliver with warnings" (caps, terminal states, C R fallback; A1 audit) (23 KiB); 01.11.2026: +§4.18 language rule, +§4.19 Marathi forms (14 KiB); 02.11.2026: +Marathi language rules section, owner instruction (18.5 KiB); 02.11.2026: +section 4b court cases / order drafts, owner instruction (21 KiB)
+MAX_BYTES = 28672  # 03.11.2026: +[I4.29] detailed-note standard (12 elements) + research step (C30; owner accepted detail over brevity: "note khupch short jhali detail asayla pahije") (28 KiB); 03.11.2026: +[I4.28] ticked drafts (C28, owner instruction "user multiple option choose karel"; no existing rule could be cut without loss) (24 KiB); 02.11.2026: +section 0 "never stop — deliver with warnings" (caps, terminal states, C R fallback; A1 audit) (23 KiB); 01.11.2026: +§4.18 language rule, +§4.19 Marathi forms (14 KiB); 02.11.2026: +Marathi language rules section, owner instruction (18.5 KiB); 02.11.2026: +section 4b court cases / order drafts, owner instruction (21 KiB)
 
 
 def lint_constant(name):
@@ -48,9 +48,14 @@ class EngineBriefTest(unittest.TestCase):
         self.assertEqual(missing, [], f"banned words missing: {missing}")
 
     def test_signers_verbatim(self):
-        signers = lint_constant("SIGNERS")
+        # C30 (03.11.2026): lint_spec.py takes SIGNERS / AMS from the default desk profile tools/desks/law-desk6.json
+        # (no longer literals); the brief states the default (law-desk6) chain
+        import json
+        with open(os.path.join(ROOT, "tools", "desks", "law-desk6.json"), encoding="utf-8") as f:
+            desk = json.load(f)
+        signers, ams = desk["signers"], desk["finance_signer"]
         self.assertEqual(len(signers), 4)
-        for s in signers + [lint_constant("AMS")]:
+        for s in signers + [ams]:
             self.assertIn(s, self.text)
         pos = [self.text.index(s) for s in signers]
         self.assertEqual(pos, sorted(pos), "signers out of order")

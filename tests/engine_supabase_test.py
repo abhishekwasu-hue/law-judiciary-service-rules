@@ -346,7 +346,7 @@ try:
     cm2 = os.path.join(tmp, "cm2", "meta.json")
     r = run("case_meta", cm2, work)
     m2 = json.load(open(cm2, encoding="utf-8"))
-    check(r.returncode == 0 and m2 == {"proposal_original_name": PROP, "proposal_pages": 3, "outputs": None}, f"case_meta: name + pages ({m2} {r.stderr[:200]})")
+    check(r.returncode == 0 and m2 == {"proposal_original_name": PROP, "package_file": PROP, "proposal_pages": 3, "outputs": None}, f"case_meta: name + pages ({m2} {r.stderr[:200]})")
 except ImportError:
     print("skip  verify page count (pymupdf not installed)")
 run_row.update(state="running", step="तपासणी चालू", warnings=[])
@@ -552,8 +552,12 @@ check(r.returncode == 0 and run_row["cost_usd"] == 0 and any("openrouter:gemma-4
       f"claude_result via gateway: provider cost stored (free = $0), not the Claude estimate ({run_row.get('cost_usd')} {run_row['warnings']})")
 
 ag = es.agents_json({"MODEL": "claude-sonnet-5-5", "MODEL_LIGHT": "claude-haiku-5-5", "MODEL_REVIEW": "claude-opus-5-5", "MODEL_STRONG": ""})
-check(set(ag) == {"drafter", "study_writer", "related_writer", "reviewer"} and ag["drafter"]["model"] == "claude-sonnet-5-5"
-      and ag["drafter"]["description"] and ag["drafter"]["prompt"], "agents: drafter on MODEL, no strong tier when not configured")
+check(set(ag) == {"drafter", "study_writer", "related_writer", "reviewer"} and ag["drafter"]["model"] == "claude-opus-5-5"
+      and ag["drafter"]["description"] and "[I4.29]" in ag["drafter"]["prompt"] and "[I4.29]" in ag["reviewer"]["prompt"],
+      "agents: drafter on MODEL_REVIEW (C30 03.11.2026: note drafted by Opus), detailed-note rule, no strong tier when not configured")
+check(es.agents_json({"MODEL": "claude-sonnet-5-5"})["drafter"]["model"] == "claude-sonnet-5-5"
+      and es.drafter_model({"MODEL": "claude-sonnet-5-5", "MODEL_REVIEW": " "}) == "claude-sonnet-5-5"
+      and es.drafter_model({}) == "claude-opus-5-5", "agents: drafter falls back to MODEL only when MODEL_REVIEW is empty")
 check(ag["study_writer"]["model"] == ag["related_writer"]["model"] == "claude-haiku-5-5"
       and all("extract_check" in ag[k]["description"] and "character for character" in ag[k]["prompt"] for k in ("study_writer", "related_writer"))
       and "copies" in ag["study_writer"]["description"], "agents: study_writer + related_writer on the cheap tier, verbatim rule, parts 5-6 copied")
@@ -567,7 +571,7 @@ agf = os.path.join(tmp, "agents.json")
 r = subprocess.run([sys.executable, TOOL, "agents", agf], capture_output=True, text=True, encoding="utf-8",
                    env=dict(os.environ, MODEL="claude-sonnet-5-5", MODEL_LIGHT="claude-haiku-5-5", MODEL_STRONG="claude-opus-5-5"))
 aj = json.load(open(agf, encoding="utf-8"))
-check(r.returncode == 0 and aj["drafter"]["model"] == "claude-sonnet-5-5" and aj["drafter_strong"]["model"] == "claude-opus-5-5"
+check(r.returncode == 0 and aj["drafter"]["model"] == "claude-opus-5-5" and "drafter_strong" not in aj
       and aj["reviewer"]["model"] == "claude-opus-5-5" and aj["study_writer"]["model"] == "claude-haiku-5-5",
       f"agents CLI: file written from env ({r.stderr[:200]})")
 
@@ -724,8 +728,13 @@ for rv, us, label, want in (
           and any(w.startswith("अंतिम पडताळणी (Opus) मान्यता नाही — वापरण्यापूर्वी तपासा: ") and want in w for w in run_row["warnings"]),
           f"review gate: {label} -> delivered with the review warning ({run_row['warnings']})")
 r = gate(good, used, MODEL="claude-sonnet-5-5")
-check(r.returncode == 0 and run_row["state"] == "running" and not [w for w in run_row["warnings"] if "अंतिम पडताळणी" in w],
-      f"review gate: approved, hashes match, Opus usage present -> no warning ({run_row['warnings']} {r.stderr[:200]})")
+# C30 (03.11.2026): the drafter runs on MODEL_REVIEW too, so modelUsage alone cannot tell the reviewer apart even when
+# MODEL is Sonnet -> the honest note (approval itself stands; no "मान्यता नाही" warning). The no-warning pass needs the
+# CLI's subagent statistics (gate_stats below).
+check(r.returncode == 0 and run_row["state"] == "running"
+      and not [w for w in run_row["warnings"] if w.startswith("अंतिम पडताळणी (Opus) मान्यता नाही")]
+      and any("सिद्ध झाले नाही" in w and "drafter" in w for w in run_row["warnings"]),
+      f"review gate: approved, hashes match, Opus usage present, drafter on Opus -> approval kept + note ({run_row['warnings']} {r.stderr[:200]})")
 r = gate(good, used)
 check(r.returncode == 0 and any("सिद्ध झाले नाही" in w and "drafter" in w for w in run_row["warnings"]),
       f"review gate: MODEL == MODEL_REVIEW, no subagent stats -> warning, not a silent pass ({run_row['warnings']})")
@@ -899,6 +908,65 @@ check(es0.norm_outputs(None) is None and es0.norm_outputs(["parawise", "x", "let
 DB["runs"].pop(); DB["case_files"] = [f for f in DB["case_files"] if f["id"] not in (51, 52)]
 if saved_outputs == "absent": run_row.pop("outputs", None)
 else: run_row["outputs"] = saved_outputs
+
+# --- NAME_MAX (live run 03.11.2026: "[Errno 36] File name too long"): a 330-byte Devanagari name works end to end
+LSUB = ("132 2026 मा. शेट्टी आयोगाच्या शिफारशीनुसार दि. 01.04.2026 रोजी कनिष्ठ आणि वरिष्ठ सहायक अधिक्षकांचे वेतन एकवटत "
+        "असल्यामुळे त्यांच्या वेतननिश्चिती संदर्भात मार्गदर्शन मिळणेबाबत._0001.pdf")
+LONG = "11ae057d-" + LSUB
+check(len(LONG.encode("utf-8")) >= 330 and len(LONG.encode("utf-8")) > 255, f"long name is {len(LONG.encode('utf-8'))} bytes")
+SHORT = es0.fs_name(LSUB)
+check(len(SHORT.encode("utf-8")) <= 200 and SHORT.endswith(".pdf") and "~" in SHORT and es0.fs_name(LSUB) == SHORT
+      and es0.fs_name("CR130.pdf") == "CR130.pdf" and es0.fs_name(LONG) != SHORT and LSUB.startswith(SHORT.rsplit("~", 1)[0]),
+      f"fs_name: cut on a character boundary + ~hash, deterministic, short names unchanged ({SHORT})")
+saved = [dict(f) for f in DB["case_files"]]
+DB["case_files"][:] = [{"id": 80, "case_id": 7, "kind": "proposal", "storage_path": "proposals/7/proposal/v1/file.pdf",
+                        "original_name": LONG, "version": 1, "created_at": "99"},
+                       {"id": 81, "case_id": 7, "kind": "reply", "storage_path": "proposals/7/reply/v1/file.pdf",
+                        "original_name": "उत्तर " + LSUB, "version": 1, "created_at": "99"}]
+try:
+    import pymupdf
+    d = pymupdf.open()
+    for _ in range(4): d.new_page()
+    lp = d.tobytes(); d.close()
+except ImportError:
+    pymupdf = None; lp = b"%PDF long"
+STORE["proposals/7/proposal/v1/file.pdf"] = lp; STORE["proposals/7/reply/v1/file.pdf"] = b"%PDF reply long"
+run_row.update(state="queued", step=None, warnings=[])
+wl = os.path.join(tmp, "case_long")
+r = run("fetch", wl)
+cjl = json.load(open(os.path.join(wl, "case.json"), encoding="utf-8")) if r.returncode == 0 else {}
+lprop = os.path.join(wl, "in", "proposal", es0.fs_name(LONG))
+check(r.returncode == 0 and open(lprop, "rb").read() == lp
+      and all(len(os.path.basename(f["local_path"]).encode("utf-8")) <= 200 for f in cjl["inputs"])
+      and os.path.exists(os.path.join(wl, "in", "reply", es0.fs_name("उत्तर " + LSUB))),
+      f"NAME_MAX fetch: proposal + reply saved under fs_name ({r.stderr.strip()[-300:]})")
+check(cjl["proposal_original_name"] == LONG and cjl["original_name"] == LONG and cjl["package_file"] == SHORT
+      and next(f for f in cjl["inputs"] if f["kind"] == "proposal")["original_name"] == LONG,
+      "NAME_MAX case.json: full original names kept, package_file = fs_name(stripped name)")
+cml = os.path.join(tmp, "cm_long.json")
+r = run("case_meta", cml, wl)
+cm = json.load(open(cml, encoding="utf-8")) if r.returncode == 0 else {}
+check(r.returncode == 0 and cm["proposal_original_name"] == LONG and cm["package_file"] == SHORT
+      and (pymupdf is None or cm["proposal_pages"] == 4), f"NAME_MAX case_meta: full name, package_file, pages from fs_name path ({cm})")
+ol = os.path.join(tmp, "out_long"); os.makedirs(ol)
+for n in ("CR132_2026_Study.docx", "CR132_2026_Note_and_Letter.docx", SHORT, SHORT + ".map.json"):
+    open(os.path.join(ol, n), "wb").write(b"x" + n.encode())
+real_study(os.path.join(ol, "CR132_2026_Study.docx"))
+json.dump({"state": "done", "summary": "s", "prefix": "CR132_2026", "package_pdf": SHORT, "proposal_pages": 4,
+           "review": {"approved": True, "changes": 0}}, open(os.path.join(ol, "status.json"), "w", encoding="utf-8"), ensure_ascii=False)
+for args, label in (((ol, wl), "case.json"), ((ol, "--case-meta", cml), "--case-meta")):
+    run_row.update(state="running", step="तपासणी चालू", warnings=[])
+    r = run("verify", *args, VERIFY_SCRIPT=fake)
+    a = json.load(open(argf, encoding="utf-8"))
+    check(r.returncode == 0 and os.path.basename(a[2]) == SHORT and a[4:] == ["--original-name", LSUB] and not run_row["warnings"],
+          f"NAME_MAX verify ({label}): short package accepted, full stripped name passed ({a[4:]} {run_row['warnings']})")
+run_row.update(state="running", warnings=[]); LOG.clear(); nrows = len(DB["case_files"])
+r = run("finish", ol)
+rows = {f["kind"]: f for f in DB["case_files"][nrows:]}
+check(r.returncode == 0 and run_row["state"] == "done" and rows["package_pdf"]["original_name"] == LSUB
+      and rows["package_pdf"]["storage_path"].endswith("/file.pdf") and rows["package_pdf"]["storage_path"].isascii(),
+      f"NAME_MAX finish: package row original_name = FULL stripped name, ASCII storage key ({rows.get('package_pdf')} {run_row.get('step')})")
+DB["case_files"][:] = saved
 
 srv.shutdown()
 print("ALL TESTS PASSED")
