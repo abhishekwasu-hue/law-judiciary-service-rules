@@ -101,8 +101,10 @@ Both are optional keys of the same spec.json; engine detail: tools/ENGINE_PROMPT
 - **Court cases** (GP/AGP/High Court/MAT notice on a writ petition, O.A., contempt, SLP):
   - Note (B9): para 1 "<सहायक सरकारी वकील, …> यांच्या पृ.N/प.वि. वरील दि. __ रोजीच्या पत्रास अनुसरून सादर."; then
     "पार्श्वभूमी थोडक्यात खालीलप्रमाणे आहे:-" and numbered facts with पृ.N/प.वि.
-  - Para 2 / para 3 (INSTRUCTIONS §4.32, Abhi 03.11.2026): para 2 = petitioners, court, petition no. (पृ.), ALL respondents in
-    order "प्रतिवादी क्र. 1 …; प्रतिवादी क्र. 2 …" (Marathi designations), verification date, "सदर याचिका कृपया पहावी."; para 3 =
+  - Para 2 / para 3 (INSTRUCTIONS §4.32, Abhi 03.11.2026): para 2 = flowing sentences: "<petitioners> यांनी … दाखल केलेली रिट
+    याचिका क्र. __ (पृ.) कृपया पहावी. सदर याचिकेत <R1> यांना प्रतिवादी क्र. 1, <R2> यांना प्रतिवादी क्र. 2, … आणि <Rn> यांना प्रतिवादी
+    क्र. N करण्यात आले आहे (पृ.)." + verification date (no choppy list); story order and linking words for all paras
+    (§4.32 (ई)); para 3 =
     "सदर याचिकेद्वारे याचिकाकर्त्यांनी पुढीलप्रमाणे प्रमुख मागण्या केल्या आहेत (पृ.N/प.वि.):-" + table अ.क्र. | प्रार्थना | मागणी
     (each prayer in Marathi, petition order); the English prayers verbatim go FIRST in `related`. Respectful plural, Marathi
     designations, short sentences. Model: samples/specs/WP35697_2026_old-pension_finance-opinion.json.
