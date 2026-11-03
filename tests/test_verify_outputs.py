@@ -289,6 +289,23 @@ class VerifyOutputs(unittest.TestCase):
         self.must_fail(d, "Order_Draft no package / warning / AI words")
         self.must_fail(d, "Parawise no package / warning / AI words")
 
+    def test_431_missing_remark_outside_the_para(self):
+        # §4.31 (Abhi 03.11.2026): a facts-table cell / another para with a missing-info remark fails (SOFT)
+        d = self.case("miss431")
+        def f(s):
+            s["note"]["paras"][2]["table"][7][2] = "प्रस्तावात नमूद नाही"
+            s["note"]["paras"][0] += " अर्जाची प्रत प्रस्तावासोबत नाही."
+        build_note(self.spec_with(f), d)
+        self.must_fail(d, "missing information in ONE para §4.31")
+        import engine_supabase as E
+        hard, soft = E.classify_verify(["FAIL: missing information in ONE para §4.31 (note body) — x"])
+        self.assertEqual(hard, [])
+
+    def test_431_two_missing_paras(self):
+        d = self.case("two431")
+        build_note(self.spec_with(lambda s: s["note"]["paras"].insert(1, "प्रस्तावासोबत खालील माहिती उपलब्ध नाही:- (1) दिनांक.")), d)
+        self.must_fail(d, "more than one")
+
     def test_c27_checks_are_soft(self):
         import engine_supabase as E
         lines = ["FAIL: no 'पॅकेज' in Note_and_Letter — x", "FAIL: no warning / working / AI words (note, …) — x",

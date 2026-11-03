@@ -88,7 +88,8 @@ Expected cost per typical proposal (15 pages, 3 GRs; estimate, not yet measured 
    /tmp/work/enclosures.json (pkg3 format; marks = exact text lines unique on the page), /tmp/work/spec.json (note +
    letter, `related` = []; पृ.N computed from the package order: proposal pages 1..n, then the enclosure pages in
    order; the note body DETAILED per brief [I4.29] — the 12 elements where they apply, nothing of the proposal left
-   out, short sentences, the brief's [I4.30] quality checks; the letter concise [I4.15]), /tmp/work/study_part0.json (part 0 as a build_study part), /tmp/work/status_core.json (summary,
+   out, short sentences, the brief's [I4.30] quality checks; missing information / documents ONLY in the one
+   missing-info para just before the last para, essential items only, "____" in tables [I4.31]; the letter concise [I4.15]), /tmp/work/study_part0.json (part 0 as a build_study part), /tmp/work/status_core.json (summary,
    letter_needed, essential_points, grs_attached, grs_missing, case) — the drafts = case.json `outputs` <list or
    null> (section "Drafts ticked by the user": `letters` / `orders` / `parawise`; null -> also `parawise` / `order`
    when the brief's court / order-draft rules call for them) — and /tmp/work/related_plan.md (which GR/rule/
@@ -125,7 +126,8 @@ Expected cost per typical proposal (15 pages, 3 GRs; estimate, not yet measured 
 7. D-final -> `reviewer` (ONE Agent call): "Read the brief, /tmp/work/facts.json, /tmp/work/spec.json,
    /tmp/work/study_part0.json; LOOK at the page images WORKDIR/pages/p-NN.png. Check and correct per your
    definition (incl. brief [I4.29]: each element present where it applies, no fact/condition of the proposal left out;
-   brief [I4.30]: checks (1)–(7), and write review.json `coverage` + `contradictions`); after your edits run `python3 tools/lint_spec.py /tmp/work/spec.json` until LINT OK, then write the
+   brief [I4.30]: checks (1)–(7), and write review.json `coverage` + `contradictions`; brief [I4.31]: missing information /
+   documents only in the one missing-info para, essential items only, no such remark elsewhere, "____" in tables); after your edits run `python3 tools/lint_spec.py /tmp/work/spec.json` until LINT OK, then write the
    hashes and /tmp/work/review.json." If `changes` > 0: copy the corrected part 0 / note / letter text into
    study.json (parts 0, 5, 6), then lint -> build -> extract_check -> verify again.
    Always (also with `changes` 0; INSTRUCTIONS §4.30, Abhi 03.11.2026): append to study.json part 7 the blocks

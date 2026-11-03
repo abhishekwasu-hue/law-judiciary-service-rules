@@ -958,7 +958,10 @@ REVIEW = (" You are the final approver. LOOK at the proposal page images (WORKDI
           "पृ.N/प.वि.) or approved=false with `redraft` points. Never add opinion; letters stay concise (§4.15). "
           "Also write \"coverage\" (table: demand/contention/condition → where answered in the note/letter/draft, पृ.) "
           "and \"contradictions\" (list of conflicting dates/amounts/names/posts across note, letter, drafts and "
-          "proposal, with पृ.) into review.json — for Study part 7 only, never into the note (INSTRUCTIONS §4.30).")
+          "proposal, with पृ.) into review.json — for Study part 7 only, never into the note (INSTRUCTIONS §4.30). "
+          "Missing information / documents (brief [I4.31], INSTRUCTIONS §4.31): only in the ONE para 'प्रस्तावासोबत "
+          "खालील माहिती उपलब्ध नाही:-' just before the last para, essential items only; move any 'नमूद नाही / जोडलेले "
+          "नाही / उपलब्ध नाही / प्रस्तावासोबत नाही' remark elsewhere into it, and a missing table value becomes '____'.")
 DRAFTER = (" Never stop or refuse: write every output you can. Missing C R/file no. → PREFIX Case<id>_<year>, ref_no "
            "'संकिर्ण-<year>/____/प्र.क्र.____/का.6'; unclear → 'अस्पष्ट'. Each problem you cannot resolve → report it in "
            "one line starting 'पडताळणी अपूर्ण — <what, where>' for status.json `warnings`. On a redraft request, fix "
@@ -967,7 +970,9 @@ DRAFTER = (" Never stop or refuse: write every output you can. Missing C R/file 
            "applicable GR/circular para, rule and SC/HC judgment cited in a GR or the proposal on its original page "
            "(official sources only) and quote it verbatim. The note body is DETAILED: the 12 elements of [I4.29] where "
            "they apply, no fact or condition of the proposal left out, short sentences, no opinion; the letter stays "
-           "concise (§4.15, §4.20).")
+           "concise (§4.15, §4.20). Missing information / documents only in the ONE missing-info para just before the "
+           "last para, essential items only; elsewhere (paras, tables, fact summary) no such remark, '____' in tables "
+           "(brief [I4.31]).")
 WRITER = (" If an extract cannot be matched to its page, report it as 'पडताळणी अपूर्ण — उतारा …'; never invent text.")
 NEVER_STOP = (" Never stop: a missing C R / file no. / date is \"____\", an unreadable page or value is \"अस्पष्ट\", a "
               "GR that cannot be fetched goes to grs_missing — each with a warning line, never a reason to stop, refuse "

@@ -140,6 +140,69 @@ class LintSpec(unittest.TestCase):
             s["note"]["paras"][i] = s["note"]["paras"][i].replace(L.MISSING_HEAD + ":-", L.MISSING_HEAD + " -")
         self.bad(self.s122, f, "missing-info para")
 
+    # ---- §4.31 missing information in ONE para (Abhi 03.11.2026) ----
+    def miss_idx(self, s):
+        return next(i for i, x in enumerate(s["note"]["paras"]) if isinstance(x, str) and x.startswith(L.MISSING_HEAD))
+
+    def test_431_remark_phrases(self):
+        for t in ("प्रती प्रस्तावासोबत जोडलेल्या नाहीत.", "प्रस्तावात नमूद नाही", "प्रस्तावात अशी वस्तुस्थिती नमूद नाही.",
+                  "अर्जाची प्रत प्रस्तावासोबत नाही.", "प्रती प्रस्तावासोबत नाहीत", "आदेश उपलब्ध नाही.", "आदेशाची प्रत नाही.",
+                  "अहवाल सादर केलेला नाही.", "प्रमाणपत्र सादर करण्यात आलेले नाही.", "कागदपत्रे जोडण्यात आलेली नाहीत.",
+                  "क्रमांक नमूद केलेला नाही."):
+            with self.subTest(t=t):
+                self.assertTrue(L.MISSING_REMARK_RE.search(t), t)
+        for t in ("प्रत्यक्ष कार्यभार स्वीकारला.", "पदोन्नती आदेशात विकल्पाबाबत नमूद नसल्याचे अर्जात नमूद आहे.", "____",
+                  "उपलब्ध नसलेली माहिती", "सदर निवेदन शासनास प्राप्त झालेले नाही."):
+            with self.subTest(ok=t):
+                self.assertFalse(L.MISSING_REMARK_RE.search(t), t)
+
+    def test_431_remark_in_other_para(self):
+        self.bad(self.s122, lambda s: s["note"]["paras"].__setitem__(0, s["note"]["paras"][0] + " अर्जाची प्रत प्रस्तावासोबत नाही."),
+                 "missing-info remark", "note.paras[0]")
+
+    def test_431_remark_in_facts_table(self):
+        self.bad(self.s122, lambda s: s["note"]["paras"][2]["table"][7].__setitem__(2, "प्रस्तावात नमूद नाही"),
+                 "missing-info remark", "note.paras[2].table[7][2]")
+
+    def test_431_remark_in_sub_first_closing(self):
+        self.bad(self.s122, lambda s: s["note"].__setitem__("sub", {"1": ["(1) पाच पत्रांच्या प्रती जोडलेल्या नाहीत."]}),
+                 "missing-info remark", "note.sub.1[0]")
+        self.bad(self.s122, lambda s: s["note"].__setitem__("first", s["note"]["first"].replace("सादर.", "सादर. प्रत नाही. सादर.")),
+                 "missing-info remark", "note.first")
+
+    def test_431_condition_table_and_fact_summary(self):
+        def f(s):
+            s["note"]["paras"][4:4] = ["उपरोक्त वस्तुस्थिती पुढीलप्रमाणे आहे:-",
+                                        {"table": [["अट", "प्रस्तावातील स्थिती", "पृ."], ["(iv) …", "प्रस्तावात अशी वस्तुस्थिती नमूद नाही.", ""]]}]
+        probs = self.bad(self.s122, f, "missing-info remark", "note.paras[5].table[1][1]")
+        self.assertTrue(all("§4.31" in p for p in probs if "missing-info remark" in p))
+
+    def test_431_two_missing_paras(self):
+        def f(s):
+            s["note"]["paras"].insert(1, "प्रस्तावासोबत खालील कागदपत्रे उपलब्ध नाहीत:- (1) आदेशाची प्रत.")
+        self.bad(self.s122, f, "more than one")
+
+    def test_431_inside_the_para_and_its_table_ok(self):
+        def f(s):
+            i = self.miss_idx(s)
+            s["note"]["paras"][i] += " (4) अर्जाची प्रत प्रस्तावासोबत नाही."
+            s["note"]["paras"].insert(i + 1, {"table": [["अ.क्र.", "माहिती"], ["1", "आदेशाची प्रत नाही; अहवाल सादर केलेला नाही"]]})
+            s["note"].setdefault("sub", {})[str(i)] = ["(अ) प्रमाणपत्र जोडलेले नाही."]
+        s = copy.deepcopy(self.s122); f(s)
+        self.assertEqual([p for p in L.lint_spec(s) if "4.31" in p], [])
+        self.assertEqual([w for w in L.lint_warnings(s) if "4.31" in w], [])
+
+    def test_431_quoted_remark_ok(self):
+        s = copy.deepcopy(self.s122)
+        s["note"]["paras"][0] += " अर्जात “नामांकन उपलब्ध नाही” असे नमूद आहे."
+        self.assertEqual([p for p in L.lint_spec(s) if "4.31" in p], [])
+
+    def test_431_placement_warning(self):
+        s = copy.deepcopy(self.s122)
+        i = self.miss_idx(s); s["note"]["paras"].insert(1, s["note"]["paras"].pop(i))
+        self.assertEqual([p for p in L.lint_spec(s) if "4.31" in p], [])
+        self.assertTrue(any("just before the last" in w for w in L.lint_warnings(s)), L.lint_warnings(s))
+
     def test_419_exclusions_ok(self):
         s = copy.deepcopy(self.s122)
         s["note"]["paras"][0] += (" पत्र क्र.संकिर्ण-2026/226/प्र.क्र.131/का.6, क्र.वेतन-1311/प्र.क्र.17/सेवा-3 (पृ.6/प.वि.):-"

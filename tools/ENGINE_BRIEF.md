@@ -77,7 +77,7 @@ content; section 0 wins over every ask / discuss / stop line (no interaction in 
   Lokayukta timeline with dates and time limits; (8) replies to this dept's earlier queries, point-wise;
   (9) every applicable GR/circular para + rules + SC/HC judgments verbatim in the BODY (no., date, para, पृ.N/प.वि.),
   with a table "अट / प्रस्तावातील स्थिती / पृ." where a provision lists conditions (status = proposal facts only,
-  else "प्रस्तावात अशी वस्तुस्थिती नमूद नाही."); (10) "उपरोक्त वस्तुस्थिती पुढीलप्रमाणे आहे:-" + numbered facts
+  else "____" [I4.31]); (10) "उपरोक्त वस्तुस्थिती पुढीलप्रमाणे आहे:-" + numbered facts
   from the paras above; (11) the exact demand: amount (figures and words), provision, person + action after
   approval; (12) the drafts sent with it [I4.28]. Sentences stay short [I4.18]; `related` keeps full extracts.
   The reviewer checks each element and that nothing of the proposal is left out.
@@ -105,7 +105,11 @@ content; section 0 wins over every ask / discuss / stop line (no interaction in 
 - Banned (closed list, = tools/lint_spec.py BANNED): "दिसून येते", "असे दिसते", "पडताळणी केली असता",
   "माझ्या मते", "मला वाटते", "असे वाटते", "ठरवावे", "कदाचित", "बहुधा"; also no commentary, theory,
   arithmetic explanation or advice.
-- Missing info para: "प्रस्तावासोबत खालील माहिती उपलब्ध नाही:- (1)…; (2)…".
+- [I4.31] Missing info para: "प्रस्तावासोबत खालील माहिती उपलब्ध नाही:- (1)…; (2)…" (or a table after it). ONE
+  such para, just before the last (सबब) para; essential items only [I4.15] (no earlier reminders / reference
+  copies). Nowhere else in the note (paras, facts/condition tables, fact summary) a "नमूद नाही", "जोडलेले नाही",
+  "उपलब्ध नाही", "प्रस्तावासोबत नाही", "प्रत नाही", "सादर केलेली नाही" remark; a missing table value = "____".
+  lint_spec.py errors; the reviewer checks it.
 - Last para, exactly one of:
   (a) "सबब, उपरोक्त माहिती तक्त्याच्या स्वरूपात … कळविण्याबाबतच्या पत्राचे प्रारूप पृ.      /प.वि. वर मान्यतेस्तव
   सादर. मान्य झाल्यास पत्र निर्गमित करण्यात येईल."

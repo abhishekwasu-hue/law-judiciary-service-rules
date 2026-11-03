@@ -38,6 +38,10 @@ Checks
  Note body and letter (§4.18, text outside “…” quotes only): no 'सौ.'; 'श्री.' followed by a space; letter: no 'तात्काळ'
  Note body and letter (§4.19, outside quotes, lint_spec.lang_hits): no '.:-', no 'करुन' / 'प्रारुप' / 'अनुसरुन', a space after
   'दि.' / 'क्र.' / 'प्र. क्र.' in running text (file nos. / codes with '/' or '-' skipped); missing-info para 'नाही:-'
+ Note body (§4.31, 03.11.2026; lint_spec.missing_scatter, outside quotes): missing information / documents only in ONE para
+  "प्रस्तावासोबत खालील माहिती उपलब्ध नाही:-" (+ its table / unnumbered sub-points); no "नमूद नाही / जोडलेले नाही /
+  उपलब्ध नाही / प्रस्तावासोबत नाही / प्रत नाही / सादर केलेली नाही" remark elsewhere; not two such paras (SOFT);
+  WARN when that para is not just before the last (numbered or "सबब,") para
  Note_and_Letter (whole file): no repo paths (register/, service-rules/, precedent-library/, pdf/, repo, रेपो)
  Letter (when present: a "प्रति," or "क्रमांक :-" paragraph):
   - starts on a new page / new section (page break or section break before the letterhead)
@@ -90,7 +94,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from lint_spec import (AMS, BANNED, BARE_CLOSING_RE, FIN, ID_RE, LH_EMAIL, RELATED, REF_NO, REPO_RE, REQUEST,  # noqa: E402,F401
                        MISSING_FORM, MISSING_HEAD, SIGNERS, banned_hits, desk_signers, finance_problems, heading_problems, id_hits,
                        lang_hits, ma_hits, ns, num, part_no, ref_problems, repo_hits, requests_info, signer_problems,
-                       style_hits, unquoted, warn_hits, PKG_WORD, draft_word_hits, related_source_problems)
+                       style_hits, unquoted, warn_hits, PKG_WORD, draft_word_hits, related_source_problems,
+                       missing_scatter)
 INTRO_HEAD = "उपरोक्त विषयाबाबत"  # letter intro paragraph (lint_spec.INTRO_START begins with it)
 from clean_meta import docx_meta_problems, pdf_meta_problems  # noqa: E402 — C27 §4 (no tool / AI trace in metadata)
 import desk as _desk  # noqa: E402 — C30 (03.11.2026): desk profiles tools/desks/<id>.json
@@ -337,6 +342,14 @@ def main(argv):
                and re.sub(r"^[0-9०-९]+\.\s*", "", ns(unquoted(b["text"]))).startswith(MISSING_HEAD)
                and not re.sub(r"^[0-9०-९]+\.\s*", "", ns(b["text"])).startswith(MISSING_HEAD + ":-")]
         check("official Marathi §4.19 (note body, letter)", lg)
+        # §4.31 (Abhi 03.11.2026): missing information / documents only in ONE missing-info para (its table / unnumbered
+        # sub-points belong to it); a numbered or "सबब," paragraph starts a new para (SOFT, like every non-HARD check)
+        nseq = [(f"note block {i + 1}", b["text"], b["kind"] == "p" and bool(re.match(r"[0-9०-९]+\.|सबब\s*,", ns(b["text"]))))
+                for i, b in enumerate(bl[:note_end]) if ns(b["text"])]
+        mp, mw = missing_scatter(nseq)
+        check("missing information in ONE para §4.31 (note body)", mp)
+        for x in mw:
+            warn(x)
         # WARN level (lint_spec.warn_hits: शुद्धलेखन नियम 1–4, 3, 12, 14) — printed, never a FAIL
         for where, t in (("note", note_txt), ("letter", letter_txt)):
             for x in warn_hits(t):

@@ -66,6 +66,11 @@ Rules (spec.json)
   - §4.24 "शुद्धिपत्रक" (not शुध्दिपत्रक / शुद्धीपत्रक / शुद्धपत्रक) — also in the related heading/source (outside quotes)
   - "ध्द" -> "द्ध" (error; मराठी भाषा विभाग GR दि. 10.11.2022) — not in a person's name (after श्री. / श्रीमती / कै. /
     डॉ., §4.18 name as in the proposal) and not inside quotes
+  - §4.31 (03.11.2026): missing information / documents only in ONE para opening "प्रस्तावासोबत खालील माहिती उपलब्ध
+    नाही(त)" (with its table / sub-points); elsewhere in the note body (first, paras, tables, sub, closing; outside “…”
+    quotes) no "नमूद नाही", "जोडलेले / जोडलेल्या नाहीत", "उपलब्ध नाही", "प्रस्तावासोबत नाही(त)", "प्रत नाही", "सादर
+    केलेली नाही" remark (MISSING_REMARK_RE; a missing table value is "____"); two such paras is an error; WARN when that
+    para is not just before the last para (missing_scatter)
 WARN level (spec.json; note body and letter, text outside quotes; related and signers not checked; warn_hits / fix_warn;
   शुद्धलेखनाचे 18 नियम, docs/STYLE_RESEARCH_LANG.md §5.2; numbered after the §3 proposals L1–L10):
   - L11 नियम 12: "…णेसाठी / …णेबाबत / …णेकरिता" -> "…ण्यासाठी / …ण्याबाबत / …ण्याकरिता" (also a letter subject taken
@@ -152,6 +157,18 @@ INTRO_START = "उपरोक्त विषयाबाबत संदर्
 INTRO_HAS = "आपणांस कळविण्यात येते की,"
 MISSING_HEAD = "प्रस्तावासोबत खालील माहिती उपलब्ध नाही"  # missing-information para (PROPOSAL_SOP Step 4)
 MISSING_FORM = MISSING_HEAD + ":- (1)…; (2)…"
+# §4.31 (Abhi 03.11.2026: "… te vishisht ekach paragraph mdhe discuss kravi"): missing information / documents only in ONE
+# para opening "प्रस्तावासोबत खालील माहिती (/ कागदपत्रे) उपलब्ध नाही(त)", just before the last para; elsewhere in the note
+# body no remark of the kinds below (outside “…” quotes); a missing table value is "____"
+MISSING_HEAD_RE = re.compile(r"^(?:[0-9०-९]+\.\s*)?प्रस्तावासोबत\s+खालील\s+(?:माहिती|कागदपत्रे)(?:\s+(?:व|आणि)\s+(?:माहिती|कागदपत्रे))?"
+                             r"\s+उपलब्ध\s+नाहीत?(?![ऀ-ॿ])")
+_NAHI = r"नाहीत?(?![ऀ-ॿ])"
+_LELA = r"लेल(?:े|ी|ा|्या)"
+MISSING_REMARK_RE = re.compile(rf"नमूद\s+(?:के{_LELA}\s+)?{_NAHI}|जोड{_LELA}\s+{_NAHI}|जोडण्यात\s+आ{_LELA}\s+{_NAHI}"
+                               rf"|उपलब्ध\s+(?:करून\s+दि{_LELA}\s+)?{_NAHI}|प्रस्तावासोबत\s+{_NAHI}"
+                               rf"|(?<![ऀ-ॿ])प्रती?\s+{_NAHI}|सादर\s+(?:के{_LELA}|करण्यात\s+आ{_LELA})\s+{_NAHI}")
+MISSING_ONE_MSG = ("उपलब्ध नसलेली माहिती / कागदपत्रे फक्त एकाच 'प्रस्तावासोबत खालील माहिती उपलब्ध नाही:-' परिच्छेदात "
+                   "(शेवटच्या परिच्छेदाच्या आधी); इतरत्र असा शेरा नको, तक्त्यात '____' (§4.31)")
 # INSTRUCTIONS §4.20 (02.11.2026): letter table only for data to fill in; documents after the table as a numbered list
 DOC_RE = re.compile(r"प्रत(?![्िृ])|प्रमाणपत्र|अहवाल")   # प्रत / प्रती(सह) — not प्रत्यक्ष, प्रतिनियुक्ती
 DOC_INTRO = "तसेच, खालील कागदपत्रे उपलब्ध करून देण्यात यावीत, ही विनंती:-"
@@ -667,6 +684,7 @@ def lint_spec(spec, pages=None):
     for path, t in body:
         if ns(unquoted(t)).startswith(MISSING_HEAD) and not ns(t).startswith(MISSING_HEAD + ":-"):
             P.append(f"{path}: missing-info para — form '{MISSING_FORM}' (§4.19)")
+    P += missing_scatter(note_seq(n))[0]   # §4.31 (03.11.2026)
     for path, t in body + letter:
         P += [f"{path}: पृ. reference — {x.split(': ', 1)[1]}" for x in ref_problems(t, pages, path)]
     for path, t in related:
@@ -761,6 +779,52 @@ def lint_letter(L, lp="letter", desk=None):
     return P
 
 
+def note_seq(n):
+    """The note body in print order: [(JSON path, text, is_para)] — is_para False for a table cell / sub-point / other
+    non-string item, which belongs to the para before it (§4.31)."""
+    seq = []
+    f = n.get("first")
+    if isinstance(f, str) and f.strip():
+        seq.append(("note.first", f, True))
+    paras = n.get("paras") if isinstance(n.get("paras"), list) else []
+    sub = n.get("sub") if isinstance(n.get("sub"), dict) else {}
+    for i, x in enumerate(paras):
+        if isinstance(x, str):
+            if x.strip():
+                seq.append((f"note.paras[{i}]", x, True))
+        else:
+            seq += [(pth, t, False) for pth, t in strings(x, f"note.paras[{i}]") if t.strip()]
+        seq += [(pth, t, False) for pth, t in strings(sub.get(str(i), []), f"note.sub.{i}") if t.strip()]
+    c = n.get("closing")
+    if isinstance(c, str) and c.strip():
+        seq.append(("note.closing", c, True))
+    return seq
+
+
+def missing_scatter(seq):
+    """§4.31: (problems, warnings) for an ordered note body seq [(label, text, is_para)] (lint: note_seq; verify: the
+    docx blocks). The missing-info para (MISSING_HEAD_RE) owns the non-para blocks after it (its table / sub-points).
+    Problems: a MISSING_REMARK_RE remark outside “…” quotes in any other block; more than one missing-info para.
+    Warning: the missing-info para is not just before the last para."""
+    heads = [i for i, (_, t, isp) in enumerate(seq) if isp and MISSING_HEAD_RE.match(ns(unquoted(t)))]
+    P, W, owned = [], [], set()
+    for h in heads[1:]:
+        P.append(f"{seq[h][0]}: missing-info para — more than one ({seq[heads[0]][0]} too); {MISSING_ONE_MSG}")
+    for h in heads:
+        owned.add(h); j = h + 1
+        while j < len(seq) and not seq[j][2]:
+            owned.add(j); j += 1
+    for i, (lab, t, _) in enumerate(seq):
+        if i not in owned:
+            for m in MISSING_REMARK_RE.finditer(unquoted(t)):
+                P.append(f"{lab}: missing-info remark — '{m.group(0)}' — {MISSING_ONE_MSG}")
+    if heads:
+        after = [i for i in range(max(owned) + 1, len(seq)) if seq[i][2]]
+        if len(after) != 1:
+            W.append(f"{seq[heads[-1]][0]}: missing-info para — should stand just before the last (सबब) para (§4.31)")
+    return P, W
+
+
 def last_para(n):
     """(JSON path, text) of the note's last para: note.closing if not blank (a bare "मान्यतेस्तव सादर." read together
     with the last text item of note.paras), else the last text item of note.paras."""
@@ -811,6 +875,7 @@ def lint_warnings(spec):
     body = [x for k in ("first", "paras", "sub", "closing") if k in n for x in strings(n[k], f"note.{k}")]
     letter = letter_strings(spec)
     W = [f"{path}: {m}" for path, t in body + letter for m in warn_hits(t)]
+    W += missing_scatter(note_seq(n))[1]   # §4.31 placement
     W += [f"{last_para(n)[0]}: last para — does not name the draft {d} (§4.28: name every draft made, e.g. "
           f"'पत्राचे प्रारूप व शासन निर्णयाचे प्रारूप पृ.      /प.वि. वर मान्यतेस्तव सादर.')" for d in drafts_unnamed(spec)]
     return W
