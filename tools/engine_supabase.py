@@ -15,6 +15,10 @@ Commands ("deliver with warnings", Abhi 02.11.2026: drafts are never thrown away
                       proposal_pages (page count of the fetched proposal PDF, null if unreadable), outputs (runs.outputs,
                       as in case.json)} — for verify --case-meta.
   step "<text>"       runs.step = text (live progress).
+  note "<text>"       an INFORMATION line (not a warning) appended to runs.warnings with the UI's info prefix "मॉडेल: "
+                      (added when missing) — shown only to the owner, never in the warning / red lists (dashboard-app
+                      RunProgress MODEL_PREFIX, format.ts runWarningTexts); no Worker or schema change. Used for the
+                      run's time split (tools/run_timeline.py --line). Never fails the run (exit 0).
   log_url <url>       runs.log_url = url (Actions run page).
   finish <outdir>     <outdir>/status.json + one *_Study.docx, one *_Note_and_Letter.docx (several, e.g. PREFIX changed:
                       the one of status.json `prefix`, else the newest by mtime + a warning) and one package .pdf (named
@@ -496,6 +500,20 @@ def cmd_finish(out):
         probs.append(f"package PDF नाव मूळ प्रस्ताव-फाइलचे नाही: {os.path.basename(pdfs[0])}")
     if probs:
         return cmd_fail("आउटपुट अपूर्ण — " + "; ".join(probs))
+    # Abhi 03.11.2026 ("हे इशारे नोटिंग मध्ये नको … स्टडी … डॉक्युमेंट फाईल … त्याच्यामध्ये द्या"): the final warnings
+    # (runs.warnings so far: verify / extracts / review / workflow lines + status.json warnings) go INTO the Study, end of
+    # भाग 7, before it is uploaded; owner-only "मॉडेल:" / cost lines are left out by tools/study_warnings.py
+    study_note = []
+    try:
+        cur_w = (rest("GET", f"runs?id=eq.{RUN}&select=warnings") or [{}])[0].get("warnings")
+        st_w = st.get("warnings") if isinstance(st.get("warnings"), list) else []
+        final_w = (cur_w if isinstance(cur_w, list) else []) + [str(x).strip()[:300] for x in st_w if str(x).strip()]
+        sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+        from study_warnings import append as study_append
+        study_append(study, final_w + [w for w in (w1, w2) if w])
+    except Exception as e:
+        print("engine_supabase: warnings not written into the Study:", e, file=sys.stderr)
+        study_note = [f"तपासणीचे इशारे अभ्यास-फाइलमध्ये लिहिता आले नाहीत ({str(e)[:120]})"[:300]]
     main3 = (("package_pdf", pdfs[0]), ("study", study), ("note_letter", nl))  # package FIRST (largest, A2)
     lim = output_limit()
     big = [(os.path.basename(p), os.path.getsize(p)) for _, p in main3 if os.path.getsize(p) > lim]
@@ -528,7 +546,7 @@ def cmd_finish(out):
     fill_case(st.get("case"))
     sw = [str(x).strip()[:300] for x in lst("warnings") if str(x).strip()]  # engine notes for Abhi (e.g. C R not found)
     sw += [w for w in (w1, w2) if w]
-    sw += [w[:300] for w in extra_warn]
+    sw += [w[:300] for w in extra_warn] + study_note
     if sw:
         try:
             add_warnings(sw)
@@ -1549,6 +1567,19 @@ def cmd_warn(text):
     activity("run_warning", {"run_id": int(RUN), "warning": text})
 
 
+def cmd_note(text):
+    """note "<text>": one owner-only information line in runs.warnings ("मॉडेल: " prefix = not a warning)."""
+    text = " ".join((text or "").split())
+    if not text:
+        return
+    if not text.startswith("मॉडेल:"):
+        text = "मॉडेल: " + text
+    try:
+        add_warnings([text[:300]])
+    except Exception as e:
+        print("engine_supabase note:", e, file=sys.stderr)
+
+
 def cmd_step_worker(text):
     """Progress text through the Worker (POST /api/engine/step with the run token) — used inside the Claude step, which
     has no Supabase key. Never fails the run: the step text is only the live status."""
@@ -1590,7 +1621,7 @@ def main(a):
     if len(a) in (2, 5) and a[0] == "litellm_config":
         return cmd_litellm_config(a[1:])
     if len(a) < 2 or a[0] not in ("fetch", "step", "log_url", "finish", "fail", "claude_result", "verify", "warn",
-                                  "extracts", "case_meta"):
+                                  "extracts", "case_meta", "note"):
         print(__doc__); sys.exit(2)
     c, arg = a[0], " ".join(a[1:])
     if c == "step" and not has_supabase():
@@ -1606,6 +1637,7 @@ def main(a):
         elif c == "claude_result": cmd_claude_result(a[1:])
         elif c == "verify": cmd_verify(a[1:])
         elif c == "warn": cmd_warn(arg)
+        elif c == "note": cmd_note(arg)
         elif c == "extracts": cmd_extracts(a[1:])
         elif c == "case_meta": cmd_case_meta(a[1:])
     except SystemExit:

@@ -114,14 +114,35 @@ r = run("log_url", "https://github.com/x/y/actions/runs/1"); check(run_row["log_
 os.makedirs(out)
 for n in ("CR130_2026_Study.docx", "CR130_2026_Note_and_Letter.docx", "CR130_2026_Note_and_Letter.pdf", PROP, PROP + ".map.json"):
     open(os.path.join(out, n), "wb").write(b"x" + n.encode())
+
+
+def real_study(path):
+    """A minimal real Study (python-docx): the final warnings are written into it at finish (Abhi 03.11.2026)."""
+    import docx
+    d = docx.Document()
+    for h in ("भाग 0 — ब्रीफिंग", "भाग 7 — पडताळणी-नोंद"):
+        d.add_paragraph(h)
+    d.save(path)
+
+
+real_study(os.path.join(out, "CR130_2026_Study.docx"))
 st = {"state": "done", "summary": "वेतननिश्चिती प्रस्ताव; माहिती-मागणी पत्र", "letter_needed": True,
+      "warnings": ["पडताळणी अपूर्ण — C R क्र. निर्देशपत्रावर नाही"],
       "essential_points": ["सेवापुस्तक उतारा"], "grs_attached": [{"code": "202204191549468012", "date": "19.04.2022", "title": "t", "pages": "12-13"}],
       "grs_missing": [{"date": "12.03.2014", "title": "t2"}],
       "case": {"cr_no": "999", "cr_year": 2026, "file_no": "संकीर्ण-2026/979/प्र.क्र.130/का.6", "subject": "दुसरा विषय", "category": "भत्ते"}}
 DB["cases"][0].update(file_no=None, category="इतर")  # user left file no. and category empty at upload
 json.dump(st, open(os.path.join(out, "status.json"), "w", encoding="utf-8"), ensure_ascii=False)
 LOG.clear()
+run_row["warnings"] = ["पडताळणी अपूर्ण — note पृ. references: x", "मॉडेल: खर्च — Opus 5 $1.20"]  # verify + owner lines so far
 r = run("finish", out); check(r.returncode == 0, f"finish exit 0 ({r.stderr.strip()[:300]})")
+import io, zipfile
+sx = zipfile.ZipFile(io.BytesIO(STORE["outputs/7/study/v2/file.docx"])).read("word/document.xml").decode("utf-8")
+check("अंतिम तपासणीचे इशारे (वापरण्यापूर्वी तपासा)" in sx and "1. पडताळणी अपूर्ण — note पृ. references: x" in sx
+      and "2. पडताळणी अपूर्ण — C R क्र. निर्देशपत्रावर नाही" in sx and "मॉडेल" not in sx and "DVOT-SurekhMR" in sx,
+      "finish: final warnings written into the uploaded Study (end of भाग 7), owner-only lines left out")
+check(run_row["warnings"] == ["पडताळणी अपूर्ण — note पृ. references: x", "मॉडेल: खर्च — Opus 5 $1.20",
+                              "पडताळणी अपूर्ण — C R क्र. निर्देशपत्रावर नाही"], f"finish: runs.warnings unchanged + status warnings ({run_row['warnings']})")
 ups = [l["path"] for l in LOG if l["m"] == "POST" and l["path"].startswith("/storage/v1/object/")]
 check(sorted(ups) == sorted(["/storage/v1/object/outputs/7/study/v2/file.docx",
                              "/storage/v1/object/outputs/7/note_letter/v1/file.docx",
@@ -358,6 +379,14 @@ r = run("warn", "नवीन GR रेपोमध्ये जतन झाल
 check(r.returncode == 0 and run_row["warnings"] == ["नवीन GR रेपोमध्ये जतन झाले नाहीत", "दुसरी सूचना"] and run_row["state"] == "done",
       "warn: runs.warnings appended, state unchanged")
 check(any(a["action"] == "run_warning" for a in DB["activity"]), "warn: activity run_warning")
+# --- note: owner-only information line (UI prefix "मॉडेल:"), never a warning; never fails
+run_row.update(state="done", warnings=["x"]); na = len(DB["activity"])
+r = run("note", "वेळ — Claude एकूण 36.5 मि; drafter 15.0 मि")
+r2 = run("note", "मॉडेल: वेळ — दुसरी ओळ")
+check(r.returncode == 0 and r2.returncode == 0 and run_row["state"] == "done" and len(DB["activity"]) == na
+      and run_row["warnings"] == ["x", "मॉडेल: वेळ — Claude एकूण 36.5 मि; drafter 15.0 मि", "मॉडेल: वेळ — दुसरी ओळ"],
+      f"note: 'मॉडेल:' info line appended once, no activity, state unchanged ({run_row['warnings']})")
+run_row.update(warnings=[])
 
 # --- newest proposal by upload time, not by name: a corrected proposal under a new name replaces the old one
 NEWP = "दुरुस्त प्रस्ताव.pdf"   # sorts before PROP alphabetically
@@ -386,6 +415,7 @@ out4 = os.path.join(tmp, "out4"); os.makedirs(out4)
 for n in ("CR130_2026_Study.docx", "CR130_2026_Note_and_Letter.docx", NEWP, "CR130_2026_Order_Draft.docx",
           "CR130_2026_Order_Draft.pdf", "CR130_2026_Parawise.docx", "CR130_2026_Parawise.pdf"):
     open(os.path.join(out4, n), "wb").write(b"x" + n.encode())
+real_study(os.path.join(out4, "CR130_2026_Study.docx"))
 json.dump({"state": "done", "summary": "s", "outputs_extra": ["order_draft", {"kind": "parawise", "file": "CR130_2026_Parawise.docx"}]},
           open(os.path.join(out4, "status.json"), "w", encoding="utf-8"), ensure_ascii=False)
 run_row.update(state="running", warnings=[]); LOG.clear()
@@ -832,6 +862,7 @@ check(r.returncode == 0 and json.load(open(cm6, encoding="utf-8"))["outputs"] ==
 out6 = os.path.join(tmp, "out6"); os.makedirs(out6)
 for n in ("CR130_2026_Study.docx", "CR130_2026_Note_and_Letter.docx", NEWP, "CR130_2026_Order_Draft.docx"):
     open(os.path.join(out6, n), "wb").write(b"x" + n.encode())
+real_study(os.path.join(out6, "CR130_2026_Study.docx"))
 json.dump({"state": "done", "summary": "s", "outputs_extra": ["letter", "reminder", "gr", {"kind": "notification", "file": "CR130_2026_Order_Draft.docx"}]},
           open(os.path.join(out6, "status.json"), "w", encoding="utf-8"), ensure_ascii=False)
 run_row.update(state="running", warnings=[]); LOG.clear()

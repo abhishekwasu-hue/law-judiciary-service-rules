@@ -49,7 +49,13 @@
   upload file types reply/approval/court_notice. runs.outputs (migration 0008); spec "orders": [..] (one Order_Draft.docx, new page each)
   and "letters": [..] (letter + reminder). Tests 309 passed; worker 21/21.
 
+- 03.11.2026: run #8 (case 7) done in 44 min, $2.80 (Claude step 36.5 min). Abhi: warnings into the Study, not the noting
+  (tools/study_warnings.py, end of भाग 7; app shows one neutral line). Per-stage timing (tools/run_timeline.py, stream-json
+  stamped to $RP/*.stream.tsv, "Stage times (वेळ-तक्ता)" step, owner-only "मॉडेल: वेळ …" line) — read it on the next run.
+  Circular 10.08.2021 (शासन शब्दकोश भाग-1) now in pdf/09-marathi-grammar-shuddhalekhan/ (Download extra PDFs, 20c55da) — Pending 7(e) closed.
+
 ## Pending
+12. **Next live run:** read the वेळ-तक्ता (job log last step) and tell Abhi which stage takes the time; check claude.err/stream size and that background agents show in the stream.
 11. **Migration 0008** (runs.outputs + file kinds approval/court_notice) — Abhi to apply in the SQL editor, then deploy (app part already on main).
 10. **AI-tells decisions — DECIDED 03.11.2026 (Abhi: "Default thewa, 4 madhe स्रोत/जसाच्या तसा kadha"): bracketed defaults final; (4) the words "स्रोत"/"जसाच्या तसा" removed from drafts (§4.27 (आ), lint) — docs/AI_TELLS.md:** (1) Word author name (DOC_AUTHOR) [empty];
    (2) signer forms "का.अ.(…)" / "अवर सचिव, महाराष्ट्र शासन" as in office files vs §4.5/§4.6 [current]; (3) subject/reference

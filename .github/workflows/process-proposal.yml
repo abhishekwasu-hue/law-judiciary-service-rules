@@ -132,6 +132,7 @@ jobs:
         timeout-minutes: 20
         run: |
           set -euo pipefail
+          S0=$(date +%s); trap '{ printf "%s\t%s\t%s\n" "Install tools" "$S0" "$(date +%s)" >> "$RP/stages.tsv"; } 2>/dev/null || true' EXIT
           trap 'echo "साधने install झाली नाहीत (apt/pip/npm) — पुन्हा तयार करा." > "$RP/fail_reason.txt"' ERR
           sudo apt-get update -y
           sudo apt-get install -y poppler-utils tesseract-ocr tesseract-ocr-mar libreoffice-writer fonts-freefont-ttf
@@ -144,6 +145,7 @@ jobs:
         timeout-minutes: 10
         run: |
           set -euo pipefail
+          S0=$(date +%s); trap '{ printf "%s\t%s\t%s\n" "Fetch case files" "$S0" "$(date +%s)" >> "$RP/stages.tsv"; } 2>/dev/null || true' EXIT
           python3 "$T/engine_supabase.py" fetch /tmp/case
           python3 "$T/engine_supabase.py" case_meta "$RP/runner-case.json" /tmp/case || { rm -f "$RP/runner-case.json"; echo "case_meta failed"; }
       # Page PNGs (110 dpi) + text layer + tesseract OCR before Claude (QUALITY_AUDIT §5 item 1). Non-fatal: without them
@@ -152,6 +154,7 @@ jobs:
         timeout-minutes: 25
         run: |
           set -uo pipefail
+          S0=$(date +%s); trap '{ printf "%s\t%s\t%s\n" "prep_pages" "$S0" "$(date +%s)" >> "$RP/stages.tsv"; } 2>/dev/null || true' EXIT
           P=$(python3 -c 'import json; c = json.load(open("/tmp/case/case.json", encoding="utf-8")); print(next(f["local_path"] for f in c["inputs"] if f["kind"] == "proposal"))') || P=""
           if [ -z "$P" ] || ! timeout 20m python3 "$T/prep_pages.py" "/tmp/case/$P" /tmp/case/pages; then
             rm -rf /tmp/case/pages
@@ -169,6 +172,7 @@ jobs:
         timeout-minutes: 10
         run: |
           set -uo pipefail
+          S0=$(date +%s); trap '{ printf "%s\t%s\t%s\n" "Precedent sources" "$S0" "$(date +%s)" >> "$RP/stages.tsv"; } 2>/dev/null || true' EXIT
           python3 "$T/oldcases_text.py" /tmp/old || python3 "$T/engine_supabase.py" warn "जुन्या प्रकरणांचा मजकूर-संग्रह (/tmp/old) तयार झाला नाही" || true
           python3 - <<'PY' || python3 "$T/engine_supabase.py" warn "पूर्वोदाहरण-ग्रंथालय (/tmp/precedent) उघडले नाही" || true
           import os, zipfile
@@ -220,7 +224,15 @@ jobs:
           set -uo pipefail
           ES() { python3 "$T/engine_supabase.py" "$@"; }
           sec() { sed -n "s/^$1=//p" "$ENGINE_SECRETS" | head -n 1; }
+          S0=$(date +%s); trap '{ printf "%s\t%s\t%s\n" "Claude (Process the proposal)" "$S0" "$(date +%s)" >> "$RP/stages.tsv"; } 2>/dev/null || true' EXIT
           [ -x "$SB" ] && [ -f "$T/engine_supabase.py" ] || { echo "no root-owned tool snapshot"; exit 1; }
+          # per-stage timing (Abhi 03.11.2026 "हो जोडा"): the CLI writes stream-json; tools/run_timeline.py stamp (runner
+          # user, root-owned $T) puts a runner epoch before every line into $RP/<run>.stream.tsv and writes the final
+          # {"type":"result"} line unchanged to the result file (= what the old json output format printed), so claude_result,
+          # fallback_ok, review_gate and "Record failure" read the same JSON as before. The filter runs in a process
+          # substitution: rc stays claude's own exit code; stamp_wait gives it 60 s after the CLI's EOF, then stops it.
+          STAMP() { python3 -I "$T/run_timeline.py" stamp "$@"; }
+          stamp_wait() { for i in $(seq 1 60); do [ -e "$1.eof" ] && return 0; sleep 1; done; pkill -f "run_timeline.py stamp $1" 2>/dev/null || true; }
           mkdir -p /tmp/out /tmp/work
           chmod 1777 /tmp/work   # shared scratch: `engine` (Claude) and the runner (Gemini part 1)
           rm -f /tmp/work/study_part1.* /tmp/work/part1*
@@ -332,11 +344,14 @@ jobs:
                   timeout -k 30 "$(( P1_S < 3600 ? P1_S : 3600 ))s" python3 "$T/part1_vision.py" /tmp/case/pages /tmp/work --provider "$PART1_PROVIDER" \
                   > /tmp/work/part1.log 2> /tmp/work/part1.err &
               else
+                : > "$RP/part1_result.json"
                 timeout -k 60 "${P1_S}s" "${ERUN[@]}" "${AUTH[@]}" "${INDIR[@]}" claude -p "$P1_PROMPT" --dangerously-skip-permissions \
-                  --max-turns 120 --tools "Bash,Read,Write" --output-format json "${MARGS[@]}" > "$RP/part1_result.json" 2> /tmp/work/part1.err &
+                  --max-turns 120 --tools "Bash,Read,Write" --output-format stream-json --verbose "${MARGS[@]}" \
+                  > >(STAMP "$RP/part1.stream.tsv" "$RP/part1_result.json") 2> /tmp/work/part1.err &
               fi
               echo $! > "$RP/part1.pid"
               wait $! || rc1=$?
+              [ "$PART1_PROVIDER" = "claude" ] && stamp_wait "$RP/part1.stream.tsv"
               if [ -e /tmp/work/study_part1.done ] && ! python3 - <<'PY'
           import json, sys
           p = json.load(open("/tmp/work/study_part1.json", encoding="utf-8"))
@@ -376,13 +391,15 @@ jobs:
           MODEL_REVIEW=$MODEL_REVIEW
           MODEL_STRONG=$MODEL_STRONG
           BUDGET_USD=${BUDGET_USD:-0.75}"
-          ARGS=(-p "$PROMPT" --dangerously-skip-permissions --max-turns 400 --output-format json
+          ARGS=(-p "$PROMPT" --dangerously-skip-permissions --max-turns 400 --output-format stream-json --verbose
                 --agents /tmp/work/agents.json --tools "Bash,Read,Write,Edit,Glob,Grep,Agent" "${MARGS[@]}")
           rc=0
           : > "$RP/claude.json"; : > "$RP/claude.err"
           if [ -z "$SKIP_MAIN" ]; then
             touch "$RP/claude.started"   # "Record failure" stores the cost (--killed) if this step is cancelled
-            timeout -k 60 "${MAIN_S}s" "${ERUN[@]}" "${AUTH[@]}" "${INDIR[@]}" claude "${ARGS[@]}" > "$RP/claude.json" 2> "$RP/claude.err" || rc=$?
+            timeout -k 60 "${MAIN_S}s" "${ERUN[@]}" "${AUTH[@]}" "${INDIR[@]}" claude "${ARGS[@]}" \
+              > >(STAMP "$RP/claude.stream.tsv" "$RP/claude.json") 2> "$RP/claude.err" || rc=$?
+            stamp_wait "$RP/claude.stream.tsv"
             echo "main run (${ENG_USED:-claude}) exit $rc"; tail -n 20 "$RP/claude.err" || true
           else
             rc=1
@@ -399,6 +416,7 @@ jobs:
             else
               echo "main run failed on the provider side -> fallback $FALLBACK_PROVIDER ($FALLBACK_MODEL / $FALLBACK_MODEL_LIGHT), limit $(( FB_S / 60 )) min"
               cp "$RP/claude.json" "$RP/claude.first.json" 2>/dev/null || true; cp "$RP/claude.err" "$RP/claude.first.err" 2>/dev/null || true
+              mv "$RP/claude.stream.tsv" "$RP/claude.first.stream.tsv" 2>/dev/null || true; rm -f "$RP/claude.stream.tsv.eof"
               FIRST_ARGS=(--first "$RP/claude.first.json")   # the failed first run is paid for too (claude_result adds it)
               if gw_start "$FALLBACK_PROVIDER" "$FALLBACK_MODEL" "$FALLBACK_MODEL_LIGHT"; then
                 # start the main run again from a clean slate (keep only part 1 and the run set-up files)
@@ -406,8 +424,10 @@ jobs:
                 find /tmp/work -mindepth 1 -maxdepth 1 ! -name 'study_part1.*' ! -name 'part1*' ! -name agents.json ! -name TOOL_DOCS.md -exec sudo rm -rf {} +
                 rm -f "$RP/litellm_cost.jsonl"   # cost of the fallback run only (the failed run is in claude.first.json)
                 rc=0
+                : > "$RP/claude.json"
                 timeout -k 60 "${FB_S}s" "${ERUN[@]}" ANTHROPIC_BASE_URL=http://127.0.0.1:4000 ANTHROPIC_AUTH_TOKEN="$MK" \
-                  "${INDIR[@]}" claude "${ARGS[@]}" > "$RP/claude.json" 2> "$RP/claude.err" || rc=$?
+                  "${INDIR[@]}" claude "${ARGS[@]}" > >(STAMP "$RP/claude.stream.tsv" "$RP/claude.json") 2> "$RP/claude.err" || rc=$?
+                stamp_wait "$RP/claude.stream.tsv"
                 echo "fallback run exit $rc"; tail -n 20 "$RP/claude.err" || true
                 FB_USED="$FALLBACK_PROVIDER"
               else
@@ -470,6 +490,15 @@ jobs:
           ES claude_result "$RP/claude.json" "$RP/claude.err" "$rc" "${FIRST_ARGS[@]}" "${P1_ARGS[@]}" "${GW_ARGS[@]}" "${KILLED[@]}" \
             --wall "$((T1 - T0))" --status /tmp/out/status.json || RRC=$?
           touch "$RP/claude_result.done"
+          # where the time went (runner side, never fails the step): table in this log, $RP/timeline.json, and ONE
+          # owner-only information line ("मॉडेल: वेळ — …", not a warning) on the run
+          TL=(); for x in main=claude.stream.tsv first=claude.first.stream.tsv part1=part1.stream.tsv; do
+            [ -s "$RP/${x#*=}" ] && TL+=("${x%%=*}=$RP/${x#*=}"); done
+          if [ "${#TL[@]}" -gt 0 ]; then
+            timeout 120 python3 -I "$T/run_timeline.py" report "$RP/timeline.json" "${TL[@]}" --agents /tmp/work/agents.json \
+              --line "$RP/timeline.line" || true
+            [ -s "$RP/timeline.line" ] && { ES note "$(head -n 1 "$RP/timeline.line")" || true; }
+          fi
           if [ -z "$DOWN_OK" ]; then
             ES fail "इंजिन थांबवून रेपो तपासता आला नाही (umount/कार्यप्रणाली) — निकाल रोखला; पुन्हा तयार करा." || true
             exit 1
@@ -482,6 +511,7 @@ jobs:
         timeout-minutes: 12
         run: |
           set -uo pipefail
+          S0=$(date +%s); trap '{ printf "%s\t%s\t%s\n" "Runner OCR" "$S0" "$(date +%s)" >> "$RP/stages.tsv"; } 2>/dev/null || true' EXIT
           PKG=$(python3 -I - <<'PY'
           import json, os, sys
           sys.path.insert(0, os.environ["T"])
@@ -508,16 +538,20 @@ jobs:
       - name: Verify outputs (verify_outputs.py)
         timeout-minutes: 10
         run: |
+          S0=$(date +%s); trap '{ printf "%s\t%s\t%s\n" "Verify outputs" "$S0" "$(date +%s)" >> "$RP/stages.tsv"; } 2>/dev/null || true' EXIT
           CM=(); [ -s "$RP/runner-case.json" ] && CM=(--case-meta "$RP/runner-case.json")
           python3 "$T/engine_supabase.py" verify /tmp/out /tmp/case --review /tmp/work --claude "$RP/claude.json" "${CM[@]}"
       - name: Check extracts (extract_check.py on the runner's own OCR)
         timeout-minutes: 10
         run: |
+          S0=$(date +%s); trap '{ printf "%s\t%s\t%s\n" "Check extracts" "$S0" "$(date +%s)" >> "$RP/stages.tsv"; } 2>/dev/null || true' EXIT
           OCR=(); [ -d "$RP/pkgpages" ] && OCR=("$RP/pkgpages")
           python3 "$T/engine_supabase.py" extracts /tmp/out /tmp/work/spec.json /tmp/work/study.json "${OCR[@]}"
       - name: Upload outputs and finish
         timeout-minutes: 10
-        run: python3 "$T/engine_supabase.py" finish /tmp/out
+        run: |
+          S0=$(date +%s); trap '{ printf "%s\t%s\t%s\n" "Upload outputs" "$S0" "$(date +%s)" >> "$RP/stages.tsv"; } 2>/dev/null || true' EXIT
+          python3 "$T/engine_supabase.py" finish /tmp/out
       - name: Record failure
         if: failure() || cancelled()
         timeout-minutes: 5
@@ -596,3 +630,19 @@ jobs:
             exit 1
           fi
           echo "pushed: $(git log -1 --format=%h)"
+      # "वेळ-तक्ता" (Abhi 03.11.2026): every timed step above appends "<name>\t<start>\t<end>" to $RP/stages.tsv (EXIT
+      # trap); this prints them with the rest of the job since JOB_T0 and the subagent rows of $RP/timeline.json. When the
+      # Claude step was cancelled before its own report, the report is made here (log only). Never fails the job.
+      - name: Stage times (वेळ-तक्ता)
+        if: always()
+        timeout-minutes: 5
+        run: |
+          set -u
+          [ -f "$T/run_timeline.py" ] && [ -d "$RP" ] || exit 0
+          if [ ! -s "$RP/timeline.json" ]; then
+            TL=(); for x in main=claude.stream.tsv first=claude.first.stream.tsv part1=part1.stream.tsv; do
+              [ -s "$RP/${x#*=}" ] && TL+=("${x%%=*}=$RP/${x#*=}"); done
+            [ "${#TL[@]}" -gt 0 ] && { timeout 120 python3 -I "$T/run_timeline.py" report "$RP/timeline.json" "${TL[@]}" || true; }
+          fi
+          timeout 60 python3 -I "$T/run_timeline.py" stages "$RP/stages.tsv" "${JOB_T0:-}" "$RP/timeline.json" || true
+          exit 0
