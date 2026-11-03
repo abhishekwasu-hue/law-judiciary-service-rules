@@ -248,6 +248,11 @@ on the page images):
   applies). Last para (lint form (a)): "सबब, रिट याचिका क्र. ____ मधील परिच्छेदनिहाय अभिप्राय (इंग्रजी) व ते <सहायक
   सरकारी वकील> यांना पाठविण्याबाबतच्या पत्राचे प्रारूप पृ.      /प.वि. वर मान्यतेस्तव सादर. मान्य झाल्यास पत्र
   निर्गमित करण्यात येईल."
+- Parawise FORMAT (Abhi 03.11.2026: "format parawise cha asach asto"): always the Section's office format = the default
+  of build_parawise.py — `case`, `petitioner`, `respondent`, `on_behalf_of`, `paras` [{para, remarks}] (one row per para /
+  sub-para, `{"section": "Grounds"}`, each ground, delay / formal paras, "Prayer Clauses (a) to (…)"; `averment` optional,
+  not printed); model samples/specs/COURT_wp_parawise_example.json. Only the format is fixed; content from the record.
+  `relief_sought` / `background` / `enclosures` / `recommendation` below exist only with `"layout": "rule58"`.
 - Parawise quality (INSTRUCTIONS §4.30, Abhi 03.11.2026; brief [I4.30]): `relief_sought` = the prayer in brief
   (printed "Relief sought:"); a chronology / service / amounts table as a `background` item {"title", "table"} where it
   is clearer; every para AND the prayer answered; State GR/rule text quoted in its original language (Marathi in “…”,

@@ -1,4 +1,6 @@
 """Tests for tools/build_parawise.py and tools/lint_parawise.py (court-case parawise remarks).
+Default layout = the Section's office format (Abhi, 03.11.2026; the sample spec); "layout": "rule58" = the earlier
+layout (fixture RULE58 below = the former sample block).
 Run: python3 -m pytest -q tests/test_build_parawise.py   (Windows: py -m pytest -q tests/test_build_parawise.py)"""
 import copy
 import json
@@ -33,15 +35,181 @@ def load(p):
         return json.load(f)
 
 
+# the former sample block, kept as the "layout": "rule58" fixture
+RULE58 = {'layout': 'rule58',
+ 'court': 'IN THE HIGH COURT OF JUDICATURE AT BOMBAY, BENCH AT AURANGABAD',
+ 'case': 'WRIT PETITION NO. ____ OF 2026',
+ 'petitioner': 'Shri A. B. Chachani (synthetic test petitioner), ____, District and Sessions Court, ____',
+ 'respondents': ['The State of Maharashtra, through the Secretary, ____ Department, Mantralaya, Mumbai',
+                 'The Principal Secretary and Legal Remembrancer, Law and Judiciary Department, Mantralaya, Mumbai',
+                 'The Registrar General, High Court of Judicature at Bombay'],
+ 'respondent_no': '2',
+ 'department': 'Law and Judiciary Department',
+ 'subject': 'Parawise remarks of Respondent No. 2 on the Writ Petition seeking grant of the ____ benefit to the '
+            'petitioner with effect from __.__.____.',
+ 'prepared_for': 'Assistant Government Pleader, High Court of Judicature at Bombay, Bench at Aurangabad',
+ 'background': ['The petitioner is working as ____ in the District and Sessions Court, ____. He submitted a '
+                'representation dated __.__.2025 seeking the ____ benefit with effect from __.__.____.',
+                'The representation was forwarded to the Government by the High Court under its letter dated '
+                '__.__.2025.',
+                'The Law and Judiciary Department informed the High Court under letter No. ____ dated __.__.2025 '
+                'that the petitioner does not fulfil the condition of ____ laid down in Government Resolution No. '
+                '____ dated __.__.____ (copy at Document No. 1).',
+                'Aggrieved thereby, the petitioner has filed the present Writ Petition. The Law and Judiciary '
+                'Department is Respondent No. 2.'],
+ 'paras': [{'para': '1 to 3',
+            'averment': "Description of the parties, the petitioner's appointment as ____ on __.__.____ and his "
+                        'service particulars.',
+            'remarks': "The particulars of the petitioner's appointment and service are a matter of the official "
+                       'record of the District and Sessions Court, ____. As per that record, the petitioner was '
+                       'appointed as ____ by order dated __.__.____ and joined on __.__.____. The remaining '
+                       'averments are not within the knowledge of this Respondent and the petitioner may be put to '
+                       'strict proof thereof.'},
+           {'para': '4',
+            'averment': 'The petitioner claims that he completed the qualifying service of ____ years on __.__.____ '
+                        'and became eligible for the ____ benefit.',
+            'remarks': 'Government Resolution No. ____ dated __.__.____ (copy at Document No. 1), paragraph ____, '
+                       'prescribes ____ years of regular service and the condition of ____ for the grant of the ____ '
+                       'benefit. As per the service record received from the High Court with its letter dated '
+                       "__.__.2025, the petitioner's regular service is counted from __.__.____; the period from "
+                       '__.__.____ to __.__.____ was on an ad hoc basis and is not counted as regular service under '
+                       'paragraph ____ of the said Government Resolution. Hence the claim that he completed the '
+                       'qualifying service on __.__.____ is not correct.'},
+           {'para': '5 and 6',
+            'averment': 'The petitioner states that his representation dated __.__.2025 was not considered and that '
+                        'similarly placed employees were granted the benefit.',
+            'remarks': 'The representation dated __.__.2025 was received through the High Court and was considered. '
+                       'The Department communicated its decision to the High Court under letter No. ____ dated '
+                       '__.__.2025 (copy at Document No. 2), stating the reason for rejection with reference to '
+                       'paragraph ____ of Government Resolution No. ____ dated __.__.____. The petitioner has not '
+                       'named the employees said to be similarly placed; the benefit is granted only to employees '
+                       'who fulfil the conditions of the said Government Resolution.'},
+           {'para': '7 (Grounds A to D)',
+            'averment': 'Grounds: the rejection is arbitrary and violates Articles 14 and 16 of the Constitution of '
+                        'India.',
+            'remarks': 'The decision was taken by applying the uniform conditions laid down in Government Resolution '
+                       'No. ____ dated __.__.____, which apply equally to all employees of the cadre. No '
+                       'discrimination has been made against the petitioner. The Government Resolution itself has '
+                       'not been challenged in the petition.'},
+           {'para': '8 (Prayer)',
+            'averment': 'The petitioner prays for a direction to grant the ____ benefit with effect from __.__.____ '
+                        'with arrears.',
+            'remarks': 'In view of the remarks on paragraphs 4 to 7 above, the petitioner is not entitled to the '
+                       'benefit from the date claimed. The prayer is not maintainable and deserves to be rejected.'}],
+ 'enclosures': ['Copy of Government Resolution No. ____ dated __.__.____ (conditions for the grant of the ____ '
+                'benefit).',
+                "Copy of the Law and Judiciary Department's letter No. ____ dated __.__.2025 to the High Court.",
+                'Copy of the service particulars of the petitioner received from the High Court with its letter '
+                'dated __.__.2025.'],
+ 'recommendation': 'oppose',
+ 'recommendation_reason': 'The petitioner does not fulfil the condition of ____ years of regular service prescribed '
+                          'in paragraph ____ of Government Resolution No. ____ dated __.__.____ on the date claimed, '
+                          'and the decision was communicated with reasons under letter dated __.__.2025.',
+ 'officer': '( ____ )',
+ 'place': 'Mumbai',
+ 'date': '__.__.2026',
+ 'verification': False}
+
+
+def rule58_spec():
+    s = load(WP); s["parawise"] = copy.deepcopy(RULE58)
+    return s
+
+
+def write(spec, d, name):
+    p = os.path.join(d, name)
+    with open(p, "w", encoding="utf-8") as f:
+        json.dump(spec, f, ensure_ascii=False)
+    return p
+
+
 def run(args):
     return subprocess.run([sys.executable] + args, env=ENV, capture_output=True, text=True, encoding="utf-8")
 
 
-class TestLintParawise(unittest.TestCase):
+class TestLintOffice(unittest.TestCase):
+    """Default layout: the Section's office format (Sr. No. | Para No. | Remarks)."""
     def setUp(self):
         self.spec = load(WP)
 
+    def test_sample_is_office_and_clean(self):
+        pw = self.spec["parawise"]
+        self.assertNotIn("layout", pw)
+        self.assertEqual(LP.layout(pw), "office")
+        self.assertEqual(LP.lint_parawise(self.spec), [])
+        self.assertEqual(LP.warnings_parawise(self.spec), [])
+        self.assertTrue(any(it.get("section") == "Grounds" for it in pw["paras"]))
+
+    def test_required_fields(self):
+        for k in ("case", "petitioner", "on_behalf_of"):
+            with self.subTest(key=k):
+                s = copy.deepcopy(self.spec); del s["parawise"][k]
+                self.assertTrue(any(p.startswith(f"parawise.{k}:") for p in LP.lint_parawise(s)))
+        s = copy.deepcopy(self.spec); del s["parawise"]["on_behalf_of"]
+        s["parawise"]["intro"] = "Parawise submissions on behalf of Respondent No. 2, in this petition."
+        self.assertEqual(LP.lint_parawise(s), [])   # "intro" replaces the whole sentence
+        s = copy.deepcopy(self.spec); s["parawise"]["paras"] = []
+        self.assertTrue(any(p.startswith("parawise.paras:") for p in LP.lint_parawise(s)))
+
+    def test_averment_optional(self):
+        s = copy.deepcopy(self.spec)
+        for it in s["parawise"]["paras"]:
+            it.pop("averment", None)
+        self.assertEqual(LP.lint_parawise(s), [])
+        s["parawise"]["paras"][0]["remarks"] = ""
+        self.assertTrue(any(p.startswith("parawise.paras[0].remarks: required") for p in LP.lint_parawise(s)))
+
+    def test_section_row_structure(self):
+        for bad in ({"section": ""}, {"section": "Grounds", "remarks": "x"}):
+            with self.subTest(item=bad):
+                s = copy.deepcopy(self.spec); s["parawise"]["paras"].insert(1, bad)
+                self.assertTrue(any(p.startswith("parawise.paras[1]: structure") for p in LP.lint_parawise(s)))
+
+    def test_cryptic_and_words(self):
+        s = copy.deepcopy(self.spec); s["parawise"]["paras"][0]["remarks"] = "Denied."
+        self.assertTrue(any("paras[0].remarks: cryptic" in p for p in LP.lint_parawise(s)))
+        s = copy.deepcopy(self.spec); s["parawise"]["paras"][0]["remarks"] += " See z6_0235, register/pay.md, TODO."
+        P = LP.lint_parawise(s)
+        for w in ("internal id", "repo path", "draft word"):
+            self.assertTrue(any(w in p for p in P), (w, P))
+
+    def test_no_prayer_row_warns(self):
+        s = copy.deepcopy(self.spec)
+        s["parawise"]["paras"] = [it for it in s["parawise"]["paras"] if "Prayer" not in it.get("para", "")]
+        self.assertEqual(LP.lint_parawise(s), [])
+        self.assertTrue(any("no 'Prayer' row" in w for w in LP.warnings_parawise(s)))
+
+    def test_rule58_keys_warn_and_layout_value(self):
+        s = copy.deepcopy(self.spec); s["parawise"]["recommendation"] = "oppose"; s["parawise"]["enclosures"] = ["x"]
+        self.assertEqual(LP.lint_parawise(s), [])
+        self.assertTrue(any("belong to \"layout\": \"rule58\"" in w for w in LP.warnings_parawise(s)))
+        s = copy.deepcopy(self.spec); s["parawise"]["layout"] = "fancy"
+        self.assertTrue(any(p.startswith("parawise.layout:") for p in LP.lint_parawise(s)))
+        s["parawise"]["layout"] = "office"
+        self.assertEqual(LP.lint_parawise(s), [])
+
+    def test_labels_and_contempt(self):
+        s = copy.deepcopy(self.spec)
+        for lab in ("Para No.3", "21 to 24", "5 (a) to (e)", "Ground (k)", "Prayer Clauses (a) to (h)"):
+            s["parawise"]["paras"][0]["para"] = lab
+            self.assertFalse(any("para label" in w for w in LP.warnings_parawise(s)), lab)
+        s["parawise"]["paras"][0]["para"] = "first para"
+        self.assertTrue(any("para label" in w for w in LP.warnings_parawise(s)))
+        s = copy.deepcopy(self.spec)
+        s["parawise"]["paras"][2]["remarks"] += " The learned Tribunal failed to consider the record."
+        s["parawise"]["paras"][3]["averment"] = "The Court failed to consider; the illegal order be quashed."
+        W = [w for w in LP.warnings_parawise(s) if "contempt-prone" in w]
+        self.assertEqual(len(W), 1, W); self.assertIn("paras[2].remarks", W[0])
+        self.assertEqual(LP.lint_parawise(s), [])
+
+
+class TestLintParawise(unittest.TestCase):
+    """"layout": "rule58" (the earlier Rule 58 layout)."""
+    def setUp(self):
+        self.spec = rule58_spec()
+
     def test_sample_clean(self):
+        self.assertEqual(LP.layout(self.spec["parawise"]), "rule58")
         self.assertEqual(LP.lint_parawise(self.spec), [])
         self.assertEqual(LP.warnings_parawise(self.spec), [])
 
@@ -161,6 +329,12 @@ class TestLintParawise(unittest.TestCase):
         self.assertTrue(any(p.startswith("parawise.relief_sought:") for p in LP.lint_parawise(t)))
 
     def test_cli(self):
+        d = tempfile.mkdtemp()
+        try:
+            r = run([os.path.join(TOOLS, "lint_parawise.py"), write(self.spec, d, "r58.json")])
+            self.assertEqual(r.returncode, 0, r.stdout + r.stderr); self.assertIn("LINT OK", r.stdout)
+        finally:
+            shutil.rmtree(d, ignore_errors=True)
         r = run([os.path.join(TOOLS, "lint_parawise.py"), WP])
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr); self.assertIn("LINT OK", r.stdout)
         r = run([os.path.join(TOOLS, "lint_parawise.py"), INFO])
@@ -192,6 +366,7 @@ def bad_fonts(d):
 class TestBuildParawise(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.mkdtemp()
+        self.r58 = write(rule58_spec(), self.tmp, "r58.json")
 
     def tearDown(self):
         shutil.rmtree(self.tmp, ignore_errors=True)
@@ -199,13 +374,65 @@ class TestBuildParawise(unittest.TestCase):
     def build(self, spec_path, pre="T", extra=()):
         return run([os.path.join(TOOLS, "build_parawise.py"), spec_path, self.tmp, pre, *extra])
 
-    def test_build_sample(self):
+    def test_build_office_sample(self):
+        """Default = the Section's office format (Abhi 03.11.2026): title, party line, submissions line, ONE table
+        Sr. No. | Para No. | Remarks; "Grounds" separator row un-numbered; averments not printed."""
         r = self.build(WP)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         out = os.path.join(self.tmp, "T_Parawise.docx")
         self.assertIn(out, r.stdout)
         d = docx.Document(out)
         pw = load(WP)["parawise"]
+        P = [p for p in d.paragraphs if p.text.strip()]
+        self.assertEqual(P[0].text, "Para wise Explanation in WRIT PETITION NO. ____ OF 2026.")
+        self.assertEqual(P[1].text, "Shri. A. B. Chachani Vs. The State of Maharashtra and Ors.")
+        self.assertTrue(P[2].text.startswith("Parawise submissions on behalf of Respondent No. 2 i.e. the State of"))
+        self.assertTrue(P[2].text.endswith("in respect of contentions raised by the present petitioner, in this petition."))
+        self.assertTrue(P[-1].text.strip().startswith("*****"))
+        self.assertEqual(P[0].alignment, 1)   # centre
+        self.assertTrue(all(r.bold for r in P[0].runs + P[1].runs))
+        self.assertEqual({r.font.size.pt for r in P[0].runs + P[1].runs}, {16.0})
+        self.assertEqual({r.font.size.pt for r in P[2].runs}, {13.0})
+        self.assertEqual(len(d.tables), 1)
+        t = d.tables[0]
+        self.assertEqual([c.text for c in t.rows[0].cells], ["Sr. No.", "Para No.", "Remarks"])
+        self.assertTrue(all(r.bold for c in t.rows[0].cells for p in c.paragraphs for r in p.runs))
+        self.assertEqual(len(t.rows), 1 + len(pw["paras"]))
+        n = 0
+        for row, it in zip(t.rows[1:], pw["paras"]):
+            cells = [c.text for c in row.cells]
+            if "section" in it:
+                self.assertEqual(cells, ["", "", "Grounds"])
+                self.assertTrue(all(r.bold for r in row.cells[2].paragraphs[0].runs))
+                continue
+            n += 1
+            self.assertEqual(cells[0], f"{n}.")
+            want = ("Para No." + it["para"]) if it["para"][0].isdigit() else it["para"]
+            self.assertEqual(cells[1], want)
+            self.assertEqual(cells[2], it["remarks"])
+        text = all_text(d)
+        for it in pw["paras"]:
+            if it.get("averment"):
+                self.assertNotIn(it["averment"], text)
+        for s in ("Brief facts", "Recommendation", "Documents enclosed", "Averments"):
+            self.assertNotIn(s, text)
+        grid = [int(g.get(qn("w:w"))) for g in t._tbl.tblGrid.iter(qn("w:gridCol"))]
+        self.assertEqual(grid, [959, 1276, 6080])
+        self.assertEqual(t._tbl.tblPr.find(qn("w:tblInd")).get(qn("w:w")), "567")
+        sec = d.sections[0]
+        self.assertEqual((sec.left_margin.twips, sec.right_margin.twips, sec.page_width.twips), (1800, 1440, 11906))
+        self.assertFalse(any(p.text.strip() for p in sec.footer.paragraphs))
+        self.assertEqual(bad_fonts(d), 0)
+        import clean_meta
+        self.assertEqual(clean_meta.docx_meta_problems(out), [])
+
+    def test_build_rule58(self):
+        r = self.build(self.r58)
+        self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        out = os.path.join(self.tmp, "T_Parawise.docx")
+        self.assertIn(out, r.stdout)
+        d = docx.Document(out)
+        pw = RULE58
         text = all_text(d)
         for s in (pw["court"], pw["case"], "Versus", "… Petitioner(s)", "… Respondent(s)",
                   "PARAWISE REMARKS OF RESPONDENT NO. 2 (Law and Judiciary Department)",
@@ -234,7 +461,7 @@ class TestBuildParawise(unittest.TestCase):
     def test_build_relief_and_facts_table(self):
         # §4.30 (03.11.2026): "Relief sought:" line after "Submitted to", a chronology table inside Brief facts;
         # string facts keep their (1), (2) … numbering; the remarks table stays the last table
-        s = load(WP)
+        s = rule58_spec()
         s["parawise"]["relief_sought"] = "A direction to grant the ____ benefit with effect from __.__.____."
         s["parawise"]["background"].insert(2, {"title": "Chronology", "table": [
             ["Date", "Event"], ["__.__.2025", "Representation"], ["__.__.2025", "Forwarded by the High Court"]]})
@@ -255,7 +482,7 @@ class TestBuildParawise(unittest.TestCase):
         self.assertEqual(bad_fonts(d), 0)
 
     def test_sample_has_no_relief_line(self):
-        r = self.build(WP)
+        r = self.build(self.r58)
         self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
         d = docx.Document(os.path.join(self.tmp, "T_Parawise.docx"))
         self.assertFalse(any(p.text.startswith("Relief sought") for p in d.paragraphs))
@@ -263,7 +490,7 @@ class TestBuildParawise(unittest.TestCase):
             self.assertTrue(os.path.exists(os.path.join(self.tmp, "T_Parawise.pdf")), r.stderr)
 
     def test_not_oppose_and_verification(self):
-        s = load(WP); s["parawise"]["recommendation"] = "not oppose"; s["parawise"]["verification"] = True
+        s = rule58_spec(); s["parawise"]["recommendation"] = "not oppose"; s["parawise"]["verification"] = True
         s["parawise"]["enclosures"] = []
         p = os.path.join(self.tmp, "s.json")
         with open(p, "w", encoding="utf-8") as f:
@@ -278,7 +505,7 @@ class TestBuildParawise(unittest.TestCase):
 
     def test_blank_recommendation_builds(self):
         # lint allows recommendation "____" (warning): the build prints "____" for the owner to fill (no KeyError)
-        s = load(WP); s["parawise"]["recommendation"] = "____"
+        s = rule58_spec(); s["parawise"]["recommendation"] = "____"
         p = os.path.join(self.tmp, "b.json")
         with open(p, "w", encoding="utf-8") as f:
             json.dump(s, f, ensure_ascii=False)

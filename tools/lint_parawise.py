@@ -13,7 +13,24 @@ should be invariably accompanied by copies of relevant notifications, rules and 
 paragraph"; Rule 58(6) the Government Pleader drafts the counter affidavit (so "verification" defaults to false).
 INSTRUCTIONS §3.1: the parawise text is in English.
 
-Errors
+Two layouts (tools/build_parawise.py): DEFAULT = the Section's office format (Abhi, 03.11.2026: "ok tar format mi dilelya
+parawise cha thewa") — table "Sr. No. | Para No. | Remarks"; "layout": "rule58" = the earlier Rule 58 layout.
+
+Errors — default (office) layout
+  - "parawise" is not an object; "layout" not "office" / "rule58"; required text fields empty: case, petitioner,
+    on_behalf_of (or intro); respondent / intro present but not a string; paras (non-empty list)
+  - every paras item: either {"section": "<text>"} (separator row, e.g. "Grounds") or {para, remarks[, averment]} with
+    "para" and "remarks" non-empty ("averment" is optional and not printed)
+  - cryptic remarks (as below); internal ids / repo paths; C27 draft words (as below)
+Warnings — default (office) layout
+  - no "Prayer" row (Rule 58(3): every point of the petition, the prayer clauses included)
+  - keys of the rule58 layout present (court, respondents, respondent_no, subject, prepared_for, relief_sought,
+    background, enclosures, recommendation, recommendation_reason, officer, designation, place, date, verification) —
+    not printed in the office format
+  - Devanagari outside quotes; remarks shorter than 8 words; para label not "1", "21 to 24", "5 (a) to (e)",
+    "Para No.1", "Ground (a)", "Prayer Clauses (a) to (h)"; §4.30 contempt-prone wording in the remarks (as below)
+
+Errors — "layout": "rule58"
   - "parawise" is not an object; required text fields empty: court, case, petitioner, respondent_no, subject,
     prepared_for; respondents (non-empty list of str); paras (non-empty list)
   - every para: "para" (e.g. "1", "1 to 3"), "averment" and "remarks" non-empty
@@ -26,7 +43,7 @@ Errors
   - internal ids / repo paths anywhere (lint_spec.id_hits / repo_hits)
   - C27 (02.11.2026): "पॅकेज" anywhere; outside quotes "package PDF", "warning", "TODO", the other warning / working words
     and the AI words (lint_spec.draft_word_hits)
-Warnings
+Warnings — "layout": "rule58"
   - recommendation "____" (blank: no basis in the record — the Section fills it; Rule 58(4)(a) still applies)
   - Devanagari outside “…” / "…" quotes (the parawise text is English; names/designations in quotes are fine)
   - remarks shorter than 8 words (Note (ii): "elaborate factual position")
@@ -127,6 +144,98 @@ def _strings(pw):
     return list(lint_spec.strings(pw, "parawise"))
 
 
+LAYOUTS = ("office", "rule58")
+OFFICE_REQ = ("case", "petitioner")
+RULE58_ONLY = ("court", "respondents", "respondent_no", "department", "subject", "prepared_for", "relief_sought",
+               "background", "enclosures", "recommendation", "recommendation_reason", "officer", "designation",
+               "place", "date", "verification")
+OFFICE_LABEL_RE = re.compile(r"(?:Para(?:graph)?s?\s*No\.?\s*)?\d+[A-Za-z]?(?:\s*(?:to|-|–|,|and)\s*\d+[A-Za-z]?)*"
+                             r"(?:\s*\([A-Za-z0-9]+\)(?:\s*(?:to|-|–|,|and)\s*\([A-Za-z0-9]+\))*)?"
+                             r"|(?:Grounds?|Prayer(?:\s+Clauses?)?)\b.*", re.I)
+
+
+def layout(pw):
+    """"rule58" when the spec says so, else the default office format (same rule as tools/build_parawise.py)."""
+    return "rule58" if isinstance(pw, dict) and str(pw.get("layout") or "").strip().lower() == "rule58" else "office"
+
+
+def _common(pw, P):
+    for path, t in _strings(pw):
+        for x in lint_spec.id_hits(t): P.append(f"{path}: internal id — '{x}'")
+        for x in lint_spec.repo_hits(t): P.append(f"{path}: repo path/word — '{x}'")
+        # C27 (02.11.2026): no "package PDF" / "पॅकेज", "warning", "TODO" or AI word (outside quotes)
+        for w in lint_spec.draft_word_hits(t):
+            P.append(f"{path}: draft word — '{w}' — no package / warning / working / AI word in the draft (C27)")
+
+
+def _lint_office(pw):
+    P = []
+    for k in OFFICE_REQ:
+        if not _txt(pw.get(k)):
+            P.append(f"parawise.{k}: required field — '{k}' missing or empty (office format; the earlier layout needs "
+                     "\"layout\": \"rule58\")")
+    if not _txt(pw.get("on_behalf_of")) and not _txt(pw.get("intro")):
+        P.append("parawise.on_behalf_of: required field — 'on_behalf_of' (e.g. \"Respondent Nos. 1 and 2 i.e. the State "
+                 "of Maharashtra, through …\") missing or empty")
+    for k in ("respondent", "intro", "on_behalf_of"):
+        if k in pw and not isinstance(pw[k], str):
+            P.append(f"parawise.{k}: structure — must be a string")
+    paras = pw.get("paras")
+    if not isinstance(paras, list) or not paras:
+        P.append("parawise.paras: required field — non-empty list of {para, remarks} / {\"section\": \"Grounds\"} "
+                 "(Rule 58(3): all the points raised in the petition)")
+        paras = []
+    for i, it in enumerate(paras):
+        path = f"parawise.paras[{i}]"
+        if not isinstance(it, dict):
+            P.append(f"{path}: structure — must be an object {{para, remarks}} or {{\"section\": …}}"); continue
+        if "section" in it:
+            if not _txt(it.get("section")) or set(it) - {"section"}:
+                P.append(f"{path}: structure — a separator row is {{\"section\": \"Grounds\"}} only")
+            continue
+        for k in ("para", "remarks"):
+            if not _txt(it.get(k)):
+                P.append(f"{path}.{k}: required field — '{k}' missing or empty")
+        if "averment" in it and not isinstance(it["averment"], str):
+            P.append(f"{path}.averment: structure — must be a string (optional, not printed)")
+        rm = _txt(it.get("remarks"))
+        if rm and cryptic(rm):
+            P.append(f"{path}.remarks: cryptic remark '{rm}' — Rule 58 Note (ii): not 'denied' / 'not admitted' alone; "
+                     "give the factual position with rule/GR references")
+    _common(pw, P)
+    return P
+
+
+def _warn_office(pw):
+    W = []
+    for path, t in _strings(pw):
+        if DEV_RE.search(lint_spec.unquoted(t)):
+            W.append(f"{path}: Devanagari outside quotes — the parawise remarks are in English (INSTRUCTIONS §3.1); "
+                     "put Marathi names/designations in “…”")
+    rows = [it for it in pw.get("paras") or [] if isinstance(it, dict) and "section" not in it]
+    for i, it in enumerate(pw.get("paras") or []):
+        if not isinstance(it, dict) or "section" in it:
+            continue
+        rm = _txt(it.get("remarks"))
+        if rm and not cryptic(rm) and len(rm.split()) < MIN_WORDS:
+            W.append(f"parawise.paras[{i}].remarks: short remark ({len(rm.split())} words) — Rule 58 Note (ii): "
+                     "factual position")
+        lab = _txt(it.get("para"))
+        if lab and not OFFICE_LABEL_RE.fullmatch(lab):
+            W.append(f"parawise.paras[{i}].para: para label '{lab}' — use '1', '21 to 24', '5 (a) to (e)', "
+                     "'Ground (a)', 'Prayer Clauses (a) to (h)'")
+        for phrase, fix in contempt_hits(it.get("remarks") if isinstance(it.get("remarks"), str) else ""):
+            W.append(f"parawise.paras[{i}].remarks: contempt-prone wording '{phrase}' — use respectful language toward "
+                     f"the Court (§4.30), e.g. {fix}")
+    if rows and not any(re.search(r"\bprayer", _txt(it.get("para")), re.I) for it in rows):
+        W.append("parawise.paras: no 'Prayer' row — answer the prayer clauses too (Rule 58(3); office format row "
+                 "\"Prayer Clauses (a) to (…)\")")
+    extra = [k for k in RULE58_ONLY if k in pw]
+    if extra:
+        W.append(f"parawise: keys {extra} belong to \"layout\": \"rule58\" — not printed in the office format")
+    return W
+
+
 def lint_parawise(spec):
     """Errors for spec["parawise"] (list of "parawise.<path>: <rule> — <detail>"); [] when clean or absent."""
     if not isinstance(spec, dict) or "parawise" not in spec:
@@ -134,6 +243,10 @@ def lint_parawise(spec):
     pw = spec["parawise"]
     if not isinstance(pw, dict):
         return ["parawise: structure — must be an object"]
+    if "layout" in pw and str(pw.get("layout") or "").strip().lower() not in LAYOUTS:
+        return [f"parawise.layout: structure — 'office' (default) or 'rule58': '{pw.get('layout')}'"]
+    if layout(pw) == "office":
+        return _lint_office(pw)
     P = []
     for k in REQ_TEXT:
         if not _txt(pw.get(k)):
@@ -182,12 +295,7 @@ def lint_parawise(spec):
                  f"'____' when the record gives no basis: '{rec}'")
     if not blank and not _txt(pw.get("recommendation_reason")):
         P.append("parawise.recommendation_reason: recommendation — reason missing (Rule 58(4)(a)/(b))")
-    for path, t in _strings(pw):
-        for x in lint_spec.id_hits(t): P.append(f"{path}: internal id — '{x}'")
-        for x in lint_spec.repo_hits(t): P.append(f"{path}: repo path/word — '{x}'")
-        # C27 (02.11.2026): no "package PDF" / "पॅकेज", "warning", "TODO" or AI word (outside quotes)
-        for w in lint_spec.draft_word_hits(t):
-            P.append(f"{path}: draft word — '{w}' — no package / warning / working / AI word in the draft (C27)")
+    _common(pw, P)
     return P
 
 
@@ -195,7 +303,10 @@ def warnings_parawise(spec):
     """WARN-level findings for spec["parawise"]; never errors."""
     if not isinstance(spec, dict) or not isinstance(spec.get("parawise"), dict):
         return []
-    pw = spec["parawise"]; W = []
+    pw = spec["parawise"]
+    if layout(pw) == "office":
+        return _warn_office(pw)
+    W = []
     for path, t in _strings(pw):
         if DEV_RE.search(lint_spec.unquoted(t)):
             W.append(f"{path}: Devanagari outside quotes — the parawise remarks are in English (INSTRUCTIONS §3.1); "

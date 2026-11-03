@@ -104,6 +104,7 @@ Both are optional keys of the same spec.json; engine detail: tools/ENGINE_PROMPT
   - Facts suffice → spec `parawise` (English; B8; Rules 1984 Rule 58(3) every point, Rule 58(4) Note (ii) elaborate
     facts + documents enclosed, recommendation oppose / not oppose — from the record only, the one exception to "no opinion"; no record basis → "____" + warning) → `python3 tools/build_parawise.py spec.json <outdir>
     <PREFIX>` → `<PREFIX>_Parawise.docx`; letter to the GP/AGP forwarding it.
+  - **Format (Abhi 03.11.2026: "ok tar format mi dilelya parawise cha thewa"):** ALWAYS the Section's office format (default of build_parawise.py): "Para wise Explanation in <case>.", "<petitioner> Vs. <respondent>", "Parawise submissions on behalf of …", one table Sr. No. | Para No. | Remarks — `paras` [{para, remarks}] for every para / sub-para, `{"section": "Grounds"}`, each ground, formal paras, "Prayer Clauses …"; model samples/specs/COURT_wp_parawise_example.json. The Rule 58 layout (relief, brief facts, enclosures, recommendation) only with `"layout": "rule58"`.
   - Essential facts missing → information letter first (§4.15).
   - Rule 58(4): to the GP within two weeks of receipt / before the date in the notice; the hearing date goes in Study part 0.
 - **Order drafts** (B7: only when the decision / Finance-GAD concurrence is on record, or Abhi asks — ticking it in

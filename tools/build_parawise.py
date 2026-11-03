@@ -5,7 +5,36 @@ Court-case PARAWISE REMARKS (English, INSTRUCTIONS §3.1) from the optional "par
 Refuses (exit 1) when the spec has no "parawise" block, or when tools/lint_parawise.py finds errors (unless --no-lint or
 env LINT_SKIP=1). The court-mode NOTE and LETTER come from the same spec's "note"/"letter" via tools/build_note_letter.py.
 
-Layout (docs/COURT_AND_ORDERS_RESEARCH.md decision B8 — no Section specimen exists; Rules for the Conduct of the Legal
+Two layouts ("parawise"."layout"):
+
+DEFAULT = the Section's own office format (Abhi, 03.11.2026: "format parawise cha asach asto" / "ok tar format mi dilelya
+parawise cha thewa"; reference: the Section's parawise of W.P. in C R 103-2026 — only its FORMAT is used, never its
+content; docs/COURT_AND_ORDERS_RESEARCH.md B8 "SUPERSEDED"):
+  A4, margins L 3.175 / R 2.54 / T,B 2.0 cm, no header/footer, line spacing 1.5, font DVOT-SurekhMR on every run;
+  title "Para wise Explanation in <case>." (16 pt bold, centre);
+  party line "<petitioner> Vs. <respondent>" (16 pt bold);
+  "Parawise submissions on behalf of <on_behalf_of>, in respect of contentions raised by the present petitioner(s),
+  in this petition." (13 pt) — or "intro" (the whole sentence) when given;
+  ONE table "Sr. No. | Para No. | Remarks" (12 pt; header bold; widths 959 / 1276 / 6080 twips, indent 567 twips,
+  single borders): one row per para / sub-para / ground / formal para / prayer clauses, Sr. No. 1., 2., … ;
+  an item {"section": "Grounds"} prints an un-numbered separator row (text bold, centre, in the Remarks column);
+  then a closing line of asterisks.
+"parawise": {
+  "case": "WRIT PETITION NO. ____ OF 2026",
+  "petitioner": "Shri. ____ & Ors.",                  # as in the petition's cause title
+  "respondent": "The State of Maharashtra and Ors.",  # optional; this is the default
+  "on_behalf_of": "Respondent Nos. 1 and 2 i.e. the State of Maharashtra, through the Principal Secretary, Law and
+                   Judiciary Department, Mantralaya, Mumbai",
+  "intro": "...",                                     # optional; replaces the whole "Parawise submissions …" sentence
+  "paras": [{"para": "1" | "5 (a) to (e)" | "21 to 24" | "Ground (a)" | "Prayer Clauses (a) to (h)",
+             "averment": "optional, NOT printed (the drafter's own pointer to the petition text)",
+             "remarks": "..."},                      # "\n" = a new paragraph inside the cell
+            {"section": "Grounds"}, ...]
+}
+  A numeric label ("1", "21 to 24", "5 (a) to (e)") prints as "Para No.<label>"; any other label prints as given.
+
+"layout": "rule58" = the earlier layout (kept; used only when the spec says so):
+Layout rule58 (docs/COURT_AND_ORDERS_RESEARCH.md decision B8 original; Rules for the Conduct of the Legal
 Affairs of Government, 1984: Rule 58(3) parawise report on all points, Rule 58(4)(a) recommendation, Rule 58(4) Note (ii)
 elaborate factual position + copies of rules/orders, Rule 32 reply to each paragraph, Rule 58(6) the Government Pleader
 drafts the counter affidavit):
@@ -17,6 +46,7 @@ drafts the counter affidavit):
   every run (§4.2), incl. the footer page number.
 
 "parawise": {
+  "layout": "rule58",
   "court": "IN THE HIGH COURT OF JUDICATURE AT BOMBAY, BENCH AT AURANGABAD",
   "case": "WRIT PETITION NO. ____ OF 2026",
   "petitioner": "...", "respondents": ["The State of Maharashtra, through ...", "..."],
@@ -50,7 +80,9 @@ from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.enum.text import WD_ALIGN_PARAGRAPH as WA
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
-from docx.shared import Cm, Pt
+import re
+
+from docx.shared import Cm, Length, Pt, Twips
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -201,7 +233,7 @@ def footer_page_no(section):
             it = OxmlElement("w:instrText"); it.set(qn("xml:space"), "preserve"); it.text = txt; r._r.append(it)
 
 
-def build(spec, out):
+def build_rule58(spec, out):
     pw = spec["parawise"]
     d = docx.Document(); fix_styles(d)
     s = d.sections[0]
@@ -266,6 +298,114 @@ def build(spec, out):
     for e in st.findall(qn("w:mirrorMargins")):
         st.remove(e)
     d.save(out); clean_docx(out, spec.get("doc_author"))
+
+
+# ---------------- DEFAULT layout: the Section's office format (Abhi, 03.11.2026) ----------------
+OFF_HEAD = ("Sr. No.", "Para No.", "Remarks")
+OFF_WIDTHS = (959, 1276, 6080)          # twips, as in the Section's format
+OFF_TBL_IND = 567                        # twips
+OFF_REMARK_FIRST = Pt(30)                # first-line indent of each remarks paragraph
+OFF_STARS = "    " + "*" * 67           # closing line under the table
+DEF_RESP = "The State of Maharashtra and Ors."
+NUM_LABEL = re.compile(r"\d+[A-Za-z]?(?:\s*(?:to|-|–|,|and)\s*\d+[A-Za-z]?)*"
+                       r"(?:\s*\([A-Za-z0-9]+\)(?:\s*(?:to|-|–|,|and)\s*\([A-Za-z0-9]+\))*)?")
+
+
+def layout(pw):
+    """"rule58" only when the spec says so; otherwise the Section's office format (default)."""
+    return "rule58" if isinstance(pw, dict) and str(pw.get("layout") or "").strip().lower() == "rule58" else "office"
+
+
+def para_label(lab):
+    """'1' / '21 to 24' / '5 (a) to (e)' -> 'Para No.1' …; 'Ground (a)', 'Prayer Clauses …', 'Para No.3' as given."""
+    lab = str(lab or "").strip()
+    return f"Para No.{lab}" if NUM_LABEL.fullmatch(lab) else lab
+
+
+def opara(container, text="", size=12, bold=False, align=WA.JUSTIFY, left=None, first=None, after=0, p=None):
+    p = p if p is not None else container.add_paragraph()
+    pf = p.paragraph_format; pf.space_before = Pt(0); pf.space_after = Pt(after); pf.line_spacing = 1.5
+    if left is not None: pf.left_indent = Twips(left)
+    if first is not None: pf.first_line_indent = first if isinstance(first, Length) else Twips(first)
+    if align is not None: p.alignment = align
+    if text:
+        setfont(p.add_run(text), size, bold)
+    else:   # empty paragraph: its mark carries the font/size too
+        rpr = p._p.get_or_add_pPr().makeelement(qn("w:rPr"), {})
+        rf = rpr.makeelement(qn("w:rFonts"), {qn("w:" + a): FONT for a in ("ascii", "hAnsi", "cs", "eastAsia")})
+        sz = rpr.makeelement(qn("w:sz"), {qn("w:val"): str(size * 2)})
+        rpr.append(rf); rpr.append(sz); p._p.get_or_add_pPr().append(rpr)
+    return p
+
+
+def ocell(c, text, bold=False, align=WA.JUSTIFY, left=None, first=None, after=0):
+    chunks = [x for x in str(text or "").split("\n")] or [""]
+    for k, ch in enumerate(chunks):
+        p = c.paragraphs[0] if k == 0 else c.add_paragraph()
+        opara(c, ch.strip(), 12, bold, align, left, first, after, p=p)
+
+
+def office_table(d, items):
+    rows = len(items) + 1
+    t = d.add_table(rows=rows, cols=3)
+    t.autofit = False; borders(t)
+    pr = t._tbl.tblPr
+    ind = pr.makeelement(qn("w:tblInd"), {qn("w:w"): str(OFF_TBL_IND), qn("w:type"): "dxa"})
+    nxt = next((pr.find(qn(f"w:{x}")) for x in ("tblBorders", "shd", "tblLayout", "tblCellMar", "tblLook")
+                if pr.find(qn(f"w:{x}")) is not None), None)
+    nxt.addprevious(ind) if nxt is not None else pr.append(ind)
+    for j, w in enumerate(OFF_WIDTHS):
+        t.columns[j].width = Twips(w)
+    ocell(t.cell(0, 0), OFF_HEAD[0], bold=True, left=340)
+    ocell(t.cell(0, 1), OFF_HEAD[1], bold=True, left=340)
+    ocell(t.cell(0, 2), OFF_HEAD[2], bold=True, align=WA.CENTER)
+    n = 0
+    for i, it in enumerate(items, 1):
+        if isinstance(it, dict) and _s(it.get("section")):
+            ocell(t.cell(i, 0), ""); ocell(t.cell(i, 1), "")
+            ocell(t.cell(i, 2), it["section"].strip(), bold=True, align=WA.CENTER, after=12)
+            continue
+        n += 1
+        ocell(t.cell(i, 0), f"{n}.", left=340)
+        ocell(t.cell(i, 1), para_label(it.get("para")), align=WA.LEFT)
+        ocell(t.cell(i, 2), it.get("remarks", ""), first=OFF_REMARK_FIRST)
+    for r in t.rows:
+        for j, w in enumerate(OFF_WIDTHS):
+            r.cells[j].width = Twips(w)
+    return t
+
+
+def build_office(spec, out):
+    pw = spec["parawise"]
+    d = docx.Document(); fix_styles(d)
+    s = d.sections[0]
+    s.page_width, s.page_height = Twips(11906), Twips(16838)
+    s.left_margin, s.right_margin = Twips(1800), Twips(1440)
+    s.top_margin, s.bottom_margin = Twips(1134), Twips(1135)
+    s.header_distance = s.footer_distance = Twips(708)
+    case = pw["case"].strip().rstrip(".")
+    opara(d, f"Para wise Explanation in {case}.", 16, True, WA.CENTER, left=567, first=510)
+    pet = pw["petitioner"].strip()
+    resp = (_s(pw.get("respondent")) or DEF_RESP).rstrip()
+    opara(d, f"{pet} Vs. {resp}", 16, True, WA.JUSTIFY, left=720, first=720)
+    plural = bool(re.search(r"(?:&|\band)\s*(?:Ors|Others)\b", pet, re.I))
+    intro = _s(pw.get("intro")) or (
+        f"Parawise submissions on behalf of {(_s(pw.get('on_behalf_of')) or '____').rstrip(',.')}, in respect of contentions raised "
+        f"by the present {'petitioners' if plural else 'petitioner'}, in this petition.")
+    opara(d, intro, 13, False, WA.JUSTIFY, left=567, first=510)
+    opara(d, "", 13)
+    office_table(d, pw["paras"])
+    opara(d, "", 12)
+    opara(d, OFF_STARS, 12)
+    st = d.settings.element
+    for e in st.findall(qn("w:mirrorMargins")):
+        st.remove(e)
+    d.save(out); clean_docx(out, spec.get("doc_author"))
+
+
+def build(spec, out):
+    """Default: the Section's office format; "layout": "rule58" = the earlier Rule 58 layout."""
+    (build_rule58 if layout(spec["parawise"]) == "rule58" else build_office)(spec, out)
 
 
 def bad_font_runs(d):

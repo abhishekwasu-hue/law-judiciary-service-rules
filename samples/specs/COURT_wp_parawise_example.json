@@ -1,5 +1,5 @@
 {
- "_comment": "SYNTHETIC court-case sample (fake data — not a real case): Writ Petition notice from the Assistant Government Pleader asking parawise remarks. Note per docs/COURT_AND_ORDERS_RESEARCH.md B9 (R1 contempt-file note format), letter to the AGP forwarding the parawise remarks (R1 letter style, INSTRUCTIONS §4.5), parawise block per B8 (tools/build_parawise.py). Signer chain = INSTRUCTIONS §4.6 (B10: Abhi to confirm for court files).",
+ "_comment": "SYNTHETIC court-case sample (fake data — not a real case): Writ Petition notice from the Assistant Government Pleader asking parawise remarks. Note per docs/COURT_AND_ORDERS_RESEARCH.md B9 (R1 contempt-file note format), letter to the AGP forwarding the parawise remarks (R1 letter style, INSTRUCTIONS §4.5), parawise block in the Section's office format (default layout of tools/build_parawise.py, Abhi 03.11.2026; B8 superseded): title, party line, \"Parawise submissions on behalf of …\", one table Sr. No. | Para No. | Remarks with a \"Grounds\" row and the prayer clauses. Signer chain = INSTRUCTIONS §4.6 (B10: Abhi to confirm for court files).",
  "note": {
   "first": "सहायक सरकारी वकील, मा. उच्च न्यायालय, खंडपीठ औरंगाबाद यांच्या पृ.1/प.वि. वरील दि. __.__.2026 रोजीच्या पत्रास अनुसरून सादर.",
   "paras": [
@@ -56,61 +56,64 @@
   ]
  },
  "parawise": {
-  "court": "IN THE HIGH COURT OF JUDICATURE AT BOMBAY, BENCH AT AURANGABAD",
   "case": "WRIT PETITION NO. ____ OF 2026",
-  "petitioner": "Shri A. B. Chachani (synthetic test petitioner), ____, District and Sessions Court, ____",
-  "respondents": [
-   "The State of Maharashtra, through the Secretary, ____ Department, Mantralaya, Mumbai",
-   "The Principal Secretary and Legal Remembrancer, Law and Judiciary Department, Mantralaya, Mumbai",
-   "The Registrar General, High Court of Judicature at Bombay"
-  ],
-  "respondent_no": "2",
-  "department": "Law and Judiciary Department",
-  "subject": "Parawise remarks of Respondent No. 2 on the Writ Petition seeking grant of the ____ benefit to the petitioner with effect from __.__.____.",
-  "prepared_for": "Assistant Government Pleader, High Court of Judicature at Bombay, Bench at Aurangabad",
-  "background": [
-   "The petitioner is working as ____ in the District and Sessions Court, ____. He submitted a representation dated __.__.2025 seeking the ____ benefit with effect from __.__.____.",
-   "The representation was forwarded to the Government by the High Court under its letter dated __.__.2025.",
-   "The Law and Judiciary Department informed the High Court under letter No. ____ dated __.__.2025 that the petitioner does not fulfil the condition of ____ laid down in Government Resolution No. ____ dated __.__.____ (copy at Document No. 1).",
-   "Aggrieved thereby, the petitioner has filed the present Writ Petition. The Law and Judiciary Department is Respondent No. 2."
-  ],
+  "petitioner": "Shri. A. B. Chachani",
+  "respondent": "The State of Maharashtra and Ors.",
+  "on_behalf_of": "Respondent No. 2 i.e. the State of Maharashtra, through the Principal Secretary and Legal Remembrancer, Law and Judiciary Department, Mantralaya, Mumbai",
   "paras": [
    {
-    "para": "1 to 3",
-    "averment": "Description of the parties, the petitioner's appointment as ____ on __.__.____ and his service particulars.",
-    "remarks": "The particulars of the petitioner's appointment and service are a matter of the official record of the District and Sessions Court, ____. As per that record, the petitioner was appointed as ____ by order dated __.__.____ and joined on __.__.____. The remaining averments are not within the knowledge of this Respondent and the petitioner may be put to strict proof thereof."
+    "para": "1",
+    "averment": "Description of the petitioner and the Article under which the petition is filed.",
+    "remarks": "Needs no remarks as the contents of this para relate to the description of the petitioner and the provision under which the petition is filed. It is, however, denied that the petitioner is entitled to the reliefs claimed."
+   },
+   {
+    "para": "2 and 3",
+    "averment": "Description of the Respondents.",
+    "remarks": "Needs no remarks as the contents of these paras are a matter of record and relate to the description of the Respondents."
    },
    {
     "para": "4",
-    "averment": "The petitioner claims that he completed the qualifying service of ____ years on __.__.____ and became eligible for the ____ benefit.",
-    "remarks": "Government Resolution No. ____ dated __.__.____ (copy at Document No. 1), paragraph ____, prescribes ____ years of regular service and the condition of ____ for the grant of the ____ benefit. As per the service record received from the High Court with its letter dated __.__.2025, the petitioner's regular service is counted from __.__.____; the period from __.__.____ to __.__.____ was on an ad hoc basis and is not counted as regular service under paragraph ____ of the said Government Resolution. Hence the claim that he completed the qualifying service on __.__.____ is not correct."
+    "averment": "The petitioner's appointment as ____ on __.__.____ and his service particulars.",
+    "remarks": "As per the service record of the District and Sessions Court, ____ received from the High Court with its letter dated __.__.2025, the petitioner was appointed as ____ by order dated __.__.____ and joined on __.__.____. The averments beyond that record are not within the knowledge of this Respondent and the petitioner may be put to strict proof thereof."
    },
    {
-    "para": "5 and 6",
-    "averment": "The petitioner states that his representation dated __.__.2025 was not considered and that similarly placed employees were granted the benefit.",
-    "remarks": "The representation dated __.__.2025 was received through the High Court and was considered. The Department communicated its decision to the High Court under letter No. ____ dated __.__.2025 (copy at Document No. 2), stating the reason for rejection with reference to paragraph ____ of Government Resolution No. ____ dated __.__.____. The petitioner has not named the employees said to be similarly placed; the benefit is granted only to employees who fulfil the conditions of the said Government Resolution."
+    "para": "5 (a) to (c)",
+    "averment": "The petitioner claims that he completed the qualifying service of ____ years on __.__.____.",
+    "remarks": "The contents of these sub-paras are denied in so far as it is claimed that the petitioner completed the qualifying service on __.__.____.\nGovernment Resolution No. ____ dated __.__.____, paragraph ____, prescribes ____ years of regular service and the condition of ____ for the grant of the ____ benefit. As per the service record, the petitioner's regular service is counted from __.__.____; the period from __.__.____ to __.__.____ was on an ad hoc basis and is not counted as regular service under paragraph ____ of the said Government Resolution."
    },
    {
-    "para": "7 (Grounds A to D)",
-    "averment": "Grounds: the rejection is arbitrary and violates Articles 14 and 16 of the Constitution of India.",
-    "remarks": "The decision was taken by applying the uniform conditions laid down in Government Resolution No. ____ dated __.__.____, which apply equally to all employees of the cadre. No discrimination has been made against the petitioner. The Government Resolution itself has not been challenged in the petition."
+    "para": "6",
+    "averment": "The representation dated __.__.2025 was not considered.",
+    "remarks": "The contents of this para are denied. The representation dated __.__.2025 was received through the High Court and was considered. The Department communicated its decision to the High Court under letter No. ____ dated __.__.2025, stating the reason with reference to paragraph ____ of Government Resolution No. ____ dated __.__.____."
    },
    {
-    "para": "8 (Prayer)",
-    "averment": "The petitioner prays for a direction to grant the ____ benefit with effect from __.__.____ with arrears.",
-    "remarks": "In view of the remarks on paragraphs 4 to 7 above, the petitioner is not entitled to the benefit from the date claimed. The prayer is not maintainable and deserves to be rejected."
+    "section": "Grounds"
+   },
+   {
+    "para": "Ground (a)",
+    "averment": "The rejection is arbitrary and violates Articles 14 and 16 of the Constitution of India.",
+    "remarks": "The contents of this ground are denied. The decision was taken by applying the uniform conditions laid down in Government Resolution No. ____ dated __.__.____, which apply equally to all employees of the cadre. The said Government Resolution has not been challenged in the petition."
+   },
+   {
+    "para": "Ground (b)",
+    "averment": "Similarly placed employees were granted the benefit.",
+    "remarks": "The contents of this ground are denied. The petitioner has not named the employees said to be similarly placed. The benefit is granted only to employees who fulfil the conditions of Government Resolution No. ____ dated __.__.____."
+   },
+   {
+    "para": "7",
+    "averment": "No delay in filing the petition.",
+    "remarks": "The contents of this para are not admitted. The decision on the representation was communicated under letter dated __.__.2025, and the petitioner may be put to strict proof of the explanation for the period thereafter."
+   },
+   {
+    "para": "8 to 10",
+    "averment": "Formal paras: no other petition filed, jurisdiction, court fee.",
+    "remarks": "Needs no remarks as the contents of these paras are formal in nature and a matter of record."
+   },
+   {
+    "para": "Prayer Clauses (a) to (c)",
+    "averment": "Direction to grant the ____ benefit with effect from __.__.____ with arrears.",
+    "remarks": "In view of the remarks on paras 5 and 6 and Grounds (a) and (b) above, the petitioner is not entitled to the benefit from the date claimed. The prayer clauses are therefore denied."
    }
-  ],
-  "enclosures": [
-   "Copy of Government Resolution No. ____ dated __.__.____ (conditions for the grant of the ____ benefit).",
-   "Copy of the Law and Judiciary Department's letter No. ____ dated __.__.2025 to the High Court.",
-   "Copy of the service particulars of the petitioner received from the High Court with its letter dated __.__.2025."
-  ],
-  "recommendation": "oppose",
-  "recommendation_reason": "The petitioner does not fulfil the condition of ____ years of regular service prescribed in paragraph ____ of Government Resolution No. ____ dated __.__.____ on the date claimed, and the decision was communicated with reasons under letter dated __.__.2025.",
-  "officer": "( ____ )",
-  "place": "Mumbai",
-  "date": "__.__.2026",
-  "verification": false
+  ]
  }
 }

@@ -179,6 +179,8 @@ Sources: GR22 = मराठी भाषा विभाग GR कपासू-
   record — no record basis -> "____" + warning) + letter to
   the GP/AGP forwarding it. Essential facts missing -> info-letter first [I4.15], no `parawise`. Rule 58(4): to the GP
   within two weeks / before the notice date — hearing date in Study part 0. Signers [I4.6] (B10).
+- Parawise format (Abhi 03.11.2026): ALWAYS the office default — table Sr. No. | Para No. | Remarks; `paras` [{para,
+  remarks}], `{"section": "Grounds"}`, prayer row; recommendation/enclosures/relief only in `"layout": "rule58"`.
 - Order draft: spec `order` (gr / corrigendum / circular / memo / notification; several: `orders` [..]) ONLY when the
   record shows the decision or concurrence in hand, or the instruction / `outputs` asks (B7). Last para (c): "सबब, … शासन निर्णयाचे (ज्ञापनाचे /
   शुद्धिपत्रकाचे / परिपत्रकाचे / अधिसूचनेचे) प्रारूप पृ.      /प.वि. वर मान्यतेस्तव सादर." (notification: "अधिसूचनेची मराठी व इंग्रजी
