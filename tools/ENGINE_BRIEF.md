@@ -176,6 +176,7 @@ Sources: GR22 = मराठी भाषा विभाग GR कपासू-
 - Checks: tools/lint_spec.py, tools/verify_outputs.py.
 
 ## 4b. Court cases and order drafts [SOP4b] (docs/COURT_AND_ORDERS_RESEARCH.md B7–B10; ENGINE_PROMPT section)
+- [I4.32] Court-case note: para 2 = petitioners, court, petition no. (पृ.), all respondents in order "प्रतिवादी क्र. 1 …; प्रतिवादी क्र. 2 …" (Marathi designations), verification date, "सदर याचिका कृपया पहावी."; para 3 = main prayers as a table अ.क्र. | प्रार्थना | मागणी (Marathi, petition order); English prayers verbatim first in `related`; respectful plural, Marathi designations, sentences under 40 words. Model: samples/specs/WP35697_2026_old-pension_finance-opinion.json.
 - Court matter (GP/AGP/HC/MAT notice: रिट याचिका, मूळ अर्ज/O.A., अवमान याचिका, SLP): note para 1 "<सहायक सरकारी वकील,
   …> यांच्या पृ.N/प.वि. वरील दि. __ रोजीच्या पत्रास अनुसरून सादर.", "पार्श्वभूमी थोडक्यात खालीलप्रमाणे आहे:-" + numbered
   facts (B9). Facts suffice -> spec `parawise` (English; Rule 58(3) every point; Rule 58(4) Note (ii) elaborate facts with

@@ -101,6 +101,11 @@ Both are optional keys of the same spec.json; engine detail: tools/ENGINE_PROMPT
 - **Court cases** (GP/AGP/High Court/MAT notice on a writ petition, O.A., contempt, SLP):
   - Note (B9): para 1 "<सहायक सरकारी वकील, …> यांच्या पृ.N/प.वि. वरील दि. __ रोजीच्या पत्रास अनुसरून सादर."; then
     "पार्श्वभूमी थोडक्यात खालीलप्रमाणे आहे:-" and numbered facts with पृ.N/प.वि.
+  - Para 2 / para 3 (INSTRUCTIONS §4.32, Abhi 03.11.2026): para 2 = petitioners, court, petition no. (पृ.), ALL respondents in
+    order "प्रतिवादी क्र. 1 …; प्रतिवादी क्र. 2 …" (Marathi designations), verification date, "सदर याचिका कृपया पहावी."; para 3 =
+    "सदर याचिकेद्वारे याचिकाकर्त्यांनी पुढीलप्रमाणे प्रमुख मागण्या केल्या आहेत (पृ.N/प.वि.):-" + table अ.क्र. | प्रार्थना | मागणी
+    (each prayer in Marathi, petition order); the English prayers verbatim go FIRST in `related`. Respectful plural, Marathi
+    designations, short sentences. Model: samples/specs/WP35697_2026_old-pension_finance-opinion.json.
   - Facts suffice → spec `parawise` (English; B8; Rules 1984 Rule 58(3) every point, Rule 58(4) Note (ii) elaborate
     facts + documents enclosed, recommendation oppose / not oppose — from the record only, the one exception to "no opinion"; no record basis → "____" + warning) → `python3 tools/build_parawise.py spec.json <outdir>
     <PREFIX>` → `<PREFIX>_Parawise.docx`; letter to the GP/AGP forwarding it.
