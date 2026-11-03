@@ -27,8 +27,11 @@ Checks
   - no warning / working / AI word (lint_spec.draft_word_hits: इशारा, पडताळणी अपूर्ण, मागवावे, वाचन अपूर्ण, अस्पष्ट,
     पडताळलेले नाही, टीप :, warning, TODO, package PDF; AI, Claude, Anthropic, मॉडेल, model, स्वयंचलित, automatic, engine,
     प्रणालीने तयार, generated, LLM, GPT, Gemini) outside “…” quotes in the note body, the संबंधित माहिती heading (bold
-    numbered line) and "(स्रोत: …)" lines, and the letter; the verbatim extracts are exempt
-  - every "(स्रोत: …)" ends with "(पृ.N/प.वि.)" or carries no page marker (lint_spec.related_source_problems)
+    numbered line) and source lines, and the letter; the verbatim extracts are exempt; also "स्रोत", "जसाच्या तसा",
+    "जसेच्या तसे", "जशीच्या तशी" (Abhi 03.11.2026)
+  - source line = the last paragraph "(…)" of each numbered संबंधित माहिती item (before the next bold numbered heading or
+    the end); it ends with "(पृ.N/प.वि.)" (printed "(…, पृ.N/प.वि.)") or carries no page marker
+    (lint_spec.related_source_problems)
   - metadata (tools/clean_meta.py): Study, Note_and_Letter, Order_Draft, Parawise — core properties blank, app.xml
     Application without a tool name, no Word comments, no tracked changes; package PDF — Info dictionary blank, no tool
     name in XMP, no annotation title/subject/content
@@ -278,16 +281,25 @@ def main(argv):
         check("no 'पॅकेज' in Note_and_Letter", pk)
         # C27: warning / working / AI words outside “…” quotes — note body, related heading + source lines, letter
         # (the verbatim related extracts are exempt)
+        # source line (03.11.2026, no word "स्रोत"): the LAST paragraph of each numbered item (before the next bold numbered
+        # heading or the end) when it reads "(…)"; ", पृ.N/प.वि.)" is reversed to " (पृ.N/प.वि.)" for the marker check
         rel_own, rel_src = [], []
         if rel is not None:
+            items = []
             for b in bl[rel + 1:rel_end]:
                 if b["kind"] != "p" or not ns(b["text"]):
                     continue
                 t = ns(b["text"])
-                if t.startswith("(स्रोत:"):
-                    rel_own.append(t); rel_src.append(re.sub(r",\s*(पृ\.[^()]*?/\s*प\.वि\.)$", r" (\1)", re.sub(r"^\(स्रोत:\s*|\)$", "", t)))
-                elif re.match(r"[0-9]+\.", t) and p_bold(Paragraph(b["el"], NL._body)):
+                if re.match(r"[0-9]+\.", t) and p_bold(Paragraph(b["el"], NL._body)):
+                    rel_own.append(t); items.append([])
+                elif items:
+                    items[-1].append(t)
+            for paras in items:
+                if paras and re.match(r"^\(.*\)$", paras[-1]):
+                    t = paras[-1]
                     rel_own.append(t)
+                    rel_src.append(re.sub(r",\s*(पृ\.[^()]*?/\s*प\.वि\.)$", r" (\1)",
+                                          re.sub(r"^\((?:स्रोत:\s*)?|\)$", "", t)))
         check("no warning / working / AI words (note, संबंधित माहिती heading/source, letter)",
               [f"{where}: '{w}'" for where, t in (("note", note_txt), ("संबंधित माहिती", "\n".join(rel_own)),
                                                  ("letter", letter_txt))

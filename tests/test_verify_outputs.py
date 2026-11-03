@@ -229,6 +229,33 @@ class VerifyOutputs(unittest.TestCase):
                 build_note(self.spec_with(f), d)
                 self.must_fail(d, "no warning / working / AI words")
 
+    def test_source_line_printed_without_srot(self):
+        """Abhi 03.11.2026: the related source prints as "(…, पृ.N/प.वि.)" — no word "स्रोत"; verify still finds it."""
+        d = self.case("srcplain")
+        build_note(self.spec_with(lambda s: s["related"][0].__setitem__("source", "परि. 2 (पृ.25/प.वि.)")), d)
+        x = docx.Document(os.path.join(d, f"{PRE}_Note_and_Letter.docx"))
+        txt = [p.text.strip() for p in x.paragraphs]
+        self.assertIn("(परि. 2, पृ.25/प.वि.)", txt)
+        self.assertFalse([t for t in txt if "स्रोत" in t])
+        self.must_fail(d, "page 25 outside package")
+
+    def test_srot_and_jasachya_tasa_in_heading_source_fail(self):
+        for i, (w, where) in enumerate((("स्रोत", "heading"), ("जसाच्या तसा", "source"), ("जसेच्या तसे", "note"),
+                                        ("जशीच्या तशी", "letter"))):
+            with self.subTest(word=w, where=where):
+                d = self.case(f"srot{i}")
+                def f(s, w=w, where=where):
+                    if where == "note": s["note"]["paras"][0] += f" {w}"
+                    elif where == "letter": s["letter"]["subject"] += f" {w}"
+                    elif where == "heading": s["related"][0]["heading"] += f" {w}"
+                    else: s["related"][0]["source"] = f"{w} " + s["related"][0]["source"]
+                build_note(self.spec_with(f), d)
+                self.must_fail(d, "no warning / working / AI words")
+        d = self.case("srotok")   # verbatim extract text is exempt
+        build_note(self.spec_with(lambda s: s["related"][0]["text"].append("उतारा जसाच्या तसा स्रोत")), d)
+        rc, out = self.run_verify(d)
+        self.assertIn("OK: no warning / working / AI words", out)
+
     def test_draft_words_in_extract_or_quote_ok(self):
         d = self.case("dwok")
         def f(s):

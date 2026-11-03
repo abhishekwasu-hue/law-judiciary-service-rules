@@ -12,7 +12,8 @@ Rules (spec.json)
     repo, रेपो) in any note / related / letter text
   - no BANNED word in the note body (first, paras, sub, closing) or the letter
   - C27 (02.11.2026): no "पॅकेज" (anywhere, quotes too) and, outside “…” quotes, no warning / working word (DRAFT_WORDS:
-    package PDF, इशारा, पडताळणी अपूर्ण, मागवावे, वाचन अपूर्ण, अस्पष्ट, पडताळलेले नाही, टीप :, warning, TODO) and no AI word
+    package PDF, इशारा, पडताळणी अपूर्ण, मागवावे, वाचन अपूर्ण, अस्पष्ट, पडताळलेले नाही, टीप :, warning, TODO; 03.11.2026:
+    स्रोत, जसाच्या तसा, जसेच्या तसे, जशीच्या तशी) and no AI word
     (AI_WORDS: AI, Claude, Anthropic, मॉडेल, model, स्वयंचलित, automatic, engine, प्रणालीने तयार, generated, LLM, GPT,
     Gemini) and no typographic / working tell (TELL_WORDS: em dash "—", arrows "→", web addresses http/www except the
     official "www.maharashtra.gov.in" line, "छापील पृ.") in the note body, the letter and the related heading/source; the
@@ -414,6 +415,11 @@ DRAFT_WORDS = [   # (label, regex) — warning / working remarks (contract C27 �
     ("टीप :", re.compile(r"(?<![ऀ-ॿ])टीप\s*:")),
     ("warning", re.compile(_LAT + r"warnings?" + _LAT_END, re.I)),
     ("TODO", re.compile(_LAT + r"TODO" + _LAT_END, re.I)),
+    # Abhi 03.11.2026 ("स्रोत/जसाच्या तसा काढा"; office notes never use them — docs/AI_TELLS.md)
+    ("स्रोत", re.compile(r"स्रोत")),
+    ("जसाच्या तसा", re.compile(r"जसाच्या\s+तसा")),
+    ("जसेच्या तसे", re.compile(r"जसेच्या\s+तसे")),
+    ("जशीच्या तशी", re.compile(r"जशीच्या\s+तशी")),
 ]
 AI_WORDS = [      # (label, regex) — AI / automation words (contract C27 §4)
     ("AI", re.compile(_LAT + r"A\.?I\.?" + _LAT_END)),

@@ -859,9 +859,10 @@ def agents_json(conf, brief="tools/ENGINE_BRIEF.md"):
         "prompt": base + VERBATIM + WRITER, "model": light}
     out["related_writer"] = {
         "description": "Cheap tier. The note's \"संबंधित माहिती (संदर्भासाठी)\" (spec `related`): verbatim GR/rule/"
-                       "precedent extracts with source, each ending \" (पृ.N/प.वि.)\" from the package map, or with no "
-                       "page marker when the page is not in the package; never \"पॅकेज PDF\", warnings, remarks or any "
-                       "mention of AI (INSTRUCTIONS §4.27); checked by tools/extract_check.py.",
+                       "precedent extracts; each source line = plain \"(GR no., date, page, para)\" ending \" (पृ.N/प.वि.)\" "
+                       "from the package map, or with no page marker when the page is not in the package; headings and "
+                       "sources never use the words \"स्रोत\" or \"जसाच्या तसा\"; never \"पॅकेज PDF\", warnings, remarks "
+                       "or any mention of AI (INSTRUCTIONS §4.27); checked by tools/extract_check.py.",
         "prompt": base + VERBATIM + WRITER, "model": light}
     out["reviewer"] = {
         "description": "Final review and approval (Opus-class). Checks every number/date/name of the note, letter and "

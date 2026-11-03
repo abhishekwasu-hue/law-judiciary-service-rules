@@ -15,7 +15,7 @@ spec.json:
               # add "अ.मु.स. (वित्त)" only when the file goes to Finance (INSTRUCTIONS §4.6)
  },
  "doc_author": "<name>",   # optional — Word author / last-modified-by (else env DOC_AUTHOR, else empty); tools/clean_meta.py
- "related": [ {"heading": "<GR/नियम/पूर्वोदाहरण शीर्षक>", "text": ["<जसाच्या तसा उतारा परिच्छेद>", "..."], "source": "<क्रमांक, दिनांक, पृ., परि.>"} ],   # शेवटी 'संबंधित माहिती'
+ "related": [ {"heading": "<GR/नियम/पूर्वोदाहरण शीर्षक>", "text": ["<verbatim extract paragraph>", "..."], "source": "<क्रमांक, दिनांक, पृ., परि.>"} ],   # शेवटी 'संबंधित माहिती'
  "letter": {   # optional — omit when no letter is needed (note only)
    "ref_no": "संकिर्ण-2026/प्र.क्र.116/का.6", "date": "__.__.2026",
    "to": ["प्रबंधक (वित्त व अर्थसंकल्प),", "उच्च न्यायालय (अपील शाखा),", "मुंबई."],
@@ -158,9 +158,10 @@ def build_note(spec, out):
             for tx in it.get("text", []):
                 add(body, sect, numbered, d, f"\t{tx}", left=Cm(0.8))
             if it.get("source"):
-                # "… (पृ.9-10/प.वि.)" prints as "(स्रोत: …, पृ.9-10/प.वि.)" — no doubled ")" (verify reverses it)
+                # "… (पृ.9-10/प.वि.)" prints as "(…, पृ.9-10/प.वि.)" — no doubled ")" and no word "स्रोत" (Abhi 03.11.2026;
+                # verify reverses it)
                 src = re.sub(r"\s*\((पृ\.[^()]*?/\s*प\.वि\.)\)\s*$", r", \1", it["source"])
-                add(body, sect, numbered, d, f"\t(स्रोत: {src})", left=Cm(0.8))
+                add(body, sect, numbered, d, f"\t({src})", left=Cm(0.8))
     nomirror(d); d.save(out); clean_docx(out, spec.get("doc_author"))
 
 def build_letter(spec, out):

@@ -92,7 +92,7 @@ Expected cost per typical proposal (15 pages, 3 GRs; estimate, not yet measured 
    - `related_writer`: "Read the brief, /tmp/work/related_plan.md, /tmp/work/spec.json and OUTDIR/<package> +
      its .map.json. Write /tmp/work/related.json = the spec `related` list (verbatim extracts in “…”, source, each
      ending " (पृ.N/प.वि.)" from the map, or with no page marker when the page is not in the package; never
-     "पॅकेज PDF", warnings or remarks — INSTRUCTIONS §4.27)."
+     "पॅकेज PDF", warnings, remarks, "स्रोत" or "जसाच्या तसा" — INSTRUCTIONS §4.27)."
    - `study_writer`: "Read the brief, facts.json, spec.json, study_part0.json, candidates.md and the package. Write
      /tmp/work/study_rest.json = parts 2, 3, 4, 7 (build_study parts; part 3 extracts verbatim in “…” with
      "(पॅकेज PDF पृ. N)" or "(पॅकेज PDF मध्ये नाही)"; unavailable GRs, discrepancies, cautions in parts 4/7)."

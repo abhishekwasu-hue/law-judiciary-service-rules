@@ -301,7 +301,8 @@ class LintSpec(unittest.TestCase):
     def test_draft_words_each_fail(self):
         words = ["इशारा", "पडताळणी अपूर्ण", "मागवावे", "वाचन अपूर्ण", "अस्पष्ट", "पडताळलेले नाही", "टीप : तपासावे",
                  "टीप:", "warning", "TODO", "package PDF", "AI", "Claude", "Anthropic", "मॉडेल", "model", "स्वयंचलित",
-                 "automatic", "engine", "प्रणालीने तयार", "generated", "LLM", "GPT", "Gemini"]
+                 "automatic", "engine", "प्रणालीने तयार", "generated", "LLM", "GPT", "Gemini",
+                 "स्रोत:", "जसाच्या तसा", "जसेच्या तसे", "जशीच्या तशी"]   # last four: Abhi 03.11.2026
         for w in words:
             with self.subTest(word=w):
                 self.bad(self.s122, self.add0(f" {w} "), "draft word", "note.paras[0]")

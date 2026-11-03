@@ -44,9 +44,9 @@
   (77 office notes + 90 letters vs our 6 samples). Evidence: docs/ai-tells-cr131-before-after.png. Tests 293 passed.
 
 ## Pending
-10. **AI-tells decisions (Abhi; provisional default in brackets) — docs/AI_TELLS.md:** (1) Word author name (DOC_AUTHOR) [empty];
+10. **AI-tells decisions — DECIDED 03.11.2026 (Abhi: "Default thewa, 4 madhe स्रोत/जसाच्या तसा kadha"): bracketed defaults final; (4) the words "स्रोत"/"जसाच्या तसा" removed from drafts (§4.27 (आ), lint) — docs/AI_TELLS.md:** (1) Word author name (DOC_AUTHOR) [empty];
    (2) signer forms "का.अ.(…)" / "अवर सचिव, महाराष्ट्र शासन" as in office files vs §4.5/§4.6 [current]; (3) subject/reference
-   fully bold+centre (§4.10) vs office (label only bold) [current]; (4) "संबंधित माहिती" block + words "स्रोत"/"जसाच्या तसा" (office
+   fully bold+centre (§4.10) vs office (label only bold) [current — Abhi 03.11.2026: "3 ठळक", full line bold stays]; (4) "संबंधित माहिती" block + words "स्रोत"/"जसाच्या तसा" (office
    never uses them) [keep block; drop the two words after decision]; (5) "(1)…; (2)…" lists vs office "."/"," [current];
    (6) linking words तथापि/त्यानुषंगाने/परंतु [use where fitting, one point per sentence kept].
    Items removed from samples' notes (still unavailable): CR122 — MCS Pay Rules 1981 rule 11 original, Finance circular 05.12.1985;

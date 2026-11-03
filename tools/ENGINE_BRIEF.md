@@ -68,7 +68,7 @@ content; section 0 wins over every ask / discuss / stop line (no interaction in 
   No repo paths, no internal ids (z6_0235 …).
 - [I4.27] Drafts (note + related, letter, order/parawise): no warning, no trace of AI. Own text (not quotes /
   related extracts) never has: "पॅकेज", "इशारा", "पडताळणी अपूर्ण", "मागवावे", "वाचन अपूर्ण", "अस्पष्ट",
-  "पडताळलेले नाही", own "टीप :", warning, TODO, AI, Claude, Anthropic, "मॉडेल", model, "स्वयंचलित", automatic,
+  "पडताळलेले नाही", own "टीप :", warning, TODO, स्रोत, जसाच्या तसा, AI, Claude, Anthropic, "मॉडेल", model, "स्वयंचलित", automatic,
   engine, "प्रणालीने तयार", generated, LLM, GPT, Gemini. Unknown -> "____"; missing GR/source, discrepancies,
   [I8] caution -> Study part 4/7 + `warnings` only. The missing-info para stays. No "—", "→", URLs.
   Metadata: tools.
