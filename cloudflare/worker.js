@@ -47,7 +47,11 @@ const DISPATCH_REASON = 'GitHub जोडणी अयशस्वी (token त
 const CLEAR = '__clear__';
 const UNCLEARABLE = ['supabase_service_key'];
 // case fields the app may set (POST create, PATCH edit)
-const CASE_FIELDS = ['cr_no', 'cr_year', 'file_no', 'subject', 'category', 'priority', 'employee_name', 'post', 'office', 'received_from', 'received_via', 'inward_date', 'due_date'];
+const CASE_FIELDS = ['cr_no', 'cr_year', 'file_no', 'subject', 'category', 'priority', 'employee_name', 'post', 'office', 'received_from', 'received_via', 'inward_date', 'due_date', 'desk'];
+// desk profiles (C30, tools/desks/<id>.json; app list dashboard-app/src/lib/constants.ts DESKS). Add an id here when a
+// profile json is added. cases.desk null = law-desk6 (migration 0009).
+export const DESK_IDS = ['law-desk6', 'hte-mashi5'];
+const BAD_DESK = 'विभाग / कार्यासन चुकीचे — यादीतील पर्याय निवडा';
 
 // PostgREST error: the browser gets only "db <status>" (no table/column text); code/detail stay for the Worker's own checks.
 class DbError extends Error {
@@ -200,6 +204,19 @@ export function normOutputs(v) {
   return { value: DRAFT_KEYS.filter(k => v.includes(k)) };
 }
 const missingColumn = (e, col) => e instanceof DbError && (e.code === '42703' || e.code === 'PGRST204' || (new RegExp(col).test(e.detail) && /does not exist|could not find/i.test(e.detail)));
+
+// cases.desk missing (migration 0009 not applied): write the case without `desk` and log; never fail the request
+async function writeCase(db, path, method, row, what) {
+  try {
+    return (await db.rest(path, { method, body: JSON.stringify(row) })) || [];
+  } catch (e) {
+    if (!('desk' in row) || !missingColumn(e, 'desk')) throw e;
+    const { desk, ...rest } = row;
+    console.log(`cases.desk column missing (apply migration 0009); ${what} without desk=${desk}`);
+    if (!Object.keys(rest).length) return (await db.rest(`${path}${path.includes('?') ? '&' : '?'}select=*`)) || [];
+    return (await db.rest(path, { method, body: JSON.stringify(rest) })) || [];
+  }
+}
 
 async function findCrDup(db, crNo, crYear, exceptId = null) {
   if (crNo == null || crNo === '' || crYear == null || crYear === '') return null;
@@ -485,12 +502,13 @@ async function route(req, env, url) {
     if (b.cr_no && !/^\d+$/.test(String(b.cr_no))) return bad('cr_no: digits only');
     if (b.cr_year && !/^\d{4}$/.test(String(b.cr_year))) return bad('cr_year: 4 digits');
     const row = Object.fromEntries(CASE_FIELDS.filter(k => b[k] !== undefined && b[k] !== '').map(k => [k, b[k]]));
+    if (row.desk != null && !DESK_IDS.includes(row.desk)) return bad(BAD_DESK);
     const findDup = () => findCrDup(db, row.cr_no, row.cr_year);
     const dupId = await findDup();
     if (dupId !== null) return json({ error: 'duplicate_cr', existing_id: dupId }, 409);
     let c;
     try {
-      [c] = await db.rest('cases', { method: 'POST', body: JSON.stringify(row) });
+      [c] = await writeCase(db, 'cases', 'POST', row, 'case created');
     } catch (e) {
       // a parallel request inserted the same C R between the check and the insert (unique cr_no, cr_year)
       if (e instanceof DbError && (e.status === 409 || e.code === '23505')) return json({ error: 'duplicate_cr', existing_id: await findDup() }, 409);
@@ -513,6 +531,7 @@ async function route(req, env, url) {
     if ('subject' in row && row.subject === null) row.subject = ''; // subject column: empty text, not null (as the app saved it before)
     if (row.cr_no != null && !/^\d+$/.test(String(row.cr_no).trim())) return bad('cr_no: digits only');
     if (row.cr_year != null && !/^\d{4}$/.test(String(row.cr_year).trim())) return bad('cr_year: 4 digits');
+    if (row.desk != null && !DESK_IDS.includes(row.desk)) return bad(BAD_DESK);
     if (row.cr_no != null) row.cr_no = String(row.cr_no).trim();
     if (row.cr_year != null) row.cr_year = Number(String(row.cr_year).trim());
     const [cur] = (await db.rest(`cases?id=eq.${id}&select=id,cr_no,cr_year`)) || [];
@@ -525,7 +544,7 @@ async function route(req, env, url) {
     }
     let c;
     try {
-      [c] = (await db.rest(`cases?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify(row) })) || [];
+      [c] = await writeCase(db, `cases?id=eq.${id}`, 'PATCH', row, `case ${id} updated`);
     } catch (e) {
       if (e instanceof DbError && (e.status === 409 || e.code === '23505')) return json({ error: 'duplicate_cr', existing_id: await findCrDup(db, crNo, crYear, id) }, 409);
       throw e;

@@ -21,6 +21,8 @@ const configTaken = new Set();
 let configColumn = true;
 let outputsColumn = true;         // false = migration 0008 not applied (runs.outputs missing)
 const runInserts = [];
+let deskColumn = true;            // false = migration 0009 not applied (cases.desk missing)
+const caseInserts = [];
 let kindEnum08 = true;            // false = migration 0008 not applied (file_kind lacks approval / court_notice)          // false = migration 0005 not applied (PostgREST 42703)
 let membersInsert = 'ok';         // 'conflict' = a parallel first request already inserted (409 23505)
 const cases = [{ id: 40, cr_no: '21', cr_year: 2026 }];
@@ -59,6 +61,10 @@ globalThis.fetch = async (u, opt = {}) => {
     assert.equal(opt.headers.Authorization, 'Bearer service-secret-1234', 'admin API with the service role');
     const f = new URL(u).searchParams.get('filter');
     return res({ users: f ? authUsers.filter(x => x.email.toLowerCase().includes(f)) : authUsers });
+  }
+  if (!deskColumn && u.startsWith(`${SB}/rest/v1/cases`) && ['POST', 'PATCH'].includes(opt.method) && 'desk' in JSON.parse(opt.body)) return res({ code: 'PGRST204', message: "Could not find the 'desk' column of 'cases' in the schema cache" }, 400);
+  if (u.startsWith(`${SB}/rest/v1/cases?id=eq.`) && u.endsWith('&select=*') && !opt.method) {
+    const r = caseRows[u.match(/id=eq\.(\d+)/)[1]]; return res(r ? [r] : []);
   }
   if (u.startsWith(`${SB}/rest/v1/cases?id=eq.`) && u.includes('&select=id,cr_no,cr_year')) {
     const r = caseRows[u.match(/id=eq\.(\d+)/)[1]]; return res(r ? [r] : []);
@@ -121,7 +127,7 @@ globalThis.fetch = async (u, opt = {}) => {
     return res(cases.filter(c => re.test(c.cr_no) && c.cr_year === y && String(c.id) !== neq).map(c => ({ id: c.id })));
   }
   if (u === `${SB}/rest/v1/cases` && opt.method === 'POST') {
-    const row = JSON.parse(opt.body);
+    const row = JSON.parse(opt.body); caseInserts.push(row);
     if (caseInsertRace) { cases.push({ id: 41, cr_no: row.cr_no, cr_year: Number(row.cr_year) }); return res({ code: '23505', message: 'duplicate key value violates unique constraint "cases_cr_no_cr_year_key"' }, 409); }
     return res([{ id: 42, ...row }], 201);
   }
@@ -735,4 +741,42 @@ test('C28: upload accepts the kinds approval and court_notice; unknown kind refu
     assert.equal((await up('extra_doc')).status, 200, 'old kinds unaffected');
   } finally { kindEnum08 = true; }
   assert.equal((await up('foo')).status, 400);
+});
+
+test('C30: case desk — create/PATCH accept the profile ids only (400 Marathi); missing column → saved without it', async () => {
+  const owner = { authorization: 'Bearer owner-jwt' };
+  const create = b => call('/api/cases', { method: 'POST', headers: owner, body: JSON.stringify(b) });
+  const edit = (id, b) => call(`/api/cases/${id}`, { method: 'PATCH', headers: owner, body: JSON.stringify(b) });
+  let r = await create({ subject: 'उ.व तं.शि.वि. प्रस्ताव', desk: 'hte-mashi5' });
+  assert.equal(r.status, 200, await r.clone().text());
+  assert.equal((await r.json()).desk, 'hte-mashi5');
+  r = await create({ subject: 'x', desk: '' });
+  assert.ok(!('desk' in caseInserts.at(-1)), "'' = not sent (null = law-desk6)");
+  const n = caseInserts.length;
+  for (const d of ['law-desk7', 'LAW-DESK6', 5, ['law-desk6']]) {
+    r = await create({ subject: 'x', desk: d });
+    assert.equal(r.status, 400, JSON.stringify(d));
+    assert.deepEqual(await r.json(), { error: 'विभाग / कार्यासन चुकीचे — यादीतील पर्याय निवडा' });
+    r = await edit(43, { desk: d });
+    assert.equal(r.status, 400, JSON.stringify(d));
+  }
+  assert.equal(caseInserts.length, n, 'nothing inserted for a bad desk');
+  r = await edit(43, { desk: 'hte-mashi5' });
+  assert.equal(r.status, 200); assert.equal(caseRows[43].desk, 'hte-mashi5');
+  r = await edit(43, { desk: '' });
+  assert.equal(r.status, 200); assert.equal(caseRows[43].desk, null, "'' clears to the default desk");
+  // migration 0009 not applied: never fail — the case is saved without desk
+  deskColumn = false;
+  try {
+    r = await create({ subject: 'y', desk: 'law-desk6' });
+    assert.equal(r.status, 200, await r.clone().text());
+    assert.ok(!('desk' in caseInserts.at(-1)), 'retried without desk');
+    assert.equal(caseInserts.at(-1).subject, 'y');
+    r = await edit(43, { post: 'लिपिक', desk: 'hte-mashi5' });
+    assert.equal(r.status, 200, await r.clone().text());
+    assert.equal(caseRows[43].post, 'लिपिक'); assert.equal(caseRows[43].desk, null);
+    r = await edit(43, { desk: 'hte-mashi5' });
+    assert.equal(r.status, 200, 'desk-only edit: the case row comes back unchanged');
+    assert.equal((await r.json()).id, 43);
+  } finally { deskColumn = true; }
 });

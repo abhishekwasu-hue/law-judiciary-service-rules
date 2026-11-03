@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type DragEvent, type FormEvent } from 'rea
 import { Link } from 'react-router-dom';
 import { ApiError, api, budgetReachedText, fmtUsd, getSpend, humanError, spendBlocked, uploadFile, type Spend } from '../lib/api';
 import { useAuth, useCanWrite } from '../lib/auth';
-import { CATEGORIES, INPUT_KINDS, INPUT_KIND_LABEL, PRIORITIES, isStale, type DraftKey, type InputKind } from '../lib/constants';
+import { CATEGORIES, DEFAULT_DESK, DESKS, INPUT_KINDS, INPUT_KIND_LABEL, PRIORITIES, isStale, type DraftKey, type InputKind } from '../lib/constants';
 import { sameDrafts, suggestDrafts } from '../lib/drafts';
 import { crLabel, fmtBytes } from '../lib/format';
 import { guessSubject } from '../lib/pdf';
@@ -56,7 +56,7 @@ export default function NewProposal() {
   const overBudget = !!spend && spendBlocked(spend);
   const [proposal, setProposal] = useState<File | null>(null);
   const [extras, setExtras] = useState<Extra[]>([]);
-  const [f, setF] = useState({ cr_no: '', cr_year: '', file_no: '', subject: '', category: '', priority: 'सामान्य', instructions: '' });
+  const [f, setF] = useState({ cr_no: '', cr_year: '', file_no: '', subject: '', category: '', priority: 'सामान्य', desk: DEFAULT_DESK as string, instructions: '' });
   // "कोणते मसुदे हवेत?": follows the suggestion (from the file types) until the user changes a chip
   const suggestion = suggestDrafts(extras.map(x => ({ kind: x.kind })), []);
   const [drafts, setDraftsRaw] = useState<DraftKey[] | null>(null); // null = untouched → the suggestion
@@ -143,7 +143,7 @@ export default function NewProposal() {
       if (!c) {
         c = await api<Case>('/api/cases', {
           // every identity field is optional; empty ones are filled by the engine from the निर्देशपत्र
-          body: Object.fromEntries(Object.entries({ cr_no: f.cr_no.trim(), cr_year: f.cr_year.trim() ? Number(f.cr_year) : '', file_no: f.file_no.trim(), subject: f.subject.trim(), category: f.category, priority: f.priority }).filter(([, v]) => v !== '')),
+          body: Object.fromEntries(Object.entries({ cr_no: f.cr_no.trim(), cr_year: f.cr_year.trim() ? Number(f.cr_year) : '', file_no: f.file_no.trim(), subject: f.subject.trim(), category: f.category, priority: f.priority, desk: f.desk }).filter(([, v]) => v !== '')),
         });
         setCreated(c);
         setDupId(null);
@@ -192,7 +192,7 @@ export default function NewProposal() {
     setProposal(null);
     setExtras([]);
     setDraftsRaw(null);
-    setF({ cr_no: '', cr_year: '', file_no: '', subject: '', category: '', priority: 'सामान्य', instructions: '' });
+    setF({ cr_no: '', cr_year: '', file_no: '', subject: '', category: '', priority: 'सामान्य', desk: DEFAULT_DESK as string, instructions: '' });
     setUps([]);
     setCreated(null);
     setRunErr('');
@@ -288,11 +288,14 @@ export default function NewProposal() {
         )}
         <Section title="तपशील">
           <div className="space-y-4">
+            <Field label="विभाग / कार्यासन" hint="नोंद व पत्राची रचना (शीर्ष, सही-साखळी, पत्राचा क्रमांक) या कार्यासनाप्रमाणे.">
+              <select className="input" disabled={locked} value={f.desk} onChange={set('desk')}>{DESKS.map(d => <option key={d.id} value={d.id}>{d.label}</option>)}</select>
+            </Field>
             <div className="grid grid-cols-2 gap-3">
               <Field label="C R क्र."><input className="input" inputMode="numeric" placeholder="उदा. 128" disabled={locked} value={f.cr_no} onChange={setCr} /></Field>
               <Field label="वर्ष"><input ref={yearRef} className="input" inputMode="numeric" maxLength={4} placeholder="PDF वरून" disabled={locked} value={f.cr_year} onChange={setYear} /></Field>
             </div>
-            <Field label="नस्ती क्र. (निर्देशपत्र)"><input className="input" placeholder="संकीर्ण-2026/___/प्र.क्र.___/का.6" disabled={locked} value={f.file_no} onChange={set('file_no')} /></Field>
+            <Field label="नस्ती क्र. (निर्देशपत्र)"><input className="input" placeholder={DESKS.find(d => d.id === f.desk)?.fileNo} disabled={locked} value={f.file_no} onChange={set('file_no')} /></Field>
             <Field label="विषय"><textarea className="input min-h-[88px]" placeholder="रिकामे ठेवल्यास PDF वरून भरले जाईल" disabled={locked} value={f.subject} onChange={set('subject')} /></Field>
             <div className="grid grid-cols-2 gap-3">
               <Field label="प्रवर्ग">

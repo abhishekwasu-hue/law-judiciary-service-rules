@@ -3,7 +3,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { sb } from '../lib/supabase';
 import { useData, overdueIds } from '../lib/data';
 import { useCanWrite } from '../lib/auth';
-import { CATEGORIES, PRIORITIES, STAGES, stageTone } from '../lib/constants';
+import { CATEGORIES, DEFAULT_DESK, DESKS, PRIORITIES, STAGES, deskLabel, stageTone } from '../lib/constants';
 import { caseSubject, crFromFileName, crLabel, fmtDate } from '../lib/format';
 import { ApiError, api, humanError } from '../lib/api';
 import type { Activity, Case, CaseFile, Letter, Member } from '../lib/types';
@@ -237,7 +237,7 @@ export default function CaseDetail() {
         </div>
         <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm sm:grid-cols-4">
           {[
-            ['नस्ती क्र.', c.file_no], ['प्रवर्ग', c.category], ['कार्यालय', c.office], ['कर्मचारी / पद', [c.employee_name, c.post].filter(Boolean).join(' / ')],
+            ['विभाग / कार्यासन', deskLabel(c.desk)], ['नस्ती क्र.', c.file_no], ['प्रवर्ग', c.category], ['कार्यालय', c.office], ['कर्मचारी / पद', [c.employee_name, c.post].filter(Boolean).join(' / ')],
             ['प्राप्त', c.received_from], ['मार्ग', c.received_via === 'High Court' ? 'उच्च न्यायालयामार्फत' : c.received_via === 'direct' ? 'थेट' : null],
             ['आवक दिनांक', c.inward_date && fmtDate(c.inward_date)], ['मुदत', c.due_date && fmtDate(c.due_date)],
           ].map(([k, v]) => (
@@ -297,6 +297,7 @@ function EditCase({ open, onClose, c, onSaved }: { open: boolean; onClose: () =>
     cr_no: x.cr_no || '', cr_year: x.cr_year ? String(x.cr_year) : '',
     file_no: x.file_no || '', subject: x.subject, category: x.category, priority: x.priority, employee_name: x.employee_name || '', post: x.post || '',
     office: x.office || '', received_from: x.received_from || '', received_via: x.received_via || '', inward_date: x.inward_date || '', due_date: x.due_date || '',
+    desk: x.desk || DEFAULT_DESK,
   });
   const [f, setF] = useState(pick(c));
   const [busy, setBusy] = useState(false);
@@ -343,6 +344,7 @@ function EditCase({ open, onClose, c, onSaved }: { open: boolean; onClose: () =>
           <Field label="वर्ष"><input className="input" inputMode="numeric" maxLength={4} placeholder="उदा. 2026" value={f.cr_year} onChange={setDigits('cr_year', 4)} /></Field>
         </div>
         <div className="sm:col-span-2"><Field label="विषय"><textarea className="input" value={f.subject ?? ''} onChange={set('subject')} /></Field></div>
+        <div className="sm:col-span-2"><Field label="विभाग / कार्यासन"><select className="input" value={f.desk} onChange={set('desk')}>{DESKS.map(d => <option key={d.id} value={d.id}>{d.label}</option>)}</select></Field></div>
         <Field label="नस्ती क्र."><input className="input" value={f.file_no} onChange={set('file_no')} /></Field>
         <Field label="प्रवर्ग"><select className="input" value={f.category} onChange={set('category')}>{CATEGORIES.map(x => <option key={x}>{x}</option>)}</select></Field>
         <Field label="प्राधान्य"><select className="input" value={f.priority} onChange={set('priority')}>{PRIORITIES.map(x => <option key={x}>{x}</option>)}</select></Field>

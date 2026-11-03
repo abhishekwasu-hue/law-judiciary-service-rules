@@ -6,6 +6,8 @@ export interface Case {
   employee_name: string | null; post: string | null; office: string | null; received_from: string | null;
   received_via: string | null; inward_date: string | null; stage: string; priority: string;
   due_date: string | null; assigned_to: string | null; created_at: string; updated_at: string;
+  // migration 20261103000009_case_desk.sql: desk profile id (DESKS); null / absent = law-desk6
+  desk?: string | null;
 }
 export interface CaseFile {
   id: number; case_id: number; kind: string; storage_path: string; original_name: string;

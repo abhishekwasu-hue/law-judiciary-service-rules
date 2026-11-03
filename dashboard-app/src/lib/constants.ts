@@ -17,6 +17,16 @@ export const CATEGORIES = [
   'विमा/GPF', 'सेवा', 'न्यायिक वेतन', 'वैद्यकीय', 'इतर',
 ] as const;
 
+/** Desk profiles (C30): ids mirror tools/desks/<id>.json and the Worker's DESK_IDS (cloudflare/worker.js) — add a desk in
+ *  all three. cases.desk null (or migration 0009 not applied) = DEFAULT_DESK. */
+export const DESKS = [
+  { id: 'law-desk6', label: 'विधि व न्याय विभाग — कार्यासन-6', fileNo: 'संकीर्ण-2026/___/प्र.क्र.___/का.6' },
+  { id: 'hte-mashi5', label: 'उच्च व तंत्र शिक्षण विभाग — मशि-5', fileNo: '___-2026/प्र.क्र.___/मशि-5' },
+] as const;
+export const DEFAULT_DESK = 'law-desk6';
+export const deskLabel = (id: string | null | undefined) =>
+  (DESKS.find(d => d.id === (id || DEFAULT_DESK)) ?? { label: id || '' }).label;
+
 export const PRIORITIES = ['सामान्य', 'तातडीचे'] as const;
 export const LETTER_STATUSES = ['मसुदा', 'पाठवले', 'उत्तर प्राप्त', 'स्मरणपत्र'] as const;
 
