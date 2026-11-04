@@ -47,7 +47,7 @@ import lint_spec  # noqa: E402
 # target -> the spec keys it may change (real keys of samples/specs/*.json)
 TARGET_KEYS = {"note": ("note", "related"), "letter": ("letter", "letters"), "order": ("order", "orders"),
                "parawise": ("parawise",), "affidavit": ("affidavit",), "lq": ("lq",), "package": ()}
-TARGET_LABEL = {"note": "नोंद", "letter": "पत्र", "order": "आदेश-प्रारूप", "parawise": "परिच्छेदनिहाय उत्तर",
+TARGET_LABEL = {"note": "टिप्पणी", "letter": "पत्र", "order": "आदेश-प्रारूप", "parawise": "परिच्छेदनिहाय उत्तर",
                 "affidavit": "शपथपत्र", "lq": "विधानमंडळ उत्तर", "package": "GR सह प्रस्ताव PDF"}
 # output kind -> (file suffix, builder, spec keys the builder reads)
 OUTPUTS = {"note_letter": ("_Note_and_Letter.docx", "build_note_letter.py", ("note", "related", "letter", "letters")),
@@ -119,7 +119,8 @@ Reply strictly as JSON: {"ops": [...], "summary": "...", "refuse": ""}.
   "replace": the path must exist; "remove": the path must exist; "insert": into a list at an index (the item is put
   before that index) or "-" (append), or a new key of an object. "value_json" = the new value as JSON text (a JSON
   string in quotes for text, an object or list for a table / item); "" for "remove".
-- "summary": ONE line in Marathi saying what was changed, e.g. "नोंदीच्या परि. 5 मधील दिनांक दुरुस्त करण्यात आला आहे."
+- In "summary" / "refuse" call the note "टिप्पणी" (never "नोंद"; owner 04.11.2026).
+- "summary": ONE line in Marathi saying what was changed, e.g. "टिप्पणीच्या परि. 5 मधील दिनांक दुरुस्त करण्यात आला आहे."
 - If only PART of the message is outside this edit (e.g. "apply this in all future proposals", a change in another
   draft), DO the part that is inside with ops, and put ONLY the reason for the other part in "refuse" (it is shown as a
   note; the done part is kept). Never drop a doable change because another part of the message is outside the edit.
@@ -287,17 +288,17 @@ def text_of(v, cap=2000):
 
 def note_para_label(paras, i, insert=False):
     if not isinstance(paras, list):
-        return "नोंद"
+        return "टिप्पणी"
     strs_before = sum(1 for x in paras[:i] if isinstance(x, str))
     if insert:
-        return f"नोंद — नवीन परिच्छेद (परि. {1 + strs_before} नंतर)"
+        return f"टिप्पणी — नवीन परिच्छेद (परि. {1 + strs_before} नंतर)"
     if i < len(paras) and isinstance(paras[i], str):
-        return f"नोंद परि. {2 + strs_before}"
-    return f"नोंद तक्ता (परि. {1 + strs_before} नंतर)"
+        return f"टिप्पणी परि. {2 + strs_before}"
+    return f"टिप्पणी तक्ता (परि. {1 + strs_before} नंतर)"
 
 
 def where_of(ch):
-    """{"toks", "state", "op"} -> e.g. "नोंद परि. 5", "पत्र — विषय", "संबंधित माहिती क्र. 2"."""
+    """{"toks", "state", "op"} -> e.g. "टिप्पणी परि. 5", "पत्र — विषय", "संबंधित माहिती क्र. 2"."""
     toks, st, ins = ch["toks"], ch["state"], ch["op"] == "insert"
     k = toks[0]
     rest = toks[1:]
@@ -306,12 +307,12 @@ def where_of(ch):
         n = st.get("note") or {}
         f = rest[0]
         if f == "first":
-            return "नोंद परि. 1"
+            return "टिप्पणी परि. 1"
         if f == "paras" and len(rest) > 1 and idx(rest[1]) is not None:
             return note_para_label(n.get("paras"), idx(rest[1]), insert=ins and len(rest) == 2)
         if f == "sub" and len(rest) > 1 and idx(rest[1]) is not None:
             return note_para_label(n.get("paras"), idx(rest[1])) + " चे उप-मुद्दे"
-        return {"closing": "नोंद शेवटचा परिच्छेद", "signers": "नोंद सही-साखळी", "uo": "नोंद — अनौपचारिक संदर्भ"}.get(f, "नोंद")
+        return {"closing": "टिप्पणी शेवटचा परिच्छेद", "signers": "टिप्पणी सही-साखळी", "uo": "टिप्पणी — अनौपचारिक संदर्भ"}.get(f, "नोंद")
     if k == "related":
         i = idx(rest[0])
         if i is None:

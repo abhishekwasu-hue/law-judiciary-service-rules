@@ -134,8 +134,8 @@ def test_apply_replace_remove_insert():
     assert PART["note"]["paras"][0] == "एक."           # the original is never changed
     assert [c["op"] for c in ch] == ["replace", "insert", "remove", "insert"]
     w = ED.readable_changes(ch)
-    assert w[0] == {"where": "नोंद परि. 2", "before": "एक.", "after": "नवीन."}
-    assert w[1]["where"].startswith("नोंद परि. ") or "नवीन परिच्छेद" in w[1]["where"]
+    assert w[0] == {"where": "टिप्पणी परि. 2", "before": "एक.", "after": "नवीन."}
+    assert w[1]["where"].startswith("टिप्पणी परि. ") or "नवीन परिच्छेद" in w[1]["where"]
     assert w[2]["where"] == "संबंधित माहिती क्र. 1"
 
 
@@ -264,7 +264,7 @@ def test_note_para_edit_shows_in_docx(sb, tmp_path, monkeypatch):
     (tmp_path / "n.docx").write_bytes(sb.objects[v2["storage_path"]])
     t = docx_text(str(tmp_path / "n.docx"))
     assert new.split(" (पृ.")[0][:60] in t and "कार्यवाहीसाठी व मान्यतेस्तव शासनास" not in t
-    assert sb.run["edit_result"]["changes"][0]["where"] == "नोंद परि. 2"
+    assert sb.run["edit_result"]["changes"][0]["where"] == "टिप्पणी परि. 2"
 
 
 def test_refusal_changes_nothing(sb, tmp_path, monkeypatch):

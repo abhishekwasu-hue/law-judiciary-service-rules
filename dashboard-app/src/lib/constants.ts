@@ -147,7 +147,7 @@ export const EXTRA_OUTPUT_KINDS = ['order_draft', 'parawise', 'affidavit', 'lq_a
 /** सुधारणा-चॅट (docs/DRAFT_EDIT_DESIGN.md §3, §6): POST /api/edit targets, their labels and the output kind each one edits.
  *  Offered only when that output file exists for the case. */
 export const EDIT_TARGETS = [
-  { id: 'note', label: 'नोंद', kind: 'note_letter' },
+  { id: 'note', label: 'टिप्पणी', kind: 'note_letter' },
   { id: 'letter', label: 'पत्र', kind: 'note_letter' },
   { id: 'order', label: 'आदेश-प्रारूप', kind: 'order_draft' },
   { id: 'parawise', label: 'परिच्छेदनिहाय उत्तर', kind: 'parawise' },

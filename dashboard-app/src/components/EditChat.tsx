@@ -313,7 +313,7 @@ export default function EditChat({ ctx }: { ctx: CaseCtx }) {
               )}
               <textarea
                 className="block min-h-[88px] w-full resize-y rounded-xl bg-transparent px-3 py-2 outline-none"
-                placeholder="उदा. नोंदीच्या परि. 5 मधील शेवटची दोन वाक्ये वगळावीत; पत्रातील दिनांक 12.10.2026 असा करावा"
+                placeholder="उदा. टिप्पणीच्या परि. 5 मधील शेवटची दोन वाक्ये वगळावीत; पत्रातील दिनांक 12.10.2026 असा करावा"
                 value={text}
                 maxLength={EDIT_MAX_CHARS}
                 disabled={busy}
