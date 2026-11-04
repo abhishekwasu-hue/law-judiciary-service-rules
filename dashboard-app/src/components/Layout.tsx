@@ -20,7 +20,7 @@ function ActiveRunsBar() {
       <Spinner className="h-4 w-4" />
       <span className="font-bold">{(() => {
         const w = active.filter(isWaiting).length;
-        return `${active.length - w} प्रक्रिया चालू${w ? `, ${w} रांगेत` : ''} — दुसऱ्या पानावर गेलात तरी काम चालूच राहते`;
+        return `${active.length - w} प्रक्रिया चालू${w ? `, ${w} रांगेत` : ''}`;
       })()}</span>
       {active.map(r => {
         const c = cases.find(x => x.id === r.case_id);
