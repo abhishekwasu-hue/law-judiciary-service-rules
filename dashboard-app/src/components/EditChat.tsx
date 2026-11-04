@@ -156,7 +156,7 @@ export default function EditChat({ ctx }: { ctx: CaseCtx }) {
   const [view, setView] = useState<CaseFile | null>(null);
   // Abhi 04.11.2026: the case is chosen by the user and confirmed before every message (no tokens spent on a wrong case)
   const [pick, setPick] = useState(false);
-  // glow + "नवीन" until the user first uses the chat (this browser only)
+  // glow + "AI" badge until the user first uses the chat (this browser only)
   const [seen, setSeen] = useState(() => { try { return localStorage.getItem('edit_chat_seen') === '1'; } catch { return false; } });
   const markSeen = () => { if (seen) return; setSeen(true); try { localStorage.setItem('edit_chat_seen', '1'); } catch { /* storage blocked */ } };
   const [confirm, setConfirm] = useState(false);
@@ -257,7 +257,7 @@ export default function EditChat({ ctx }: { ctx: CaseCtx }) {
     <section ref={boxRef} className={`card edit-panel relative min-w-0 scroll-mt-20 overflow-hidden ${seen ? 'seen' : ''} ${drag ? 'ring-4 ring-saffron-500' : ''}`} aria-label="सुधारणा" {...dragProps}>
       <div className="edit-head flex items-center justify-between gap-2 px-4 py-3">
         <div className="min-w-0">
-          <h2 className="flex items-center gap-2 text-lg font-bold">✏️ सुधारणा-चॅट {!seen && <span className="blink-badge rounded-full bg-white px-2 py-0.5 text-xs font-bold text-orange-600">नवीन</span>}</h2>
+          <h2 className="flex items-center gap-2 text-lg font-bold">✏️ सुधारणा-चॅट {!seen && <span className="blink-badge rounded-full bg-white px-2 py-0.5 text-xs font-bold text-orange-600">AI</span>}</h2>
           <p className="text-sm text-white/90">मसुद्यात बदल हवा असल्यास कृपया येथे नमूद करावे</p>
         </div>
         {turns.length > 0 && <span className="shrink-0 rounded-full bg-white/20 px-2 py-0.5 text-sm font-semibold">{turns.length} संदेश</span>}
