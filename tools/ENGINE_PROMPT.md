@@ -218,6 +218,14 @@ parawise (परिच्छेदनिहाय उत्तर). The Study, t
     without Finance/GAD concurrence (or the decision) on record -> still drafted (unknown references "____") + warning
     "पडताळणी अपूर्ण — शासन निर्णय: वित्त/सा.प्र.वि. सहमती अभिलेखावर नाही (B7)".
   - parawise -> spec `parawise` (court mode below; build_parawise.py).
+  - do_letter (अर्धशासकीय पत्र) -> a letter with `"kind": "do"` in `letter` / `letters` (mkdocs.py docstring; it goes
+    into the same Note_and_Letter). uo_note (अनौपचारिक संदर्भ नोंद) -> note `uo` {to, no, date} (the note goes to that
+    department; its last para sends the file there).
+  - endorsement / office_order / press_note / addendum -> items of spec `orders` with that `type` (build_order.py; same
+    one Order_Draft as the other orders).
+  - affidavit (शपथपत्र) -> spec `affidavit` -> `python3 tools/build_affidavit.py spec.json OUTDIR PREFIX` ->
+    `OUTDIR/<PREFIX>_Affidavit.docx`; lq (विधानमंडळ प्रश्नाचे उत्तर) -> spec `lq` -> `python3 tools/build_lq.py spec.json
+    OUTDIR PREFIX` -> `OUTDIR/<PREFIX>_LQ_Answer.docx` (build after build_note_letter, before verify, like parawise).
   - The note's last para names every draft made, e.g. "सबब, … पत्राचे प्रारूप व शासन निर्णयाचे प्रारूप पृ.      /प.वि. वर
     मान्यतेस्तव सादर." (lint_spec accepts the combined form; "अ.मु.स. (वित्त)" only on a Finance route, as before).
   - §4.27 applies to every draft (no warning / AI words inside; unknown -> "____").
@@ -337,13 +345,15 @@ Step 0 is done by the workflow:
    - `OUTDIR/<PREFIX>_Study.docx` (part 0 briefing + parts 1–7),
    - `OUTDIR/<PREFIX>_Note_and_Letter.docx`,
    - optional: `OUTDIR/<PREFIX>_Order_Draft.docx`, `OUTDIR/<PREFIX>_Parawise.docx` (section "Court cases and order drafts"),
+     `OUTDIR/<PREFIX>_Affidavit.docx`, `OUTDIR/<PREFIX>_LQ_Answer.docx` (section "Drafts ticked by the user"),
    - the package PDF under the ORIGINAL proposal file name = `proposal_original_name` exactly (INSTRUCTIONS §4.16;
      strip only a random upload prefix like `11ae057d-`). Never invent a new name such as `<PREFIX>_Proposal_with_GRs.pdf`
      — but when the original name itself looks machine-made (e.g. the uploaded file really is `CR66_Proposal_with_GRs.pdf`
      or `..._0001.pdf`), keep it exactly as uploaded; never "correct" it.
      The local file name to use = case.json `package_file` (that original name; shortened by the tool only when too long
      for the disk, NAME_MAX 255 bytes — the user still downloads it under the full name).
-   Exactly one .pdf in OUTDIR besides `*_Note_and_Letter.pdf` / `*_Study.pdf` / `*_Order_Draft.pdf` / `*_Parawise.pdf` previews.
+   Exactly one .pdf in OUTDIR besides `*_Note_and_Letter.pdf` / `*_Study.pdf` / `*_Order_Draft.pdf` / `*_Parawise.pdf` /
+   `*_Affidavit.pdf` / `*_LQ_Answer.pdf` previews.
 6. Verify (SOP Step 7): `python3 tools/verify_outputs.py OUTDIR <PREFIX> "OUTDIR/<original name>" <proposal pages> --original-name "<proposal_original_name>"`
    must print ALL OK; fix by the ladder (Escalation (b), end state (d)). The second read of every number and date in
    the note, letter and Study part 0 against the page images is the `reviewer`'s final review (Order step 7).

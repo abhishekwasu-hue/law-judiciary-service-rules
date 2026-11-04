@@ -84,6 +84,7 @@ export const FILE_KIND_LABEL: Record<string, string> = {
   package_pdf: 'GR सह प्रस्ताव', gr: 'GR', reply: 'उत्तर',
   approval: 'मान्यता (वित्त/सा.प्र.वि.)', court_notice: 'न्यायालयीन नोटीस',
   order_draft: 'शासन आदेश-मसुदा', parawise: 'परिच्छेदनिहाय अभिप्राय (इंग्रजी)',
+  affidavit: 'शपथपत्र (इंग्रजी)', lq_answer: 'विधानमंडळ प्रश्नाचे उत्तर',
 };
 
 /** Files the user uploads, with the type selector's short labels (C28; migration 0008 adds approval / court_notice). */
@@ -93,13 +94,25 @@ export const INPUT_KIND_LABEL: Record<InputKind, string> = {
   proposal: 'प्रस्ताव', reply: 'उत्तर', approval: 'मान्यता', court_notice: 'न्यायालयीन नोटीस', extra_doc: 'इतर',
 };
 
-/** "कोणते मसुदे हवेत?" (C28) — keys in the Worker's fixed order (DRAFT_KEYS); stored in runs.outputs. */
-export const DRAFT_KEYS = ['letter', 'reminder', 'gr', 'corrigendum', 'circular', 'memo', 'notification', 'parawise'] as const;
+/** "कोणते मसुदे हवेत?" (C28) — keys in the Worker's fixed order (DRAFT_KEYS); stored in runs.outputs.
+ *  04.11.2026: do_letter … lq appended (same order in cloudflare/worker.js and tools/engine_supabase.py). */
+export const DRAFT_KEYS = [
+  'letter', 'reminder', 'gr', 'corrigendum', 'circular', 'memo', 'notification', 'parawise',
+  'do_letter', 'uo_note', 'endorsement', 'office_order', 'press_note', 'addendum', 'affidavit', 'lq',
+] as const;
 export type DraftKey = (typeof DRAFT_KEYS)[number];
 export const DRAFT_LABEL: Record<DraftKey, string> = {
   letter: 'पत्र', reminder: 'स्मरणपत्र', gr: 'शासन निर्णय', corrigendum: 'शुद्धिपत्रक', circular: 'परिपत्रक', memo: 'ज्ञापन',
   notification: 'अधिसूचना', parawise: 'परिच्छेदनिहाय उत्तर',
+  do_letter: 'अर्धशासकीय पत्र', uo_note: 'अनौपचारिक संदर्भ नोंद', endorsement: 'पृष्ठांकन', office_order: 'कार्यालयीन आदेश',
+  press_note: 'प्रसिद्धीपत्रक', addendum: 'पूरकपत्र', affidavit: 'शपथपत्र', lq: 'विधानमंडळ प्रश्नाचे उत्तर',
 };
+/** Picker groups (phone layout: a short heading per group). Every DRAFT_KEYS key is in exactly one group. */
+export const DRAFT_GROUPS: { label: string; keys: readonly DraftKey[] }[] = [
+  { label: 'पत्रे', keys: ['letter', 'reminder', 'do_letter', 'uo_note'] },
+  { label: 'आदेश', keys: ['gr', 'corrigendum', 'circular', 'memo', 'notification', 'endorsement', 'office_order', 'press_note', 'addendum'] },
+  { label: 'न्यायालय / विधिमंडळ', keys: ['parawise', 'affidavit', 'lq'] },
+];
 /** Labels of a runs.outputs value: null = legacy run (nothing shown), [] = note only. */
 export function draftsText(v: unknown): string {
   if (!Array.isArray(v)) return '';
@@ -107,8 +120,9 @@ export function draftsText(v: unknown): string {
   return l.length ? l.join(', ') : 'फक्त नोंद';
 }
 
-/** Optional engine outputs (02.11.2026, migration 0006): shown with the note when the engine produced them. */
-export const EXTRA_OUTPUT_KINDS = ['order_draft', 'parawise'] as const;
+/** Optional engine outputs (02.11.2026, migration 0006; affidavit / lq_answer 04.11.2026, migration 0010): shown with the
+ *  note when the engine produced them. */
+export const EXTRA_OUTPUT_KINDS = ['order_draft', 'parawise', 'affidavit', 'lq_answer'] as const;
 
 export const ACTION_LABEL: Record<string, string> = {
   case_created: 'प्रकरण नोंदवले', case_updated: 'तपशील बदलला', file_uploaded: 'फाइल अपलोड', run_started: 'अभ्यास सुरू',

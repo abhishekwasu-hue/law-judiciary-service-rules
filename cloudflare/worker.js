@@ -31,7 +31,8 @@ const ALL_KEYS = [...SECRET_KEYS, ...PLAIN_KEYS];
 // upload kinds (C28, migration 0008: approval = वित्त/सा.प्र.वि. मान्यता, court_notice = न्यायालयीन नोटीस)
 const FILE_KINDS = ['proposal', 'extra_doc', 'reply', 'approval', 'court_notice'];
 // drafts the user can tick for a run (C28 "कोणते मसुदे हवेत?"), in this fixed order; stored in runs.outputs
-const DRAFT_KEYS = ['letter', 'reminder', 'gr', 'corrigendum', 'circular', 'memo', 'notification', 'parawise'];
+const DRAFT_KEYS = ['letter', 'reminder', 'gr', 'corrigendum', 'circular', 'memo', 'notification', 'parawise',
+  'do_letter', 'uo_note', 'endorsement', 'office_order', 'press_note', 'addendum', 'affidavit', 'lq'];   // 04.11.2026: last 8
 const KIND_NOT_READY = 'हा फाइल-प्रकार अजून सुरू नाही (मालकाने migration 0008 लागू करावे) — "इतर" निवडा';
 const BAD_OUTPUTS = 'मसुद्यांची निवड चुकीची — पान पुन्हा उघडा';
 const MAX_UPLOAD = 50 * 1024 * 1024;

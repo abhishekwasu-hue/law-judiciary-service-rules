@@ -695,6 +695,11 @@ test('C28: /api/run outputs — validated, deduped, fixed order; 400 Marathi; mi
   assert.equal(r.status, 200, await r.clone().text());
   assert.deepEqual(runInserts.at(-1).outputs, ['letter', 'gr', 'parawise'], 'dedupe + fixed order');
   assert.deepEqual((await r.json()).outputs, ['letter', 'gr', 'parawise']);
+  // 04.11.2026: eight more keys, appended after the old ones in the fixed order
+  r = await run({ outputs: ['lq', 'affidavit', 'addendum', 'press_note', 'office_order', 'endorsement', 'uo_note', 'do_letter', 'letter'] });
+  assert.equal(r.status, 200, await r.clone().text());
+  assert.deepEqual(runInserts.at(-1).outputs,
+    ['letter', 'do_letter', 'uo_note', 'endorsement', 'office_order', 'press_note', 'addendum', 'affidavit', 'lq'], 'new keys accepted, fixed order');
   r = await run({ outputs: [] });
   assert.deepEqual(runInserts.at(-1).outputs, [], 'empty = note only');
   await run({});

@@ -32,12 +32,14 @@ Commands ("deliver with warnings", Abhi 02.11.2026: drafts are never thrown away
                       all three uploads succeeded; runs done + summary fields, status.json `warnings`, cases.stage
                       "मसुदा तयार", activity run_done. status.json state not "done" -> fail with ONLY its Marathi summary.
                       Optional outputs (02.11.2026, docs/COURT_AND_ORDERS_RESEARCH.md B7–B9): *_Order_Draft.docx ->
-                      kind "order_draft", *_Parawise.docx -> kind "parawise" (same ASCII key style), uploaded when
-                      present (status.json `outputs_extra` = ["order_draft", "parawise"] or [{"kind", "file"}]; C28 draft
-                      keys gr / corrigendum / circular / memo / notification count as order_draft, letter / reminder are
-                      in the Note_and_Letter; a
+                      kind "order_draft", *_Parawise.docx -> kind "parawise", *_Affidavit.docx -> kind "affidavit",
+                      *_LQ_Answer.docx -> kind "lq_answer" (04.11.2026, migration 0010; same ASCII key style), uploaded
+                      when present (status.json `outputs_extra` = ["order_draft", "parawise"] or [{"kind", "file"}]; C28
+                      draft keys gr / corrigendum / circular / memo / notification / endorsement / office_order /
+                      press_note / addendum count as order_draft, affidavit as affidavit, lq as lq_answer; letter /
+                      reminder / do_letter / uo_note are in the Note_and_Letter; a
                       listed kind whose file is absent -> warning); absence is fine; more than one of a kind, or a refused upload (enum value missing until
-                      migration 0006 is applied) -> a runs.warnings line, never a failure.
+                      migration 0006 / 0010 is applied) -> a runs.warnings line, never a failure.
   claude_result <claude.json> [<stderr file>] [<exit code>] [--part1 <part1.json>] [--part1-no-cost] [--first <first.json>]
                 [--killed] [--wall <seconds>] [--status <status.json>] [--gateway-cost F --gateway-provider P]
                       Claude Code `--output-format json` result(s) -> runs.cost_usd and num_turns = SUM of the main run,
@@ -92,13 +94,29 @@ import datetime, glob, json, mimetypes, os, re, subprocess, sys, urllib.error, u
 
 INPUT_KINDS = ("proposal", "extra_doc", "reply", "approval", "court_notice")   # approval / court_notice: C28 (03.11.2026)
 # C28 "कोणते मसुदे हवेत?" (INSTRUCTIONS §4.28, 03.11.2026): the drafts the user ticked for a run (runs.outputs), fixed order
-DRAFT_KEYS = ("letter", "reminder", "gr", "corrigendum", "circular", "memo", "notification", "parawise")
+# 04.11.2026: do_letter … lq appended (docs/FORMS_RESEARCH_DO_UO.md, FORMS_RESEARCH_ORDERS.md, FORMS_RESEARCH_AFFIDAVIT_LQ.md)
+DRAFT_KEYS = ("letter", "reminder", "gr", "corrigendum", "circular", "memo", "notification", "parawise",
+              "do_letter", "uo_note", "endorsement", "office_order", "press_note", "addendum", "affidavit", "lq")
 DRAFT_LABEL = {"letter": "पत्र", "reminder": "स्मरणपत्र", "gr": "शासन निर्णय", "corrigendum": "शुद्धिपत्रक",
-               "circular": "परिपत्रक", "memo": "ज्ञापन", "notification": "अधिसूचना", "parawise": "परिच्छेदनिहाय उत्तर"}
-ORDER_KEYS = ("gr", "corrigendum", "circular", "memo", "notification")
-# body heading paragraph that tools/build_order.py writes for each order type (BODY_HEAD there; kept equal)
+               "circular": "परिपत्रक", "memo": "ज्ञापन", "notification": "अधिसूचना", "parawise": "परिच्छेदनिहाय उत्तर",
+               "do_letter": "अर्धशासकीय पत्र", "uo_note": "अनौपचारिक संदर्भ नोंद", "endorsement": "पृष्ठांकन",
+               "office_order": "कार्यालयीन आदेश", "press_note": "प्रसिद्धीपत्रक", "addendum": "पूरकपत्र",
+               "affidavit": "शपथपत्र", "lq": "विधानमंडळ प्रश्नाचे उत्तर"}
+ORDER_KEYS = ("gr", "corrigendum", "circular", "memo", "notification", "endorsement", "office_order", "press_note",
+              "addendum")
+# drafts that live inside <PREFIX>_Note_and_Letter.docx (no file of their own)
+NOTE_LETTER_KEYS = ("letter", "reminder", "do_letter", "uo_note")
+# draft key -> upload kind of its own file (EXTRA_OUTPUTS); order keys -> order_draft
+DRAFT_FILE_KIND = {"parawise": "parawise", "affidavit": "affidavit", "lq": "lq_answer"}
+# body heading paragraph that tools/build_order.py writes for each order type (BODY_HEAD there; kept equal). The
+# endorsement has no body heading: it is detected by its bracketed "(… या खाली.)" line (ENDORSE_BELOW there).
 ORDER_HEAD = {"gr": "शासन निर्णय :-", "corrigendum": "शासन शुद्धिपत्रक :-", "circular": "परिपत्रक :-",
-              "memo": "ज्ञापन :-", "notification": "अधिसूचना"}
+              "memo": "ज्ञापन :-", "notification": "अधिसूचना", "office_order": "कार्यालयीन आदेश",
+              "press_note": "प्रसिद्धीपत्रक", "addendum": "शासन पूरकपत्र :-"}
+ENDORSE_LINE = re.compile(r"^\(.*\sया खाली\.\)$")
+# printed lines of tools/mkdocs.py (DO_REF_LABEL, UO_LABEL there; kept equal)
+DO_REF_LABEL = "अ.शा.पत्र क्र."
+UO_MARK = "विभागाकडे अनौपचारिक संदर्भ"
 MIME = {".pdf": "application/pdf", ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"}
 
 
@@ -439,12 +457,16 @@ def strip_upload_prefix(n):
 
 def package_pdfs(out):
     return [p for p in glob.glob(os.path.join(out, "*.pdf"))
-            if not re.search(r"_(Study|Note_and_Letter|Note|Letter|Order_Draft|Parawise)\.pdf$", p)]  # previews
+            if not re.search(r"_(Study|Note_and_Letter|Note|Letter|Order_Draft|Parawise|Affidavit|LQ_Answer)\.pdf$", p)]  # previews
 
 
-# optional outputs (02.11.2026): kind -> (file suffix, Marathi label for warnings)
+# optional outputs (02.11.2026; affidavit / lq_answer 04.11.2026, migration 0010): kind -> (file suffix, Marathi label)
 EXTRA_OUTPUTS = (("order_draft", "_Order_Draft.docx", "शासन आदेश-मसुदा"),
-                 ("parawise", "_Parawise.docx", "परिच्छेदनिहाय अभिप्राय"))
+                 ("parawise", "_Parawise.docx", "परिच्छेदनिहाय अभिप्राय"),
+                 ("affidavit", "_Affidavit.docx", "शपथपत्र"),
+                 ("lq_answer", "_LQ_Answer.docx", "विधानमंडळ प्रश्नाचे उत्तर"))
+# the Supabase migration that adds each kind to the file_kind enum (for the warning when the upload is refused)
+EXTRA_MIGRATION = {"order_draft": "0006", "parawise": "0006", "affidavit": "0010", "lq_answer": "0010"}
 
 
 # Supabase Storage bucket `outputs` refuses objects over 50 MB (413; init.sql file_size_limit). OUTPUT_MAX_BYTES overrides
@@ -516,9 +538,10 @@ def listed_extras(st):
         k, f = (x, None) if isinstance(x, str) else ((x.get("kind"), x.get("file") or x.get("name")) if isinstance(x, dict) else (None, None))
         if not isinstance(k, str):
             continue
-        # C28: draft keys -> upload kinds (order kinds -> order_draft; letter / reminder live in the Note_and_Letter)
-        k = "order_draft" if k in ORDER_KEYS else k
-        if k in ("letter", "reminder"):
+        # C28: draft keys -> upload kinds (order kinds -> order_draft; affidavit -> affidavit, lq -> lq_answer;
+        # letter / reminder / do_letter / uo_note live in the Note_and_Letter)
+        k = "order_draft" if k in ORDER_KEYS else DRAFT_FILE_KIND.get(k, k)
+        if k in NOTE_LETTER_KEYS:
             continue
         if k not in out or (f and not out[k]):
             out[k] = f
@@ -543,7 +566,7 @@ def upload_extras(out, st=None):
         try:
             done.append(upload_output(kind, found[0]))
         except Exception as e:
-            warns.append(f"{label} जतन झाला नाही (Supabase migration 0006 लागू आहे का?) — {str(e)[:160]}")
+            warns.append(f"{label} जतन झाला नाही (Supabase migration {EXTRA_MIGRATION.get(kind, '0006')} लागू आहे का?) — {str(e)[:160]}")
     return done, warns
 
 
@@ -940,7 +963,7 @@ REVIEW = (" You are the final approver. LOOK at the proposal page images (WORKDI
           "a cross-check) for every number, date, name and amount used in the note, the letter and Study part 0. Check "
           "rule compliance (INSTRUCTIONS §4 incl. §4.18; the lint_spec rules), that the letter-or-not decision follows "
           "PROPOSAL_SOP Step 3 / INSTRUCTIONS §4.15, and the official language. Correct /tmp/work/spec.json (note + "
-          "letter, and `order` / `parawise` when present; not `related`) and /tmp/work/study_part0.json directly with "
+          "letter, and `order` / `orders` / `parawise` / `affidavit` / `lq` when present; not `related`) and /tmp/work/study_part0.json directly with "
           "MINIMAL edits (never restyle approved wording). Never refuse approval for missing case fields (C R no., file "
           "no., subject, category — ref_no blanks ____ are allowed) or for unclear pages ('अस्पष्ट' + a warning). "
           "Correct small problems directly. After your edits run `python3 tools/lint_spec.py /tmp/work/spec.json` and "
@@ -1002,7 +1025,7 @@ def agents_json(conf, brief="tools/ENGINE_BRIEF.md"):
         "description": "Drafter (Opus-class). Research the applicable GR paras, rules and cited SC/HC judgments on their "
                        "original pages; read facts/numbers/dates/names/handwriting/stamps from the proposal page images; "
                        "letter-or-not decision; GR selection for the note body and the enclosures; DETAILED note body "
-                       "(brief [I4.29], 12 elements) and concise letter spec; the optional spec `order` (order draft) / `parawise` (court remarks, English) "
+                       "(brief [I4.29], 12 elements) and concise letter spec; the optional spec `order` / `orders` (order drafts) / `parawise` (court remarks, English) / `affidavit` (affidavit in reply, English) / `lq` (legislature question answer) "
                        "per the brief's court and order-draft rules; Study part 0; extracts and Study part 1 pages that failed their check; content "
                        "fixes that lint/verify still reports after 2 mechanical attempts.",
         "prompt": base + DRAFTER, "model": dmodel}}
@@ -1463,17 +1486,24 @@ def docx_paragraphs(path):
 
 def missing_drafts(out, prefix, outputs):
     """C28 (§4.28): ticked draft keys whose draft is not in OUTDIR -> Marathi labels. letter: a letter without a
-    "स्मरणपत्र-N" heading in <PREFIX>_Note_and_Letter.docx; reminder: a "स्मरणपत्र-N" letter there; order kinds: the
-    body heading of that type in <PREFIX>_Order_Draft.docx; parawise: <PREFIX>_Parawise.docx."""
+    "स्मरणपत्र-N" heading in <PREFIX>_Note_and_Letter.docx; reminder: a "स्मरणपत्र-N" letter there; do_letter: an
+    "अ.शा.पत्र क्र. …" line there; uo_note: the "… विभागाकडे अनौपचारिक संदर्भ …" line there; order kinds: the body
+    heading of that type in <PREFIX>_Order_Draft.docx (endorsement: its "(… या खाली.)" line); parawise / affidavit /
+    lq: <PREFIX>_Parawise.docx / _Affidavit.docx / _LQ_Answer.docx."""
     if not outputs:
         return []
     nl = [t.strip() for t in docx_paragraphs(os.path.join(out, f"{prefix}_Note_and_Letter.docx"))]
     letters = sum(1 for t in nl if re.match(r"क्रमांक\s*:?\s*-", t))
     reminders = sum(1 for t in nl if re.fullmatch(r"स्मरणपत्र-\d+", t))
     od = {t.strip() for t in docx_paragraphs(os.path.join(out, f"{prefix}_Order_Draft.docx"))}
+    exists = lambda suffix: os.path.exists(os.path.join(out, f"{prefix}{suffix}"))
     have = {"letter": letters - reminders > 0, "reminder": reminders > 0,
-            "parawise": os.path.exists(os.path.join(out, f"{prefix}_Parawise.docx"))}
-    have.update({k: ORDER_HEAD[k] in od for k in ORDER_KEYS})
+            "do_letter": any(t.startswith(DO_REF_LABEL) for t in nl),
+            "uo_note": any(UO_MARK in t for t in nl),
+            "parawise": exists("_Parawise.docx"), "affidavit": exists("_Affidavit.docx"),
+            "lq": exists("_LQ_Answer.docx")}
+    have.update({k: ORDER_HEAD[k] in od for k in ORDER_HEAD})
+    have["endorsement"] = any(ENDORSE_LINE.match(t) for t in od)
     return [DRAFT_LABEL[k] for k in outputs if k in have and not have[k]]
 
 

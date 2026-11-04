@@ -905,6 +905,73 @@ check(r.returncode == 0 and not run_row["warnings"], "C28 verify: outputs null (
 check(es0.norm_outputs(None) is None and es0.norm_outputs(["parawise", "x", "letter"]) == ["letter", "parawise"]
       and es0.listed_extras({"outputs_extra": ["gr", "memo", "letter", {"kind": "parawise", "file": "P.docx"}]}) == {"order_draft": None, "parawise": "P.docx"},
       "C28 norm_outputs / listed_extras mapping")
+# --- more draft kinds (04.11.2026, migration 0010): do_letter / uo_note in the Note_and_Letter, endorsement /
+# office_order / press_note / addendum in the Order_Draft, affidavit -> *_Affidavit.docx, lq -> *_LQ_Answer.docx
+check(es0.DRAFT_KEYS[:8] == ("letter", "reminder", "gr", "corrigendum", "circular", "memo", "notification", "parawise")
+      and es0.DRAFT_KEYS[8:] == ("do_letter", "uo_note", "endorsement", "office_order", "press_note", "addendum", "affidavit", "lq")
+      and set(es0.DRAFT_LABEL) == set(es0.DRAFT_KEYS), "more drafts: DRAFT_KEYS order (old keys first, new appended), every key labelled")
+check(es0.norm_outputs(["lq", "affidavit", "letter", "do_letter"]) == ["letter", "do_letter", "affidavit", "lq"],
+      "more drafts: norm_outputs keeps the new keys in the fixed order")
+check(es0.listed_extras({"outputs_extra": ["do_letter", "uo_note", "endorsement", "press_note", "affidavit",
+                                            {"kind": "lq", "file": "X_LQ_Answer.docx"}]})
+      == {"order_draft": None, "affidavit": None, "lq_answer": "X_LQ_Answer.docx"},
+      "more drafts: listed_extras maps order kinds -> order_draft, affidavit, lq -> lq_answer; do_letter / uo_note skipped")
+out8 = os.path.join(tmp, "out8"); os.makedirs(out8)
+for n in ("CR130_2026_Study.docx", "CR130_2026_Note_and_Letter.docx", NEWP, "CR130_2026_Affidavit.docx",
+          "CR130_2026_Affidavit.pdf", "CR130_2026_LQ_Answer.docx", "CR130_2026_LQ_Answer.pdf"):
+    open(os.path.join(out8, n), "wb").write(b"x" + n.encode())
+real_study(os.path.join(out8, "CR130_2026_Study.docx"))
+json.dump({"state": "done", "summary": "s", "outputs_extra": ["do_letter", "affidavit", "lq"]},
+          open(os.path.join(out8, "status.json"), "w", encoding="utf-8"), ensure_ascii=False)
+run_row.update(state="running", warnings=[]); LOG.clear(); n8 = len(DB["case_files"])
+r = run("finish", out8)
+ups = sorted(l["path"] for l in LOG if l["m"] == "POST" and l["path"].startswith("/storage/v1/object/"))
+rows8 = {f["kind"]: f for f in DB["case_files"][n8:]}
+check(r.returncode == 0 and run_row["state"] == "done" and len(ups) == 5
+      and any("/affidavit/" in u for u in ups) and any("/lq_answer/" in u for u in ups) and all(u.isascii() for u in ups)
+      and rows8["affidavit"]["original_name"] == "CR130_2026_Affidavit.docx"
+      and rows8["lq_answer"]["original_name"] == "CR130_2026_LQ_Answer.docx" and not run_row["warnings"],
+      f"more drafts finish: affidavit + lq_answer uploaded, previews not a package, no warning ({ups} {run_row['warnings']} {r.stderr[:200]})")
+# migration 0010 not applied -> the enum refuses the kinds: warnings naming 0010, the three main outputs stored
+REJECT_KINDS.update({"affidavit", "lq_answer"}); run_row.update(state="running", warnings=[]); n8 = len(DB["case_files"])
+r = run("finish", out8)
+check(r.returncode == 0 and run_row["state"] == "done" and len(DB["case_files"]) == n8 + 3
+      and any(w.startswith("शपथपत्र जतन झाला नाही") and "0010" in w for w in run_row["warnings"])
+      and any(w.startswith("विधानमंडळ प्रश्नाचे उत्तर जतन झाला नाही") and "0010" in w for w in run_row["warnings"]),
+      f"more drafts finish, enum missing: warnings name migration 0010, still done ({run_row['warnings']})")
+REJECT_KINDS.clear()
+# verify: the new kinds detected from their printed lines / files
+out9 = os.path.join(tmp, "out9"); os.makedirs(out9)
+open(os.path.join(out9, "CR130_2026_Study.docx"), "wb").write(b"x"); open(os.path.join(out9, PROP), "wb").write(b"%PDF")
+mini_docx(os.path.join(out9, "CR130_2026_Note_and_Letter.docx"), ["विधि व न्याय विभाग/का.6"])
+mini_docx(os.path.join(out9, "CR130_2026_Order_Draft.docx"), ["महाराष्ट्र शासन", "शासन निर्णय :-"])
+json.dump({"state": "done", "prefix": "CR130_2026", "package_pdf": PROP, "proposal_pages": 5, "review": {"approved": True, "changes": 0}},
+          open(os.path.join(out9, "status.json"), "w", encoding="utf-8"), ensure_ascii=False)
+NEW8 = ["do_letter", "uo_note", "endorsement", "office_order", "press_note", "addendum", "affidavit", "lq"]
+cm9 = os.path.join(tmp, "cm9.json")
+json.dump({"proposal_original_name": PROP, "proposal_pages": 5, "outputs": ["gr"] + NEW8}, open(cm9, "w", encoding="utf-8"))
+run_row.update(state="running", step="तपासणी चालू", warnings=[])
+r = run("verify", out9, "--case-meta", cm9, VERIFY_SCRIPT=fake)
+miss = sorted(w.rsplit(": ", 1)[1] for w in run_row["warnings"] if "निवडलेला मसुदा तयार झाला नाही" in w)
+check(r.returncode == 0 and miss == sorted(es0.DRAFT_LABEL[k] for k in NEW8),
+      f"more drafts verify: none of the 8 made -> 8 soft warnings, the GR made -> none ({run_row['warnings']})")
+mini_docx(os.path.join(out9, "CR130_2026_Note_and_Letter.docx"),
+          ["विधि व न्याय विभाग/का.6", "विधि व न्याय विभाग", "वित्त विभागाकडे अनौपचारिक संदर्भ कार्यासन का.6",
+           "क्रमांक ____ दिनांक ____", "अ.शा.पत्र क्र. संकिर्ण-2026/979/प्र.क्र.130/का.6", "आपला स्नेहांकित,"])
+mini_docx(os.path.join(out9, "CR130_2026_Order_Draft.docx"),
+          ["शासन निर्णय :-", "(शासन निर्णय क्रमांक ____ दिनांक ____ या खाली.)", "कार्यालयीन आदेश", "प्रसिद्धीपत्रक",
+           "शासन पूरकपत्र :-"])
+for n in ("CR130_2026_Affidavit.docx", "CR130_2026_LQ_Answer.docx"):
+    open(os.path.join(out9, n), "wb").write(b"x")
+run_row.update(warnings=[])
+r = run("verify", out9, "--case-meta", cm9, VERIFY_SCRIPT=fake)
+check(r.returncode == 0 and not run_row["warnings"] and "verify: ALL OK" in r.stdout,
+      f"more drafts verify: all 8 made -> no warning; the D.O. / U.O. lines are not counted as an ordinary letter ({run_row['warnings']})")
+json.dump({"proposal_original_name": PROP, "proposal_pages": 5, "outputs": ["letter"]}, open(cm9, "w", encoding="utf-8"))
+r = run("verify", out9, "--case-meta", cm9, VERIFY_SCRIPT=fake)
+check(r.returncode == 0 and [w.rsplit(": ", 1)[1] for w in run_row["warnings"] if "निवडलेला मसुदा" in w] == ["पत्र"],
+      f"more drafts verify: a D.O. letter alone does not satisfy a ticked ordinary letter ({run_row['warnings']})")
+check(es0.package_pdfs(out8) == [os.path.join(out8, NEWP)], f"more drafts: _Affidavit.pdf / _LQ_Answer.pdf previews are not the package ({es0.package_pdfs(out8)})")
 DB["runs"].pop(); DB["case_files"] = [f for f in DB["case_files"] if f["id"] not in (51, 52)]
 if saved_outputs == "absent": run_row.pop("outputs", None)
 else: run_row["outputs"] = saved_outputs
