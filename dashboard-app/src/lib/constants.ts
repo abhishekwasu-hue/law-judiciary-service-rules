@@ -166,7 +166,7 @@ export const EDIT_ATTACH_KINDS = [{ id: 'extra_doc', label: 'इतर काग
 export type EditAttachKind = (typeof EDIT_ATTACH_KINDS)[number]['id'];
 export const EDIT_ATTACH_ACCEPT = '.pdf,.jpg,.jpeg,.png,.doc,.docx';
 /** Text put in an empty message box when files are attached (a message is required). */
-export const EDIT_ATTACH_DEFAULT = 'जोडलेली कागदपत्रे GR सह PDF मध्ये जोडा';
+export const EDIT_ATTACH_DEFAULT = 'जोडलेली कागदपत्रे GR सह PDF मध्ये जोडावीत, ही विनंती.';
 /** Internal file kinds never listed, viewed or downloaded in the app ('spec' = the drafts' source, kept for edits). */
 export const HIDDEN_FILE_KINDS = ['spec'] as const;
 export const isHiddenFile = (f: { kind: string }) => (HIDDEN_FILE_KINDS as readonly string[]).includes(f.kind);

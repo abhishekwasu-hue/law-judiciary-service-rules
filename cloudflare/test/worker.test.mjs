@@ -1219,7 +1219,7 @@ test('0012: नस्ती page CSP — connect-src without self (data: blob: o
 // ---------- draft edit (docs/DRAFT_EDIT_DESIGN.md point 3 + Addendum A, migration 0013): POST /api/edit ----------
 const editCall = (b, h = owner33) => call('/api/edit', { method: 'POST', headers: h, body: JSON.stringify(b) });
 const dispatchEvents = () => calls.filter(c => c.u.endsWith('/dispatches')).map(c => JSON.parse(c.opt.body));
-const NO_SPEC_TXT = "या प्रकरणाची सुधारणा-फाइल नाही (जुने प्रकरण) — 'पुन्हा तयार करा' वापरा";
+const NO_SPEC_TXT = "हे प्रकरण या सुविधेपूर्वीचे असल्याने सुधारणा-फाइल उपलब्ध नाही. कृपया 'पुन्हा तयार करा' हा पर्याय वापरावा, ही विनंती.";
 
 test('draft edit: /api/edit dispatches edit_drafts at once (dispatched_at), queue ignores edit runs, one run per case both ways', async () => {
   Q = { rows: [], nextId: 700 }; monthRuns = []; dispatchFail = false; acts.length = 0;
@@ -1286,11 +1286,11 @@ test('draft edit: validation — target, message, attachments (this case, kinds,
     { id: 84, case_id: 752, kind: 'extra_doc' }, { id: 85, case_id: 752, kind: 'gr' });
   const err = async (b, status, re) => { const r = await editCall(b); assert.equal(r.status, status, JSON.stringify(b)); const j = await r.json(); if (re) assert.match(j.error, re); return j; };
   try {
-    await err({ case_id: 751, target: 'study', message: 'x' }, 400, /सुधारणा कोठे करायची ते चुकीचे/);
-    await err({ case_id: 751, message: 'x' }, 400, /सुधारणा कोठे करायची/);
-    await err({ case_id: 751, target: 'note', message: '   ' }, 400, /सुधारणा-संदेश लिहा/);
-    await err({ case_id: 751, target: 'note' }, 400, /सुधारणा-संदेश लिहा/);
-    await err({ case_id: 751, target: 'note', message: 'क'.repeat(2001) }, 400, /जास्तीत जास्त 2000 अक्षरे/);
+    await err({ case_id: 751, target: 'study', message: 'x' }, 400, /सुधारणा कोठे करावयाची/);
+    await err({ case_id: 751, message: 'x' }, 400, /सुधारणा कोठे करावयाची/);
+    await err({ case_id: 751, target: 'note', message: '   ' }, 400, /सुधारणा-संदेश नमूद करावा/);
+    await err({ case_id: 751, target: 'note' }, 400, /सुधारणा-संदेश नमूद करावा/);
+    await err({ case_id: 751, target: 'note', message: 'क'.repeat(2001) }, 400, /2000 अक्षरांच्या मर्यादेत/);
     await err({ case_id: 'x', target: 'note', message: 'x' }, 400);
     await err({ case_id: 751, target: 'note', message: 'x', attachments: [83] }, 400, /जोडलेल्या फाइल चुकीच्या/);   // other case
     await err({ case_id: 751, target: 'note', message: 'x', attachments: [82] }, 400, /जोडलेल्या फाइल चुकीच्या/);   // kind study
@@ -1331,7 +1331,7 @@ test('draft edit: migration 0013 missing → 409 migration_missing; the queue st
     editColumns = false;
     let r = await editCall({ case_id: 801, target: 'note', message: 'x' });
     assert.equal(r.status, 409);
-    assert.deepEqual(await r.json(), { error: 'migration_missing', reason: 'Supabase मध्ये migration 0013 लागू करा' });
+    assert.deepEqual(await r.json(), { error: 'migration_missing', reason: 'Supabase मध्ये migration 0013 लागू करणे आवश्यक आहे.' });
     const a = await body(await runCase(802));
     assert.equal(a.queued, false, 'queue without runs.kind: filter dropped');
     const b = await body(await runCase(803));
@@ -1347,7 +1347,7 @@ test('draft edit: migration 0013 missing → 409 migration_missing; the queue st
                 { id: 813, case_id: 83, kind: 'edit', state: 'running', dispatched_at: t10, created_at: t10 });
     const sw2 = await body(await call('/api/runs/sweep', { method: 'POST', headers: owner33 }));
     assert.deepEqual(sw2.failed, [811]);
-    assert.equal(Q.rows[0].state, 'failed'); assert.equal(Q.rows[0].step, 'वेळ संपली — सुधारणा पुन्हा पाठवा');
+    assert.equal(Q.rows[0].state, 'failed'); assert.equal(Q.rows[0].step, 'वेळ संपली — कृपया सुधारणा पुन्हा पाठवावी, ही विनंती.');
     assert.deepEqual([Q.rows[1].state, Q.rows[2].state], ['running', 'running']);
     assert.ok(acts.some(x => Array.isArray(x) && x.some(y => y.action === 'edit_failed' && y.detail.run_id === 811)), 'activity edit_failed');
     // without the queue column (migration 0011): the edit row is inserted without dispatched_at, dispatched at once

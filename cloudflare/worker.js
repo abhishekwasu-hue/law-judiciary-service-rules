@@ -47,13 +47,13 @@ const EDIT_ATTACH_MAX = 5;
 const EDIT_ATTACH_KINDS = ['gr', 'extra_doc', 'reply', 'approval', 'court_notice'];   // case_files kinds that may be attached
 const DEFAULT_MODEL_EDIT = 'claude-sonnet-5-5';
 const EDIT_STALE_MS = 30 * 60 * 1000;           // edit job timeout 20 min (edit-drafts.yml) + dispatch time
-const EDIT_STALE_REASON = 'वेळ संपली — सुधारणा पुन्हा पाठवा';
-const NO_SPEC = "या प्रकरणाची सुधारणा-फाइल नाही (जुने प्रकरण) — 'पुन्हा तयार करा' वापरा";
-const EDIT_MIGRATION = 'Supabase मध्ये migration 0013 लागू करा';
-const BAD_EDIT_TARGET = 'सुधारणा कोठे करायची ते चुकीचे — यादीतील पर्याय निवडा';
-const EDIT_MSG_EMPTY = 'सुधारणा-संदेश लिहा';
-const EDIT_MSG_LONG = `सुधारणा-संदेश जास्तीत जास्त ${EDIT_MSG_MAX} अक्षरे`;
-const BAD_ATTACH = `जोडलेल्या फाइल चुकीच्या — या प्रकरणाच्या जास्तीत जास्त ${EDIT_ATTACH_MAX} फाइल (GR / इतर कागदपत्र / उत्तर / मान्यता / नोटीस) जोडा`;
+const EDIT_STALE_REASON = 'वेळ संपली — कृपया सुधारणा पुन्हा पाठवावी, ही विनंती.';
+const NO_SPEC = "हे प्रकरण या सुविधेपूर्वीचे असल्याने सुधारणा-फाइल उपलब्ध नाही. कृपया 'पुन्हा तयार करा' हा पर्याय वापरावा, ही विनंती.";
+const EDIT_MIGRATION = 'Supabase मध्ये migration 0013 लागू करणे आवश्यक आहे.';
+const BAD_EDIT_TARGET = 'सुधारणा कोठे करावयाची हे यादीतील पर्यायांतून कृपया निवडावे, ही विनंती.';
+const EDIT_MSG_EMPTY = 'कृपया सुधारणा-संदेश नमूद करावा, ही विनंती.';
+const EDIT_MSG_LONG = `कृपया सुधारणा-संदेश ${EDIT_MSG_MAX} अक्षरांच्या मर्यादेत नमूद करावा, ही विनंती.`;
+const BAD_ATTACH = `जोडलेल्या फाइल चुकीच्या — या प्रकरणाच्या जास्तीत जास्त ${EDIT_ATTACH_MAX} फाइल (GR / इतर कागदपत्र / उत्तर / मान्यता / नोटीस) कृपया जोडाव्यात, ही विनंती.`;
 const SIGN_BUCKETS = ['proposals', 'outputs', 'gr-library'];
 // Run token (D4): created at dispatch, sent to GitHub in the payload. Single use for /api/engine/config (the secrets);
 // after that it is only good for /api/engine/fail and /api/engine/step (THIS run only, return nothing secret) until it expires.

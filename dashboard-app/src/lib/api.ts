@@ -111,7 +111,7 @@ export function humanError(e: unknown): string {
   if (msg === 'profile_unsupported') return 'सर्व्हर अद्ययावत नाही — माहिती जतन झाली नाही (Worker deploy बाकी)';
   if (msg === 'no_spec') {
     const r = e instanceof ApiError ? (e.data as { reason?: unknown } | undefined)?.reason : undefined;
-    return typeof r === 'string' && r ? r : "या प्रकरणाची सुधारणा-फाइल नाही (जुने प्रकरण) — 'पुन्हा तयार करा' वापरा";
+    return typeof r === 'string' && r ? r : "हे प्रकरण या सुविधेपूर्वीचे असल्याने सुधारणा-फाइल उपलब्ध नाही. कृपया 'पुन्हा तयार करा' हा पर्याय वापरावा, ही विनंती.";
   }
   if (msg === 'run_active') return 'या प्रकरणाची प्रक्रिया आधीच चालू आहे — ती संपेपर्यंत थांबा';
   if (msg === 'dispatch_failed') return DISPATCH_REASON;

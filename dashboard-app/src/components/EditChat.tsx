@@ -107,7 +107,7 @@ function Turn({ r, ctx, names, onOpen }: { r: Run; ctx: CaseCtx; names: string[]
         </div>
         {refused && <div className="break-words text-sm text-amber-900 [overflow-wrap:anywhere] dark:text-amber-100">{textOf(res.refused)}</div>}
         {(r.state === 'failed' || stale) && (
-          <div className="break-words text-sm text-red-900 [overflow-wrap:anywhere] dark:text-red-200">{stale ? 'वेळ संपली — पुन्हा पाठवा' : cleanReason(r.step) || 'कारण उपलब्ध नाही'}</div>
+          <div className="break-words text-sm text-red-900 [overflow-wrap:anywhere] dark:text-red-200">{stale ? 'वेळ संपली — कृपया सुधारणा पुन्हा पाठवावी, ही विनंती.' : cleanReason(r.step) || 'कारण उपलब्ध नाही'}</div>
         )}
         {r.state === 'done' && !refused && (res.summary || r.summary) && <div className="break-words font-semibold [overflow-wrap:anywhere]">{res.summary || r.summary}</div>}
         {r.state === 'done' && !refused && changes.length > 0 && (
@@ -261,11 +261,11 @@ export default function EditChat({ ctx }: { ctx: CaseCtx }) {
           <span className="font-semibold">प्रकरण:</span> <b>{crLabel(ctx.c)}</b>
           {ctx.c.subject && <div className="truncate text-slate-600 dark:text-slate-300" title={ctx.c.subject}>{ctx.c.subject}</div>}
         </div>
-        <button type="button" className="btn-ghost shrink-0 px-2 text-sm" onClick={() => setPick(true)}>प्रकरण बदला</button>
+        <button type="button" className="btn-ghost shrink-0 px-2 text-sm" onClick={() => setPick(true)}>प्रकरण बदलावे</button>
       </div>
       <CasePicker open={pick} onClose={() => setPick(false)} />
       {drag && (
-        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-amber-50/90 text-lg font-bold text-navy-800 dark:bg-navy-900/90 dark:text-white">📎 फाइल येथे सोडा</div>
+        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-amber-50/90 text-lg font-bold text-navy-800 dark:bg-navy-900/90 dark:text-white">📎 फाइल येथे सोडावी</div>
       )}
       <div className="space-y-3 p-3">
         {turns.length > 0 && (
@@ -276,7 +276,7 @@ export default function EditChat({ ctx }: { ctx: CaseCtx }) {
           </div>
         )}
         {!ctx.hasSpec ? (
-          <p className="rounded-lg bg-slate-100 px-3 py-2 text-sm text-slate-700 dark:bg-navy-800 dark:text-slate-200">हे प्रकरण जुने आहे — बदलासाठी 'पुन्हा तयार करा' वापरा</p>
+          <p className="rounded-lg bg-slate-100 px-3 py-2 text-sm text-slate-700 dark:bg-navy-800 dark:text-slate-200">हे प्रकरण या सुविधेपूर्वीचे आहे. बदलासाठी कृपया 'पुन्हा तयार करा' हा पर्याय वापरावा, ही विनंती.</p>
         ) : !ctx.canWrite ? null : (
           <form onSubmit={ask} className="space-y-2">
             <label className="flex min-w-0 items-center gap-2 text-sm">
@@ -307,7 +307,7 @@ export default function EditChat({ ctx }: { ctx: CaseCtx }) {
               )}
               <textarea
                 className="block min-h-[88px] w-full resize-y rounded-xl bg-transparent px-3 py-2 outline-none"
-                placeholder="उदा. नोंदीच्या परि. 5 मधील शेवटची दोन वाक्ये काढा; पत्रात दिनांक 12.10.2026 करा"
+                placeholder="उदा. नोंदीच्या परि. 5 मधील शेवटची दोन वाक्ये वगळावीत; पत्रातील दिनांक 12.10.2026 असा करावा"
                 value={text}
                 maxLength={EDIT_MAX_CHARS}
                 disabled={busy}
@@ -318,21 +318,21 @@ export default function EditChat({ ctx }: { ctx: CaseCtx }) {
               <div className="flex items-center gap-2 px-2 pb-2">
                 <button type="button" className="btn-ghost min-h-tap min-w-tap px-2" disabled={busy || atts.length >= EDIT_MAX_FILES} title="फाइल जोडा (PDF / JPG / PNG / Word)" aria-label="फाइल जोडा" onClick={() => fileRef.current?.click()}>📎</button>
                 <input ref={fileRef} type="file" hidden multiple accept={EDIT_ATTACH_ACCEPT} onChange={e => { const l = e.target.files; if (l?.length) addFiles(l); e.target.value = ''; }} />
-                <span className="min-w-0 truncate text-xs text-slate-500 dark:text-slate-400">{text.length > EDIT_MAX_CHARS - 200 ? `${text.length}/${EDIT_MAX_CHARS}` : fine ? 'Enter = पाठवा • Shift+Enter = नवी ओळ' : ''}</span>
-                <button className="btn-primary ml-auto" disabled={!canSend}>{busy && <Spinner />} {busy && atts.some(a => !a.id) ? 'अपलोड…' : 'पाठवा'}</button>
+                <span className="min-w-0 truncate text-xs text-slate-500 dark:text-slate-400">{text.length > EDIT_MAX_CHARS - 200 ? `${text.length}/${EDIT_MAX_CHARS}` : fine ? 'Enter = पाठवावे • Shift+Enter = नवी ओळ' : ''}</span>
+                <button className="btn-primary ml-auto" disabled={!canSend}>{busy && <Spinner />} {busy && atts.some(a => !a.id) ? 'अपलोड…' : 'पाठवावे'}</button>
               </div>
             </div>
             {confirm && (
               <div className="space-y-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-100" role="alertdialog" aria-label="पुष्टी">
-                <div>हा बदल <b>{crLabel(ctx.c)}</b>{ctx.c.subject ? <> ({ctx.c.subject.length > 60 ? `${ctx.c.subject.slice(0, 60)}…` : ctx.c.subject})</> : null} च्या <b>{editTargetLabel(tgt)}</b> मध्ये करायचा{atts.length ? ` • ${atts.length} फाइल जोडणार` : ''} — बरोबर?</div>
+                <div>हा बदल <b>{crLabel(ctx.c)}</b>{ctx.c.subject ? <> ({ctx.c.subject.length > 60 ? `${ctx.c.subject.slice(0, 60)}…` : ctx.c.subject})</> : null} च्या <b>{editTargetLabel(tgt)}</b> मध्ये करावयाचा आहे{atts.length ? ` • ${atts.length} फाइल जोडणार` : ''} — कृपया खात्री करावी.</div>
                 <div className="flex flex-wrap gap-2">
-                  <button type="button" className="btn-primary" onClick={() => void send()}>✓ होय, पाठवा</button>
-                  <button type="button" className="btn-ghost" onClick={() => setConfirm(false)}>✕ नाही</button>
-                  <button type="button" className="btn-ghost" onClick={() => { setConfirm(false); setPick(true); }}>प्रकरण बदला</button>
+                  <button type="button" className="btn-primary" onClick={() => void send()}>✓ होय, पाठवावे</button>
+                  <button type="button" className="btn-ghost" onClick={() => setConfirm(false)}>✕ नाही, थांबावे</button>
+                  <button type="button" className="btn-ghost" onClick={() => { setConfirm(false); setPick(true); }}>प्रकरण बदलावे</button>
                 </div>
               </div>
             )}
-            <p className="text-xs text-slate-500 dark:text-slate-400">एका संदेशात अनेक सुधारणा लिहू शकता • फक्त सांगितलेलाच बदल होईल{active ? ' • प्रक्रिया चालू — संपल्यावर पाठवा' : ''}</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">आपण एका संदेशात अनेक सुधारणा नमूद करू शकता • आपण सांगितलेलाच बदल करण्यात येईल{active ? ' • प्रक्रिया चालू आहे — ती पूर्ण झाल्यावर कृपया संदेश पाठवावा' : ''}</p>
           </form>
         )}
       </div>
