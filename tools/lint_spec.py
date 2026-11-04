@@ -29,7 +29,8 @@ Rules (spec.json)
     "सबब, … पत्राचे प्रारूप व शासन निर्णयाचे प्रारूप पृ.  /प.वि. वर मान्यतेस्तव सादर." (two or more of पत्राचे / स्मरणपत्राचे /
     <order kinds below>, the first optionally followed by "प्रारूप", then "," / "व", any words, the last kind + "प्रारूप(े)";
     optionally "मान्य झाल्यास … निर्गमित करण्यात येईल / येतील.") or (order draft, 02.11.2026, docs/COURT_AND_ORDERS_RESEARCH.md
-    R3 (c), B7) "सबब, … <शासन निर्णयाचे / शुद्धिपत्रकाचे / परिपत्रकाचे / ज्ञापनाचे / अधिसूचनेचे / आदेशाचे> प्रारूप पृ.  /प.वि. वर
+    R3 (c), B7) "सबब, … <शासन निर्णयाचे / शुद्धिपत्रकाचे / परिपत्रकाचे / ज्ञापनाचे / अधिसूचनेचे / आदेशाचे / पृष्ठांकनाचे /
+    प्रसिद्धीपत्रकाचे / पूरकपत्राचे (04.11.2026, docs/FORMS_RESEARCH_ORDERS.md)> प्रारूप पृ.  /प.वि. वर
     मान्यतेस्तव सादर." or "सबब, … अधिसूचनेची मराठी व इंग्रजी प्रारूपे पृ.  /प.वि. वर मान्यतेस्तव सादर." (optionally "… मान्य झाल्यास … निर्गमित करण्यात येईल.")
     or (02.11.2026, audit A1 H5 — SOP Step 3 routes) "सबब, … <वित्त / सामान्य प्रशासन / सार्वजनिक आरोग्य> विभागाच्या
     <मान्यतेस्तव / मान्यतेसाठी / अभिप्रायास्तव / अभिप्रायार्थ / सहमतीस्तव> सादर (करण्यात येत आहे)." or (INSTRUCTIONS §8.3,
@@ -52,6 +53,12 @@ Rules (spec.json)
     to, subject, refs present; intro starts "उपरोक्त विषयाबाबत संदर्भाधीन", contains "आपणांस कळविण्यात येते की," and ends
     with ":-" when there are points; "ही विनंती" only in an information-request letter (points / table / reminder, or the
     intro asks "… उपलब्ध करून देण्यात यावी"; requests_info) — a reply / conveying letter needs none
+  - letter "kind": "do" (अर्धशासकीय पत्र; docs/FORMS_RESEARCH_DO_UO.md; lint_do_letter) — instead of the intro rules:
+    ref_no (desk form), subject, to (addressee at the foot), body (list, first person: मी / मला / माझ्या …), salutation
+    "प्रिय श्री. … / प्रिय महोदय," when given; intro / points / closing / reminder / copies / enclosure are errors; an
+    unknown kind is an error; the note's last para names it "अर्धशासकीय पत्राचे" (§4.28 WARN)
+  - note "uo" (अनौपचारिक संदर्भ; uo_problems): keys to / no / date / desk / from (text); "to" = a department ending
+    "विभाग"; the last para sends the file to that department
   - §4.20: no document (प्रत / प्रमाणपत्र / अहवाल) in a data row of a letter.points table (outside quotes); documents go
     after the table as a numbered list introduced by DOC_INTRO
   - §4.21 स्मरणपत्र (letter.reminder): refs[0] has "या कार्यासनाचे समक्रमांकाचे पत्र", intro has "अद्याप अप्राप्त" and
@@ -78,7 +85,7 @@ WARN level (spec.json; note body and letter, text outside quotes; related and si
   - L12 नियम 14: halant before an abbreviation dot ("एम्.ए.", "पीएच्.डी.") -> "एम.ए.", "पीएच.डी."
   - L13 नियम 3 (आदरार्थी): त्याने/तिने -> त्यांनी, त्याचे/तिचे -> त्यांचे, त्याला/तिला -> त्यांना, त्याच्या/तिच्या -> त्यांच्या
   - L14 नियम 1–4 (अनुस्वार): "आपणास" -> "आपणांस"; "यांनां" / "यानां" -> "यांना"
-  - C32 §4.32 (03.11.2026, relevance + एकसंध flow; flow_warnings): note-body table header with a "पृ./प.वि." / "पृ."
+  - C32 §4.34 (03.11.2026, relevance + एकसंध flow; flow_warnings): note-body table header with a "पृ./प.वि." / "पृ."
     column; "पृष्ठांकन" / "माहितीकरिता देण्यात" outside quotes; quote-gluing "तसेच, “" / "” व “"; an item of the
     "उपरोक्त वस्तुस्थिती पुढीलप्रमाणे आहे:-" list with "पृ.N/प.वि."; a quoted “…” containing "…" / "..." (note body and
     related extracts)
@@ -126,8 +133,12 @@ LAST_LETTER_RE = re.compile(r"^सबब\s*,.*पत्राचे\s+प्र�
 LAST_FIN_RE = re.compile(r"^सबब\s*,.*वित्त\s+विभागाच्या\s+मान्यतेस्तव\s+सादर\s+करण्यात\s+येत\s+आहे\s*\.$", re.S)
 # order draft on the file (02.11.2026; R3 (c): "…शासन निर्णयाचे प्रारुप पृ.  /प.वि.वर मान्यतेस्तव सादर.")
 # "अधिसूचनेची मराठी व इंग्रजी प्रारूपे" = B6 notification (Marathi + English text)
-ORDER_DRAFT_KINDS = (r"(?:(?:शासन\s+)?(?:निर्णयाचे|शुद्धिपत्रकाचे|परिपत्रकाचे|ज्ञापनाचे|अधिसूचनेचे|आदेशाचे)\s+प्रारूप"
-                     r"|अधिसूचनेची\s+मराठी\s+व\s+इंग्रजी\s+प्रारूपे)")
+# 04.11.2026: पृष्ठांकनाचे / प्रसिद्धीपत्रकाचे / पूरकपत्राचे (new order types, docs/FORMS_RESEARCH_ORDERS.md); कार्यालयीन
+# आदेशाचे = "आदेशाचे"; शपथपत्राचे / उत्तराचे (tools/build_affidavit.py, tools/build_lq.py)
+ORDER_DRAFT_KINDS = (r"(?:(?:शासन\s+)?(?:निर्णयाचे|शुद्धिपत्रकाचे|परिपत्रकाचे|ज्ञापनाचे|अधिसूचनेचे|आदेशाचे|पृष्ठांकनाचे"
+                     r"|प्रसिद्धीपत्रकाचे|पूरकपत्राचे)\s+प्रारूप"
+                     r"|अधिसूचनेची\s+मराठी\s+व\s+इंग्रजी\s+प्रारूपे"
+                     r"|शपथपत्राचे\s+प्रारूप|उत्तराचे\s+प्रारूप)")
 LAST_ORDER_RE = re.compile(rf"^सबब\s*,.*{ORDER_DRAFT_KINDS}\s+पृ\.[^/]{{0,40}}/\s*प\.वि\.\s*वर\s+मान्यतेस्तव\s+सादर"
                            r"(?:\s+करण्यात\s+येत\s+आहे)?\s*\.(?:\s*मान्य\s+झाल्यास\s+[^.]{0,120}निर्गमित\s+करण्यात\s+येईल\s*\.)?$", re.S)
 # 02.11.2026 (audit A1 H5): the other SOP Step 3 routes, in the Section's wording (old notes /tmp/old, medical-bill
@@ -145,8 +156,9 @@ LAST_DEPT_APPROVAL_RE = re.compile(rf"^सबब\s*,(?!.*प्रार[ुू]
 LAST_CLOSE_RE = re.compile(r"^सबब\s*,.*(?:नस्ती\s*बंद|नस्तीबंद)[^.]*(?:मान्यता\s+असावी|मान्यतेस्तव\s+सादर|सादर)\s*\.$", re.S)
 # INSTRUCTIONS §4.28 (03.11.2026, Abhi: "user multiple option choose karel"): one last para naming every draft made, e.g.
 # "सबब, … पत्राचे प्रारूप व शासन निर्णयाचे प्रारूप पृ.      /प.वि. वर मान्यतेस्तव सादर." (two or more drafts)
-_DRAFT_KIND = (r"(?:(?:शासन\s+)?(?:निर्णयाचे|शुद्धिपत्रकाचे|परिपत्रकाचे|ज्ञापनाचे|अधिसूचनेचे|आदेशाचे)|पत्राचे|पत्रांचे|"
-               r"स्मरणपत्राचे|अधिसूचनेची\s+मराठी\s+व\s+इंग्रजी)")
+_DRAFT_KIND = (r"(?:(?:शासन\s+)?(?:निर्णयाचे|शुद्धिपत्रकाचे|परिपत्रकाचे|ज्ञापनाचे|अधिसूचनेचे|आदेशाचे|पृष्ठांकनाचे"
+               r"|प्रसिद्धीपत्रकाचे|पूरकपत्राचे)|पत्राचे|पत्रांचे|"
+               r"स्मरणपत्राचे|अधिसूचनेची\s+मराठी\s+व\s+इंग्रजी|शपथपत्राचे|उत्तराचे)")
 _DRAFT_ITEM = rf"{_DRAFT_KIND}(?:\s+प्रारूपे?)?"
 LAST_COMBINED_RE = re.compile(rf"^सबब\s*,.*{_DRAFT_ITEM}(?:\s*,\s*|\s+व\s+)[^.]{{0,160}}?{_DRAFT_KIND}\s+प्रारूपे?\s+"
                               r"पृ\.[^/]{0,40}/\s*प\.वि\.\s*वर\s+मान्यतेस्तव\s+सादर(?:\s+करण्यात\s+येत\s+आहे)?\s*\."
@@ -649,7 +661,7 @@ def lint_spec(spec, pages=None):
         dk = _desk.desk_of(spec)
     except ValueError as e:
         P.append(f"desk: desk profile — {e}"); dk = _D0
-    body = [x for k in ("first", "paras", "sub", "closing") if k in n for x in strings(n[k], f"note.{k}")]
+    body = [x for k in ("first", "paras", "sub", "closing", "uo") if k in n for x in strings(n[k], f"note.{k}")]
     related = list(strings(spec.get("related", []), "related"))
     letter = letter_strings(spec)
     signers = list(strings(n.get("signers", []), "note.signers"))
@@ -721,6 +733,8 @@ def lint_spec(spec, pages=None):
     P += [f"note.signers: signer chain (§4.6) — {x}" for x in signer_problems(sg, has_ams, dk)]
     P += [f"{lpath}: अ.मु.स. (वित्त) <=> Finance last para — {x}" for x in finance_problems(lastn, has_ams, dk)]
 
+    P += uo_problems(n, lastn, lpath)   # अनौपचारिक संदर्भ (note "uo")
+
     # letters ("letter" and / or "letters", §4.28)
     if spec.get("letter") and spec.get("letters"):
         P.append("letters: structure — give either 'letter' or 'letters' (list), not both (§4.28)")
@@ -731,12 +745,56 @@ def lint_spec(spec, pages=None):
     return P
 
 
+# अर्धशासकीय पत्र (letter "kind": "do"; docs/FORMS_RESEARCH_DO_UO.md): GAD "टिप्पणी लेखन व पत्रव्यवहार" परि. 12.26–12.29 and
+# specimen (book p.43–44, PDF p.47–48); MMOP 2023 §10.1(7)(a) "written in the first person" (PDF p.64), §11.4(3) "The subject
+# should be mentioned invariably in all communications including reminders and demi official letters" (PDF p.80)
+LETTER_KINDS = ("do",)
+DO_SALUTATION_RE = re.compile(r"^प्रिय\s+(?:श्री\.|श्रीमती|महोदय|महोदया)")   # 12.27 "प्रिय श्री."; 12.28 "प्रिय महोदय"
+DO_FIRST_PERSON_RE = re.compile(r"(?<![ऀ-ॿ])(?:मी|मला|माझे|माझी|माझा|माझ्या[ऀ-ॿ]*)(?![ऀ-ॿ])")
+DO_OFFICIAL_ONLY = ("intro", "points", "closing", "reminder", "copies", "enclosure")   # ordinary-letter keys
+
+
+def lint_do_letter(L, lp, dl):
+    """problems of ONE अर्धशासकीय पत्र (kind "do") at JSON path lp; dl = desk profile["letter"]."""
+    P = []
+    rn = L.get("ref_no")
+    if not isinstance(rn, str) or not re.fullmatch(dl["ref_pattern"], rn.strip()):
+        P.append(f"{lp}.ref_no: ref no. — not {dl['ref_hint']}: '{rn}'")
+    if not isinstance(L.get("subject"), str) or not L["subject"].strip():
+        P.append(f"{lp}.subject: अर्धशासकीय पत्र — 'subject' missing (MMOP §11.4(3): subject invariably, D.O. letters too)")
+    to = L.get("to")
+    if not isinstance(to, list) or not any(isinstance(x, str) and x.strip() for x in to):
+        P.append(f"{lp}.to: अर्धशासकीय पत्र — addressee name / designation / office lines missing (printed at the foot, left)")
+    sal = L.get("salutation")
+    if sal is not None and (not isinstance(sal, str) or not DO_SALUTATION_RE.match(ns(sal))):
+        P.append(f"{lp}.salutation: अर्धशासकीय पत्र — 'प्रिय श्री. <नाव>,' / 'प्रिय महोदय,' (GAD परि. 12.27–12.28)")
+    fr = L.get("from")
+    if fr is not None and not (isinstance(fr, dict) and all(isinstance(fr.get(k, ""), str) for k in ("name", "designation"))):
+        P.append(f"{lp}.from: अर्धशासकीय पत्र — {{'name': …, 'designation': …}}")
+    bd = L.get("body")
+    texts = [x for x in (bd if isinstance(bd, list) else []) if isinstance(x, str) and x.strip()]
+    if not texts:
+        P.append(f"{lp}.body: अर्धशासकीय पत्र — 'body' (list of paragraphs) missing or empty")
+    elif not any(DO_FIRST_PERSON_RE.search(unquoted(t)) for t in texts):
+        P.append(f"{lp}.body: अर्धशासकीय पत्र — first person (मी / मला / माझ्या …) required (MMOP §10.1(7)(a))")
+    for k in DO_OFFICIAL_ONLY:
+        if L.get(k):
+            P.append(f"{lp}.{k}: अर्धशासकीय पत्र — '{k}' belongs to the ordinary letter; use 'body' (the specimen has no "
+                     f"{k})")
+    return P
+
+
 def lint_letter(L, lp="letter", desk=None):
     """problems of ONE letter object at JSON path lp ("letter" or "letters[i]"); desk = profile (dict / id; None = law-desk6)."""
     P = []
     if not isinstance(L, dict):
         return [f"{lp}: structure — must be an object"]
     dl = (desk if isinstance(desk, dict) else _desk.load_desk(desk))["letter"]
+    kind = L.get("kind")
+    if kind is not None and kind not in LETTER_KINDS:
+        return [f"{lp}.kind: letter kind — '{kind}' unknown (absent = ordinary letter; 'do' = अर्धशासकीय पत्र)"]
+    if kind == "do":
+        return lint_do_letter(L, lp, dl)
     rn = L.get("ref_no")
     if not isinstance(rn, str) or not re.fullmatch(dl["ref_pattern"], rn.strip()):
         P.append(f"{lp}.ref_no: ref no. — not {dl['ref_hint']}: '{rn}'")
@@ -780,6 +838,39 @@ def lint_letter(L, lp="letter", desk=None):
                 for c, cell in enumerate(row if isinstance(row, list) else []):
                     if isinstance(cell, str) and DOC_RE.search(unquoted(cell)):
                         P.append(f"{lp}.points[{i}].table[{r}][{c}]: {DOC_MSG} — '{DOC_INTRO}'")
+    return P
+
+
+# अनौपचारिक संदर्भ (note "uo"; docs/FORMS_RESEARCH_DO_UO.md): MMOP 2023 §9.1(1), (4) (PDF p.57) — inter-departmental
+# references are made unofficially, with a note signed by the officer "precisely specifying the points on which the opinion
+# of the other department is sought"; GADT परि. 5.2 (book p.16, PDF p.20) — those points at the end of the note.
+# Block = NPM परिशिष्ट-8 form foot (book p.77, PDF p.84; tools/mkdocs.py uo_lines)
+UO_KEYS = ("to", "no", "date", "desk", "from")
+UO_DEPT_RE = re.compile(r"^(.+?)\s*विभाग\s*$")
+
+
+def uo_problems(n, lastn, lpath="note.paras"):
+    """problems of note["uo"] (absent = none); lastn = the note's last para (normalised)."""
+    u = n.get("uo")
+    if u is None:
+        return []
+    if not isinstance(u, dict):
+        return ["note.uo: अनौपचारिक संदर्भ — must be an object {'to', 'no', 'date', 'desk', 'from'}"]
+    P = [f"note.uo.{k}: अनौपचारिक संदर्भ — unknown key (allowed: {', '.join(UO_KEYS)})" for k in u if k not in UO_KEYS]
+    P += [f"note.uo.{k}: अनौपचारिक संदर्भ — text ('____' when not known)" for k in UO_KEYS
+          if k in u and not isinstance(u[k], str)]
+    to = u.get("to")
+    if not isinstance(to, str) or not to.strip() or to.strip() == "____":
+        P.append("note.uo.to: अनौपचारिक संदर्भ — the department the file is sent to (e.g. 'वित्त विभाग')")
+    elif not UO_DEPT_RE.match(ns(to)):
+        P.append(f"note.uo.to: अनौपचारिक संदर्भ — a department name ending 'विभाग' (printed '… विभागाकडे अनौपचारिक "
+                 f"संदर्भ', NPM परिशिष्ट-8): '{to}'")
+    else:
+        dep = ns(to)
+        if dep not in lastn:
+            P.append(f"{lpath}: अनौपचारिक संदर्भ — the last para must "
+                     f"send the file to '{dep}' (the points for its opinion / concurrence at the end of the note, "
+                     f"GADT परि. 5.2; MMOP §9.1(4))")
     return P
 
 
@@ -846,20 +937,24 @@ def last_para(n):
 
 # §4.28 (03.11.2026): the note's last para names every draft made — spec draft -> words that name it (WARN level)
 ORDER_NAMES = {"gr": ("निर्णयाचे",), "corrigendum": ("शुद्धिपत्रकाचे",), "circular": ("परिपत्रकाचे",),
-               "memo": ("ज्ञापनाचे",), "notification": ("अधिसूचनेचे", "अधिसूचनेची")}
+               "memo": ("ज्ञापनाचे",), "notification": ("अधिसूचनेचे", "अधिसूचनेची"),
+               "endorsement": ("पृष्ठांकनाचे",), "office_order": ("आदेशाचे",), "press_note": ("प्रसिद्धीपत्रकाचे",),
+               "addendum": ("पूरकपत्राचे",)}
 
 
 def drafts_unnamed(spec):
-    """Drafts in the spec ("letter"/"letters", "order"/"orders", "parawise") that the note's last para does not name."""
+    """Drafts in the spec ("letter"/"letters", "order"/"orders", "parawise", "affidavit", "lq") that the note's last para does not name."""
     if not isinstance(spec, dict) or not isinstance(spec.get("note"), dict):
         return []
     last = ns(unquoted(last_para(spec["note"])[1]))
     miss = []
     for lp, L in letters_of(spec):
         rem = isinstance(L, dict) and L.get("reminder")
-        words = ("स्मरणपत्राचे", "पत्राचे", "पत्रांचे") if rem else ("पत्राचे", "पत्रांचे")
+        do = isinstance(L, dict) and L.get("kind") == "do"
+        words = ("अर्धशासकीय पत्राचे",) if do else \
+            ("स्मरणपत्राचे", "पत्राचे", "पत्रांचे") if rem else ("पत्राचे", "पत्रांचे")
         if not any(w in last for w in words):
-            miss.append(f"{lp} ({'स्मरणपत्र' if rem else 'पत्र'})")
+            miss.append(f"{lp} ({'अर्धशासकीय पत्र' if do else 'स्मरणपत्र' if rem else 'पत्र'})")
     orders = ([spec["order"]] if isinstance(spec.get("order"), dict) else []) + \
              [o for o in (spec.get("orders") if isinstance(spec.get("orders"), list) else []) if isinstance(o, dict)]
     for o in orders:
@@ -868,26 +963,30 @@ def drafts_unnamed(spec):
             miss.append(f"order {o.get('type')}")
     if spec.get("parawise") and "परिच्छेदनिहाय" not in last:
         miss.append("parawise (परिच्छेदनिहाय अभिप्राय)")
+    if spec.get("affidavit") and "शपथपत्राचे" not in last:
+        miss.append("affidavit (शपथपत्राचे प्रारूप)")
+    if spec.get("lq") and "उत्तराचे" not in last:
+        miss.append("lq (प्रश्नाच्या उत्तराचे प्रारूप)")
     return miss
 
 
-# C32 §4.32 (Abhi 03.11.2026: "vinakarna upyogache naslele sandarbh noting mdhe dakhwile aahet … eksandh pna nahi"):
+# C32 §4.34 (Abhi 03.11.2026: "vinakarna upyogache naslele sandarbh noting mdhe dakhwile aahet … eksandh pna nahi"):
 # relevance + एकसंध flow — WARN level only (never an error; verify_outputs prints the same as "WARN: …"). Note body:
 # a table whose header row has a "पृ./प.वि." / "पृ." column (the ref goes in the sentence before the table); forwarding
 # trivia "पृष्ठांकन" / "माहितीकरिता देण्यात" outside quotes; quote-gluing "तसेच, “" / "” व “" (one quote per sentence);
 # an item of the "उपरोक्त वस्तुस्थिती पुढीलप्रमाणे आहे:-" list carrying "पृ.N/प.वि." (refs are in the body). Note body and
 # related extracts: a quoted “…” containing "…" or "..." (a shortened quote, §1.1).
 PAGE_COL_RE = re.compile(r"^\s*(?:पृ|पृष्ठ)\s*\.?\s*(?:क्र\s*\.?\s*)?(?:/\s*प\s*\.\s*वि\s*\.?)?\s*$")
-TRIVIA_RE = re.compile(r"पृष्ठांकन|माहितीकरिता\s+देण्यात")
+TRIVIA_RE = re.compile(r"पृष्ठांकन(?!ाचे\s+प्रारूप|\s+निर्गमित)|माहितीकरिता\s+देण्यात")  # 04.11.2026: the endorsement draft itself ([I4.33]) is not trivia
 GLUE_RE = re.compile(r"तसेच\s*,\s*“|”\s*व\s*“")
 SUMMARY_HEAD_RE = re.compile(r"उपरोक्त\s+वस्तुस्थिती\s+(?:पुढीलप्रमाणे|खालीलप्रमाणे)")
 CURLY_QUOTE_RE = re.compile(r"“[^”]*”")
 SHORT_QUOTE_RE = re.compile(r"…|\.\.\.")
-FLOW_SRC = "(§4.32)"
+FLOW_SRC = "(§4.34)"
 
 
 def flow_warnings(seq, headers=(), related=()):
-    """C32 §4.32 WARN-level findings. seq = the note body in print order [(label, text, is_para)] (lint: note_seq;
+    """C32 §4.34 WARN-level findings. seq = the note body in print order [(label, text, is_para)] (lint: note_seq;
     verify: the docx blocks); headers = [(label, [header cells])] of each note-body table; related = [(label, text)] of
     the related extracts (only the shortened-quote rule). Returns ["<label>: <message>"]; never errors."""
     W = []
@@ -950,7 +1049,7 @@ def lint_warnings(spec):
     W = [f"{path}: {m}" for path, t in body + letter for m in warn_hits(t)]
     W += missing_scatter(note_seq(n))[1]   # §4.31 placement
     rel_txt = [(pth, t) for pth, t in strings(spec.get("related", []), "related") if re.search(r"\.text(\[|$)", pth)]
-    W += flow_warnings(note_seq(n), note_tables(n), rel_txt)   # C32 §4.32 relevance + flow
+    W += flow_warnings(note_seq(n), note_tables(n), rel_txt)   # C32 §4.34 relevance + flow
     W += [f"{last_para(n)[0]}: last para — does not name the draft {d} (§4.28: name every draft made, e.g. "
           f"'पत्राचे प्रारूप व शासन निर्णयाचे प्रारूप पृ.      /प.वि. वर मान्यतेस्तव सादर.')" for d in drafts_unnamed(spec)]
     return W
@@ -977,7 +1076,9 @@ def lint_study(study, pages=None, allow_missing_part1=False):
 
 # spec key -> tools/<module>.py, error function, optional WARN-level function names
 EXTRA_LINTS = ((("order", "orders"), "lint_order", ("lint_order_warnings", "warnings_order")),   # "orders": §4.28
-               (("parawise",), "lint_parawise", ("warnings_parawise", "lint_parawise_warnings")))
+               (("parawise",), "lint_parawise", ("warnings_parawise", "lint_parawise_warnings")),
+               (("affidavit",), "lint_affidavit", ("warnings_affidavit",)),   # 04.11.2026: tools/build_affidavit.py
+               (("lq",), "lint_lq", ("warnings_lq",)))                       # 04.11.2026: tools/build_lq.py
 _IN_EXTRA = []
 
 

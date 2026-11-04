@@ -586,11 +586,11 @@ class VerifyOutputs(unittest.TestCase):
 
     def test_good_has_no_warn(self):
         rc, out = self.run_verify(self.good)
-        # C32 §4.32: CR122's related precedent extract is itself quoted with "..." (quote content never altered, §1.1)
+        # C32 §4.34: CR122's related precedent extract is itself quoted with "..." (quote content never altered, §1.1)
         self.assertEqual([ln for ln in out.splitlines() if ln.startswith("WARN:") and "shortened quote" not in ln], [], out)
 
     def test_432_flow_warn_not_fail(self):
-        # C32 §4.32 (Abhi 03.11.2026): relevance + एकसंध flow findings are SOFT notes (WARN), never a FAIL
+        # C32 §4.34 (Abhi 03.11.2026): relevance + एकसंध flow findings are SOFT notes (WARN), never a FAIL
         d = self.case("flow432")
         def f(s):
             t = s["note"]["paras"][2]["table"]; t[0].append("पृ./प.वि."); [r.append("12") for r in t[1:]]
@@ -603,7 +603,7 @@ class VerifyOutputs(unittest.TestCase):
         self.assertEqual(rc, 0, out)
         self.assertIn("ALL OK", out)
         self.assertNotIn("FAIL:", out)
-        warns = [ln for ln in out.splitlines() if ln.startswith("WARN:") and "(§4.32)" in ln]
+        warns = [ln for ln in out.splitlines() if ln.startswith("WARN:") and "(§4.34)" in ln]
         for needle in ("(table): table column 'पृ./प.वि.'", "forwarding detail 'माहितीकरिता देण्यात'", "quote-gluing",
                        "shortened quote", "'उपरोक्त वस्तुस्थिती' item carries a पृ./प.वि. reference"):
             self.assertTrue(any(needle in w for w in warns), f"{needle}:\n{out}")

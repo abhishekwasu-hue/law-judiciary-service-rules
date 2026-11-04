@@ -85,9 +85,13 @@ class TestBuildNoteLetter(TmpCase):
                 self.assertEqual(bad_font_runs(d), 0)
                 has_letter = bool(jload(sp).get("letter"))
                 text = "\n".join(p.text for p in d.paragraphs)
-                if has_letter:
+                if has_letter and jload(sp)["letter"].get("kind") == "do":   # अर्धशासकीय पत्र (GAD specimen ending)
+                    self.assertIn("आपला स्नेहांकित,", text)
+                    self.assertNotIn("प्रत : निवड नस्ती", text)
+                elif has_letter:
                     self.assertIn("आपला,", text)
                     self.assertIn("प्रत : निवड नस्ती", text)
+                if has_letter:
                     self.assertEqual(len(d.sections), 2)
                     self.assertEqual(page_setup(d.sections[0]), note_m)
                     self.assertEqual(page_setup(d.sections[1]), let_m)

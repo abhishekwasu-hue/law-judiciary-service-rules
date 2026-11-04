@@ -159,3 +159,25 @@ def test_unnamed_draft_warning():
     s = with_closing("सबब, शासन निर्णयाचे प्रारूप पृ.      /प.वि. वर मान्यतेस्तव सादर.")
     w = [x for x in lint_spec.lint_warnings(s) if "§4.28" in x]
     assert len(w) == 1 and "notification" in w[0]
+
+
+# ---------------- more draft kinds (04.11.2026): engine detection on the real builders' output ----------------
+def test_engine_detects_new_draft_kinds(tmp_path):
+    """tools/engine_supabase.py missing_drafts finds each new kind in the files the real builders write (printed lines
+    of build_order / mkdocs, file names of build_affidavit / build_lq), and does not mistake one kind for another."""
+    import engine_supabase as E
+    builds = [("build_order.py", "ORDER_endorsement_example.json", "E"), ("build_order.py", "ORDER_office_order_example.json", "O"),
+              ("build_order.py", "ORDER_press_note_example.json", "P"), ("build_order.py", "ORDER_addendum_example.json", "A"),
+              ("build_order.py", "ORDER_gr_example.json", "G"),
+              ("build_note_letter.py", "LETTER_do_example.json", "D"), ("build_note_letter.py", "NOTE_uo_reference_example.json", "U"),
+              ("build_note_letter.py", "CR131_2026_special-pay_info-letter.json", "L"),
+              ("build_affidavit.py", "COURT_affidavit_example.json", "F"), ("build_lq.py", "LQ_answer_example.json", "Q")]
+    for tool, spec, pre in builds:
+        r = run([os.path.join(TOOLS, tool), os.path.join(SPECS, spec), str(tmp_path), pre])
+        assert r.returncode == 0, f"{tool} {spec}: {r.stdout}{r.stderr}"
+    made = {"E": "endorsement", "O": "office_order", "P": "press_note", "A": "addendum", "G": "gr", "D": "do_letter",
+            "U": "uo_note", "L": "letter", "F": "affidavit", "Q": "lq"}
+    checked = ["letter", "gr", "do_letter", "uo_note", "endorsement", "office_order", "press_note", "addendum", "affidavit", "lq"]
+    for pre, key in made.items():
+        miss = E.missing_drafts(str(tmp_path), pre, checked)
+        assert miss == [E.DRAFT_LABEL[k] for k in checked if k != key], f"{pre} ({key}): {miss}"

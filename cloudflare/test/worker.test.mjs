@@ -89,7 +89,7 @@ async function queueDb(u, opt, res) {
 globalThis.fetch = async (u, opt = {}) => {
   u = String(u); calls.push({ u, opt });
   const res = (o, s = 200) => new Response(JSON.stringify(o), { status: s });
-  // C33: without a queue table (Q null) the runs.dispatched_at column is "missing" (migration 0010 not applied) →
+  // C33: without a queue table (Q null) the runs.dispatched_at column is "missing" (migration 0011 not applied) →
   // the Worker dispatches at once, as the older tests expect
   if (u.startsWith(`${SB}/rest/v1/runs`) && /dispatched_at/.test(decodeURIComponent(u) + (opt.body || ''))) {
     if (!Q) return res({ code: '42703', message: 'column runs.dispatched_at does not exist' }, 400);
@@ -753,6 +753,11 @@ test('C28: /api/run outputs — validated, deduped, fixed order; 400 Marathi; mi
   assert.equal(r.status, 200, await r.clone().text());
   assert.deepEqual(runInserts.at(-1).outputs, ['letter', 'gr', 'parawise'], 'dedupe + fixed order');
   assert.deepEqual((await r.json()).outputs, ['letter', 'gr', 'parawise']);
+  // 04.11.2026: eight more keys, appended after the old ones in the fixed order
+  r = await run({ outputs: ['lq', 'affidavit', 'addendum', 'press_note', 'office_order', 'endorsement', 'uo_note', 'do_letter', 'letter'] });
+  assert.equal(r.status, 200, await r.clone().text());
+  assert.deepEqual(runInserts.at(-1).outputs,
+    ['letter', 'do_letter', 'uo_note', 'endorsement', 'office_order', 'press_note', 'addendum', 'affidavit', 'lq'], 'new keys accepted, fixed order');
   r = await run({ outputs: [] });
   assert.deepEqual(runInserts.at(-1).outputs, [], 'empty = note only');
   await run({});
@@ -856,7 +861,7 @@ test('C33: case work_type — 4 ids only (400 Marathi); missing column → saved
   assert.equal(pr.status, 400);
   assert.equal((await call('/api/cases/40', { method: 'PATCH', headers: owner33, body: JSON.stringify({ work_type: 'court' }) })).status, 200);
   assert.equal(caseRows[40].work_type, 'court');
-  // column missing (migration 0010 not applied): the case is still saved, without work_type
+  // column missing (migration 0011 not applied): the case is still saved, without work_type
   const realFetch = globalThis.fetch;
   globalThis.fetch = async (u, opt = {}) => (String(u).startsWith(`${SB}/rest/v1/cases`) && ['POST', 'PATCH'].includes(opt.method) && 'work_type' in JSON.parse(opt.body)
     ? new Response(JSON.stringify({ code: 'PGRST204', message: "Could not find the 'work_type' column of 'cases' in the schema cache" }), { status: 400 })

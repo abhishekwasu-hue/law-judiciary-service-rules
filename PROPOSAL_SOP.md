@@ -2,7 +2,7 @@
 
 Owner: Abhi, Section Officer (कार्यासन अधिकारी), Law & Judiciary Department, Desk-6 (कार्यासन-6), Govt of Maharashtra.
 When he sends a proposal PDF, do ALL steps below without asking. He must never have to explain this again.
-The rules are in INSTRUCTIONS.md §4 (items 1–26); this file is the order of work + the tools. If anything here conflicts with
+The rules are in INSTRUCTIONS.md §4 (items 1–33); this file is the order of work + the tools. If anything here conflicts with
 INSTRUCTIONS.md, INSTRUCTIONS.md wins. Reply to him in Marathi, few words.
 
 The quality standard = the approved notes in `samples/specs/` (C R 66, 122, 128, 130, 131, 133 of 2026). Match them.
@@ -58,8 +58,9 @@ Trigger: Abhi says "प्रस्ताव कक्षातील नवी�
   - or GAD (सा.प्र.वि.);
   - or a reply letter on the basis of an existing opinion.
 - **Drafts ticked by Abhi (INSTRUCTIONS §4.28, 03.11.2026 — "कोणते मसुदे हवेत?"):** case.json / the desk choice `outputs`
-  (letter, reminder, gr, corrigendum, circular, memo, notification, parawise). Given → make EXACTLY those besides the note
-  (Study, note, package always; nothing ticked → note only); null → decide as above. Letter ticked but nothing essential
+  (letter, reminder, gr, corrigendum, circular, memo, notification, parawise; since 04.11.2026 also do_letter, uo_note,
+  endorsement, office_order, press_note, addendum, affidavit, lq — Step 4b "New draft types", INSTRUCTIONS §4.33).
+  Given → make EXACTLY those besides the note (Study, note, package always; nothing ticked → note only); null → decide as above. Letter ticked but nothing essential
   missing → a letter fitting the demand (reply / forwarding / intimation) + warning; letter not ticked but essential
   information missing → no letter + warning "माहिती कमी — पत्र सुचवले (निवडलेले नाही)". Letter + reminder → spec
   `letters` [letter, reminder] (one Note_and_Letter, each on a new page); several orders → spec `orders` [..] (one
@@ -71,7 +72,7 @@ Copy the structure of the nearest sample in `samples/specs/` and fill your facts
 - **Marathi forms (INSTRUCTIONS §4.19, 01.11.2026; Marathi Language Dept GR कपासू-2020/प्र.क्र.56/भाषा-2, दि. 10.11.2022):** outside “…” quotes — a space after an abbreviation dot in running text ("दि. 17.09.2026", "क्र. 108", "प्र. क्र. 21/2024"); ":-" never ".:-"; "करून" not "करुन", "प्रारूप" not "प्रारुप". Left exactly: quotes and related extracts, "पृ.N/प.वि." / "पॅकेज PDF पृ. N", file/letter nos. and any token with '/' or '-' ("संकिर्ण-2026/226/प्र.क्र.131/का.6"), the signer chain, date digits, decimals, GR codes. lint_spec.py and verify_outputs.py check this.
 - **Para 1:** "<authority> यांच्या पृ.__/प.वि. वरील दि. __ रोजीच्या पत्रास अनुसरून सादर." (or "…पत्रासोबत प्राप्त … पत्रास अनुसरून सादर.")
 - **Body:** numbered paras, DETAILED (INSTRUCTIONS §4.29, Abhi 03.11.2026: "note khupch short jhali detail asayla pahije"): the 12 elements in order where they apply (every covering letter in para 1; background/service table; the documents that create the issue verbatim; benefit/amount/period tables; each authority's letter verbatim; present status; complaint/court timeline; replies to earlier queries; every applicable GR para + rules + SC/HC judgments verbatim in the body with a condition table; "उपरोक्त वस्तुस्थिती पुढीलप्रमाणे आहे:-" fact summary; the exact demand + action after approval; the drafts) — no fact or condition of the proposal left out; sentences stay short (§4.18); letters stay concise (§4.15). Model: samples/specs/HTE_2026_overpayment-waiver_finance-concurrence.json.
-- **Relevance + एकसंध flow (INSTRUCTIONS §4.32, Abhi 03.11.2026 on CR132: "vinakarna upyogache naslele sandarbh noting mdhe dakhwile aahet, tasech paragraph cha wachtana flow tutato"):** only references needed to decide the demand (no endorsement/पृष्ठांकन nos., "प्रत … माहितीकरिता" lines, the office's own reminder history — at most one clause in para 1/2 —, copy lines, meta lines); covering letters once, in para 1; each fact ONCE in the body (table OR quote OR sentence), quotes only where the wording matters; "उपरोक्त वस्तुस्थिती" = 3-6 decisive facts, one line each, no पृ.; office order (reference → who asks what → background → issue → provisions + condition table → उपरोक्त वस्तुस्थिती → missing info → सबब) with linking openers ("सदर प्रकरणी", "त्यानुषंगाने", "याबाबत", "तथापि"); one quote per sentence (no "तसेच, “…” व “…”"); पृ.N/प.वि. once per document at first mention, no "पृ./प.वि." table column; quotes never cut with "…". lint/verify WARN.
+- **Relevance + एकसंध flow (INSTRUCTIONS §4.34, Abhi 03.11.2026 on CR132: "vinakarna upyogache naslele sandarbh noting mdhe dakhwile aahet, tasech paragraph cha wachtana flow tutato"):** only references needed to decide the demand (no endorsement/पृष्ठांकन nos., "प्रत … माहितीकरिता" lines, the office's own reminder history — at most one clause in para 1/2 —, copy lines, meta lines); covering letters once, in para 1; each fact ONCE in the body (table OR quote OR sentence), quotes only where the wording matters; "उपरोक्त वस्तुस्थिती" = 3-6 decisive facts, one line each, no पृ.; office order (reference → who asks what → background → issue → provisions + condition table → उपरोक्त वस्तुस्थिती → missing info → सबब) with linking openers ("सदर प्रकरणी", "त्यानुषंगाने", "याबाबत", "तथापि"); one quote per sentence (no "तसेच, “…” व “…”"); पृ.N/प.वि. once per document at first mention, no "पृ./प.वि." table column; quotes never cut with "…". lint/verify WARN.
 - **Quality checks (INSTRUCTIONS §4.30, Abhi 03.11.2026 — inside the existing drafts, nothing new):** every demand/contention/condition answered; no contradictory dates/amounts/names/posts across proposal, note, letter, drafts, parawise; the demand in one sentence right after para 1 (parawise `relief_sought`); GR/rule text in its original language; respectful language to courts (lint_parawise WARN); tables for chronology/service/amounts; GP/other-department opinions as recorded, never treated as binding. Engine reviewer: coverage table + contradictions -> Study part 7 only.
   - Facts, posts, periods and amounts go in TABLES: a `{"table": [[...],[...]], "bold_last": true}` item in `note.paras`.
   - GR/rule text verbatim in “ ” with "(पृ.N/प.वि.)".
@@ -102,6 +103,13 @@ Both are optional keys of the same spec.json; engine detail: tools/ENGINE_PROMPT
 - **Court cases** (GP/AGP/High Court/MAT notice on a writ petition, O.A., contempt, SLP):
   - Note (B9): para 1 "<सहायक सरकारी वकील, …> यांच्या पृ.N/प.वि. वरील दि. __ रोजीच्या पत्रास अनुसरून सादर."; then
     "पार्श्वभूमी थोडक्यात खालीलप्रमाणे आहे:-" and numbered facts with पृ.N/प.वि.
+  - Para 2 / para 3 (INSTRUCTIONS §4.32, Abhi 03.11.2026): para 2 = flowing sentences: "<petitioners> यांनी … दाखल केलेली रिट
+    याचिका क्र. __ (पृ.) कृपया पहावी. सदर याचिकेत <R1> यांना प्रतिवादी क्र. 1, <R2> यांना प्रतिवादी क्र. 2, … आणि <Rn> यांना प्रतिवादी
+    क्र. N करण्यात आले आहे (पृ.)." + verification date (no choppy list); story order and linking words for all paras
+    (§4.32 (ई)); para 3 =
+    "सदर याचिकेद्वारे याचिकाकर्त्यांनी पुढीलप्रमाणे प्रमुख मागण्या केल्या आहेत (पृ.N/प.वि.):-" + table अ.क्र. | प्रार्थना | मागणी
+    (each prayer in Marathi, petition order); the English prayers verbatim go FIRST in `related`. Respectful plural, Marathi
+    designations, short sentences. Model: samples/specs/WP35697_2026_old-pension_finance-opinion.json.
   - Facts suffice → spec `parawise` (English; B8; Rules 1984 Rule 58(3) every point, Rule 58(4) Note (ii) elaborate
     facts + documents enclosed, recommendation oppose / not oppose — from the record only, the one exception to "no opinion"; no record basis → "____" + warning) → `python3 tools/build_parawise.py spec.json <outdir>
     <PREFIX>` → `<PREFIX>_Parawise.docx`; letter to the GP/AGP forwarding it.
@@ -115,6 +123,26 @@ Both are optional keys of the same spec.json; engine detail: tools/ENGINE_PROMPT
   ONE `<PREFIX>_Order_Draft.docx` (each order on a new page). Note's last para: "सबब, … शासन निर्णयाचे (ज्ञापनाचे /
   शुद्धिपत्रकाचे / परिपत्रकाचे / अधिसूचनेचे) प्रारूप पृ.      /प.वि. वर मान्यतेस्तव सादर."; several drafts in one para,
   e.g. "सबब, … पत्राचे प्रारूप व शासन निर्णयाचे प्रारूप पृ.      /प.वि. वर मान्यतेस्तव सादर." (lint_spec.py).
+- **New draft types (04.11.2026, INSTRUCTIONS §4.33 — when to use each, what the tool prints, open-point defaults;
+  research: docs/FORMS_RESEARCH_DO_UO.md, FORMS_RESEARCH_ORDERS.md, FORMS_RESEARCH_AFFIDAVIT_LQ.md,
+  LEGISLATURE_INSTRUMENTS_RESEARCH.md).** Draft key → spec → tool → file:
+  - `do_letter` (अर्धशासकीय पत्र) → `letter` / `letters` item `{"kind": "do", …}` (first-person `body`, `to` at the foot) →
+    `tools/build_note_letter.py` → `<PREFIX>_Note_and_Letter.docx`; model samples/specs/LETTER_do_example.json.
+  - `uo_note` (अनौपचारिक संदर्भ) → `note.uo` `{to, no, date}`; last para sends the file to that department →
+    `tools/build_note_letter.py` (block after the signers); model NOTE_uo_reference_example.json.
+  - `endorsement` (पृष्ठांकन), `office_order` (कार्यालयीन आदेश), `press_note` (प्रसिद्धीपत्रक), `addendum` (शासन पूरकपत्र) →
+    `order` / `orders` item with that `type` → `tools/build_order.py` → `<PREFIX>_Order_Draft.docx`; models
+    ORDER_endorsement_example.json, ORDER_office_order_example.json, ORDER_press_note_example.json, ORDER_addendum_example.json.
+  - `affidavit` (शपथपत्र, English) → spec `affidavit` (reply defaults to `parawise.paras`) → `tools/build_affidavit.py spec.json
+    <outdir> <PREFIX>` → `<PREFIX>_Affidavit.docx`; model COURT_affidavit_example.json.
+  - `lq` (विधानमंडळ प्रश्नाचे उत्तर) → spec `lq` → `tools/build_lq.py spec.json <outdir> <PREFIX>` → `<PREFIX>_LQ_Answer.docx`
+    (+ पुरवणी टिप्पणी for starred / short notice); the note: one para per clause ending "प्रस्तावित उत्तर : …"; model
+    LQ_answer_example.json.
+  - Last para names each: "अर्धशासकीय पत्राचे / पृष्ठांकनाचे / कार्यालयीन आदेशाचे / प्रसिद्धीपत्रकाचे / शासन पूरकपत्राचे /
+    शपथपत्राचे / … प्रश्न क्रमांक ____ च्या उत्तराचे प्रारूप पृ.      /प.वि. वर मान्यतेस्तव सादर."; U.O.: "सबब, … <विभाग>
+    विभागाच्या अभिप्रायास्तव सादर करण्यात येत आहे." Never write the lines the tool prints (lint refuses).
+    Lints: lint_order.py, lint_affidavit.py, lint_lq.py (via lint_spec.py). verify_outputs.py does not yet check the
+    Affidavit / LQ_Answer files: look at their PDF previews.
 - Unknown details (petition no., date, संकेतांक, Gazette part) → "____"; never stop.
 - Checks: `tools/lint_spec.py` (calls tools/lint_order.py / tools/lint_parawise.py), `tools/verify_outputs.py` (fonts,
   ids, repo paths, पृ. ranges of both files). App: kinds `order_draft` / `parawise` (Supabase migration 0006).

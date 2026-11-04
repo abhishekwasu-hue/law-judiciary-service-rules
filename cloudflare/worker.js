@@ -31,7 +31,8 @@ const ALL_KEYS = [...SECRET_KEYS, ...PLAIN_KEYS];
 // upload kinds (C28, migration 0008: approval = वित्त/सा.प्र.वि. मान्यता, court_notice = न्यायालयीन नोटीस)
 const FILE_KINDS = ['proposal', 'extra_doc', 'reply', 'approval', 'court_notice'];
 // drafts the user can tick for a run (C28 "कोणते मसुदे हवेत?"), in this fixed order; stored in runs.outputs
-const DRAFT_KEYS = ['letter', 'reminder', 'gr', 'corrigendum', 'circular', 'memo', 'notification', 'parawise'];
+const DRAFT_KEYS = ['letter', 'reminder', 'gr', 'corrigendum', 'circular', 'memo', 'notification', 'parawise',
+  'do_letter', 'uo_note', 'endorsement', 'office_order', 'press_note', 'addendum', 'affidavit', 'lq'];   // 04.11.2026: last 8
 const KIND_NOT_READY = 'हा फाइल-प्रकार अजून सुरू नाही (मालकाने migration 0008 लागू करावे) — "इतर" निवडा';
 const BAD_OUTPUTS = 'मसुद्यांची निवड चुकीची — पान पुन्हा उघडा';
 const MAX_UPLOAD = 50 * 1024 * 1024;
@@ -52,12 +53,12 @@ const CASE_FIELDS = ['cr_no', 'cr_year', 'file_no', 'subject', 'category', 'prio
 // profile json is added. cases.desk null = law-desk6 (migration 0009).
 export const DESK_IDS = ['law-desk6', 'hte-mashi5'];
 const BAD_DESK = 'विभाग / कार्यासन चुकीचे — यादीतील पर्याय निवडा';
-// work categories (C33, migration 0010; app list dashboard-app): service = सेवाविषयक प्रकरणे (default; cases.work_type
+// work categories (C33, migration 0011; app list dashboard-app): service = सेवाविषयक प्रकरणे (default; cases.work_type
 // null = service), court = न्यायालयीन प्रकरणे, legislature = विधिमंडळ कामकाज, procurement = खरेदी विषयक बाबी
 export const WORK_TYPES = ['service', 'court', 'legislature', 'procurement'];
 const BAD_WORK_TYPE = 'कामाची श्रेणी चुकीची — यादीतील पर्याय निवडा';
 // case columns added by later migrations: the case is saved without them until the migration is applied
-const OPTIONAL_CASE_COLS = { desk: '0009', work_type: '0010' };
+const OPTIONAL_CASE_COLS = { desk: '0009', work_type: '0011' };
 
 // PostgREST error: the browser gets only "db <status>" (no table/column text); code/detail stay for the Worker's own checks.
 class DbError extends Error {
@@ -185,7 +186,7 @@ async function failRuns(cfg, filter, reason, actor = null) {
   return rows || [];
 }
 
-// ---------- sequential queue (C33, migration 0010: runs.dispatched_at) ----------
+// ---------- sequential queue (C33, migration 0011: runs.dispatched_at) ----------
 // One engine run at a time across ALL cases (Abhi 04.11.2026: "काम मात्र सिक्वेन्सनेस … वन बाय वन"). A run waits with
 // state 'queued' and dispatched_at null; dispatchNext hands the oldest one (FIFO: created_at, id) to GitHub when no run
 // is active. Active = running/queued and dispatched less than STALE_MS ago (a legacy running row without dispatched_at:
@@ -197,7 +198,7 @@ async function activeRuns(db) {
   try {
     return (await db.rest(`runs?state=in.(queued,running)&or=${encodeURIComponent(`(dispatched_at.gt.${since},and(dispatched_at.is.null,state.eq.running,created_at.gt.${since}))`)}&select=id,case_id,state,dispatched_at&order=id.asc`)) || [];
   } catch (e) {
-    if (missingColumn(e, 'dispatched_at')) { console.log('runs.dispatched_at column missing (apply migration 0010); runs dispatched at once'); return null; }
+    if (missingColumn(e, 'dispatched_at')) { console.log('runs.dispatched_at column missing (apply migration 0011); runs dispatched at once'); return null; }
     throw e;
   }
 }
@@ -296,7 +297,7 @@ export function normOutputs(v) {
 }
 const missingColumn = (e, col) => e instanceof DbError && (e.code === '42703' || e.code === 'PGRST204' || (new RegExp(col).test(e.detail) && /does not exist|could not find/i.test(e.detail)));
 
-// cases.desk (migration 0009) / cases.work_type (migration 0010) missing: write the case without that column and log;
+// cases.desk (migration 0009) / cases.work_type (migration 0011) missing: write the case without that column and log;
 // never fail the request
 async function writeCase(db, path, method, row, what) {
   let cur = row;
@@ -374,7 +375,7 @@ async function monthSpend(cfg) {
     rows = (await sb(cfg).rest(`${q},dispatched_at`)) || [];
   } catch (e) {
     if (!missingColumn(e, 'dispatched_at')) throw e;
-    rows = (await sb(cfg).rest(q)) || [];   // migration 0010 not applied: every queued run was dispatched at once
+    rows = (await sb(cfg).rest(q)) || [];   // migration 0011 not applied: every queued run was dispatched at once
   }
   const inMonth = rows.filter(r => r.created_at && istMonth(new Date(r.created_at).getTime()).month === month);
   const spent = inMonth.reduce((t, r) => t + (Number(r.cost_usd) || 0), 0);
@@ -741,7 +742,7 @@ async function route(req, env, url) {
   }
 
   // POST /api/run {case_id, instructions, outputs?} → runs row + dispatch. outputs (C28): ticked drafts, DRAFT_KEYS only
-  // C33 queue (migration 0010): → {...run, queued: false} dispatched now | {...run, queued: true, position} waiting
+  // C33 queue (migration 0011): → {...run, queued: false} dispatched now | {...run, queued: true, position} waiting
   // (position 1 = next after the active run) | without the migration: the run row as before (dispatched at once)
   if (p === '/api/run' && M === 'POST') {
     if (!canWrite(user)) return bad('read-only', 403);
@@ -759,7 +760,7 @@ async function route(req, env, url) {
     // one run at a time per case (H3, QUALITY_AUDIT §7): a double tap / second tab / second user would start a second,
     // paid run. Runs older than STALE_MS (since dispatch) are stuck (swept), so they do not block; a run waiting in
     // the queue (C33) always blocks.
-    const act = await activeRuns(db);   // null = migration 0010 not applied → immediate dispatch as before
+    const act = await activeRuns(db);   // null = migration 0011 not applied → immediate dispatch as before
     const sinceIso = new Date(Date.now() - STALE_MS).toISOString();
     const caseActive = act === null
       ? `runs?case_id=eq.${case_id}&state=in.(queued,running)&created_at=gt.${encodeURIComponent(sinceIso)}&select=id&order=created_at.desc&limit=1`

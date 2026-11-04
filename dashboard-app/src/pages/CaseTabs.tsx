@@ -194,7 +194,8 @@ export function BriefingTab({ ctx }: { ctx: CaseCtx }) {
 }
 
 // ---------------- टिप्पणी व पत्र ----------------
-/** Optional outputs (शासन आदेश-मसुदा, परिच्छेदनिहाय अभिप्राय): latest version of each kind, view + download. */
+/** Optional outputs (शासन आदेश-मसुदा, परिच्छेदनिहाय अभिप्राय, शपथपत्र, विधानमंडळ प्रश्नाचे उत्तर): latest version of each
+ *  kind, view + download. */
 function ExtraOutputs({ ctx }: { ctx: CaseCtx }) {
   const items = EXTRA_OUTPUT_KINDS.map(k => ofKind(ctx.files, k)[0]).filter((f): f is CaseFile => !!f);
   // made by the latest finished run = stored after that run started; older ones are labelled (they may be stale)

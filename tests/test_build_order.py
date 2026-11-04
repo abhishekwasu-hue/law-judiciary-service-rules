@@ -287,3 +287,213 @@ def test_built_metadata_blank(built, t, tmp_path):
     assert (cp.author, cp.last_modified_by, cp.title, cp.subject, cp.keywords, cp.comments, cp.category) == ("",) * 7
     p = tmp_path / "x.docx"; built[t].save(str(p)); clean_meta.clean_docx(str(p))
     assert clean_meta.docx_meta_problems(str(p)) == []
+
+
+# ---- 04.11.2026: four more types — पृष्ठांकन / कार्यालयीन आदेश / प्रसिद्धीपत्रक / शासन पूरकपत्र
+#      (docs/FORMS_RESEARCH_ORDERS.md: NPM परिशिष्ट-27/31/32, GADT 12.9/12.16/12.23-12.25, MMOP App. 10.8/10.10/10.11) ----
+NEW_TYPES = ["endorsement", "office_order", "press_note", "addendum"]
+
+
+@pytest.fixture(scope="module")
+def built_new(tmp_path_factory):
+    od = tmp_path_factory.mktemp("orders_new")
+    out = {}
+    for t in NEW_TYPES:
+        r = run([os.path.join(TOOLS, "build_order.py"), os.path.join(SPECS, f"ORDER_{t}_example.json"), str(od), f"N_{t}"])
+        assert r.returncode == 0, r.stdout + r.stderr
+        assert "bad-font runs: 0" in r.stdout
+        out[t] = docx.Document(str(od / f"N_{t}_Order_Draft.docx"))
+    return out
+
+
+def test_types_extended():
+    assert build_order.TYPES[:5] == tuple(TYPES) and lint_order.TYPES == build_order.TYPES
+    for t in NEW_TYPES:
+        assert t in build_order.TYPES
+
+
+@pytest.mark.parametrize("t", NEW_TYPES)
+def test_new_samples_lint_clean(t):
+    assert lint_order.lint_order(sample(t)) == []
+    assert lint_order.lint_order_warnings(sample(t)) == []
+    r = run([os.path.join(TOOLS, "lint_order.py"), os.path.join(SPECS, f"ORDER_{t}_example.json")])
+    assert r.returncode == 0 and "LINT OK" in r.stdout
+
+
+@pytest.mark.parametrize("t", NEW_TYPES)
+def test_new_font_and_metadata(built_new, t):
+    d = built_new[t]
+    assert font_problems(d) == []
+    cp = d.core_properties
+    assert (cp.author, cp.title, cp.subject, cp.keywords, cp.comments) == ("",) * 5
+    tx = "\n".join(texts(d))
+    for w in ("AI", "Claude", "इशारा", "पॅकेज", "TODO"):
+        assert w not in tx
+
+
+def test_endorsement_layout(built_new):
+    tx = texts(built_new["endorsement"]); o = sample("endorsement")["order"]
+    assert tx[0] == f"({o['forwarded']} या खाली.)"                       # NPM परि.-27 first line
+    assert f"क्रमांक :- {o['ref_no']}" in tx and f"दिनांक :- {o['date']}" in tx
+    assert "महाराष्ट्र शासन" not in tx                                       # no masthead in the specimen
+    sent = [x for x in tx if x.endswith("पाठविण्यात येत आहे.")]
+    assert sent == [f"\t{o['forward_to'][0]} व {o['forward_to'][1]} यांजकडे {o['purpose']} पाठविण्यात येत आहे."]
+    i = tx.index(build_order.GOVERNOR)
+    assert tx[i + 1] == o["signer"]["name"] and tx[i + 2] == o["signer"]["designation"]
+    assert not any("www.maharashtra.gov.in" in x for x in tx)
+    assert build_order.join_names(["अ", "ब", "क"]) == "अ, ब व क" and build_order.join_names([]) == "____"
+
+
+def test_office_order_layout(built_new):
+    tx = texts(built_new["office_order"]); o = sample("office_order")["order"]
+    assert tx[0] == o["subject"]
+    assert "कार्यालयीन आदेश" in tx and tx.index("महाराष्ट्र शासन") < tx.index("कार्यालयीन आदेश")
+    assert f"क्रमांक :- {o['ref_no']}" not in tx                            # no number line (NPM परि.-31)
+    assert f"\tक्रमांक :- {o['ref_no']}, {o['operative'][0]}" in tx
+    assert any(x.startswith("2.\t") for x in tx)
+    assert build_order.GOVERNOR not in tx and "आदेशानुसार," in tx          # GADT 12.16; NPM परि.-31
+    i = tx.index("आदेशानुसार,")
+    assert tx[i + 1] == o["signer"]["name"]
+    paras = [p.text for p in built_new["office_order"].paragraphs]
+    assert paras[-1] == "निवड नस्ती (कार्यासन-6)" and o["copies"][0] in paras   # recipients below, no heading
+    assert "प्रत," not in tx and not any("www.maharashtra.gov.in" in x for x in tx)
+    assert len(built_new["office_order"].tables) == 1
+
+
+def test_press_note_layout(built_new):
+    d = built_new["press_note"]; tx = texts(d); o = sample("press_note")["order"]
+    assert tx[:5] == ["प्रसिद्धीपत्रक", o["number"], o["saka_date"], o["date"], "____ वाजता."]   # NPM परि.-32
+    assert o["subject"] in tx
+    assert "\t" + o["operative"][0] in tx and o["cites"][0] in o["operative"][0]
+    assert build_order.GOVERNOR not in tx and "महाराष्ट्र शासन" not in tx and "प्रत," not in tx
+    assert next(p for p in d.paragraphs if p.text == "____ वाजता.").alignment == build_order.WA.RIGHT
+
+
+def test_addendum_layout(built_new):
+    tx = texts(built_new["addendum"]); o = sample("addendum")["order"]; a = o["additions"][0]
+    assert tx[0] == o["subject"]
+    assert "शासन पूरकपत्र क्रमांक :- " + o["ref_no"] in tx
+    for h in ("वाचा :-", "प्रस्तावना :-", "शासन पूरकपत्र :-"):
+        assert h in tx
+    assert tx.index("प्रस्तावना :-") < tx.index("शासन पूरकपत्र :-") < tx.index(build_order.GOVERNOR)
+    assert f"\t{a['at']} खालील मजकूर समाविष्ट करण्यात येत आहे:-" in tx
+    assert f"\t“{a['text']}”" in tx
+    assert f"2.\t{build_order.ADD_CLOSING}" in tx
+    assert any(x.startswith("3.\t") and x.endswith(o["concurrence"]) for x in tx)
+    web = [x for x in tx if "www.maharashtra.gov.in" in x]
+    assert len(web) == 1 and web[0].startswith("4.\t") and "हे शासन पूरकपत्र डिजिटल स्वाक्षरीने" in web[0]
+    assert "प्रत," in tx and tx[-1].endswith("निवड नस्ती (कार्यासन-6)")
+
+
+def test_addendum_closing_not_doubled(tmp_path):
+    s = sample("addendum"); s["order"]["operative"] = ["संदर्भाधीन शासन निर्णयातील इतर तरतुदी कायम राहतील."]
+    p = tmp_path / "s.json"; p.write_text(json.dumps(s, ensure_ascii=False), encoding="utf-8")
+    r = run([os.path.join(TOOLS, "build_order.py"), str(p), str(tmp_path), "X"])
+    assert r.returncode == 0, r.stdout + r.stderr
+    tx = texts(docx.Document(str(tmp_path / "X_Order_Draft.docx")))
+    assert build_order.ADD_CLOSING not in "\n".join(tx)
+
+
+def test_new_types_in_orders_list(tmp_path):
+    """§4.28: the new types also go in "orders" — one docx, each on a new page."""
+    s = {"orders": [sample(t)["order"] for t in NEW_TYPES]}
+    assert lint_order.lint_order(s) == []
+    p = tmp_path / "m.json"; p.write_text(json.dumps(s, ensure_ascii=False), encoding="utf-8")
+    r = run([os.path.join(TOOLS, "build_order.py"), str(p), str(tmp_path), "M"])
+    assert r.returncode == 0, r.stdout + r.stderr
+    d = docx.Document(str(tmp_path / "M_Order_Draft.docx"))
+    assert sum(1 for x in d.paragraphs if x.paragraph_format.page_break_before) == 3
+    assert font_problems(d) == []
+
+
+# ---- lint negatives, new types ----
+@pytest.mark.parametrize("t,key", [("endorsement", "forwarded"), ("endorsement", "forward_to"), ("endorsement", "purpose"),
+                                   ("endorsement", "ref_no"), ("office_order", "subject"), ("office_order", "operative"),
+                                   ("office_order", "copies"), ("press_note", "subject"), ("press_note", "operative"),
+                                   ("press_note", "cites"), ("press_note", "date"), ("addendum", "read"),
+                                   ("addendum", "additions"), ("addendum", "copies"), ("addendum", "subject")])
+def test_lint_new_required(t, key):
+    s = sample(t); del s["order"][key]
+    assert f"order.{key}" in probs(s), (t, key)
+
+
+def test_lint_new_optional_keys():
+    s = sample("endorsement"); s["order"].pop("signer")
+    assert probs(s) == ""                                       # endorsement: no subject / copies needed
+    s = sample("press_note")
+    for k in ("number", "saka_date"):
+        s["order"].pop(k)
+    assert probs(s) == ""                                       # press note: no ref_no / copies / signer needed
+
+
+def test_lint_endorsement_rules():
+    s = sample("endorsement"); s["order"]["forwarded"] = "(" + s["order"]["forwarded"] + " या खाली.)"
+    assert "order.forwarded" in probs(s)
+    s = sample("endorsement"); s["order"]["purpose"] = "माहिती"
+    assert "order.purpose" in probs(s)
+    s = sample("endorsement"); s["order"]["copies"] = ["महाप्रबंधक, उच्च न्यायालय, मुंबई"]
+    assert "निवड नस्ती" in probs(s)
+    s = sample("endorsement"); s["order"]["website_line"] = True
+    assert "website line" in probs(s)
+
+
+def test_lint_office_order_rules():
+    s = sample("office_order"); s["order"]["operative"].insert(1, "महोदय,")
+    assert "no salutation" in probs(s)
+    s = sample("office_order"); s["order"]["operative"].append("आपला,")
+    assert "no salutation" in probs(s)
+    s = sample("office_order"); s["order"]["operative"].append("आदेशानुसार,")
+    assert "added by the tool" in probs(s)
+    s = sample("office_order"); s["order"]["operative"].append("महाराष्ट्राचे राज्यपाल यांच्या आदेशानुसार व नावाने,")
+    assert "Governor line" in probs(s)
+    s = sample("office_order"); s["order"]["operative"].insert(1, "कार्यालयीन आदेश")
+    assert "added by the tool" in probs(s)
+
+
+def test_lint_press_note_rules():
+    s = sample("press_note"); s["order"]["operative"] = ["____ या पदाची वेतनश्रेणी सुधारित करण्यात आली आहे."]
+    assert "order.cites[0]" in probs(s)                        # NPM 102(11): reference stated in the text
+    s = sample("press_note"); s["order"]["copies"] = ["निवड नस्ती (कार्यासन-6)"]
+    assert "प्रत list" in probs(s)
+    s = sample("press_note"); s["order"]["date"] = "____ नोव्हेंबर, 2026"
+    assert probs(s) == ""                                       # repo date form also accepted
+    s = sample("press_note"); s["order"]["date"] = "Nov 2026"
+    assert "order.date" in probs(s)
+    s = sample("press_note"); s["order"]["operative"].insert(0, "प्रसिद्धीपत्रक")
+    assert "added by the tool" in probs(s)
+
+
+def test_lint_addendum_rules():
+    s = sample("addendum"); s["order"]["additions"][0]["text"] = "“3अ. ____”"
+    assert "quotes" in probs(s)
+    s = sample("addendum"); s["order"]["additions"] = [{"at": "परिच्छेद 2 नंतर"}]
+    assert "order.additions[0].text" in probs(s)
+    s = sample("addendum"); s["order"]["website_line"] = False
+    assert "website line" in probs(s)
+    s = sample("addendum"); s["order"]["operative"] = ["शासन पूरकपत्र :- ____"]
+    assert "heading" in probs(s)
+    s = sample("addendum"); s["order"]["additions"][0]["at"] = "शासन निर्णयातील परिच्छेद 3 नंतर करुन"
+    assert "करून" in probs(s)
+
+
+def test_lint_new_draft_words():
+    s = sample("press_note"); s["order"]["operative"].append("हा मजकूर AI ने तयार केला.")
+    assert "draft word" in probs(s)
+    s = sample("endorsement"); s["order"]["purpose"] = "इशारा माहितीसाठी"
+    assert "draft word" in probs(s)
+
+
+def test_new_not_printed_warnings():
+    s = sample("office_order"); s["order"]["read"] = ["____"]
+    assert any("order.read: not printed" in w for w in lint_order.lint_order_warnings(s))
+    s = sample("press_note"); s["order"]["signer"] = {"name": "( ____ )", "designation": "____"}
+    assert any("order.signer: not printed" in w for w in lint_order.lint_order_warnings(s))
+
+
+def test_note_last_para_names_new_drafts():
+    import lint_spec
+    for t in NEW_TYPES:
+        assert lint_spec.lint_spec(sample(t)) == [], t
+        assert lint_spec.drafts_unnamed(sample(t)) == [], t
+    s = sample("press_note"); s["note"]["closing"] = s["note"]["closing"].replace("प्रसिद्धीपत्रकाचे", "पत्राचे")
+    assert lint_spec.drafts_unnamed(s) == ["order press_note"]

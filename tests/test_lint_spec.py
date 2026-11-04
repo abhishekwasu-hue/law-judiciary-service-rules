@@ -34,7 +34,7 @@ def load(p):
 
 def load_clean(p):
     """A sample with the shortened-quote marks ("…" / "...") of its related extracts removed — test copy only, so a WARN
-    test starts from no WARN (C32 §4.32: CR122's related precedent extract is quoted with "..."; the sample is unchanged)."""
+    test starts from no WARN (C32 §4.34: CR122's related precedent extract is quoted with "..."; the sample is unchanged)."""
     s = raw_load(p)
     for it in s.get("related") or []:
         if isinstance(it, dict) and isinstance(it.get("text"), list):
@@ -73,7 +73,7 @@ class LintSpec(unittest.TestCase):
                 continue
             with self.subTest(spec=os.path.basename(p)):
                 self.assertEqual(L.lint_spec(raw_load(p)), [])
-                # approved samples: no WARN-level finding, except C32 §4.32 "shortened quote" — the quoted text itself
+                # approved samples: no WARN-level finding, except C32 §4.34 "shortened quote" — the quoted text itself
                 # carries "…" / "..." and quote content is never altered (§1.1)
                 ws = [w for w in L.lint_warnings(raw_load(p)) if "shortened quote" not in w]
                 self.assertEqual(ws, [])
@@ -863,10 +863,10 @@ class AuditA1Fixes(unittest.TestCase):
         self.assertTrue(any(w.startswith("letter.subject") and "णेबाबत" in w for w in L.lint_warnings(s)))
 
 
-    # ---- C32 §4.32 (Abhi 03.11.2026): relevance + एकसंध flow — WARN only, never an error ----
+    # ---- C32 §4.34 (Abhi 03.11.2026): relevance + एकसंध flow — WARN only, never an error ----
     def flow(self, s):
         self.assertEqual(L.lint_spec(s), [])   # never an error
-        return [w for w in L.lint_warnings(s) if "(§4.32)" in w]
+        return [w for w in L.lint_warnings(s) if "(§4.34)" in w]
 
     def test_432_page_column_warn(self):
         for col in ("पृ./प.वि.", "पृ.", "पृ. / प.वि."):
@@ -915,12 +915,12 @@ class AuditA1Fixes(unittest.TestCase):
         self.assertEqual(self.flow(s), [])
 
     def test_432_samples_own_construction_clean(self):
-        # the samples carry no §4.32 finding of their own construction (page columns, trivia, gluing, summary refs)
+        # the samples carry no §4.34 finding of their own construction (page columns, trivia, gluing, summary refs)
         for p in SPECS:
             sp = raw_load(p)
             if "note" in sp:
                 with self.subTest(spec=os.path.basename(p)):
-                    self.assertEqual([w for w in L.lint_warnings(sp) if "(§4.32)" in w and "shortened quote" not in w], [])
+                    self.assertEqual([w for w in L.lint_warnings(sp) if "(§4.34)" in w and "shortened quote" not in w], [])
 
     def test_432_cli_warn_exit_0(self):
         s = copy.deepcopy(self.s122); s["note"]["paras"].insert(1, "सदर पत्रात “अ” व “ब” असे नमूद आहे.")

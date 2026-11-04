@@ -249,10 +249,12 @@ jobs:
           python3 - <<'PY'
           import ast, io, os
           out = io.open("/tmp/work/TOOL_DOCS.md", "w", encoding="utf-8")
-          # build_order / build_parawise / lint_order / lint_parawise (02.11.2026: optional order-draft and court outputs) are
+          # build_order / build_parawise / lint_order / lint_parawise (02.11.2026: optional order-draft and court outputs) and
+          # build_affidavit / build_lq / lint_affidavit / lint_lq (04.11.2026) are
           # skipped when absent, so a checkout without them still runs
           for t in ("mkdocs", "build_note_letter", "build_study", "pkg3", "highlight", "lint_spec", "verify_outputs", "extract_check", "oldcases_text",
-                    "build_order", "lint_order", "build_parawise", "lint_parawise"):
+                    "build_order", "lint_order", "build_parawise", "lint_parawise", "build_affidavit", "lint_affidavit",
+                    "build_lq", "lint_lq"):
               if not os.path.exists(f"tools/{t}.py"):
                   continue
               d = ast.get_docstring(ast.parse(io.open(f"tools/{t}.py", encoding="utf-8").read())) or ""

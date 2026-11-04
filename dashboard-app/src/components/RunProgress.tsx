@@ -120,7 +120,7 @@ export function useTypicalRunSeconds() {
     let alive = true;
     void sb()
       .from('runs')
-      // '*' (not a column list): dispatched_at exists only after migration 0010; a missing column must not break the read
+      // '*' (not a column list): dispatched_at exists only after migration 0011; a missing column must not break the read
       .select('*')
       .in('state', ['done', 'failed'])
       .not('finished_at', 'is', null)

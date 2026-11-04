@@ -42,7 +42,7 @@ Checks
   "प्रस्तावासोबत खालील माहिती उपलब्ध नाही:-" (+ its table / unnumbered sub-points); no "नमूद नाही / जोडलेले नाही /
   उपलब्ध नाही / प्रस्तावासोबत नाही / प्रत नाही / सादर केलेली नाही" remark elsewhere; not two such paras (SOFT);
   WARN when that para is not just before the last (numbered or "सबब,") para
- Note body (C32 §4.32, 03.11.2026; lint_spec.flow_warnings, WARN only — never FAIL, ALL OK unaffected): a table
+ Note body (C32 §4.34, 03.11.2026; lint_spec.flow_warnings, WARN only — never FAIL, ALL OK unaffected): a table
   header with a "पृ./प.वि." / "पृ." column; "पृष्ठांकन" / "माहितीकरिता देण्यात" outside quotes; quote-gluing "तसेच, “" /
   "” व “"; an "उपरोक्त वस्तुस्थिती पुढीलप्रमाणे आहे:-" item with "पृ.N/प.वि."; a quoted “…” with "…" / "..." (also in
   संबंधित माहिती)
@@ -54,6 +54,12 @@ Checks
   - intro paragraph (starting "उपरोक्त विषयाबाबत") contains "ही विनंती" outside quotes (§4.18) when the letter asks for
     information (lint_spec.requests_info: a table / numbered points, a reminder, or "… उपलब्ध करून देण्यात यावी")
   - "आपला," present, signature "आपली," absent ("आपली पत्रे" in संदर्भ is allowed); lines "( राजेश वडनेरकर )", "अवर सचिव ,महाराष्ट्र शासन", "प्रत : निवड नस्ती"
+ अर्धशासकीय पत्र (spec letter "kind": "do"; found by its "अ.शा.पत्र क्र." line; docs/FORMS_RESEARCH_DO_UO.md): new page /
+  section; number line = "अ.शा.पत्र क्र. <desk ref no.>" + "दिनांक" line; विषय bold + centre; "प्रिय …,"; body in the first
+  person; "शुभेच्छा", "आपला स्नेहांकित,", "(<sender>)" and the addressee lines after it. The ordinary-letter checks above
+  run only on the ordinary letter(s).
+ Note "uo" (अनौपचारिक संदर्भ): the three lines right after the signer chain — "<department>" / "<to> विभागाकडे अनौपचारिक
+  संदर्भ कार्यासन <desk>" / "क्रमांक … दिनांक …"; they are left out of the signer-chain check.
  Desk (C30, 03.11.2026): the signer chain, finance signer, ref no. form, letterhead e-mail (checked only when the
   profile has one; a blank "____" is fine) and the letter's ending lines come from the desk profile tools/desks/<id>.json:
   --desk ID, else the profile whose note_header is the note's first line, else law-desk6 (the Desk-6 values above)
@@ -99,8 +105,11 @@ from lint_spec import (AMS, BANNED, BARE_CLOSING_RE, FIN, ID_RE, LH_EMAIL, RELAT
                        MISSING_FORM, MISSING_HEAD, SIGNERS, banned_hits, desk_signers, finance_problems, heading_problems, id_hits,
                        lang_hits, ma_hits, ns, num, part_no, ref_problems, repo_hits, requests_info, signer_problems,
                        style_hits, unquoted, warn_hits, PKG_WORD, draft_word_hits, related_source_problems,
-                       missing_scatter, flow_warnings)
+                       missing_scatter, flow_warnings, DO_FIRST_PERSON_RE)
+from mkdocs import DO_WISH, DO_SUBSCRIPTION  # noqa: E402 — अर्धशासकीय पत्र ending (GAD specimen)
 INTRO_HEAD = "उपरोक्त विषयाबाबत"  # letter intro paragraph (lint_spec.INTRO_START begins with it)
+UO_LINE_RE = re.compile(r"^\S.*विभागाकडे\s+अनौपचारिक\s+संदर्भ\s+कार्यासन(?:\s|$)")   # note "uo" block (mkdocs.uo_lines)
+DO_LINE_RE = re.compile(r"^\s*अ\.\s*शा\.\s*पत्र\s+क्र\.")   # अर्धशासकीय पत्र number line (mkdocs.DO_REF_LABEL)
 from clean_meta import docx_meta_problems, pdf_meta_problems  # noqa: E402 — C27 §4 (no tool / AI trace in metadata)
 import desk as _desk  # noqa: E402 — C30 (03.11.2026): desk profiles tools/desks/<id>.json
 from engine_supabase import strip_upload_prefix, name_forms  # noqa: E402 — the ONE upload-prefix rule (§4.16) + NAME_MAX short form
@@ -210,7 +219,7 @@ def letter_body_for_ma(texts):
         n = ns(t)
         if n.startswith("विषय"): state = "subject"
         elif n.startswith("संदर्भ"): state = "refs"
-        elif n.startswith("महोदय"): state = "body"
+        elif n.startswith("महोदय") or n.startswith("प्रिय"): state = "body"   # "प्रिय …," = अर्धशासकीय पत्र
         if state == "subject" or (state == "body" and not n.startswith("प्रत")):
             out.append(t)
     return "\n".join(out)
@@ -223,6 +232,55 @@ def letter_info(blocks, letter_txt):
     else:   # numbered points ("1) …" / "1. …"); they ask only with ask wording (lint_spec.points_ask, C30)
         pts = [b["text"] for b in blocks if b["kind"] == "p" and re.match(r"\s*[0-9०-९]+\s*[).]", b["text"])]
     return {"points": pts, "reminder": "स्मरणपत्र-" in letter_txt}
+
+
+def new_page_before(bl, start):
+    """a page / section break right before block start (blank paragraphs in between allowed)."""
+    prev = start - 1
+    while prev > 0 and not ns(bl[prev]["text"]) and not bl[prev]["brk"]:
+        prev -= 1
+    return any(b["brk"] for b in bl[max(prev, 0):start + 1])
+
+
+def do_letter_problems(blocks, doc, dk):
+    """[(check name, problems)] for one अर्धशासकीय पत्र (letter "kind": "do"), blocks from its "अ.शा.पत्र क्र." line.
+    Layout of the GAD specimen (टिप्पणी लेखन व पत्रव्यवहार परि. 12.27–12.29, book p.43–44, PDF p.47–48): number +
+    department + date block, "विषय" bold + centre, salutation "प्रिय …", "शुभेच्छा", "आपला स्नेहांकित,", "(<sender>)", the
+    addressee lines after it; MMOP 2023 §10.1(7)(a) first person (PDF p.64), §11.4(3) subject (PDF p.80)."""
+    ps = [Paragraph(b["el"], doc.element.body) for b in blocks if b["kind"] == "p"]
+    lt = [ns(p.text) for p in ps]
+    out, pr = [], []
+    first = lt[0] if lt else ""
+    if not DO_LINE_RE.match(first) or not _desk.letter_ref_re(dk).search(first):
+        pr.append(f"D.O. no. not 'अ.शा.पत्र क्र. {dk['letter']['ref_hint']}': '{first}'")
+    if not any(t.startswith("दिनांक") for t in lt[:8]):
+        pr.append("'दिनांक :' line missing in the number block")
+    out.append(("अर्धशासकीय पत्र number / department block", pr))
+    vb = []
+    vi = next((i for i, t in enumerate(lt) if t.startswith("विषय")), None)
+    si = next((i for i, t in enumerate(lt) if t.startswith("प्रिय")), None)
+    if vi is None:
+        vb.append("'विषय' paragraph missing (MMOP §11.4(3))")
+    else:
+        for p in ps[vi:(si if si is not None and si > vi else vi + 1)]:
+            if not p.text.strip(): continue
+            if not p_centred(p): vb.append(f"not centred: '{ns(p.text)[:40]}'")
+            if not p_bold(p): vb.append(f"not bold: '{ns(p.text)[:40]}'")
+    out.append(("अर्धशासकीय पत्र विषय bold + centre", vb))
+    en = []
+    if si is None: en.append("salutation 'प्रिय …,' missing")
+    for w in (DO_WISH, DO_SUBSCRIPTION):
+        if w not in lt: en.append(f"'{w}' line missing")
+    ci = lt.index(DO_SUBSCRIPTION) if DO_SUBSCRIPTION in lt else None
+    sig = next((i for i in range(ci + 1, len(lt)) if lt[i]), None) if ci is not None else None
+    if ci is not None and (sig is None or not re.fullmatch(r"\(.+\)", lt[sig])):
+        en.append(f"sender's name '(…)' missing after '{DO_SUBSCRIPTION}'")
+    if sig is not None and not any(lt[sig + 1:]):
+        en.append("addressee (name, designation, office) missing at the foot")
+    if si is not None and ci is not None and not DO_FIRST_PERSON_RE.search(unquoted("\n".join(lt[si + 1:ci]))):
+        en.append("body not in the first person (MMOP §10.1(7)(a))")
+    out.append(("अर्धशासकीय पत्र salutation / ending / addressee", en))
+    return out
 
 
 def main(argv):
@@ -276,14 +334,19 @@ def main(argv):
         rel = next((i for i, b in enumerate(bl) if b["kind"] == "p" and ns(b["text"]) == RELATED), None)
         kram = next((i for i, b in enumerate(bl) if b["kind"] == "p" and re.match(r"\s*क्रमांक\s*:?\s*-", b["text"])), None)
         prati = next((i for i, b in enumerate(bl) if b["kind"] == "p" and ns(b["text"]) == "प्रति,"), None)
-        has_letter = kram is not None or prati is not None
-        lstart = None
-        if has_letter:
+        # अर्धशासकीय पत्र (letter "kind": "do"): first line "अ.शा.पत्र क्र. …" (GAD specimen p.43, PDF p.47)
+        do_i = next((i for i, b in enumerate(bl) if b["kind"] == "p" and DO_LINE_RE.match(b["text"])), None)
+        has_std = kram is not None or prati is not None
+        has_letter = has_std or do_i is not None
+        lstart = std_start = None
+        if has_std:
             anchor = kram if kram is not None else prati
-            lstart = anchor
+            std_start = anchor
             for j in range(anchor - 1, max(-1, anchor - 9), -1):
                 if ns(bl[j]["text"]) == "महाराष्ट्र शासन":
-                    lstart = j; break
+                    std_start = j; break
+        if has_letter:
+            lstart = min(x for x in (std_start, do_i) if x is not None)
         note_end = rel if rel is not None else (lstart if lstart is not None else n)
         rel_end = lstart if lstart is not None else n
         note_txt = txt(0, note_end)
@@ -354,7 +417,7 @@ def main(argv):
         check("missing information in ONE para §4.31 (note body)", mp)
         for x in mw:
             warn(x)
-        # C32 §4.32 (Abhi 03.11.2026; lint_spec.flow_warnings): relevance + एकसंध flow — SOFT notes printed as WARN, never
+        # C32 §4.34 (Abhi 03.11.2026; lint_spec.flow_warnings): relevance + एकसंध flow — SOFT notes printed as WARN, never
         # a FAIL: "पृ./प.वि." table column, "पृष्ठांकन" / "माहितीकरिता देण्यात", quote-gluing, a page ref in an
         # "उपरोक्त वस्तुस्थिती" item, a shortened quote (note body and संबंधित माहिती)
         nheads = [(f"note block {i + 1} (table)", b["text"].split("\n", 1)[0].split(" | "))
@@ -375,6 +438,20 @@ def main(argv):
         except ValueError as e:
             check("desk profile", [str(e)]); dk = _desk.load_desk(None)
         print(f"OK: desk profile — {dk['id']}")
+        # अनौपचारिक संदर्भ (note "uo"; NPM परिशिष्ट-8 form foot, mkdocs.uo_lines): [department,
+        # "<to> विभागाकडे अनौपचारिक संदर्भ कार्यासन <desk>", "क्रमांक <no> दिनांक <date>"] after the signers
+        ui = next((i for i, t in enumerate(ntexts) if UO_LINE_RE.search(t)), None)
+        if ui is not None:
+            up = []
+            if ui == 0 or not ntexts[ui - 1].endswith("विभाग"): up.append("sender department line missing above the U.O. line")
+            if ui + 1 >= len(ntexts) or not re.match(r"क्रमांक\s+\S.*\sदिनांक\s+\S", ntexts[ui + 1]):
+                up.append("'क्रमांक … दिनांक …' line missing below the U.O. line")
+            k0 = 0
+            while ui - 2 - k0 >= 0 and ntexts[ui - 2 - k0] in desk_signers(dk)[0] + [desk_signers(dk)[1]]:
+                k0 += 1
+            if not k0: up.append("U.O. block not right after the signer chain")
+            check("अनौपचारिक संदर्भ block (note foot)", up)
+            ntexts = ntexts[:max(ui - 1, 0)] + ntexts[ui + 2:]
         D_SIGNERS, D_AMS = desk_signers(dk)
         has_ams = D_AMS in ntexts
         k = 0
@@ -408,11 +485,19 @@ def main(argv):
                 check("status.json letter_needed = letter in Note_and_Letter",
                       [f"status.json letter_needed not true/false ({ln!r})"[:120]])
 
-        # letter
+        # letter: ordinary letters / स्मरणपत्र from std_start; अर्धशासकीय पत्र from do_i — each up to the other or the end
         if not has_letter:
             print("OK: letter — none (note only)")
-        else:
-            lb = bl[lstart:]
+        if do_i is not None:
+            do_end = std_start if (has_std and std_start > do_i) else n
+            for cname, probs in do_letter_problems(bl[do_i:do_end], NL, dk):
+                check(cname, probs)
+            check("अर्धशासकीय पत्र on a new page / section",
+                  [] if new_page_before(bl, do_i) else ["no page or section break before the D.O. number line"])
+        if has_std:
+            std_end = do_i if (do_i is not None and do_i > std_start) else n
+            std_txt = txt(std_start, std_end)
+            lb = bl[std_start:std_end]
             lp = [Paragraph(b["el"], NL.element.body) for b in lb if b["kind"] == "p"]
             lt = [ns(p.text) for p in lp]
             pr = []
@@ -421,13 +506,10 @@ def main(argv):
                 pr.append(f"ref no. not {dk['letter']['ref_hint']}: '{ns(bl[kram]['text'])}'")
             if prati is None: pr.append("'प्रति,' missing")
             lh_email = (dk["letter"].get("email") or "").strip()   # checked only when the profile has one (C30)
-            if lh_email and lh_email not in letter_txt: pr.append(f"letterhead e-mail {lh_email} missing")
+            if lh_email and lh_email not in std_txt: pr.append(f"letterhead e-mail {lh_email} missing")
             check("letter ref no. / letterhead", pr)
-            prev = lstart - 1
-            while prev > 0 and not ns(bl[prev]["text"]) and not bl[prev]["brk"]:
-                prev -= 1
-            newpage = any(b["brk"] for b in bl[max(prev, 0):lstart + 1])
-            check("letter on a new page / section", [] if newpage else ["no page or section break before the letterhead"])
+            check("letter on a new page / section",
+                  [] if new_page_before(bl, std_start) else ["no page or section break before the letterhead"])
             vb = []
             vi = next((i for i, t in enumerate(lt) if t.startswith("विषय")), None)
             mi = next((i for i, t in enumerate(lt) if t.startswith("महोदय")), None)
@@ -442,11 +524,11 @@ def main(argv):
             intro = next((t for t in lt if t.startswith(INTRO_HEAD)), None)
             rq = []
             if intro is None: rq.append("intro paragraph 'उपरोक्त विषयाबाबत …' missing")
-            elif requests_info(letter_info(bl[lstart:], letter_txt), intro) and REQUEST not in unquoted(intro): rq.append(f"intro lacks '{REQUEST}' — '…उपलब्ध करून देण्यात यावी, {REQUEST}.'")
+            elif requests_info(letter_info(lb, std_txt), intro) and REQUEST not in unquoted(intro): rq.append(f"intro lacks '{REQUEST}' — '…उपलब्ध करून देण्यात यावी, {REQUEST}.'")
             check("letter intro request wording §4.18", rq)
             en = []
             if "आपला," not in lt: en.append("'आपला,' line missing")
-            if any(re.fullmatch(r"आपली\s*,?", t) for t in lt) or re.search(r"आपली\s*,", letter_txt):
+            if any(re.fullmatch(r"आपली\s*,?", t) for t in lt) or re.search(r"आपली\s*,", std_txt):
                 en.append("signature 'आपली,' present (must be 'आपला,')")  # "आपली पत्रे" in संदर्भ is grammatical
             for line in _desk.letter_end_lines(dk):   # C30: signature / post / copy line of the desk profile
                 if ns(line) not in lt: en.append(f"line '{ns(line)}' missing")

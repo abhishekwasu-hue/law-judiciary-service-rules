@@ -33,7 +33,7 @@
 5. **App label:** `dashboard-app/src/lib/constants.ts` → `WORK_TYPES` (id, label, short) व `WORK_TYPE_TONE` (रंग); `WorkType`
    type आपोआप. नंतर `python3 tools/work_type.py check`, `python3 -m pytest -q tests/test_work_types.py`, worker tests, app build.
 
-(Database: `cases.work_type` साधा text आहे, CHECK constraint नाही (`supabase/migrations/20261104000010_work_type_queue.sql`) —
+(Database: `cases.work_type` साधा text आहे, CHECK constraint नाही (`supabase/migrations/20261104000011_work_type_queue.sql`) —
 नवीन id साठी migration नको.)
 
 ## Engine wiring (एकदाच, C33 engine agent)
