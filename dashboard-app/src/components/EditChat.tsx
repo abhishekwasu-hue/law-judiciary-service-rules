@@ -180,6 +180,10 @@ export default function EditChat({ ctx }: { ctx: CaseCtx }) {
     return [...m.values()].sort((a, b) => a.id - b.id);
   }, [sent, ctx.editRuns]);
   const active = runActive(ctx.runs?.[0]) || turns.some(r => runActive(r));
+  // this visit: the turns sent from this page + any still running; the rest are "मागील सुधारणा"
+  const sentIds = useMemo(() => new Set(sent.map(r => r.id)), [sent]);
+  const recent = turns.filter(r => sentIds.has(r.id) || runActive(r));
+  const older = turns.filter(r => !(sentIds.has(r.id) || runActive(r)));
 
   useEffect(() => {
     const el = listRef.current;
@@ -264,7 +268,6 @@ export default function EditChat({ ctx }: { ctx: CaseCtx }) {
           <h2 className="flex items-center gap-2 text-lg font-bold">✏️ सुधारणा-चॅट <span className={`${seen ? '' : 'blink-badge '}rounded-full bg-white px-3 py-1 text-base font-black text-orange-600 shadow`}>AI</span></h2>
           <p className="text-sm text-white/90">टिप्पणी किंवा मसुद्यात (पत्र, शासन निर्णय इ.) बदल हवा असल्यास कृपया येथे नमूद करावे</p>
         </div>
-        {turns.length > 0 && <span className="shrink-0 rounded-full bg-white/20 px-2 py-0.5 text-sm font-semibold">{turns.length} संदेश</span>}
       </div>
       <div className="flex min-w-0 items-center justify-between gap-2 border-b border-slate-200 bg-navy-50 px-4 py-2 text-sm dark:border-navy-800 dark:bg-navy-800/60">
         <div className="min-w-0">
@@ -278,10 +281,20 @@ export default function EditChat({ ctx }: { ctx: CaseCtx }) {
         <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-amber-50/90 text-lg font-bold text-navy-800 dark:bg-navy-900/90 dark:text-white">📎 कृपया फाइल येथे सोडावी</div>
       )}
       <div className="space-y-3 p-3">
-        {turns.length > 0 && (
-          <div ref={listRef} className="max-h-[60vh] overflow-y-auto overscroll-contain pr-1">
+        {/* owner 05.11.2026: earlier edits confused the chat — only this visit's messages (and a running one) are shown;
+            the earlier ones stay behind "मागील सुधारणा (N)" */}
+        {older.length > 0 && (
+          <details className="rounded-lg border border-slate-200 dark:border-navy-800">
+            <summary className="min-h-tap cursor-pointer px-3 py-2 text-sm font-semibold text-slate-600 dark:text-slate-300">मागील सुधारणा ({older.length})</summary>
+            <ol className="space-y-4 p-2">
+              {older.map(r => <Turn key={r.id} r={r} ctx={ctx} names={names.get(r.id) || []} onOpen={setView} />)}
+            </ol>
+          </details>
+        )}
+        {recent.length > 0 && (
+          <div ref={listRef}>
             <ol className="space-y-4">
-              {turns.map(r => <Turn key={r.id} r={r} ctx={ctx} names={names.get(r.id) || []} onOpen={setView} />)}
+              {recent.map(r => <Turn key={r.id} r={r} ctx={ctx} names={names.get(r.id) || []} onOpen={setView} />)}
             </ol>
           </div>
         )}
@@ -295,7 +308,8 @@ export default function EditChat({ ctx }: { ctx: CaseCtx }) {
                 {targets.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
               </select>
             </label>
-            <div className="rounded-xl border border-slate-300 bg-white focus-within:border-navy-500 focus-within:ring-2 focus-within:ring-navy-200 dark:border-navy-700 dark:bg-navy-900 dark:focus-within:ring-navy-700">
+            <label htmlFor="edit-msg" className="block text-base font-bold text-orange-700 dark:text-orange-300">✍️ कृपया येथे आपला बदल लिहावा</label>
+            <div className="rounded-xl border-2 border-orange-400 bg-white shadow-sm focus-within:border-navy-500 focus-within:ring-2 focus-within:ring-navy-200 dark:border-navy-700 dark:bg-navy-900 dark:focus-within:ring-navy-700">
               {atts.length > 0 && (
                 <ul className="flex flex-wrap gap-1.5 border-b border-slate-200 p-2 dark:border-navy-800">
                   {atts.map(a => (
@@ -316,7 +330,7 @@ export default function EditChat({ ctx }: { ctx: CaseCtx }) {
                 </ul>
               )}
               <textarea
-                className="block min-h-[88px] w-full resize-y rounded-xl bg-transparent px-3 py-2 outline-none"
+                className="block min-h-[160px] w-full resize-y rounded-xl bg-transparent px-3 py-3 text-lg outline-none"
                 placeholder="उदा. टिप्पणीच्या परि. 5 मधील शेवटची दोन वाक्ये वगळावीत; पत्रातील दिनांक 12.10.2026 असा करावा"
                 value={text}
                 maxLength={EDIT_MAX_CHARS}
@@ -324,6 +338,7 @@ export default function EditChat({ ctx }: { ctx: CaseCtx }) {
                 onChange={e => setText(e.target.value)}
                 onFocus={markSeen}
                 onKeyDown={onKey}
+                id="edit-msg"
                 aria-label="सुधारणेचा संदेश"
               />
               <div className="flex items-center gap-2 px-2 pb-2">
