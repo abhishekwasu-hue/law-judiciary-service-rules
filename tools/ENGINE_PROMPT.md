@@ -306,7 +306,8 @@ end state (d), build with `--no-lint` so the draft is delivered, and put the rem
 
 ## Binding
 The binding rules are `tools/ENGINE_BRIEF.md` (appended BELOW this prompt; subagents Read the file) and the tool
-docstrings (appended below and saved as /tmp/work/TOOL_DOCS.md). Full rule files (INSTRUCTIONS.md, PROPOSAL_SOP.md,
+docstrings (appended below and saved as /tmp/work/TOOL_DOCS.md — only the tools of the ticked drafts; every tool's
+docstring is in /tmp/work/TOOL_DOCS_ALL.md, Read it only if this run needs a tool that is not below). Full rule files (INSTRUCTIONS.md, PROPOSAL_SOP.md,
 PROPOSAL_WORKFLOW.md, tools/PROPOSAL_PROMPT.md) stay the authority: grep the exact item on a real doubt; INSTRUCTIONS.md
 wins on any conflict of CONTENT (sources, format, language). This run has NO interaction (A1 H14): rules 2, 5 and 9
 below override every ask / discuss / stop line of the rule files — INSTRUCTIONS §3.2 "आधी वापरकर्त्याशी चर्चा",

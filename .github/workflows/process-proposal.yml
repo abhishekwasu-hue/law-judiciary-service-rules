@@ -246,20 +246,9 @@ jobs:
           : "${ENGINE_PROVIDER:=}" "${ENGINE_MODEL:=}" "${ENGINE_MODEL_LIGHT:=}" "${CLOUDFLARE_ACCOUNT_ID:=}" "${OLLAMA_BASE_URL:=}"
           export MODEL MODEL_LIGHT MODEL_REVIEW MODEL_STRONG
           ES agents /tmp/work/agents.json
-          python3 - <<'PY'
-          import ast, io, os
-          out = io.open("/tmp/work/TOOL_DOCS.md", "w", encoding="utf-8")
-          # build_order / build_parawise / lint_order / lint_parawise (02.11.2026: optional order-draft and court outputs) and
-          # build_affidavit / build_lq / lint_affidavit / lint_lq (04.11.2026) are
-          # skipped when absent, so a checkout without them still runs
-          for t in ("mkdocs", "build_note_letter", "build_study", "pkg3", "highlight", "lint_spec", "verify_outputs", "extract_check", "oldcases_text",
-                    "build_order", "lint_order", "build_parawise", "lint_parawise", "build_affidavit", "lint_affidavit",
-                    "build_lq", "lint_lq"):
-              if not os.path.exists(f"tools/{t}.py"):
-                  continue
-              d = ast.get_docstring(ast.parse(io.open(f"tools/{t}.py", encoding="utf-8").read())) or ""
-              out.write("### tools/" + t + ".py" + chr(10) + d + chr(10) + chr(10))
-          PY
+          # tool docstrings for the prompt: only the tools the ticked drafts need (owner 04.11.2026); all of them in
+          # TOOL_DOCS_ALL.md. No case meta / outputs null -> every tool (tools/tool_docs.py).
+          python3 -I "$T/tool_docs.py" /tmp/work "$RP/runner-case.json" || echo "tool_docs failed (prompt without tool docstrings)"
 
           # ---- H1: the `engine` user and its READ-ONLY view of the repo (writable: pdf/gr, tools/gr-request*.txt) ----
           ME="$(id -u):$(id -g)"
@@ -388,7 +377,7 @@ jobs:
 
           $WT_BLOCK
 
-          ## Tool docstrings (also in /tmp/work/TOOL_DOCS.md)
+          ## Tool docstrings of the tools this run needs (also in /tmp/work/TOOL_DOCS.md; every tool: /tmp/work/TOOL_DOCS_ALL.md)
           $(cat /tmp/work/TOOL_DOCS.md)
 
           WORKDIR=/tmp/case
@@ -434,7 +423,7 @@ jobs:
               if gw_start "$FALLBACK_PROVIDER" "$FALLBACK_MODEL" "$FALLBACK_MODEL_LIGHT"; then
                 # start the main run again from a clean slate (keep only part 1 and the run set-up files)
                 sudo find /tmp/out -mindepth 1 -delete
-                find /tmp/work -mindepth 1 -maxdepth 1 ! -name 'study_part1.*' ! -name 'part1*' ! -name agents.json ! -name TOOL_DOCS.md -exec sudo rm -rf {} +
+                find /tmp/work -mindepth 1 -maxdepth 1 ! -name 'study_part1.*' ! -name 'part1*' ! -name agents.json ! -name TOOL_DOCS.md ! -name TOOL_DOCS_ALL.md -exec sudo rm -rf {} +
                 rm -f "$RP/litellm_cost.jsonl"   # cost of the fallback run only (the failed run is in claude.first.json)
                 rc=0
                 : > "$RP/claude.json"
