@@ -8,6 +8,7 @@ import { crLabel } from '../lib/format';
 import { Modal, Spinner } from './ui';
 import ProfileForm from './ProfileForm';
 import CasePicker from './CasePicker';
+import AiAssistant from './AiAssistant';
 import ErrorBoundary from './ErrorBoundary';
 
 /** Global bar on every page: runs still processing, each a link to its case (Abhi 01.11.2026 — progress must not "disappear" when he leaves the page). */
@@ -284,6 +285,7 @@ export default function Layout() {
       </div>
       <CommandPalette open={palette} onClose={() => setPalette(false)} />
       <CasePicker open={pick} onClose={() => setPick(false)} />
+      <AiAssistant />
       <Modal open={profile} onClose={closeProfile} title="माझी माहिती">
         <p className="mb-3 text-sm text-slate-600 dark:text-slate-300">नस्ती अद्ययावत स्थिती पानात हीच माहिती वापरली जाते.</p>
         <ProfileForm onDone={closeProfile} onSkip={closeProfile} skipLabel="रद्द" />

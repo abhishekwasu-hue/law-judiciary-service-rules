@@ -251,7 +251,7 @@ export default function CaseDetail() {
               </select>
               {hasSpec && (
                 <Link to="?tab=note&edit=1" className="edit-cta inline-flex min-h-tap items-center gap-1.5 rounded-lg px-3 font-bold">
-                  ✏️ सुधारणा <span className="blink-dot" aria-hidden="true" />
+                  <span className="rounded-full bg-white px-1.5 text-sm font-black text-orange-600">AI</span> सुधारणा <span className="blink-dot" aria-hidden="true" />
                 </Link>
               )}
               <button className="btn-ghost" onClick={() => setEditOpen(true)}>✎ तपशील</button>
