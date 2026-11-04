@@ -334,7 +334,7 @@ export default function NewProposal() {
             <Field label="कामाचा प्रकार">
               <select className="input" disabled={locked} value={f.work_type} onChange={set('work_type')}>{WORK_TYPES.map(w => <option key={w.id} value={w.id}>{w.label}</option>)}</select>
             </Field>
-            <Field label="विभाग / कार्यासन" hint="नोंद व पत्राची रचना (शीर्ष, सही-साखळी, पत्राचा क्रमांक) या कार्यासनाप्रमाणे.">
+            <Field label="विभाग / कार्यासन" hint="टिप्पणी व पत्राची रचना (शीर्ष, सही-साखळी, पत्राचा क्रमांक) या कार्यासनाप्रमाणे.">
               <select className="input" disabled={locked} value={f.desk} onChange={set('desk')}>{DESKS.map(d => <option key={d.id} value={d.id}>{d.label}</option>)}</select>
             </Field>
             <div className="grid grid-cols-2 gap-3">

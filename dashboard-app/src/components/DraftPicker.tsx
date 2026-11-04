@@ -76,7 +76,7 @@ export default function DraftPicker({ value, onChange, suggestion, disabled }: {
   return (
     <fieldset className="min-w-0 space-y-2" disabled={disabled}>
       <legend className="label mb-0">कोणते मसुदे हवेत?</legend>
-      <p className="text-sm text-slate-500 dark:text-slate-400">नोंद, अभ्यास-फाइल व GR सह PDF नेहमी मिळतील</p>
+      <p className="text-sm text-slate-500 dark:text-slate-400">टिप्पणी, अभ्यास-फाइल व GR सह PDF नेहमी मिळतील</p>
       {DRAFT_GROUPS.map(g => {
         const n = g.keys.filter(k => value.includes(k)).length;
         return (
@@ -109,7 +109,7 @@ export default function DraftPicker({ value, onChange, suggestion, disabled }: {
           </div>
         );
       })}
-      {value.length === 0 && <div className="rounded-lg bg-amber-100 px-3 py-1.5 text-sm font-semibold text-amber-900 dark:bg-amber-900/40 dark:text-amber-100">फक्त नोंद तयार होईल</div>}
+      {value.length === 0 && <div className="rounded-lg bg-amber-100 px-3 py-1.5 text-sm font-semibold text-amber-900 dark:bg-amber-900/40 dark:text-amber-100">फक्त टिप्पणी तयार होईल</div>}
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
         <span className="text-slate-700 dark:text-slate-200">सुचवलेले: <b>{draftLabels(suggestion.keys)}</b> <span className="text-slate-500 dark:text-slate-400">({suggestion.reason})</span></span>
         {differs && !disabled && (

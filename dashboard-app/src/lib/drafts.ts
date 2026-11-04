@@ -28,7 +28,7 @@ export function suggestDrafts(files: FileLike[], runs: RunLike[] | null | undefi
   return { keys: ['letter'], reason: list.length ? 'नेहमीप्रमाणे' : 'पहिली प्रक्रिया' };
 }
 
-export const draftLabels = (keys: readonly DraftKey[]) => (keys.length ? keys.map(k => DRAFT_LABEL[k]).join(', ') : 'फक्त नोंद');
+export const draftLabels = (keys: readonly DraftKey[]) => (keys.length ? keys.map(k => DRAFT_LABEL[k]).join(', ') : 'फक्त टिप्पणी');
 export const sameDrafts = (a: readonly DraftKey[], b: readonly DraftKey[]) => a.length === b.length && a.every((k, i) => k === b[i]);
 
 /** Estimate: base = typical run (time/cost of earlier runs, which made the note + one letter); each further draft adds a

@@ -124,7 +124,7 @@ export type DraftKey = (typeof DRAFT_KEYS)[number];
 export const DRAFT_LABEL: Record<DraftKey, string> = {
   letter: 'पत्र', reminder: 'स्मरणपत्र', gr: 'शासन निर्णय', corrigendum: 'शुद्धिपत्रक', circular: 'परिपत्रक', memo: 'ज्ञापन',
   notification: 'अधिसूचना', parawise: 'परिच्छेदनिहाय उत्तर',
-  do_letter: 'अर्धशासकीय पत्र', uo_note: 'अनौपचारिक संदर्भ नोंद', endorsement: 'पृष्ठांकन', office_order: 'कार्यालयीन आदेश',
+  do_letter: 'अर्धशासकीय पत्र', uo_note: 'अनौपचारिक संदर्भ टिप्पणी', endorsement: 'पृष्ठांकन', office_order: 'कार्यालयीन आदेश',
   press_note: 'प्रसिद्धीपत्रक', addendum: 'पूरकपत्र', affidavit: 'शपथपत्र', lq: 'विधानमंडळ प्रश्नाचे उत्तर',
 };
 /** Picker groups (phone layout: a short heading per group). Every DRAFT_KEYS key is in exactly one group. */
@@ -137,7 +137,7 @@ export const DRAFT_GROUPS: { label: string; keys: readonly DraftKey[] }[] = [
 export function draftsText(v: unknown): string {
   if (!Array.isArray(v)) return '';
   const l = DRAFT_KEYS.filter(k => v.includes(k)).map(k => DRAFT_LABEL[k]);
-  return l.length ? l.join(', ') : 'फक्त नोंद';
+  return l.length ? l.join(', ') : 'फक्त टिप्पणी';
 }
 
 /** Optional engine outputs (02.11.2026, migration 0006; affidavit / lq_answer 04.11.2026, migration 0010): shown with the

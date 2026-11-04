@@ -105,7 +105,7 @@ DRAFT_KEYS = ("letter", "reminder", "gr", "corrigendum", "circular", "memo", "no
               "do_letter", "uo_note", "endorsement", "office_order", "press_note", "addendum", "affidavit", "lq")
 DRAFT_LABEL = {"letter": "पत्र", "reminder": "स्मरणपत्र", "gr": "शासन निर्णय", "corrigendum": "शुद्धिपत्रक",
                "circular": "परिपत्रक", "memo": "ज्ञापन", "notification": "अधिसूचना", "parawise": "परिच्छेदनिहाय उत्तर",
-               "do_letter": "अर्धशासकीय पत्र", "uo_note": "अनौपचारिक संदर्भ नोंद", "endorsement": "पृष्ठांकन",
+               "do_letter": "अर्धशासकीय पत्र", "uo_note": "अनौपचारिक संदर्भ टिप्पणी", "endorsement": "पृष्ठांकन",
                "office_order": "कार्यालयीन आदेश", "press_note": "प्रसिद्धीपत्रक", "addendum": "पूरकपत्र",
                "affidavit": "शपथपत्र", "lq": "विधानमंडळ प्रश्नाचे उत्तर"}
 ORDER_KEYS = ("gr", "corrigendum", "circular", "memo", "notification", "endorsement", "office_order", "press_note",
@@ -1797,9 +1797,9 @@ def cmd_extracts(args):
     if unv:
         lines.append(f"मॉडेल: उतारा-तपासणी — {len(unv)} उतारे पडताळता आले नाहीत (स्कॅन/विस्कळीत मजकूर-स्तर)")
     if nbad:
-        lines.append(f"मॉडेल: उतारा-तपासणी — नोंदीतील {len(nbad)} अवतरणे मूळ PDF शी जुळली नाहीत ({where(nbad)}) — तपासावे")
+        lines.append(f"मॉडेल: उतारा-तपासणी — टिप्पणीतील {len(nbad)} अवतरणे मूळ PDF शी जुळली नाहीत ({where(nbad)}) — तपासावे")
     if nunv:
-        lines.append(f"मॉडेल: उतारा-तपासणी — नोंदीतील {len(nunv)} अवतरणे पडताळता आली नाहीत (पृ.N/प.वि. नाही / स्कॅन)")
+        lines.append(f"मॉडेल: उतारा-तपासणी — टिप्पणीतील {len(nunv)} अवतरणे पडताळता आली नाहीत (पृ.N/प.वि. नाही / स्कॅन)")
     add_warnings(lines)
     print("extracts:", "MISMATCH (warning)" if bad else "OK")
 

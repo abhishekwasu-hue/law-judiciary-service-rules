@@ -40,7 +40,7 @@ const KIND_NOT_READY = 'हा फाइल-प्रकार अजून स�
 const BAD_OUTPUTS = 'मसुद्यांची निवड चुकीची — पान पुन्हा उघडा';
 const MAX_UPLOAD = 50 * 1024 * 1024;
 // ---------- draft edit (सुधारणा-चॅट; docs/DRAFT_EDIT_DESIGN.md points 3 + Addendum A, migration 0013) ----------
-// POST /api/edit targets: नोंद, पत्र, आदेश-प्रारूप, परिच्छेदनिहाय उत्तर, शपथपत्र, विधानमंडळ उत्तर, GR सह प्रस्ताव PDF
+// POST /api/edit targets: टिप्पणी, पत्र, आदेश-प्रारूप, परिच्छेदनिहाय उत्तर, शपथपत्र, विधानमंडळ उत्तर, GR सह प्रस्ताव PDF
 export const EDIT_TARGETS = ['note', 'letter', 'order', 'parawise', 'affidavit', 'lq', 'package'];
 const EDIT_MSG_MAX = 2000;
 const EDIT_ATTACH_MAX = 5;

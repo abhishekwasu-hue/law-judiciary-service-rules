@@ -678,7 +678,7 @@ if pymupdf and FONTF:
               open(spx, "w", encoding="utf-8"), ensure_ascii=False)
     r = run("extracts", ox, spx, os.path.join(tmp, "absent_study.json"))
     check(r.returncode == 0 and run_row["state"] == "running" and len(run_row["warnings"]) == 1
-          and run_row["warnings"][0].startswith("मॉडेल: उतारा-तपासणी — नोंदीतील 1 अवतरणे मूळ PDF शी जुळली नाहीत"),
+          and run_row["warnings"][0].startswith("मॉडेल: उतारा-तपासणी — टिप्पणीतील 1 अवतरणे मूळ PDF शी जुळली नाहीत"),
           f"extracts: note-body quote mismatch -> warning only ({run_row['warnings']} {r.stderr[:200]})")
 else:
     print("skip  extracts (pymupdf or Devanagari font missing)")
