@@ -34,19 +34,22 @@ export function readNasti(): NastiStore | null {
 const str = (v: unknown) => (typeof v === 'string' ? v : '');
 const empty = (v: unknown) => !str(v).trim();
 
-/** Pure merge: fill only empty user.n / user.d / office / mine from the profile; seen = true when user.n is set.
+/** Pure merge: user.n / user.d follow the profile (when set); office / mine only when empty; seen = true when user.n is set.
  *  `changed` false → nothing to write. A missing store becomes {rows: []} + the profile fields (as the page itself accepts). */
 export function mergeProfile(store: NastiStore | null, p: Partial<Profile> | null | undefined): { next: NastiStore; changed: boolean } {
   const next: NastiStore = store ? { ...store } : { rows: [] };
   let changed = false;
   if (!p) return { next, changed };
   const user = { ...(next.user && typeof next.user === 'object' ? next.user : {}) };
-  const put = (cur: unknown, val: unknown, set: (v: string) => void) => {
+  const put = (cur: unknown, val: unknown, set: (v: string) => void, always = false) => {
     const v = str(val).trim();
-    if (v && empty(cur)) { set(v); changed = true; }
+    if (v && (empty(cur) || (always && str(cur).trim() !== v))) { set(v); changed = true; }
   };
-  put(user.n, p.display_name, v => (user.n = v));
-  put(user.d, p.designation, v => (user.d = v));
+  // name / designation: the main app's profile is the one source (Abhi 04.11.2026: "ज्या गोष्टी आवश्यक आहे त्या करा" —
+  // one name everywhere), so a changed profile updates the page; office / mine may also come from the page's own report
+  // upload, so they are filled only when empty
+  put(user.n, p.display_name, v => (user.n = v), true);
+  put(user.d, p.designation, v => (user.d = v), true);
   put(next.office, p.office, v => (next.office = v));
   put(next.mine, p.mine, v => (next.mine = v));
   if (changed) next.user = user;
@@ -54,7 +57,7 @@ export function mergeProfile(store: NastiStore | null, p: Partial<Profile> | nul
   return { next, changed };
 }
 
-/** Write the profile into the नस्ती store (only empty fields). Returns true when something was written. */
+/** Write the profile into the नस्ती store (name / designation follow the profile; office / mine only when empty). Returns true when something was written. */
 export function prefillNasti(p: Partial<Profile> | null | undefined): boolean {
   const cur = readNasti();
   // invalid JSON present → leave the page's data alone
