@@ -280,6 +280,22 @@ def test_refusal_changes_nothing(sb, tmp_path, monkeypatch):
     assert sb.run["edit_result"]["cost_usd"] > 0
 
 
+def test_partly_out_of_scope_still_edits(sb, tmp_path, monkeypatch):
+    """Live 04.11.2026: "remove the letter no. from para 1 … apply this in all future proposals" came back refused and
+    the note was not changed. Ops + refuse -> the ops are applied, the reason is kept as a note."""
+    spec, _ = seed_cr131(sb, tmp_path)
+    p0 = spec["note"]["paras"][0]
+    new = p0.replace("पुढील कार्यवाहीसाठी व मान्यतेस्तव", "पुढील कार्यवाहीसाठी")
+    sb.run.update({"edit_target": "note", "edit_message": "परि. 2 मधून 'व मान्यतेस्तव' काढावे; पुढील सर्व प्रस्तावांत लागू करावे"})
+    monkeypatch.setattr(ED, "post_json", FakeAPI([model_reply([("replace", "/note/paras/0", new)], "बदल करण्यात आला आहे.",
+                                                              "पुढील प्रस्तावांसाठीची सूचना या सुविधेच्या कक्षेबाहेर आहे.")]))
+    ED.run_edit(str(tmp_path / "w"), api_key="sk", model="claude-sonnet-5-5")
+    er = sb.run["edit_result"]
+    assert sb.run["state"] == "done" and "refused" not in er and er["changes"]
+    assert any("कक्षेबाहेर" in n for n in er["notes"])
+    assert any(f["kind"] == "note_letter" and f["version"] == 2 for f in sb.files)
+
+
 def test_lint_retry_then_ok(sb, tmp_path, monkeypatch):
     spec, _ = seed_cr131(sb, tmp_path)
     old = spec["letter"]["intro"]

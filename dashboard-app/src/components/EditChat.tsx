@@ -109,6 +109,7 @@ function Turn({ r, ctx, names, onOpen }: { r: Run; ctx: CaseCtx; names: string[]
           <div className="break-words text-sm text-red-900 [overflow-wrap:anywhere] dark:text-red-200">{stale ? 'वेळ संपली — कृपया सुधारणा पुन्हा पाठवावी, ही विनंती.' : cleanReason(r.step) || 'कारण उपलब्ध नाही'}</div>
         )}
         {r.state === 'done' && !refused && (res.summary || r.summary) && <div className="break-words font-semibold [overflow-wrap:anywhere]">{res.summary || r.summary}</div>}
+        {r.state === 'done' && !refused && Array.isArray(res.notes) && res.notes.map((n, i) => <div key={i} className="break-words rounded-lg bg-amber-50 px-2 py-1 text-sm text-amber-900 [overflow-wrap:anywhere] dark:bg-amber-900/30 dark:text-amber-100">ℹ️ {textOf(n)}</div>)}
         {r.state === 'done' && !refused && changes.length > 0 && (
           <ol className="space-y-1.5" aria-label={`बदल (${changes.length})`}>{changes.map((c, i) => <Change key={i} c={c} />)}</ol>
         )}

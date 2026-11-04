@@ -46,6 +46,8 @@ export interface EditResult {
   summary?: string | null; changes?: EditChange[] | null; files?: string[] | null; cost_usd?: number | string | null; refused?: string | null;
   /** Addendum A: items appended to the returned PDF */
   attached?: { title?: string | null; pages?: string | number | null }[] | null;
+  /** parts of the message that could not be done in this edit (the rest was done) */
+  notes?: string[] | null;
 }
 export interface Letter {
   id: number; case_id: number; ref_no: string | null; addressed_to: string | null; sent_date: string | null;

@@ -120,7 +120,10 @@ Reply strictly as JSON: {"ops": [...], "summary": "...", "refuse": ""}.
   before that index) or "-" (append), or a new key of an object. "value_json" = the new value as JSON text (a JSON
   string in quotes for text, an object or list for a table / item); "" for "remove".
 - "summary": ONE line in Marathi saying what was changed, e.g. "नोंदीच्या परि. 5 मधील दिनांक दुरुस्त करण्यात आला आहे."
-- "refuse": "" normally. A short Marathi reason, and no ops, when the message needs a full new study: a GR or document
+- If only PART of the message is outside this edit (e.g. "apply this in all future proposals", a change in another
+  draft), DO the part that is inside with ops, and put ONLY the reason for the other part in "refuse" (it is shown as a
+  note; the done part is kept). Never drop a doable change because another part of the message is outside the edit.
+- "refuse": "" normally. A short Marathi reason, and no ops, when the WHOLE message needs a full new study: a GR or document
   that is not given, re-reading the proposal, a new kind of draft, or a change outside this part, e.g. "हा बदल करण्यासाठी
   प्रस्तावाचे पुन्हा वाचन आवश्यक आहे. कृपया 'पुन्हा तयार करा' हा पर्याय वापरावा, ही विनंती."
 - Language of "summary" and "refuse" (the reader is a senior officer): very respectful, formal office Marathi; honorific
@@ -964,6 +967,7 @@ def run_edit(work, api_key=None, model=None):
         raise EditFail("GR सह प्रस्ताव PDF सापडली नाही. कृपया 'पुन्हा तयार करा' हा पर्याय वापरावा, ही विनंती.")
 
     cost, summary, changes, refused, new_spec = 0.0, "", [], "", spec
+    extra_notes = []   # out-of-scope parts of a message whose doable part was done
     if target != "package":   # attach-only (target package): no model call
         keys = [k for k in TARGET_KEYS[target] if k in spec and spec[k] not in (None, "", [], {})]
         if not keys:
@@ -987,9 +991,12 @@ def run_edit(work, api_key=None, model=None):
                 rep = reply_of(resp)
             except Refused as r:
                 raise Refused(r.args[0], cost)
-            if rep["refuse"]:
+            # partly out of scope (owner 04.11.2026: the note edit was dropped because the message also said "apply in
+            # all future proposals"): the doable ops are applied, the reason for the rest becomes a note, never a refusal
+            if rep["refuse"] and not rep["ops"]:
                 refused = rep["refuse"]; summary = rep["summary"] or refused
                 break
+            part_note = rep["refuse"]
             try:
                 new_part, chs = apply_ops(part, rep["ops"])
                 cand = {**spec, **new_part}
@@ -998,6 +1005,8 @@ def run_edit(work, api_key=None, model=None):
                 chs, errs = [], [str(e)]
             if not errs:
                 new_spec, changes, summary = cand, chs, rep["summary"]
+                if part_note:
+                    extra_notes.append(part_note)
                 break
             if attempt == 2:
                 raise EditFail(f"सुधारणा नियमांत बसली नाही ({errs[0]}). कृपया बदल वेगळ्या शब्दांत पाठवावा, ही विनंती."[:500])
@@ -1036,7 +1045,7 @@ def run_edit(work, api_key=None, model=None):
     files_kinds = [u["kind"] for u in uploaded if u["kind"] != "spec"]
     if package and not summary:
         summary = "GR सह PDF मध्ये खालील कागदपत्रे जोडण्यात आली आहेत: " + "; ".join(f"{a['title']} ({a['pages']})" for a in package["attached"])
-    notes = list(package["notes"]) if package else []
+    notes = (list(package["notes"]) if package else []) + extra_notes
     er = {"summary": summary, "changes": readable_changes(changes), "files": files_kinds, "cost_usd": round(cost, 4),
           "attached": package["attached"] if package else []}
     if refused:
