@@ -130,10 +130,11 @@ LAST_FIN_RE = re.compile(r"^सबब\s*,.*वित्त\s+विभागा�
 # order draft on the file (02.11.2026; R3 (c): "…शासन निर्णयाचे प्रारुप पृ.  /प.वि.वर मान्यतेस्तव सादर.")
 # "अधिसूचनेची मराठी व इंग्रजी प्रारूपे" = B6 notification (Marathi + English text)
 # 04.11.2026: पृष्ठांकनाचे / प्रसिद्धीपत्रकाचे / पूरकपत्राचे (new order types, docs/FORMS_RESEARCH_ORDERS.md); कार्यालयीन
-# आदेशाचे = "आदेशाचे"
+# आदेशाचे = "आदेशाचे"; शपथपत्राचे / उत्तराचे (tools/build_affidavit.py, tools/build_lq.py)
 ORDER_DRAFT_KINDS = (r"(?:(?:शासन\s+)?(?:निर्णयाचे|शुद्धिपत्रकाचे|परिपत्रकाचे|ज्ञापनाचे|अधिसूचनेचे|आदेशाचे|पृष्ठांकनाचे"
                      r"|प्रसिद्धीपत्रकाचे|पूरकपत्राचे)\s+प्रारूप"
-                     r"|अधिसूचनेची\s+मराठी\s+व\s+इंग्रजी\s+प्रारूपे)")
+                     r"|अधिसूचनेची\s+मराठी\s+व\s+इंग्रजी\s+प्रारूपे"
+                     r"|शपथपत्राचे\s+प्रारूप|उत्तराचे\s+प्रारूप)")
 LAST_ORDER_RE = re.compile(rf"^सबब\s*,.*{ORDER_DRAFT_KINDS}\s+पृ\.[^/]{{0,40}}/\s*प\.वि\.\s*वर\s+मान्यतेस्तव\s+सादर"
                            r"(?:\s+करण्यात\s+येत\s+आहे)?\s*\.(?:\s*मान्य\s+झाल्यास\s+[^.]{0,120}निर्गमित\s+करण्यात\s+येईल\s*\.)?$", re.S)
 # 02.11.2026 (audit A1 H5): the other SOP Step 3 routes, in the Section's wording (old notes /tmp/old, medical-bill
@@ -153,7 +154,7 @@ LAST_CLOSE_RE = re.compile(r"^सबब\s*,.*(?:नस्ती\s*बंद|न�
 # "सबब, … पत्राचे प्रारूप व शासन निर्णयाचे प्रारूप पृ.      /प.वि. वर मान्यतेस्तव सादर." (two or more drafts)
 _DRAFT_KIND = (r"(?:(?:शासन\s+)?(?:निर्णयाचे|शुद्धिपत्रकाचे|परिपत्रकाचे|ज्ञापनाचे|अधिसूचनेचे|आदेशाचे|पृष्ठांकनाचे"
                r"|प्रसिद्धीपत्रकाचे|पूरकपत्राचे)|पत्राचे|पत्रांचे|"
-               r"स्मरणपत्राचे|अधिसूचनेची\s+मराठी\s+व\s+इंग्रजी)")
+               r"स्मरणपत्राचे|अधिसूचनेची\s+मराठी\s+व\s+इंग्रजी|शपथपत्राचे|उत्तराचे)")
 _DRAFT_ITEM = rf"{_DRAFT_KIND}(?:\s+प्रारूपे?)?"
 LAST_COMBINED_RE = re.compile(rf"^सबब\s*,.*{_DRAFT_ITEM}(?:\s*,\s*|\s+व\s+)[^.]{{0,160}}?{_DRAFT_KIND}\s+प्रारूपे?\s+"
                               r"पृ\.[^/]{0,40}/\s*प\.वि\.\s*वर\s+मान्यतेस्तव\s+सादर(?:\s+करण्यात\s+येत\s+आहे)?\s*\."
@@ -938,7 +939,7 @@ ORDER_NAMES = {"gr": ("निर्णयाचे",), "corrigendum": ("शु�
 
 
 def drafts_unnamed(spec):
-    """Drafts in the spec ("letter"/"letters", "order"/"orders", "parawise") that the note's last para does not name."""
+    """Drafts in the spec ("letter"/"letters", "order"/"orders", "parawise", "affidavit", "lq") that the note's last para does not name."""
     if not isinstance(spec, dict) or not isinstance(spec.get("note"), dict):
         return []
     last = ns(unquoted(last_para(spec["note"])[1]))
@@ -958,6 +959,10 @@ def drafts_unnamed(spec):
             miss.append(f"order {o.get('type')}")
     if spec.get("parawise") and "परिच्छेदनिहाय" not in last:
         miss.append("parawise (परिच्छेदनिहाय अभिप्राय)")
+    if spec.get("affidavit") and "शपथपत्राचे" not in last:
+        miss.append("affidavit (शपथपत्राचे प्रारूप)")
+    if spec.get("lq") and "उत्तराचे" not in last:
+        miss.append("lq (प्रश्नाच्या उत्तराचे प्रारूप)")
     return miss
 
 
@@ -996,7 +1001,9 @@ def lint_study(study, pages=None, allow_missing_part1=False):
 
 # spec key -> tools/<module>.py, error function, optional WARN-level function names
 EXTRA_LINTS = ((("order", "orders"), "lint_order", ("lint_order_warnings", "warnings_order")),   # "orders": §4.28
-               (("parawise",), "lint_parawise", ("warnings_parawise", "lint_parawise_warnings")))
+               (("parawise",), "lint_parawise", ("warnings_parawise", "lint_parawise_warnings")),
+               (("affidavit",), "lint_affidavit", ("warnings_affidavit",)),   # 04.11.2026: tools/build_affidavit.py
+               (("lq",), "lint_lq", ("warnings_lq",)))                       # 04.11.2026: tools/build_lq.py
 _IN_EXTRA = []
 
 

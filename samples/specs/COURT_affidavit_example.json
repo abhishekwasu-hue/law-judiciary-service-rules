@@ -1,0 +1,75 @@
+{
+ "_comment": "SYNTHETIC sample (blanks '____', no real names): affidavit in reply on behalf of the State in a Writ Petition (tools/build_affidavit.py; sources docs/FORMS_RESEARCH_AFFIDAVIT_LQ.md part A: Bombay High Court Appellate Side Rules 1960 Ch. III Rules 1, 2, 4, 5, 10 and Ch. XVII Rules 10-12; CPC Appendix E Form 16-A; the Section's own parawise drafts for the label forms and the prayer). The note and the letter to the Government Pleader follow the Section's practice (the State's affidavit is settled on the basis of the parawise remarks and sent to the Government Pleader).",
+ "note": {
+  "first": "सरकारी वकील, मा. उच्च न्यायालय, मुंबई यांच्या पृ.1/प.वि. वरील दि. __.__.2026 रोजीच्या पत्रास अनुसरून सादर.",
+  "paras": [
+   "श्री. ____ व इतर यांनी मा. उच्च न्यायालय, मुंबई येथे दाखल केलेली रिट याचिका क्र. ____/2026 (पृ.2-10/प.वि.) कृपया पहावी. सदर याचिकेत प्रधान सचिव, विधि व न्याय विभाग यांना प्रतिवादी क्र. 1 आणि प्रधान सचिव, वित्त विभाग यांना प्रतिवादी क्र. 2 करण्यात आले आहे (पृ.2/प.वि.).",
+   "सदर याचिकेतील परिच्छेदनिहाय अभिप्राय या विभागाने यापूर्वी सरकारी वकील यांना पाठविले आहेत (पृ.11-14/प.वि.). त्यानुसार प्रतिवादी क्र. 1 व 2 यांच्या वतीने दाखल करावयाच्या शपथपत्राचे प्रारूप (इंग्रजी) तयार करण्यात आले आहे."
+  ],
+  "closing": "सबब, रिट याचिका क्र. ____/2026 मध्ये प्रतिवादी क्र. 1 व 2 यांच्या वतीने दाखल करावयाच्या शपथपत्राचे प्रारूप व सरकारी वकील यांना पाठवावयाच्या पत्राचे प्रारूप पृ.      /प.वि. वर मान्यतेस्तव सादर. मान्य झाल्यास पत्र निर्गमित करण्यात येईल.",
+  "signers": [
+   "का. अ. (श्रीम. कऱ्हाडे)",
+   "अ.स. (श्री. वडनेरकर)",
+   "उ.वि.स. नि. उ.स. (श्री. बोंद्रे)",
+   "प्र.स. व वि.प. (श्री. खटी)"
+  ]
+ },
+ "letter": {
+  "ref_no": "संकिर्ण-2026/____/प्र.क्र.____/का.6",
+  "date": "__.__.2026",
+  "to": [
+   "सरकारी वकील,",
+   "मा. उच्च न्यायालय,",
+   "मुंबई."
+  ],
+  "subject": "रिट याचिका क्र. ____/2026 (श्री. ____ व इतर विरुद्ध महाराष्ट्र शासन व इतर) मध्ये प्रतिवादी क्र. 1 व 2 यांच्या वतीने शपथपत्र दाखल करण्याबाबत.",
+  "refs": [
+   "आपले पत्र क्र. ____, दि. __.__.2026"
+  ],
+  "intro": "उपरोक्त विषयाबाबत संदर्भाधीन पत्रास अनुसरून आपणांस कळविण्यात येते की, उपरोक्त रिट याचिकेत प्रतिवादी क्र. 1 व 2 यांच्या वतीने दाखल करावयाच्या शपथपत्राचे प्रारूप (इंग्रजी) सोबत पाठविण्यात येत आहे. सदर शपथपत्र मा. उच्च न्यायालयात दाखल करण्याबाबत पुढील कार्यवाही करण्यात यावी, ही विनंती.",
+  "points": [],
+  "closing": "",
+  "enclosure": "सोबत :- शपथपत्राचे प्रारूप (इंग्रजी).",
+  "copies": []
+ },
+ "affidavit": {
+  "bench": "bombay",
+  "case": "WRIT PETITION NO. ____ OF 2026",
+  "petitioners": [
+   "Shri. ____, aged ____ years, retired as ____, City Civil and Sessions Court, Mumbai, residing at ____",
+   "Shri. ____, aged ____ years, retired as ____, City Civil and Sessions Court, Mumbai, residing at ____"
+  ],
+  "respondents": [
+   "The State of Maharashtra, through the Principal Secretary, Law and Judiciary Department, Mantralaya, Mumbai 400 032",
+   "The Principal Secretary, Finance Department, Mantralaya, Mumbai 400 032",
+   "The Registrar, City Civil and Sessions Court, Mumbai"
+  ],
+  "on_behalf_of": "Respondent Nos. 1 and 2",
+  "deponent": {
+   "name": "____",
+   "age": "____",
+   "designation": "Deputy Secretary to Government",
+   "office": "Law and Judiciary Department, Government of Maharashtra, Mantralaya, Mumbai 400 032"
+  },
+  "paras": [
+   "The Petitioners were employees on the establishment of the City Civil and Sessions Court, Mumbai (Respondent No. 3) and retired on superannuation on __.__.____ and __.__.____ respectively. Their pay and pension were fixed under the Maharashtra Civil Services (Pay) Rules, 1981 and the Maharashtra Civil Services (Pension) Rules, 1982.",
+   "The Petitioners have prayed for the grant of ____ with effect from __.__.____ and for the consequential benefits. The Respondents oppose the Petition for the reasons stated in the parawise reply below."
+  ],
+  "reply": [
+   {"para": "1", "reply": "Needs no comments as the contentions in this para are the details of the Petitioners and the provision under which the Petition is filed. However, it is denied that the Petitioners are entitled to the reliefs claimed."},
+   {"para": "2 and 3", "reply": "Needs no remarks as the contentions in these paras are matter of record and pertain to the description of the Respondents."},
+   {"para": "4", "reply": "The contents of this para are denied. Government Resolution No. ____ dated __.__.____, paragraph ____, prescribes the condition of ____ for the grant of the said benefit. As per the service record received from Respondent No. 3 with its letter dated __.__.2026, the Petitioners do not fulfil the said condition."},
+   {"section": "Grounds"},
+   {"para": "Ground (a)", "reply": "The contents of this ground are denied. The action of the Respondents is in accordance with Government Resolution No. ____ dated __.__.____ and the Rules referred to in paragraph 2 above."},
+   {"para": "Prayer Clauses (a) to (d)", "reply": "The prayer clauses are denied. The Petitioners are not entitled to the ____ claimed, as they do not fulfil the condition laid down in Government Resolution No. ____ dated __.__.____. No case is made out for any interim relief."}
+  ],
+  "sources": "the official record of the Law and Judiciary Department and the service record received from Respondent No. 3",
+  "belief_reasons": "the said record is maintained in the ordinary course of official business",
+  "knowledge_paras": "1 to 3",
+  "place": "Mumbai",
+  "day": "____",
+  "month_year": "____ 2026",
+  "identified_by": "____",
+  "advocate_for": "Respondent Nos. 1 and 2"
+ }
+}
