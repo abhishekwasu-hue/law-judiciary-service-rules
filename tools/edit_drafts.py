@@ -124,7 +124,7 @@ Reply strictly as JSON: {"ops": [...], "summary": "...", "refuse": ""}.
   that is not given, re-reading the proposal, a new kind of draft, or a change outside this part, e.g. "हा बदल करण्यासाठी
   प्रस्तावाचे पुन्हा वाचन आवश्यक आहे. कृपया 'पुन्हा तयार करा' हा पर्याय वापरावा, ही विनंती."
 - Language of "summary" and "refuse" (the reader is a senior officer): very respectful, formal office Marathi; honorific
-  plural and "आपण"; passive statements ("… करण्यात आले आहे.") and the request form ("कृपया … वापरावे, ही विनंती.");
+  plural and "आपण"; passive statements ("… करण्यात आले आहे.") and the request form ("कृपया … वापरावे, ही विनंती."); every request or suggestion to the reader MUST start with "कृपया" (owner, 04.11.2026: "कृपया हा शब्द महत्त्वाचा आहे");
   never a command ending ("करा", "वापरा", "पाठवा", "लिहा", "जोडा"), never casual words, no apology, no filler."""
 
 

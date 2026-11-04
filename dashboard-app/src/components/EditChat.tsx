@@ -261,11 +261,11 @@ export default function EditChat({ ctx }: { ctx: CaseCtx }) {
           <span className="font-semibold">प्रकरण:</span> <b>{crLabel(ctx.c)}</b>
           {ctx.c.subject && <div className="truncate text-slate-600 dark:text-slate-300" title={ctx.c.subject}>{ctx.c.subject}</div>}
         </div>
-        <button type="button" className="btn-ghost shrink-0 px-2 text-sm" onClick={() => setPick(true)}>प्रकरण बदलावे</button>
+        <button type="button" className="btn-ghost shrink-0 px-2 text-sm" onClick={() => setPick(true)}>कृपया प्रकरण बदलावे</button>
       </div>
       <CasePicker open={pick} onClose={() => setPick(false)} />
       {drag && (
-        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-amber-50/90 text-lg font-bold text-navy-800 dark:bg-navy-900/90 dark:text-white">📎 फाइल येथे सोडावी</div>
+        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-amber-50/90 text-lg font-bold text-navy-800 dark:bg-navy-900/90 dark:text-white">📎 कृपया फाइल येथे सोडावी</div>
       )}
       <div className="space-y-3 p-3">
         {turns.length > 0 && (
@@ -318,17 +318,17 @@ export default function EditChat({ ctx }: { ctx: CaseCtx }) {
               <div className="flex items-center gap-2 px-2 pb-2">
                 <button type="button" className="btn-ghost min-h-tap min-w-tap px-2" disabled={busy || atts.length >= EDIT_MAX_FILES} title="फाइल जोडा (PDF / JPG / PNG / Word)" aria-label="फाइल जोडा" onClick={() => fileRef.current?.click()}>📎</button>
                 <input ref={fileRef} type="file" hidden multiple accept={EDIT_ATTACH_ACCEPT} onChange={e => { const l = e.target.files; if (l?.length) addFiles(l); e.target.value = ''; }} />
-                <span className="min-w-0 truncate text-xs text-slate-500 dark:text-slate-400">{text.length > EDIT_MAX_CHARS - 200 ? `${text.length}/${EDIT_MAX_CHARS}` : fine ? 'Enter = पाठवावे • Shift+Enter = नवी ओळ' : ''}</span>
-                <button className="btn-primary ml-auto" disabled={!canSend}>{busy && <Spinner />} {busy && atts.some(a => !a.id) ? 'अपलोड…' : 'पाठवावे'}</button>
+                <span className="min-w-0 truncate text-xs text-slate-500 dark:text-slate-400">{text.length > EDIT_MAX_CHARS - 200 ? `${text.length}/${EDIT_MAX_CHARS}` : fine ? 'Enter = कृपया पाठवावे • Shift+Enter = नवी ओळ' : ''}</span>
+                <button className="btn-primary ml-auto" disabled={!canSend}>{busy && <Spinner />} {busy && atts.some(a => !a.id) ? 'अपलोड…' : 'कृपया पाठवावे'}</button>
               </div>
             </div>
             {confirm && (
               <div className="space-y-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-100" role="alertdialog" aria-label="पुष्टी">
                 <div>हा बदल <b>{crLabel(ctx.c)}</b>{ctx.c.subject ? <> ({ctx.c.subject.length > 60 ? `${ctx.c.subject.slice(0, 60)}…` : ctx.c.subject})</> : null} च्या <b>{editTargetLabel(tgt)}</b> मध्ये करावयाचा आहे{atts.length ? ` • ${atts.length} फाइल जोडणार` : ''} — कृपया खात्री करावी.</div>
                 <div className="flex flex-wrap gap-2">
-                  <button type="button" className="btn-primary" onClick={() => void send()}>✓ होय, पाठवावे</button>
+                  <button type="button" className="btn-primary" onClick={() => void send()}>✓ होय, कृपया पाठवावे</button>
                   <button type="button" className="btn-ghost" onClick={() => setConfirm(false)}>✕ नाही, थांबावे</button>
-                  <button type="button" className="btn-ghost" onClick={() => { setConfirm(false); setPick(true); }}>प्रकरण बदलावे</button>
+                  <button type="button" className="btn-ghost" onClick={() => { setConfirm(false); setPick(true); }}>कृपया प्रकरण बदलावे</button>
                 </div>
               </div>
             )}
