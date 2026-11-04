@@ -32,6 +32,21 @@ spec.json:
                       # optional — "प्रत : <each>" above "प्रत : निवड नस्ती" (INSTRUCTIONS §4.22: letter via the High Court
                       # asking information from a District Judge)
  },
+ # letter "kind": "do" — अर्धशासकीय पत्र (D.O. letter; GAD "टिप्पणी लेखन व पत्रव्यवहार" परि. 12.26–12.29 + specimen
+ #   book p.43–44; NPM परिशिष्ट-30; MMOP 2023 §10.1(7), Appendix 10.9 — docs/FORMS_RESEARCH_DO_UO.md):
+ #   {"kind": "do", "ref_no": "संकिर्ण-2026/____/प्र.क्र.____/का.6", "date": "__.__.2026",
+ #    "from": {"name": "...", "designation": "..."},   # optional — default: desk signer name / post (e.g. "अवर सचिव")
+ #    "subject": "...", "refs": [],                      # refs optional (12.26: may be written apart)
+ #    "salutation": "प्रिय श्री. ____,",                 # or "प्रिय महोदय," (12.28)
+ #    "body": ["first para (unnumbered)", "2nd para (printed '2.')", ...],   # first person (MMOP §10.1(7)(a))
+ #    "to": ["श्री. ____,", "<पदनाम>,", "<कार्यालय>,", "<ठिकाण>."]}          # addressee at the foot, left
+ #   prints: "अ.शा.पत्र क्र. <ref_no>" / department / address / "दिनांक : <date>" (right), sender name (bold) and
+ #   designation (left), "विषय : …" (bold, centre), salutation, body, "शुभेच्छा", "आपला स्नेहांकित,", "(<name>)", addressee;
+ #   no letterhead / logos, no "प्रत" line (the specimens have none). Works in "letter" and in "letters".
+ # note "uo" — अनौपचारिक संदर्भ (the note sent to another department): {"to": "वित्त विभाग", "no": "____",
+ #   "date": "____", "desk": optional (default desk profile, e.g. "का.6"), "from": optional (default desk department)}
+ #   prints after the signers (left; NPM परिशिष्ट-8 form foot, book p.77): "<from>" / "<to>ाकडे अनौपचारिक संदर्भ
+ #   कार्यासन <desk>" / "क्रमांक <no> दिनांक <date>"; the last para must send the file to that department (lint).
  "letters": [{...}, {...}]   # optional (INSTRUCTIONS §4.28, 03.11.2026) — several letters in one run, e.g. a letter and a
                       # स्मरणपत्र (each the same format as "letter"); built after "letter" (if both are given) in this order:
                       # <PREFIX>_Letter.docx, <PREFIX>_Letter_2.docx, … — build_note_letter.py puts each on a new page
@@ -130,6 +145,32 @@ def add_table(d, sect, rows, bold_last=False):
     sect.addprevious(t._tbl)
     return t
 
+UO_LABEL = "अनौपचारिक संदर्भ"   # GAD कार्यालयीन कार्यपद्धती नियमपुस्तिका, परिशिष्ट-8, book p.77 (PDF p.84) — foot of the
+# form: "……… विभागाकडे अनौपचारिक संदर्भ ……… कार्यासन ………" / "क्रमांक ……… दिनांक ……… १९ ………" (docs/FORMS_RESEARCH_DO_UO.md)
+
+
+def uo_dept_to(to):
+    """"वित्त विभाग" -> "वित्त विभागाकडे" (the form's "……… विभागाकडे"); unknown -> "____ विभागाकडे"."""
+    t = re.sub(r"\s*विभाग\s*$", "", _blank(to))
+    return f"{t} विभागाकडे"
+
+
+def uo_lines(spec):
+    """The U.O. block of a note sent to another department as an अनौपचारिक संदर्भ (spec note "uo": {"to", "no", "date",
+    "desk", "from"}) — the lines of the NPM परिशिष्ट-8 form foot: [sender department (the form's "———विभाग"),
+    "<to> विभागाकडे अनौपचारिक संदर्भ कार्यासन <desk>", "क्रमांक <no> दिनांक <date>"]; [] without "uo".
+    Unknown values -> "____"; "from" / "desk" default to the desk profile's department / desk."""
+    n = spec.get("note") if isinstance(spec, dict) else None
+    u = n.get("uo") if isinstance(n, dict) else None
+    if not isinstance(u, dict) or not u:
+        return []
+    dk = desk_of(spec)
+    frm = u.get("from") if isinstance(u.get("from"), str) and u["from"].strip() else dk["department"]
+    desk = u.get("desk") if isinstance(u.get("desk"), str) and u["desk"].strip() else dk.get("desk")
+    return [_blank(frm), f"{uo_dept_to(u.get('to'))} {UO_LABEL} कार्यासन {_blank(desk)}",
+            f"क्रमांक {_blank(u.get('no'))} दिनांक {_blank(u.get('date'))}"]
+
+
 def build_note(spec, out):
     from docx.shared import Cm
     d = docx.Document(NOTE_T); body, P, sect = fresh(d); fix_styles(d)
@@ -153,6 +194,12 @@ def build_note(spec, out):
         sp = add(body, sect, sign, d, s)
         sp.paragraph_format.left_indent = Cm(0); sp.paragraph_format.right_indent = Cm(0)
         sp.alignment = 0  # left
+    ul = uo_lines(spec)
+    if ul:   # अनौपचारिक संदर्भ (note "uo"): the U.O. block at the foot of the note, left (docs/FORMS_RESEARCH_DO_UO.md)
+        add(body, sect, blank, d, " ")
+        for t in ul:
+            up = add(body, sect, close, d, t, bold=False, left=Cm(0), first=Cm(0))
+            up.paragraph_format.right_indent = Cm(0); up.alignment = 0
     rel = spec.get("related", [])
     if rel:
         from docx.enum.text import WD_BREAK
@@ -182,10 +229,93 @@ def letter_file(od, pre, i):
     return os.path.join(od, f"{pre}_Letter.docx" if i == 0 else f"{pre}_Letter_{i + 1}.docx")
 
 
+DO_REF_LABEL = "अ.शा.पत्र क्र."   # GADT p.43 (PDF p.47) specimen: "अ.शा.पत्र क्र. इएसटी १२८०/२८४-का.१७"
+DO_WISH = "शुभेच्छा"              # GADT 12.27 + specimen p.44 (PDF p.48)
+DO_SUBSCRIPTION = "आपला स्नेहांकित,"   # GADT 12.27 + specimen p.44 (PDF p.48)
+
+
+def do_sender(L, dk):
+    """(name, designation) of the D.O. letter's sender: letter.from, else the desk profile's signer (name without the
+    brackets of sign_name; designation = sign_post up to the first ','); unknown -> "____"."""
+    fr = L.get("from") if isinstance(L.get("from"), dict) else {}
+    name = fr.get("name") if isinstance(fr.get("name"), str) and fr["name"].strip() else \
+        re.sub(r"^\(\s*|\s*\)$", "", (dk.get("sign_name") or "").strip())
+    desig = fr.get("designation") if isinstance(fr.get("designation"), str) and fr["designation"].strip() else \
+        (dk.get("sign_post") or "").split(",")[0]
+    return _blank(name), _blank(desig)
+
+
+def build_do_letter(spec, out, L):
+    """अर्धशासकीय पत्र (letter "kind": "do") — layout of the GAD specimen, टिप्पणी लेखन व पत्रव्यवहार परि. 12.26–12.29,
+    book p.43–44 (PDF p.47–48); MMOP 2023 §10.1(7), Appendix 10.9 (PDF p.64, 76); docs/FORMS_RESEARCH_DO_UO.md.
+    No letterhead / logos and no copy line (the specimen has none). Page setup = LETTER_TEMPLATE."""
+    from docx.shared import Cm
+    from docx.enum.text import WD_ALIGN_PARAGRAPH as WA
+    d = docx.Document(LET_T); body, P, sect = fresh(d); fix_styles(d)
+    dk = desk_of(spec)["letter"]
+    RIGHT = Cm(5.5)   # the specimen's right-hand block (number, department, address, date); wide enough for the ref no.
+    SUB = Cm(10.5)    # "आपला स्नेहांकित," and the signature name (right, specimen p.44)
+
+    def line(proto, text, bold=None, left=None, align=None):
+        p = add(body, sect, proto, d, text, bold=bold, left=left, first=Cm(0))
+        p.paragraph_format.right_indent = Cm(0)
+        if align is not None:
+            p.alignment = align
+        for r in p.runs:   # Devanagari bold is the complex-script flag w:bCs (as in the template's bold lines)
+            rpr = r._element.get_or_add_rPr()
+            for e in rpr.findall(qn("w:bCs")): rpr.remove(e)
+            if bold:
+                r.bold = True   # w:b in schema order; w:bCs right after it
+                rpr.find(qn("w:b")).addnext(rpr.makeelement(qn("w:bCs"), {}))
+        return p
+    # right-hand block: D.O. number, department, address, date
+    line(P[5], f"{DO_REF_LABEL} {L['ref_no']}", left=RIGHT)
+    for ln in dk["office"]:
+        line(P[5], ln, left=RIGHT)
+    line(P[5], f"दिनांक : {L.get('date') or '____'}", left=RIGHT)
+    add(body, sect, P[6], d, "")
+    # sender (top left): name, designation
+    name, desig = do_sender(L, dk)
+    line(P[5], name, bold=True, left=Cm(0))
+    line(P[5], desig + ".", left=Cm(0))
+    add(body, sect, P[10], d, "")
+
+    def ctr(p):
+        p.alignment = WA.CENTER
+        pf = p.paragraph_format; pf.left_indent = Cm(0); pf.right_indent = Cm(0); pf.first_line_indent = Cm(0)
+        for r in p.runs: r.bold = True; setfont(r)
+        return p
+    ctr(add(body, sect, P[11], d, "विषय : " + L["subject"].strip(), bold=True))
+    refs = [r for r in (L.get("refs") or []) if isinstance(r, str) and r.strip()]   # 12.26: संदर्भ may be written apart
+    if refs:
+        ctr(add(body, sect, P[13], d, "संदर्भ : " + refs[0].strip(), bold=True))
+        for r in refs[1:]: ctr(add(body, sect, P[13], d, r.strip(), bold=True))
+    add(body, sect, P[15], d, "")
+    line(P[17], (L.get("salutation") or "प्रिय श्री. ____,").strip(), bold=False, left=Cm(0))
+    k = 0   # paragraphs: the first unnumbered, then "2.", "3." … (specimen p.43–44); a {"table": …} item is not counted
+    for t in L.get("body") or []:
+        if isinstance(t, dict):
+            add_table(d, sect, t["table"], t.get("bold_last", False)); continue
+        k += 1
+        add(body, sect, P[17], d, ("\t" if k == 1 else f"\t{k}.  ") + t.strip())
+    add(body, sect, P[19], d, "")
+    line(P[17], DO_WISH, left=Cm(0))
+    line(P[18], DO_SUBSCRIPTION, left=SUB)
+    add(body, sect, P[19], d, "")
+    add(body, sect, P[19], d, "")
+    line(P[20], f"({name})", bold=True, left=SUB)
+    add(body, sect, P[19], d, "")
+    for ln in L.get("to") or []:   # addressee: name and designation at the foot, left (12.27)
+        line(P[17], ln.strip(), bold=False, left=Cm(0))
+    nomirror(d); d.save(out); clean_docx(out, spec.get("doc_author"))
+
+
 def build_letter(spec, out, L=None):
     from docx.shared import Cm
-    d = docx.Document(LET_T); body, P, sect = fresh(d); fix_styles(d)
     L = spec["letter"] if L is None else L
+    if isinstance(L, dict) and L.get("kind") == "do":
+        return build_do_letter(spec, out, L)
+    d = docx.Document(LET_T); body, P, sect = fresh(d); fix_styles(d)
     dk = desk_of(spec)["letter"]   # C30: the desk profile (tools/desks/<id>.json; spec "desk", default law-desk6)
     # 0..4 letterhead (0 holds the two logo drawings) ; 5 ref/date ; 6 blank
     from docx.text.paragraph import Paragraph as _P
