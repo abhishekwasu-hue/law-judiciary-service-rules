@@ -1,6 +1,7 @@
 // Calls to the Cloudflare Worker (/api/*, same origin). Auth: Bearer <supabase access_token>.
 import { hasSupabase, sb } from './supabase';
 import type { InputKind } from './constants';
+import type { Me, Profile } from './types';
 
 export class ApiError extends Error {
   constructor(public status: number, message: string, public data?: unknown) {
@@ -103,6 +104,11 @@ export function humanError(e: unknown): string {
     const lim = e instanceof ApiError ? Number((e.data as { limit_usd?: unknown } | undefined)?.limit_usd) : NaN;
     return budgetReachedText(Number.isFinite(lim) ? lim : null);
   }
+  if (msg === 'migration_missing') {
+    const r = e instanceof ApiError ? (e.data as { reason?: unknown } | undefined)?.reason : undefined;
+    return typeof r === 'string' && r ? r : 'सर्व्हरचा डेटाबेस अद्ययावत नाही (migration बाकी) — मालकाने migration लागू करावे';
+  }
+  if (msg === 'profile_unsupported') return 'सर्व्हर अद्ययावत नाही — माहिती जतन झाली नाही (Worker deploy बाकी)';
   if (msg === 'run_active') return 'या प्रकरणाची प्रक्रिया आधीच चालू आहे — ती संपेपर्यंत थांबा';
   if (msg === 'dispatch_failed') return DISPATCH_REASON;
   if (msg === 'duplicate_cr') {
@@ -114,6 +120,13 @@ export function humanError(e: unknown): string {
   for (const [re, mr] of MARATHI) if (re.test(msg)) return mr;
   if (looksMarathi(msg)) return msg;
   return GENERIC;
+}
+
+/** PATCH /api/me — the user's own profile. An old Worker answers PATCH like GET (no `profile`) → treated as not saved. */
+export async function saveProfile(p: Partial<Profile>): Promise<Me> {
+  const m = await api<Me>('/api/me', { method: 'PATCH', body: p });
+  if (!m || !m.profile) throw new ApiError(501, 'profile_unsupported');
+  return m;
 }
 
 export async function api<T = unknown>(path: string, opt: { method?: string; body?: unknown } = {}): Promise<T> {

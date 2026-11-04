@@ -5,7 +5,8 @@ import CommandPalette from './CommandPalette';
 import { useData } from '../lib/data';
 import { isStale, isWaiting } from '../lib/constants';
 import { crLabel } from '../lib/format';
-import { Spinner } from './ui';
+import { Modal, Spinner } from './ui';
+import ProfileForm from './ProfileForm';
 import ErrorBoundary from './ErrorBoundary';
 
 /** Global bar on every page: runs still processing, each a link to its case (Abhi 01.11.2026 — progress must not "disappear" when he leaves the page). */
@@ -46,11 +47,11 @@ export function Brand() {
 
 const NAV = [
   { to: '/', label: 'मुख्य पृष्ठ', icon: '🏠', end: true },
+  { to: '/nasti', label: 'नस्ती अद्ययावत स्थिती', icon: '📊' },
   { to: '/new', label: 'नवीन प्रस्ताव', icon: '➕' },
   { to: '/cases', label: 'प्रकरणे', icon: '🗂️' },
   { to: '/gr', label: 'GR ग्रंथालय', icon: '📚' },
   { to: '/search', label: 'नोंदवही शोध', icon: '🔎' },
-  { to: '/nasti', label: 'नस्ती डॅशबोर्ड', icon: '📊' },
 ];
 
 export function ThemeToggle() {
@@ -106,7 +107,7 @@ function LogoutButton({ className, label }: { className: string; label: string }
 }
 
 /** Phone header: settings (owner) + logout behind one "⋯" button so the header fits 360 px. */
-function MoreMenu({ isOwner }: { isOwner: boolean }) {
+function MoreMenu({ isOwner, onProfile }: { isOwner: boolean; onProfile: () => void }) {
   const [open, setOpen] = useState(false);
   const [ask, setAsk] = useState(false);
   const closeAsk = useCallback(() => setAsk(false), []);
@@ -157,6 +158,9 @@ function MoreMenu({ isOwner }: { isOwner: boolean }) {
       </button>
       {open && (
         <div ref={menu} id="more-menu" role="menu" aria-label="अधिक पर्याय" className="card absolute right-0 top-full z-40 mt-1 w-48 overflow-hidden py-1">
+          <button role="menuitem" className={item} onClick={() => { setOpen(false); onProfile(); }}>
+            <span aria-hidden="true">👤</span> माझी माहिती
+          </button>
           {isOwner && (
             <NavLink to="/settings" role="menuitem" className={item} onClick={() => setOpen(false)}>
               <span aria-hidden="true">⚙️</span> सेटिंग्ज
@@ -181,6 +185,8 @@ export default function Layout() {
   const { me } = useAuth();
   const nav = useNavigate();
   const [palette, setPalette] = useState(false);
+  const [profile, setProfile] = useState(false);
+  const closeProfile = useCallback(() => setProfile(false), []);
 
   useEffect(() => {
     const k = (e: KeyboardEvent) => {
@@ -224,6 +230,10 @@ export default function Layout() {
           <button className="btn-ghost w-full justify-between" onClick={() => setPalette(true)}>
             झटपट शोध <kbd className="rounded border px-1 text-xs">Ctrl K</kbd>
           </button>
+          <button className="btn-ghost w-full justify-start" onClick={() => setProfile(true)}>
+            <span aria-hidden="true">👤</span> माझी माहिती
+          </button>
+          {me?.profile?.display_name && <div className="font-semibold">{me.profile.display_name}{me.profile.designation ? `, ${me.profile.designation}` : ''}</div>}
           <div className="break-all text-slate-500 dark:text-slate-400">{me?.email}</div>
           <div className="flex gap-2">
             <ThemeToggle />
@@ -241,7 +251,7 @@ export default function Layout() {
           <div className="flex shrink-0 items-center gap-1">
             <button className="btn-ghost min-h-tap min-w-tap px-2 text-sm font-semibold" onClick={() => setPalette(true)}>शोध</button>
             <ThemeToggle />
-            <MoreMenu isOwner={me?.role === 'owner'} />
+            <MoreMenu isOwner={me?.role === 'owner'} onProfile={() => setProfile(true)} />
           </div>
         </header>
         <main className="mx-auto w-full max-w-7xl px-4 pb-28 pt-4 md:pb-10 md:pt-6">
@@ -265,6 +275,10 @@ export default function Layout() {
         </nav>
       </div>
       <CommandPalette open={palette} onClose={() => setPalette(false)} />
+      <Modal open={profile} onClose={closeProfile} title="माझी माहिती">
+        <p className="mb-3 text-sm text-slate-600 dark:text-slate-300">नस्ती अद्ययावत स्थिती पानात हीच माहिती वापरली जाते.</p>
+        <ProfileForm onDone={closeProfile} onSkip={closeProfile} skipLabel="रद्द" />
+      </Modal>
     </div>
   );
 }

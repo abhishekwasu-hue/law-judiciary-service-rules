@@ -1,5 +1,7 @@
 export type Role = 'owner' | 'staff' | 'senior';
-export interface Me { id: string; email: string; role: Role | null }
+/** Per-user profile (Worker GET/PATCH /api/me; '' when empty). Absent on a Worker without the profile migration. */
+export interface Profile { display_name: string; designation: string; office: string; mine: string }
+export interface Me { id: string; email: string; role: Role | null; profile?: Profile }
 
 export interface Case {
   id: number; cr_no: string | null; cr_year: number | null; file_no: string | null; subject: string | null; category: string;
@@ -10,6 +12,8 @@ export interface Case {
   desk?: string | null;
   // migration 20261104000011_work_type_queue.sql: work category (WORK_TYPES); null / absent = service
   work_type?: string | null;
+  // eOffice नस्ती no. linking the case to a row of the नस्ती अद्ययावत स्थिती page (nasti_dash_v1.rows[].fileNo); absent on old DB
+  nasti_no?: string | null;
 }
 export interface CaseFile {
   id: number; case_id: number; kind: string; storage_path: string; original_name: string;

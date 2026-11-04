@@ -10,6 +10,7 @@ import type { Activity, Case, CaseFile, Letter, Member } from '../lib/types';
 import { Chip, Empty, Field, Modal, Skeleton, Spinner } from '../components/ui';
 import { useToast } from '../components/Toast';
 import { StudyWarningsLine, useRuns } from '../components/RunProgress';
+import NastiLink from '../components/NastiLink';
 import { BriefingTab, HistoryTab, LettersTab, NoteTab, PackageTab, StudyTab } from './CaseTabs';
 
 const TABS = [
@@ -248,6 +249,7 @@ export default function CaseDetail() {
             </div>
           ))}
         </dl>
+        <NastiLink c={c} canWrite={canWrite} onSaved={row => { patchLocal(row); setSingle(row); }} />
         <StudyWarningsLine run={runs?.find(r => r.state === 'done')} studyHref="?tab=study" className="no-print" />
       </header>
 

@@ -58,6 +58,16 @@ D13. (02.11.2026, Abhi: "Ek tab add karun he application, tyamdhe add kra") **"�
     (`src/pages/NastiDashboard.tsx`; nav item 📊; phone bottom bar 6 columns). Its data stays in the browser's localStorage
     (same origin), not in Supabase; Android-only plugins fall back to browser download/share/copy. The static file is served
     without login (it holds code, no data). Needs a deploy (scripts/deploy.ps1) to go live.
+    04.11.2026 (Abhi: "नस्ती अद्ययावत स्थिती … पर्याय सांगा" → "आ करा"; audit: scratch NASTI_AUDIT.md): option (आ) —
+    tab renamed **"नस्ती अद्ययावत स्थिती"**, 2nd in the nav; name / designation / office / "आपल्याकडे असलेले स्थान" stored
+    once per member (members.display_name / designation / office / mine, migration 0012; GET/PATCH /api/me; form
+    "माझी माहिती") and written into the page's own localStorage `nasti_dash_v1` (empty fields only; `seen` true) before
+    the frame loads, so the page no longer asks; `cases.nasti_no` (eOffice file / receipt no., chosen from the page's
+    rows) links a case to its नस्ती — the case page shows the नस्ती's current place / holder / days / status, the नस्ती tab
+    lists the linked cases. नस्ती data still never leaves the browser (only the number typed into a case goes to
+    Supabase). The page file itself is unchanged. CSP for /nasti/ no longer allows connect-src 'self' (the page makes no
+    requests; an injected script could otherwise call /api). Limit: same-origin frame — full isolation would need
+    another origin, which would lose the page's existing localStorage data.
 D14. (02.11.2026, Abhi: "पहिले तीन H मुद्दे दुरुस्त करा") **Engine isolation (H1):** checkout without persisted
     credentials; keys only in the runner's 700 file `/tmp/engine-secrets/secrets.env` (ENGINE_SECRETS; read by
     engine_supabase.py), never in the job env; Claude runs as unix user `engine` (no sudo) on a bind mount `/srv/engine`

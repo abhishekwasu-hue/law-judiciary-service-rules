@@ -11,9 +11,11 @@ interface AuthState {
   me: Me | null;
   session: Session | null;
   reload: () => void;
+  /** Replace `me` after PATCH /api/me (profile saved). */
+  setMe: (m: Me) => void;
   signOut: () => Promise<void>;
 }
-const Ctx = createContext<AuthState>({ phase: 'loading', error: '', me: null, session: null, reload: () => {}, signOut: async () => {} });
+const Ctx = createContext<AuthState>({ phase: 'loading', error: '', me: null, session: null, reload: () => {}, setMe: () => {}, signOut: async () => {} });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [phase, setPhase] = useState<Phase>('loading');
@@ -89,7 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await sb().auth.signOut();
   }, []);
 
-  return <Ctx.Provider value={{ phase, error, me, session, reload, signOut }}>{children}</Ctx.Provider>;
+  return <Ctx.Provider value={{ phase, error, me, session, reload, setMe, signOut }}>{children}</Ctx.Provider>;
 }
 export const useAuth = () => useContext(Ctx);
 export const useCanWrite = () => {

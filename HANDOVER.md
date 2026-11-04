@@ -69,6 +69,7 @@
   no rule dropped). Gap: tools/verify_outputs.py does not check the _Affidavit / _LQ_Answer files yet.
 
 ## Pending
+16. **नस्ती अद्ययावत स्थिती (option आ, 04.11.2026):** apply migration 0012 (members profile + cases.nasti_no) and deploy. Open for Abhi: should members see each other's profile (members_read RLS allows it today) [kept]; the desktop sidebar "माझी माहिती" button was added beyond the brief [kept unless Abhi says remove]; phone shows two bottom bars on /nasti (page's own + app nav) [unchanged].
 15. **Merge 04.11.2026:** C33 relevance/flow rule renumbered INSTRUCTIONS §4.34 / brief [I4.34] (§4.32 = court-note para 2/3, §4.33 = new draft types, from the parallel session). Samples LETTER_do, NOTE_uo, WP35697 x2: पृ./प.वि. table column dropped and glued quotes split (§4.34 WARN); lint TRIVIA no longer flags the endorsement draft itself. Nasti integration: Abhi to choose option (अ)/(आ)/(इ) (scratch audit) — nothing built yet.
 14. **Apply migrations 0010 (more_draft_kinds) + 0011 (work_type_queue: cases.work_type, runs.dispatched_at, queue index — C33 bulk upload / sequential queue / work categories) + deploy** (from the app/engine wiring of the eight new draft keys) — Abhi in the SQL editor,
     then Actions "Deploy app"; then one test run per new type.
