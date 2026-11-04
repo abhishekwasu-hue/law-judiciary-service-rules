@@ -2,7 +2,7 @@
 
 Owner: Abhi, Section Officer (कार्यासन अधिकारी), Law & Judiciary Department, Desk-6 (कार्यासन-6), Govt of Maharashtra.
 When he sends a proposal PDF, do ALL steps below without asking. He must never have to explain this again.
-The rules are in INSTRUCTIONS.md §4 (items 1–33); this file is the order of work + the tools. If anything here conflicts with
+The rules are in INSTRUCTIONS.md §4 (items 1–35); this file is the order of work + the tools. If anything here conflicts with
 INSTRUCTIONS.md, INSTRUCTIONS.md wins. Reply to him in Marathi, few words.
 
 The quality standard = the approved notes in `samples/specs/` (C R 66, 122, 128, 130, 131, 133 of 2026). Match them.
@@ -114,6 +114,7 @@ Both are optional keys of the same spec.json; engine detail: tools/ENGINE_PROMPT
     facts + documents enclosed, recommendation oppose / not oppose — from the record only, the one exception to "no opinion"; no record basis → "____" + warning) → `python3 tools/build_parawise.py spec.json <outdir>
     <PREFIX>` → `<PREFIX>_Parawise.docx`; letter to the GP/AGP forwarding it.
   - **Format (Abhi 03.11.2026: "ok tar format mi dilelya parawise cha thewa"):** ALWAYS the Section's office format (default of build_parawise.py): "Para wise Explanation in <case>.", "<petitioner> Vs. <respondent>", "Parawise submissions on behalf of …", one table Sr. No. | Para No. | Remarks — `paras` [{para, remarks}] for every para / sub-para, `{"section": "Grounds"}`, each ground, formal paras, "Prayer Clauses …"; model samples/specs/COURT_wp_parawise_example.json. The Rule 58 layout (relief, brief facts, enclosures, recommendation) only with `"layout": "rule58"`.
+  - **Joint affidavit (INSTRUCTIONS §4.35, Abhi 04.11.2026):** several State respondents → parawise on behalf of all of them and the GP letter asks ONE joint affidavit draft "शासनाच्या वतीने"; copy to the other respondent department. The High Court Registry, if a respondent, is not part of it (no remarks, no copy). Model: samples/specs/WP35697_2026_parawise_GP-letter.json.
   - Essential facts missing → information letter first (§4.15).
   - Rule 58(4): to the GP within two weeks of receipt / before the date in the notice; the hearing date goes in Study part 0.
 - **Order drafts** (B7: only when the decision / Finance-GAD concurrence is on record, or Abhi asks — ticking it in
