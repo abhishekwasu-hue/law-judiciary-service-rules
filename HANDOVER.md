@@ -1,4 +1,4 @@
-# HANDOVER — state as of 02.11.2026 (App B live; audit fix round merged to main) (read after CLAUDE.md files)
+# HANDOVER — state as of 04.11.2026 (App B live; eight new draft types added) (read after CLAUDE.md files)
 
 ## Done (all in this repo)
 - Procedure: INSTRUCTIONS.md §4 items 1–18 (§4.18, 01.11.2026: sentence flow + respectful language), PROPOSAL_SOP.md, PROPOSAL_WORKFLOW.md, samples/specs/ (approved notes), tools/ (mkdocs, build_note_letter, build_study, pkg3, highlight, lint_spec, verify_outputs, gr_request, oldcases_text, prep_pages).
@@ -54,7 +54,49 @@
   stamped to $RP/*.stream.tsv, "Stage times (वेळ-तक्ता)" step, owner-only "मॉडेल: वेळ …" line) — read it on the next run.
   Circular 10.08.2021 (शासन शब्दकोश भाग-1) now in pdf/09-marathi-grammar-shuddhalekhan/ (Download extra PDFs, 20c55da) — Pending 7(e) closed.
 
+- 04.11.2026 (Abhi: "पत्रासोबतच अधिसूचना शासन निर्णय पत्र अशा अनेक बाबी तयार करायचे असतात हे सुद्धा तयार करता यायला पाहिजे";
+  all eight new types selected; ज्ञापन and स्मरणपत्र unchanged): eight new draft types, formats only from official specimens.
+  Draft keys (app/engine `outputs`): do_letter (अर्धशासकीय पत्र, letter `"kind": "do"`, tools/mkdocs.py), uo_note
+  (अनौपचारिक संदर्भ, note `"uo"` block), endorsement (पृष्ठांकन), office_order (कार्यालयीन आदेश), press_note
+  (प्रसिद्धीपत्रक), addendum (शासन पूरकपत्र) — tools/build_order.py + lint_order.py; affidavit (शपथपत्र, English,
+  tools/build_affidavit.py + lint_affidavit.py, <PREFIX>_Affidavit.docx); lq (विधानमंडळ प्रश्नाचे उत्तर, tools/build_lq.py +
+  lint_lq.py, <PREFIX>_LQ_Answer.docx). Research (sources + pages + open points): docs/FORMS_RESEARCH_DO_UO.md,
+  docs/FORMS_RESEARCH_ORDERS.md, docs/FORMS_RESEARCH_AFFIDAVIT_LQ.md, docs/LEGISLATURE_INSTRUMENTS_RESEARCH.md. Samples:
+  samples/specs/LETTER_do_example.json, NOTE_uo_reference_example.json, ORDER_{endorsement,office_order,press_note,
+  addendum}_example.json, COURT_affidavit_example.json, LQ_answer_example.json. Docs: INSTRUCTIONS §4.28 list + new §4.33,
+  PROPOSAL_SOP Step 3 / Step 4b, PROPOSAL_WORKFLOW §२.4, tools/ENGINE_BRIEF.md [I4.33] (brief also brought under the
+  tests/test_engine_brief.py size limit: 29436 -> 28576 bytes, duplicates/provenance quotes removed, lines reflowed;
+  no rule dropped). Gap: tools/verify_outputs.py does not check the _Affidavit / _LQ_Answer files yet.
+
 ## Pending
+14. **Apply migration 0010 + deploy** (from the app/engine wiring of the eight new draft keys) — Abhi in the SQL editor,
+    then Actions "Deploy app"; then one test run per new type.
+13. **New draft types — open points for Abhi (04.11.2026; provisional defaults in brackets are in use, INSTRUCTIONS §4.33):**
+    (a) D.O. letter (docs/FORMS_RESEARCH_DO_UO.md §5): closing — the brief said "आपला,", every official specimen has
+    "आपला स्नेहांकित," (+ "शुभेच्छा") ["आपला स्नेहांकित,"]; D.O. stationery with emblem (GADT 12.27) not in the repo [none —
+    give the अवर सचिव's D.O. paper if wanted]; label "अ.शा.पत्र क्र." (GADT) vs "अर्ध-शासकीय पत्र क्र." (NPM) [GADT]; sender
+    "अवर सचिव." and addressee level per case [desk signer; `salutation` "प्रिय महोदय," for a senior].
+    (b) U.O. block: "कार्यासन का.6" vs "कार्यासन-6" [का.6; `uo.desk`]; no official note-foot U.O. specimen, NPM परि.-8 form foot
+    used [as built].
+    (c) Orders (docs/FORMS_RESEARCH_ORDERS.md §6): addendum wording "<at> खालील मजकूर समाविष्ट करण्यात येत आहे:-" is composed
+    (no official fixed formula) [keep; free `operative` text also accepted]; addendum label "शासन पूरकपत्र" vs L&J's own
+    "शासन निर्णय पूरकपत्र" (का.8) / "शासन पूरक पत्र" (का.4) [शासन पूरकपत्र]; endorsement "यांजकडे" (NPM) vs "यांच्याकडे …
+    अग्रेषित" (GADT 12.25) [NPM]; the four live addenda used as evidence not stored in pdf/gr/ [not stored]; press-note
+    number / Saka date / time are DGIPR details ["____"].
+    (d) Affidavit (FORMS_RESEARCH_AFFIDAVIT_LQ.md A4): O1 font — ASR XVII Rule 10(ii) Times New Roman / Georgia vs §4.2
+    [DVOT-SurekhMR, 14]; O2 "aged about" (no source), nationality [age only when given; no nationality]; O3 [“the Deponent
+    abovenamed”]; O4 rule's typo "known" [printed "know"]; O5 no filed Desk-6 affidavit — one would settle the authority
+    para [RCLAG 58(6)(e) / MMOP 3.3 default]; O6 benches other than Bombay [jurat place from the Rule 1 bench text].
+    (e) LQ answer (same file, B4): Q1 copies — GADT "१०", KKN "तीस", PAD-2026 late 450 / 250 [`copies` "____"]; Q2 signature
+    "शासनाचे अवर सचिव." vs §4.5 form [specimen]; Q3 heading "पुरवणी टिप्पणी" vs "पुरवणी प्रश्नांकरिता टिप्पणी" [GADT]; Q4 extra
+    signers (note goes to the Minister through the Secretary) [§4.6 chain]; Q5 current Legislature prescribed form not
+    found [GADT 1993 specimen]; Q6 one past Desk-6 LQ answer would confirm the endorsement and file-no. form.
+    (f) Legislature instruments (docs/LEGISLATURE_INSTRUMENTS_RESEARCH.md §6): O-1 Secretariat covering-letter formats not in
+    repo [ask Abhi for one recent letter of each device; TIP specimen meanwhile]; O-2 calling-attention statement body has no
+    GAD specimen [title + note + supplementary note only]; O-3 assurance compliance statement columns (PAD circular
+    26.05.2016) not found [ask for a blank statement]; O-4 GAD/PAD circulars 2019–2025 not in repo / not read in full;
+    O-5 which devices Desk-6 handles [question drafts first]; O-6 Marathi rule books in legacy font (titles from PAD-2026);
+    O-7 time limits [PAD-2026 and the rules, not the older TIP / NPM figures].
 12. **Next live run:** read the वेळ-तक्ता (job log last step) and tell Abhi which stage takes the time; check claude.err/stream size and that background agents show in the stream.
 11. **Migration 0008** (runs.outputs + file kinds approval/court_notice) — Abhi to apply in the SQL editor, then deploy (app part already on main).
 10. **AI-tells decisions — DECIDED 03.11.2026 (Abhi: "Default thewa, 4 madhe स्रोत/जसाच्या तसा kadha"): bracketed defaults final; (4) the words "स्रोत"/"जसाच्या तसा" removed from drafts (§4.27 (आ), lint) — docs/AI_TELLS.md:** (1) Word author name (DOC_AUTHOR) [empty];
