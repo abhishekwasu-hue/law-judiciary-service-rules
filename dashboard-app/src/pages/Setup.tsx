@@ -30,7 +30,7 @@ export default function Setup() {
     try {
       const body = Object.fromEntries(Object.entries(f).map(([k, v]) => [k, v.trim()]).filter(([, v]) => v));
       await api('/api/setup', { body });
-      toast('सेटअप पूर्ण. आता लॉगिन करा.');
+      toast('सेटअप पूर्ण झाला. कृपया लॉगिन करावे.');
       reload();
     } catch (x) {
       setErr(humanError(x));
@@ -45,7 +45,7 @@ export default function Setup() {
       <form onSubmit={submit} className="card mt-4 space-y-5 p-5">
         <div>
           <h1 className="text-2xl font-bold">प्रारंभिक सेटअप</h1>
-          <p className="mt-1 text-slate-600 dark:text-slate-300">एकदाच. नंतर सर्व बदल "सेटिंग्ज" मधून (फक्त मालक).</p>
+          <p className="mt-1 text-slate-600 dark:text-slate-300">हा सेटअप एकदाच करावयाचा आहे. नंतरचे सर्व बदल "सेटिंग्ज" मधून (फक्त मालक) करता येतात.</p>
         </div>
 
         <fieldset className="space-y-4">
@@ -54,7 +54,7 @@ export default function Setup() {
             label="सेटअप कोड *"
             hint={
               <details>
-                <summary className="cursor-pointer">कोड कुठे मिळेल?</summary>
+                <summary className="flex min-h-tap cursor-pointer items-center">कोड कुठे मिळेल?</summary>
                 Cloudflare dashboard → Workers &amp; Pages → Workers KV (Storage &amp; Databases) → namespace <b>SETTINGS</b> → key <b>setup_code</b> ची value. हा कोड एकदाच लागतो; सेटअपनंतर तो नष्ट होतो.
               </details>
             }
@@ -81,8 +81,9 @@ export default function Setup() {
         </fieldset>
 
         <details className="rounded-lg border border-slate-200 p-3 dark:border-navy-800">
-          <summary className="min-h-tap cursor-pointer py-2 font-bold text-navy-700 dark:text-navy-200">3. प्रक्रिया-इंजिन (ऐच्छिक — नंतरही भरता येईल)</summary>
+          <summary className="flex min-h-tap cursor-pointer items-center py-2 font-bold text-navy-700 dark:text-navy-200">3. प्रस्ताव तयार करणारी सेवा (ऐच्छिक)</summary>
           <div className="mt-3 space-y-4">
+            <p className="text-sm text-slate-500 dark:text-slate-400">हे तपशील नंतर "सेटिंग्ज" मधूनही भरता येतात.</p>
             <Field label="GitHub repo" hint="उदा. owner/repo">
               <input className="input font-mono" value={f.github_repo} onChange={set('github_repo')} />
             </Field>

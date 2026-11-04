@@ -340,7 +340,7 @@ test('sweep, upload case check, signed-URL bucket whitelist', async () => {
   const before = decodeURIComponent(p.u.match(/created_at=lt\.([^&]+)/)[1]);
   const age = Date.now() - new Date(before).getTime();
   assert.ok(Math.abs(age - 3.5 * 3600 * 1000) < 60000, 'cut-off = 3.5 h');
-  assert.equal(p.body.step, 'वेळ संपली — पुन्हा तयार करा');
+  assert.equal(p.body.step, "वेळ संपली. कृपया 'पुन्हा तयार करा' वापरावे, ही विनंती.");
   assert.equal(acts[0].length, 2);
 
   const up = (cid, kind = 'extra_doc') => call(`/api/upload?case_id=${cid}&kind=${kind}`, { method: 'POST', headers: { ...owner, 'x-file-name': encodeURIComponent('पत्र.pdf'), 'content-type': 'application/pdf' }, body: 'x' });
@@ -650,6 +650,17 @@ test('search: qualifiers stripped, hits outside github_repo dropped', async () =
   const n = searchUrls.length;
   assert.deepEqual(await body(await call(`/api/search?q=${encodeURIComponent('repo:x/y')}`, { headers: owner })), [], 'only qualifiers → no search');
   assert.equal(searchUrls.length, n);
+  // R3 (UI audit 04.11.2026): GitHub not set → 503 with a Marathi reason (not an empty list that reads as "nothing found")
+  const tok = env.SETTINGS.m.get('github_token');
+  env.SETTINGS.m.delete('github_token');
+  try {
+    const r2 = await call(`/api/search?q=${encodeURIComponent('वेतन')}`, { headers: owner });
+    assert.equal(r2.status, 503);
+    assert.deepEqual(await r2.json(), { error: 'search_unavailable', reason: 'नियम-उतारे शोध-सेवा जोडलेली नाही — कृपया मालकांनी सेटिंग्ज भरावीत.' });
+    assert.equal(searchUrls.length, n, 'no GitHub call');
+  } finally {
+    env.SETTINGS.m.set('github_token', tok);
+  }
 });
 
 test('monthly limit counts queued/running runs at an estimate', async () => {
@@ -694,11 +705,11 @@ test('dispatch failure: Marathi reason + finished_at on the run, raw GitHub text
     const r = await call('/api/run', { method: 'POST', headers: owner, body: JSON.stringify({ case_id: 7 }) });
     assert.equal(r.status, 502);
     const j = await r.json();
-    assert.equal(j.error, 'dispatch_failed'); assert.match(j.reason, /GitHub जोडणी अयशस्वी/);
+    assert.equal(j.error, 'dispatch_failed'); assert.match(j.reason, /प्रक्रिया सुरू होऊ शकली नाही/); assert.match(j.detail, /GitHub token/);
     assert.ok(!JSON.stringify(j).includes('Bad credentials'), 'raw text not sent to the browser');
     const pt = patches.find(x => x.u.includes('runs?id=eq.55') && x.body.state === 'failed');
     assert.ok(pt, 'run marked failed');
-    assert.match(pt.body.step, /^GitHub जोडणी अयशस्वी \(token तपासा — सेटिंग्ज\) — पुन्हा तयार करा$/);
+    assert.equal(pt.body.step, "प्रक्रिया सुरू होऊ शकली नाही (तांत्रिक कारण). कृपया 'पुन्हा तयार करा' वापरावे; अडचण राहिल्यास मालकांना कळवावे.");
     assert.ok(pt.body.finished_at, 'finished_at set');
     const a = acts.find(x => x.action === 'run_failed');
     assert.equal(a.detail.reason, pt.body.step); assert.match(a.detail.error, /dispatch 401: .*Bad credentials/);
@@ -806,7 +817,7 @@ test('C28: /api/run outputs — validated, deduped, fixed order; 400 Marathi; mi
   for (const bad of [['letter', 'x'], 'letter', [1], { a: 1 }, ['LETTER']]) {
     r = await run({ outputs: bad });
     assert.equal(r.status, 400, JSON.stringify(bad));
-    assert.deepEqual(await r.json(), { error: 'मसुद्यांची निवड चुकीची — पान पुन्हा उघडा' });
+    assert.deepEqual(await r.json(), { error: 'मसुद्यांची निवड योग्य नाही. कृपया पान पुन्हा उघडून निवड करावी, ही विनंती.' });
   }
   assert.equal(runInserts.length, n, 'nothing inserted for a bad selection');
   // migration 0008 not applied: the run still starts, without outputs, and the activity log says so
@@ -838,7 +849,7 @@ test('C28: upload accepts the kinds approval and court_notice; unknown kind refu
   try {
     const r = await up('court_notice');
     assert.equal(r.status, 409);
-    assert.match((await r.json()).error, /migration 0008/);
+    { const j = await r.json(); assert.match(j.error, /"इतर" हा प्रकार निवडावा/); assert.match(j.detail, /migration 0008/); }
     assert.equal((await up('extra_doc')).status, 200, 'old kinds unaffected');
   } finally { kindEnum08 = true; }
   assert.equal((await up('foo')).status, 400);
@@ -857,7 +868,7 @@ test('C30: case desk — create/PATCH accept the profile ids only (400 Marathi);
   for (const d of ['law-desk7', 'LAW-DESK6', 5, ['law-desk6']]) {
     r = await create({ subject: 'x', desk: d });
     assert.equal(r.status, 400, JSON.stringify(d));
-    assert.deepEqual(await r.json(), { error: 'विभाग / कार्यासन चुकीचे — यादीतील पर्याय निवडा' });
+    assert.deepEqual(await r.json(), { error: 'विभाग / कार्यासन योग्य नाही. कृपया यादीतील पर्याय निवडावा, ही विनंती.' });
     r = await edit(43, { desk: d });
     assert.equal(r.status, 400, JSON.stringify(d));
   }
@@ -1021,7 +1032,7 @@ test('C33: GitHub dispatch failure → that run failed (Marathi), the next one i
     dispatchFail = true;
     const r = await runCase(401);
     assert.equal(r.status, 502);
-    assert.equal((await r.json()).reason, 'GitHub जोडणी अयशस्वी (token तपासा — सेटिंग्ज) — पुन्हा तयार करा');
+    assert.equal((await r.json()).reason, "प्रक्रिया सुरू होऊ शकली नाही (तांत्रिक कारण). कृपया 'पुन्हा तयार करा' वापरावे; अडचण राहिल्यास मालकांना कळवावे.");
     assert.equal(Q.rows[0].state, 'failed');
     assert.ok(acts.some(x => x.action === 'run_failed' && x.detail.run_id === 400 && /Bad credentials/.test(x.detail.error)));
     // two waiting runs, GitHub down: both failed, nothing left hanging
@@ -1040,7 +1051,7 @@ test('C33: GitHub dispatch failure → that run failed (Marathi), the next one i
       assert.deepEqual(out.failed, [402]);
       assert.equal(out.dispatched, 403);
     } finally { globalThis.fetch = realFetch; }
-    assert.equal(Q.rows.find(x => x.id === 402).step, 'GitHub जोडणी अयशस्वी (token तपासा — सेटिंग्ज) — पुन्हा तयार करा');
+    assert.equal(Q.rows.find(x => x.id === 402).step, "प्रक्रिया सुरू होऊ शकली नाही (तांत्रिक कारण). कृपया 'पुन्हा तयार करा' वापरावे; अडचण राहिल्यास मालकांना कळवावे.");
   } finally { Q = null; dispatchFail = false; }
 });
 
@@ -1057,7 +1068,7 @@ test('C33: sweep uses dispatch time; a long-waiting queued run is not swept; mon
     assert.deepEqual(sw, { ok: true, failed: [501], dispatched: null });
     assert.equal(Q.rows[1].state, 'queued');
     assert.equal(Q.rows[1].dispatched_at, null);
-    assert.equal(Q.rows[1].step, 'मासिक खर्च-मर्यादा गाठली — Settings मध्ये मर्यादा वाढवल्यावर आपोआप सुरू होईल');
+    assert.equal(Q.rows[1].step, 'मासिक खर्च-मर्यादा पूर्ण झाली आहे. मालकांनी सेटिंग्जमध्ये मर्यादा वाढवल्यावर प्रक्रिया आपोआप सुरू होईल.');
     await worker.scheduled({}, env, null);
     assert.equal(dispatchBodies().length, n0, 'cron retries, still blocked');
     // the owner raised the limit (here: the spend is gone) → the cron dispatches it
@@ -1098,7 +1109,7 @@ test('C33: monthly limit — waiting runs are not reserved; the check runs at di
     const out = await cronTick(env);
     assert.equal(out.dispatched, null);
     assert.equal(blockedRun.state, 'queued');
-    assert.match(blockedRun.step, /मासिक खर्च-मर्यादा गाठली/);
+    assert.match(blockedRun.step, /मासिक खर्च-मर्यादा पूर्ण झाली/);
     assert.equal(dispatchBodies().length, n0 + 1, 'nothing dispatched past the limit');
   } finally { Q = null; monthRuns = []; }
 });
@@ -1153,7 +1164,7 @@ test('0012: PATCH /api/me — trimmed own row, unknown keys ignored, too long 40
   try {
     r = await patchMe({ display_name: 'x' });
     assert.equal(r.status, 409);
-    assert.deepEqual(await r.json(), { error: 'migration_missing', reason: 'माहिती साठवता आली नाही — Supabase मध्ये migration 0012 लागू करा' });
+    assert.deepEqual(await r.json(), { error: 'migration_missing', reason: 'माहिती जतन होऊ शकली नाही (तांत्रिक अडचण). कृपया मालकांना कळवावे, ही विनंती.', detail: 'Supabase मध्ये migration 0012 लागू करणे आवश्यक आहे.' });
   } finally { profileColumns = true; }
   // not a member / not signed in
   assert.equal((await patchMe({ display_name: 'x' }, { authorization: 'Bearer stranger-jwt' })).status, 403);
@@ -1174,7 +1185,7 @@ test('0012: case nasti_no — create / PATCH trimmed, cleared, too long 400 Mara
   for (const v of ['न'.repeat(101), 12, ['a']]) {
     r = await create({ subject: 'x', nasti_no: v });
     assert.equal(r.status, 400, JSON.stringify(v));
-    assert.deepEqual(await r.json(), { error: 'नस्ती क्रमांक चुकीचा — जास्तीत जास्त 100 अक्षरे' });
+    assert.deepEqual(await r.json(), { error: 'नस्ती क्रमांक योग्य नाही. कृपया तो जास्तीत जास्त 100 अक्षरांत नमूद करावा, ही विनंती.' });
     assert.equal((await edit(43, { nasti_no: v })).status, 400);
   }
   assert.equal(caseInserts.length, n, 'nothing inserted for a bad nasti_no');
@@ -1331,7 +1342,7 @@ test('draft edit: migration 0013 missing → 409 migration_missing; the queue st
     editColumns = false;
     let r = await editCall({ case_id: 801, target: 'note', message: 'x' });
     assert.equal(r.status, 409);
-    assert.deepEqual(await r.json(), { error: 'migration_missing', reason: 'Supabase मध्ये migration 0013 लागू करणे आवश्यक आहे.' });
+    assert.deepEqual(await r.json(), { error: 'migration_missing', reason: 'सुधारणा-सुविधा सध्या उपलब्ध नाही (तांत्रिक अडचण). कृपया मालकांना कळवावे, ही विनंती.', detail: 'Supabase मध्ये migration 0013 लागू करणे आवश्यक आहे.' });
     const a = await body(await runCase(802));
     assert.equal(a.queued, false, 'queue without runs.kind: filter dropped');
     const b = await body(await runCase(803));

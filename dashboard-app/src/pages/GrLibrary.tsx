@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { sb } from '../lib/supabase';
-import { api, humanError } from '../lib/api';
+import { ApiError, api, humanError } from '../lib/api';
 import { useCanWrite } from '../lib/auth';
 import { useData } from '../lib/data';
 import { crLabel, fmtDate } from '../lib/format';
@@ -23,6 +23,7 @@ export default function GrLibrary() {
   const [adding, setAdding] = useState(false);
   const [view, setView] = useState<{ code: string; url: string; title: string } | null>(null);
   const [opening, setOpening] = useState('');
+  const [addErr, setAddErr] = useState('');
 
   const load = () => sb().from('gr_library').select('*').order('date', { ascending: false, nullsFirst: false }).then(({ data, error }) => {
     if (error) toast(humanError(error.message), 'err');
@@ -48,15 +49,17 @@ export default function GrLibrary() {
 
   async function add(e: FormEvent) {
     e.preventDefault();
-    if (!/^\d{16,20}$/.test(code)) return toast('सांकेतांक 16 ते 20 अंकी असावा (उदा. 202204191549468012)', 'err');
+    setAddErr('');
+    if (!/^\d{16,20}$/.test(code)) return setAddErr('सांकेतांक 16 ते 20 अंकी असावा (उदा. 202204191549468012). कृपया सांकेतांक तपासावा.');
     setAdding(true);
     try {
       const r = await api<{ code: string }>('/api/gr', { body: { code: code.trim() } });
-      toast(`GR ${r.code} जोडला`);
+      toast(`GR ${r.code} जोडला आहे.`);
       setCode('');
       await load();
     } catch (x) {
-      toast(humanError(x), 'err');
+      // 404 = the code is not on the official site (Worker: "GR not found …")
+      setAddErr(x instanceof ApiError && x.status === 404 ? 'हा सांकेतांक gr.maharashtra.gov.in वर मिळाला नाही. कृपया सांकेतांक तपासावा.' : humanError(x));
     } finally {
       setAdding(false);
     }
@@ -75,22 +78,42 @@ export default function GrLibrary() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-bold">GR ग्रंथालय <span className="text-base font-normal text-slate-500">({list.length})</span></h1>
-      <div className="card grid gap-2 p-3 sm:grid-cols-2 lg:grid-cols-5">
-        <input className="input lg:col-span-2" type="search" placeholder="सांकेतांक, शीर्षक, विभाग…" value={q} onChange={e => setQ(e.target.value)} aria-label="शोधा" />
-        <select className="input" value={dept} onChange={e => setDept(e.target.value)} aria-label="विभाग">
-          <option value="">सर्व विभाग</option>
-          {depts.map(d => <option key={d}>{d}</option>)}
-        </select>
-        <input className="input" type="date" value={from} onChange={e => setFrom(e.target.value)} aria-label="दिनांकापासून" title="दिनांकापासून" />
-        <input className="input" type="date" value={to} onChange={e => setTo(e.target.value)} aria-label="दिनांकापर्यंत" title="दिनांकापर्यंत" />
+      <div>
+        <h1 className="text-2xl font-bold">GR ग्रंथालय <span className="text-base font-normal text-slate-500">({list.length})</span></h1>
+        <p className="mt-1 text-slate-600 dark:text-slate-300">प्रकरणांसाठी आणलेले शासन निर्णय (GR) येथे पाहता येतात. प्रत्येक GR कोणत्या प्रकरणात वापरला, तेही दिसते.</p>
+      </div>
+      <div className="card grid grid-cols-1 gap-3 p-3 sm:grid-cols-2 lg:grid-cols-5 lg:items-end">
+        <div className="min-w-0 sm:col-span-2">
+          <Field label="शोध">
+            <input className="input" type="search" placeholder="सांकेतांक, शीर्षक, विभाग…" value={q} onChange={e => setQ(e.target.value)} />
+          </Field>
+        </div>
+        <div className="min-w-0">
+          <Field label="विभाग">
+            <select className="input" value={dept} onChange={e => setDept(e.target.value)}>
+              <option value="">सर्व विभाग</option>
+              {depts.map(d => <option key={d}>{d}</option>)}
+            </select>
+          </Field>
+        </div>
+        <div className="min-w-0">
+          <Field label="दिनांकापासून">
+            <input className="input" type="date" value={from} onChange={e => setFrom(e.target.value)} />
+          </Field>
+        </div>
+        <div className="min-w-0">
+          <Field label="दिनांकापर्यंत">
+            <input className="input" type="date" value={to} onChange={e => setTo(e.target.value)} />
+          </Field>
+        </div>
       </div>
 
       {canWrite && (
         <form onSubmit={add} className="card flex flex-col gap-2 p-3 sm:flex-row sm:items-end">
-          <div className="flex-1">
-            <Field label="GR जोडा — सांकेतांक" hint="सांकेतांक टाकल्यावर अधिकृत संकेतस्थळावरून (gr.maharashtra.gov.in) PDF आणली जाते.">
-              <input className="input font-mono" inputMode="numeric" placeholder="उदा. 202204191549468012" value={code} onChange={e => setCode(e.target.value.replace(/\D/g, ''))} />
+          <div className="min-w-0 flex-1">
+            <Field label="GR जोडा — सांकेतांक" hint="सांकेतांक नमूद केल्यावर अधिकृत संकेतस्थळावरून (gr.maharashtra.gov.in) PDF आणली जाते.">
+              <input className="input font-mono" inputMode="numeric" placeholder="उदा. 202204191549468012" value={code} aria-invalid={!!addErr} onChange={e => { setCode(e.target.value.replace(/\D/g, '')); setAddErr(''); }} />
+              {addErr && <span className="mt-1 block font-semibold text-red-700 dark:text-red-400" role="alert">{addErr}</span>}
             </Field>
           </div>
           <button className="btn-primary sm:mb-6" disabled={adding}>{adding && <Spinner />} GR जोडा</button>
@@ -98,28 +121,37 @@ export default function GrLibrary() {
       )}
 
       <div className="card">
-        {!rows ? <SkeletonRows n={6} /> : list.length === 0 ? <Empty icon="📚" title="GR सापडला नाही" hint="शोध बदला किंवा सांकेतांकाने GR जोडा." /> : (
+        {!rows ? <SkeletonRows n={6} /> : rows.length === 0 ? (
+          <Empty icon="📚" title="ग्रंथालयात अजून एकही GR नाही" hint={canWrite ? 'कृपया वरील चौकटीत सांकेतांक नमूद करून GR जोडावा.' : 'प्रकरणांची प्रक्रिया झाल्यावर लागू GR येथे दिसतील.'} />
+        ) : list.length === 0 ? (
+          <Empty icon="🔎" title="या शोधाशी जुळणारा GR नाही" hint="कृपया शोध-शब्द, विभाग किंवा दिनांक बदलावा.">
+            <button type="button" className="btn-ghost mt-2" onClick={() => { setQ(''); setDept(''); setFrom(''); setTo(''); }}>शोध रिकामा करावा</button>
+          </Empty>
+        ) : (
           <ul className="divide-y divide-slate-100 dark:divide-navy-800">
             {list.map(r => (
               <li key={r.code} className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">
-                  <div className="font-semibold">{r.title || '—'}</div>
+                  {r.title ? <div className="font-semibold">{r.title}</div> : <div className="font-semibold text-slate-500 dark:text-slate-400">शीर्षक उपलब्ध नाही</div>}
                   <div className="text-sm text-slate-500">
-                    <span className="font-mono">{r.code}</span> • {fmtDate(r.date)}{r.department ? ` • ${r.department}` : ''}
+                    <span className="break-all font-mono">{r.code}</span> • {fmtDate(r.date)}{r.department ? ` • ${r.department}` : ''}
                   </div>
                   {(r.used_in_cases || []).length > 0 && (
-                    <div className="mt-1 flex flex-wrap gap-1 text-sm">
+                    <div className="mt-1 flex flex-wrap items-center gap-1 text-sm">
                       वापर:
                       {(r.used_in_cases || []).map(id => {
                         const c = caseById.get(Number(id));
-                        return <Link key={id} to={`/cases/${id}`} className="chip bg-navy-100 text-navy-900 dark:bg-navy-800 dark:text-navy-100">{c ? crLabel(c) : `#${id}`}</Link>;
+                        return <Link key={id} to={`/cases/${id}`} className="chip min-h-tap bg-navy-100 px-3 text-navy-900 dark:bg-navy-800 dark:text-navy-100">{c?.cr_no ? crLabel(c) : `प्रकरण क्र. ${id}`}</Link>;
                       })}
                     </div>
                   )}
                 </div>
-                <button className="btn-ghost shrink-0" disabled={!r.storage_path || opening === r.code} onClick={() => void open(r)} title={r.storage_path ? '' : 'या GR ची PDF अजून आणलेली नाही'}>
-                  {opening === r.code ? <Spinner /> : '📄'} उघडा
-                </button>
+                <div className="flex shrink-0 flex-col items-start gap-1 sm:items-end">
+                  <button className="btn-ghost" disabled={!r.storage_path || opening === r.code} onClick={() => void open(r)}>
+                    {opening === r.code ? <Spinner /> : '📄'} उघडा
+                  </button>
+                  {!r.storage_path && <span className="text-sm text-slate-500 dark:text-slate-400">PDF अजून आणलेली नाही</span>}
+                </div>
               </li>
             ))}
           </ul>

@@ -3,12 +3,12 @@ import { Link } from 'react-router-dom';
 import { sb } from '../lib/supabase';
 import type { Run } from '../lib/types';
 import { RUN_STATE_LABEL, RUN_STEPS, STALE_REASON, isEditRun, isStale, isWaiting, runTone } from '../lib/constants';
-import { asArray, cleanReason, criticalWarnings, fmtDateTime, isOwnerOnlyLine, studyWarningTexts, textOf } from '../lib/format';
+import { asArray, cleanReason, cleanStep, criticalWarnings, fmtDateTime, isOwnerOnlyLine, studyWarningTexts, textOf } from '../lib/format';
 import { useAuth } from '../lib/auth';
 import { Chip, Progress, Spinner } from './ui';
 
-/** Glossary wording for a run state (प्रक्रिया रांगेत / चालू / तयार / अयशस्वी). */
-const STATE_TEXT: Record<string, string> = { queued: 'प्रक्रिया रांगेत', running: 'प्रक्रिया चालू', done: 'प्रक्रिया तयार', failed: 'प्रक्रिया अयशस्वी' };
+/** Glossary wording for a run state (प्रक्रिया प्रतीक्षेत / चालू / पूर्ण / अयशस्वी). */
+const STATE_TEXT: Record<string, string> = { queued: 'प्रक्रिया प्रतीक्षेत', running: 'प्रक्रिया चालू', done: 'प्रक्रिया पूर्ण', failed: 'प्रक्रिया अयशस्वी' };
 const stateText = (s: string) => STATE_TEXT[s] || RUN_STATE_LABEL[s] || s;
 
 /** Latest runs of a case, kept live through Supabase Realtime (table `runs`). */
@@ -177,7 +177,7 @@ const MODEL_PREFIX = 'मॉडेल:';
 export function StudyWarningsLine({ run, studyHref, className = '' }: { run: Run | undefined; studyHref?: string; className?: string }) {
   const n = run && run.state === 'done' ? studyWarningTexts(run.warnings).length : 0;
   if (!n) return null;
-  const text = `तपासणीचे ${n} मुद्दे अभ्यास-फाइलमध्ये (भाग 7 शेवटी) — वापरण्यापूर्वी पाहा`;
+  const text = `तपासणीचे ${n} मुद्दे अभ्यास-फाइलमध्ये (भाग 7 शेवटी) आहेत — कृपया वापरण्यापूर्वी पाहावेत.`;
   return (
     <div className={`text-sm text-slate-600 dark:text-slate-300 break-words [overflow-wrap:anywhere] ${className}`}>
       ⓘ {studyHref ? <Link className="font-semibold text-navy-600 underline-offset-2 hover:underline dark:text-navy-200" to={studyHref}>{text}</Link> : text}
@@ -221,6 +221,8 @@ export function RunWarnings({ run, studyHref }: { run: Run; studyHref?: string }
 
 /** `retryHint`: shown under a failure only when the caller really renders a "पुन्हा तयार करा" control next to it. */
 export default function RunProgress({ run, retryHint }: { run: Run; retryHint?: string }) {
+  const { me } = useAuth();
+  const isOwner = me?.role === 'owner';
   const idx = stepIndex(run);
   const stale = isStale(run);
   const failed = run.state === 'failed' || stale;
@@ -246,16 +248,17 @@ export default function RunProgress({ run, retryHint }: { run: Run; retryHint?: 
         <div className="flex items-center gap-2">
           {active ? (
             <span className="inline-flex items-center gap-2 rounded-full bg-blue-100 px-3 py-1 text-sm font-bold text-blue-900 dark:bg-blue-900/40 dark:text-blue-100">
-              <Spinner className="h-4 w-4" /> {waiting ? 'रांगेत — आधीची प्रक्रिया संपल्यावर आपोआप सुरू होईल' : preparing ? 'तयारी चालू — सर्व्हर सुरू होत आहे' : 'प्रक्रिया चालू'}
+              <Spinner className="h-4 w-4" /> {waiting ? 'प्रतीक्षेत — आधीची प्रक्रिया पूर्ण झाल्यावर आपोआप सुरू होईल' : preparing ? 'तयारी चालू — सर्व्हर सुरू होत आहे' : 'प्रक्रिया चालू'}
             </span>
           ) : (
             <Chip tone={stale ? 'red' : runTone(run.state)}>{stale ? 'वेळ संपली' : stateText(run.state)}</Chip>
           )}
-          <span className="text-sm text-slate-500 dark:text-slate-400">प्रक्रिया क्र. {run.id} • {fmtDateTime(run.created_at)}</span>
+          {/* run id: owner only (X4) */}
+          <span className="text-sm text-slate-500 dark:text-slate-400">{isOwner ? `प्रक्रिया क्र. ${run.id} • ` : ''}{fmtDateTime(run.created_at)}</span>
         </div>
         <RunCost run={run} />
       </div>
-      <Progress pct={failed ? 100 : pct} tone={failed ? 'red' : run.state === 'done' ? 'green' : 'blue'} active={active} label={`प्रक्रिया क्र. ${run.id} — ${stale ? 'वेळ संपली' : stateText(run.state)}`} />
+      <Progress pct={failed ? 100 : pct} tone={failed ? 'red' : run.state === 'done' ? 'green' : 'blue'} active={active} label={`प्रक्रिया — ${stale ? 'वेळ संपली' : stateText(run.state)}`} />
       <ol className="grid grid-cols-4 gap-1 text-center text-xs sm:grid-cols-7 sm:text-sm">
         {RUN_STEPS.map((s, i) => {
           const done = i < idx || run.state === 'done' || (idx < 0 && i === 0);
@@ -276,12 +279,12 @@ export default function RunProgress({ run, retryHint }: { run: Run; retryHint?: 
           );
         })}
       </ol>
-      {run.step && !failed && <div className="text-sm text-slate-600 dark:text-slate-300">सद्य: {run.step}</div>}
+      {!failed && cleanStep(run.step, isOwner) && <div className="text-sm text-slate-600 dark:text-slate-300 break-words [overflow-wrap:anywhere]">सद्य: {cleanStep(run.step, isOwner)}</div>}
       {!failed && (run.state === 'queued' || run.state === 'running') && <RunEta run={run} />}
       {failed && (
         <div className="rounded-lg bg-red-100 px-3 py-2 text-red-900 dark:bg-red-900/40 dark:text-red-100" role="alert">
           <div className="font-semibold">प्रक्रिया अयशस्वी{!stale && idx >= 0 && run.state === 'failed' ? ` — टप्पा: ${RUN_STEPS[idx].label}` : ''}</div>
-          <div className="mt-1 whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{stale ? STALE_REASON : cleanReason(run.step) || 'कारण उपलब्ध नाही'}</div>
+          <div className="mt-1 whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{stale ? STALE_REASON : cleanReason(run.step, isOwner) || 'कारण उपलब्ध नाही'}</div>
           {retryHint && <div className="mt-1 text-sm">{retryHint}</div>}
         </div>
       )}
@@ -294,7 +297,7 @@ export default function RunProgress({ run, retryHint }: { run: Run; retryHint?: 
 export function RunStateBadge({ run }: { run: Run | undefined }) {
   if (!run) return <span className="text-sm text-slate-500">—</span>;
   const stale = isStale(run);
-  if (!stale && isWaiting(run)) return <Chip tone="amber">⏳ रांगेत</Chip>;
+  if (!stale && isWaiting(run)) return <Chip tone="amber">⏳ प्रतीक्षेत</Chip>;
   if (!stale && (run.state === 'queued' || run.state === 'running'))
     return (
       <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-100 px-2.5 py-0.5 text-sm font-bold text-blue-900 dark:bg-blue-900/40 dark:text-blue-100">

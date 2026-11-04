@@ -70,7 +70,7 @@ export function stageTone(s: string): Tone {
 }
 
 export const RUN_STATE_LABEL: Record<string, string> = {
-  queued: 'रांगेत', running: 'चालू', done: 'पूर्ण', failed: 'अयशस्वी',
+  queued: 'प्रतीक्षेत', running: 'चालू', done: 'पूर्ण', failed: 'अयशस्वी',
 };
 export function runTone(s: string): Tone {
   return s === 'done' ? 'green' : s === 'failed' ? 'red' : s === 'running' ? 'blue' : 'amber';
@@ -78,7 +78,7 @@ export function runTone(s: string): Tone {
 
 /** A run queued/running longer than this is stuck (engine job timeout 180 min). Same limit as the Worker's /api/runs/sweep. */
 export const STALE_MS = 3.5 * 3600 * 1000;
-export const STALE_REASON = 'वेळ संपली — पुन्हा तयार करा';
+export const STALE_REASON = "वेळ संपली. कृपया 'पुन्हा तयार करा' वापरावे, ही विनंती.";
 export const isStale = (r: { state: string; created_at: string; dispatched_at?: string | null }) =>
   (r.state === 'queued' || r.state === 'running') && !isWaiting(r)
   && Date.now() - new Date(r.dispatched_at || r.created_at).getTime() > STALE_MS;
@@ -90,20 +90,20 @@ export const runActive = (r: { state: string; created_at: string; dispatched_at?
 
 /** Live progress steps (prompt §6.2). Keys = the exact runs.step texts written by the engine (tools/ENGINE_PROMPT.md rule 4). */
 export const RUN_STEPS: { key: string; label: string }[] = [
-  { key: 'queued', label: 'रांगेत' },
+  { key: 'queued', label: 'प्रतीक्षेत' },
   { key: 'पाने वाचत आहे', label: 'पाने वाचन' },
   { key: 'GR शोधत आहे', label: 'GR शोध' },
-  { key: 'मसुदा तयार करत आहे', label: 'मसुदा' },
+  { key: 'मसुदा तयार करत आहे', label: 'टिप्पणी व मसुदे' },
   { key: 'PDF बनवत आहे', label: 'PDF तयार' },
   { key: 'तपासणी चालू', label: 'पडताळणी' },
   { key: 'done', label: 'पूर्ण' },
 ];
 
 export const FILE_KIND_LABEL: Record<string, string> = {
-  proposal: 'प्रस्ताव', extra_doc: 'इतर कागदपत्र', study: 'अभ्यास', note_letter: 'टिप्पणी व पत्र',
-  package_pdf: 'GR सह प्रस्ताव', gr: 'GR', reply: 'उत्तर',
+  proposal: 'मूळ प्रस्ताव', extra_doc: 'इतर कागदपत्र', study: 'अभ्यास-फाइल', note_letter: 'टिप्पणी व पत्र',
+  package_pdf: 'GR सह प्रस्ताव (PDF)', gr: 'GR', reply: 'उत्तर',
   approval: 'मान्यता (वित्त/सा.प्र.वि.)', court_notice: 'न्यायालयीन नोटीस',
-  order_draft: 'शासन आदेश-मसुदा', parawise: 'परिच्छेदनिहाय अभिप्राय (इंग्रजी)',
+  order_draft: 'शासन निर्णय-प्रारूप', parawise: 'परिच्छेदनिहाय अभिप्राय (इंग्रजी)',
   affidavit: 'शपथपत्र (इंग्रजी)', lq_answer: 'विधानमंडळ प्रश्नाचे उत्तर',
 };
 
@@ -149,12 +149,12 @@ export const EXTRA_OUTPUT_KINDS = ['order_draft', 'parawise', 'affidavit', 'lq_a
 export const EDIT_TARGETS = [
   { id: 'note', label: 'टिप्पणी', kind: 'note_letter' },
   { id: 'letter', label: 'पत्र', kind: 'note_letter' },
-  { id: 'order', label: 'आदेश-प्रारूप', kind: 'order_draft' },
+  { id: 'order', label: 'शासन निर्णय-प्रारूप', kind: 'order_draft' },
   { id: 'parawise', label: 'परिच्छेदनिहाय उत्तर', kind: 'parawise' },
   { id: 'affidavit', label: 'शपथपत्र', kind: 'affidavit' },
   { id: 'lq', label: 'विधानमंडळ उत्तर', kind: 'lq_answer' },
   // Addendum A: add a GR / document to the returned PDF (attachments or GR सांकेतांक in the message)
-  { id: 'package', label: 'GR सह प्रस्ताव PDF', kind: 'package_pdf' },
+  { id: 'package', label: 'GR सह प्रस्ताव (PDF)', kind: 'package_pdf' },
 ] as const;
 export type EditTarget = (typeof EDIT_TARGETS)[number]['id'];
 export const editTargetLabel = (id: string | null | undefined) => EDIT_TARGETS.find(t => t.id === id)?.label || '';
@@ -166,7 +166,7 @@ export const EDIT_ATTACH_KINDS = [{ id: 'extra_doc', label: 'इतर काग
 export type EditAttachKind = (typeof EDIT_ATTACH_KINDS)[number]['id'];
 export const EDIT_ATTACH_ACCEPT = '.pdf,.jpg,.jpeg,.png,.doc,.docx';
 /** Text put in an empty message box when files are attached (a message is required). */
-export const EDIT_ATTACH_DEFAULT = 'जोडलेली कागदपत्रे GR सह PDF मध्ये जोडावीत, ही विनंती.';
+export const EDIT_ATTACH_DEFAULT = 'जोडलेली कागदपत्रे GR सह प्रस्ताव (PDF) मध्ये जोडावीत, ही विनंती.';
 /** Internal file kinds never listed, viewed or downloaded in the app ('spec' = the drafts' source, kept for edits). */
 export const HIDDEN_FILE_KINDS = ['spec'] as const;
 export const isHiddenFile = (f: { kind: string }) => (HIDDEN_FILE_KINDS as readonly string[]).includes(f.kind);
@@ -175,9 +175,9 @@ export const isHiddenFile = (f: { kind: string }) => (HIDDEN_FILE_KINDS as reado
 export const isEditRun = (r: { kind?: string | null } | null | undefined) => r?.kind === 'edit';
 
 export const ACTION_LABEL: Record<string, string> = {
-  case_created: 'प्रकरण नोंदवले', case_updated: 'तपशील बदलला', file_uploaded: 'फाइल अपलोड', run_started: 'अभ्यास सुरू', run_queued: 'प्रक्रिया रांगेत',
+  case_created: 'प्रकरण नोंदवले', case_updated: 'तपशील बदलला', file_uploaded: 'फाइल अपलोड', run_started: 'प्रक्रिया सुरू', run_queued: 'प्रक्रिया प्रतीक्षेत',
   stage_changed: 'टप्पा बदलला', letter_saved: 'पत्र नोंदवले', letter_updated: 'पत्राची नोंद बदलली', letter_reply_received: 'पत्राचे उत्तर प्राप्त',
-  run_done: 'अभ्यास पूर्ण', run_failed: 'अभ्यास अयशस्वी', run_warning: 'अभ्यास-सूचना',
+  run_done: 'प्रक्रिया पूर्ण', run_failed: 'प्रक्रिया अयशस्वी', run_warning: 'प्रक्रिया-सूचना',
   edit_requested: 'सुधारणा मागवली', edit_done: 'सुधारणा तयार', edit_failed: 'सुधारणा अयशस्वी',
   case_cr_duplicate: 'C R आधीच दुसऱ्या प्रकरणात', case_filled_from_pdf: 'तपशील PDF वरून भरला', case_fill_skipped: 'PDF वरून तपशील भरता आला नाही',
 };

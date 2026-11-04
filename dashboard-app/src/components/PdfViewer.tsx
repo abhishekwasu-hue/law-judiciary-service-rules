@@ -5,7 +5,7 @@ import { openPdf } from '../lib/pdf';
 import { Skeleton } from './ui';
 import { isChunkError, reloadOnceForNewBuild } from './ErrorBoundary';
 
-const NEW_BUILD_MSG = 'app ची नवीन आवृत्ती आली आहे — पान रीलोड करत आहे';
+const NEW_BUILD_MSG = 'नवीन आवृत्ती उपलब्ध झाली आहे — पान पुन्हा उघडत आहे.';
 
 interface OutlineNode { title: string; page: number | null; items: OutlineNode[] }
 
@@ -149,7 +149,7 @@ export default function PdfViewer({ fileId, url, jumpTo }: { fileId?: number; ur
           // an old tab after a redeploy cannot load the pdf.js chunk → reload once for the new build
           if (isChunkError(e) && reloadOnceForNewBuild()) return setErr(NEW_BUILD_MSG);
           const h = humanError(e);
-          setErr(/[ऀ-ॿ]/.test(h) ? h : 'फाइल उघडता आली नाही — पुन्हा लोड करा किंवा डाउनलोड करून पाहा.');
+          setErr(/[ऀ-ॿ]/.test(h) ? h : 'फाइल उघडता आली नाही. कृपया पुन्हा प्रयत्न करावा किंवा फाइल डाउनलोड करून पाहावी, ही विनंती.');
         }
       }
     })();

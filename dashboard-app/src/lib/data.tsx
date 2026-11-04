@@ -1,11 +1,11 @@
 // Shared case + letter store for list, फलक (Kanban), Home and the command palette. Reads go straight to Supabase (RLS).
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { sb } from './supabase';
-import { api } from './api';
-import { useCanWrite } from './auth';
+import { api, humanError } from './api';
+import { useAuth, useCanWrite } from './auth';
 import type { Case, Letter, Run } from './types';
 import { isEditRun } from './constants';
-import { addDaysISO, crLabel, todayISO } from './format';
+import { addDaysISO, crLabel, ownerDetail, setViewerIsOwner, todayISO } from './format';
 import { useToast } from '../components/Toast';
 
 interface DataState {
@@ -23,6 +23,9 @@ interface DataState {
 const Ctx = createContext<DataState>(null as unknown as DataState);
 
 export function DataProvider({ children }: { children: ReactNode }) {
+  // the viewer's role for helpers called without `isOwner` (humanError, cleanReason …): set during render, before children
+  const { me } = useAuth();
+  setViewerIsOwner(me?.role === 'owner');
   const [cases, setCases] = useState<Case[]>([]);
   const [letters, setLetters] = useState<Letter[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,8 +48,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
         sb().from('letters').select('*').order('created_at', { ascending: false }),
         sb().from('runs').select('*').order('created_at', { ascending: false }).limit(500),
       ]);
-      const errs = [c.error && `प्रकरणे: ${c.error.message}`, l.error && `पत्रे: ${l.error.message}`, r.error && `प्रक्रिया: ${r.error.message}`].filter(Boolean);
-      setError(errs.join(' • '));
+      // staff: which lists could not be read + the Marathi reason; the owner also gets the raw Supabase text (X2)
+      const failed = ([['प्रकरणे', c.error], ['पत्रे', l.error], ['प्रक्रिया', r.error]] as const).filter(([, e]) => e);
+      setError(
+        failed.length
+          ? `${failed.map(([n]) => n).join(', ')} यांची माहिती वाचता आली नाही. ${humanError(new Error(failed[0][1]!.message), false)}`
+            + ownerDetail(failed.map(([n, e]) => `${n}: ${e!.message}`).join(' • '))
+          : '',
+      );
       if (!c.error) setCases((c.data as Case[]) || []);
       if (!l.error) setLetters((l.data as Letter[]) || []);
       if (!r.error) {
@@ -122,12 +131,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
         runState.current.set(row.id, row.state);
         if ((prev === 'queued' || prev === 'running') && (row.state === 'done' || row.state === 'failed')) {
           const c = casesRef.current.find(x => x.id === row.case_id);
-          const label = c ? crLabel(c) : `प्रकरण #${row.case_id}`;
+          const label = c ? crLabel(c) : `प्रकरण क्र. ${row.case_id}`;
           if (isEditRun(row)) {
-            if (row.state === 'done') toast(`${label}: ${row.edit_result?.refused ? 'सुधारणा नाकारली — कारण प्रकरणात पाहा' : 'सुधारणा तयार — नवीन आवृत्ती उपलब्ध'}`, row.edit_result?.refused ? 'err' : 'ok');
-            else toast(`${label}: सुधारणा अयशस्वी — प्रकरणात कारण पाहा`, 'err');
-          } else if (row.state === 'done') toast(`${label}: प्रक्रिया तयार — प्रकरणे मध्ये पाहा`, 'ok');
-          else toast(`${label}: प्रक्रिया अयशस्वी — प्रकरण उघडून "पुन्हा तयार करा" दाबा`, 'err');
+            if (row.state === 'done') toast(`${label}: ${row.edit_result?.refused ? 'सुधारणा नाकारली. कृपया कारण प्रकरणात पाहावे, ही विनंती.' : 'सुधारणा तयार — नवीन आवृत्ती उपलब्ध आहे.'}`, row.edit_result?.refused ? 'err' : 'ok');
+            else toast(`${label}: सुधारणा अयशस्वी. कृपया कारण प्रकरणात पाहावे, ही विनंती.`, 'err');
+          } else if (row.state === 'done') toast(`${label}: प्रक्रिया पूर्ण — फाइल प्रकरणात उपलब्ध आहेत.`, 'ok');
+          else toast(`${label}: प्रक्रिया अयशस्वी. कृपया प्रकरण उघडून 'पुन्हा तयार करा' वापरावे, ही विनंती.`, 'err');
         }
         if (isEditRun(row)) return;
         setLatestRuns(s => {

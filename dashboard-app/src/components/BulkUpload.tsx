@@ -7,7 +7,8 @@
 // ({queued: true, position}). A failed row keeps what was done (case / upload) and is retried from there.
 import { useRef, useState, type DragEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { ApiError, api, budgetReachedText, getSpend, humanError, runStartText, spendBlocked, uploadFile, type RunStart } from '../lib/api';
+import { ApiError, api, budgetReachedText, getSpend, humanError, spendBlocked, uploadFile, type RunStart } from '../lib/api';
+import { useAuth } from '../lib/auth';
 import { DEFAULT_DESK, DEFAULT_WORK_TYPE, DESKS, INPUT_KINDS, INPUT_KIND_LABEL, WORK_TYPES, type DraftKey, type InputKind, type WorkType } from '../lib/constants';
 import { suggestDrafts } from '../lib/drafts';
 import { fmtBytes } from '../lib/format';
@@ -31,19 +32,40 @@ interface Extra { file: File; kind: InputKind }
 const defaultDrafts = (r: { work: WorkType; extras: Extra[] }): DraftKey[] =>
   r.extras.length ? suggestDrafts(r.extras.map(x => ({ kind: x.kind })), [], r.work).keys : draftsForWork(r.work);
 
+/** Words the staff should not see (owner-only: GitHub / token / Supabase / Worker / migration …, BRIEF OWNER-ONLY). */
+const TECH = /GitHub|token|Supabase|Worker|migration|deploy|API|JSON|सर्व्हर|सेटिंग्ज/i;
+export const STAFF_TECH = 'तांत्रिक अडचण — कृपया मालकांना कळवावे.';
+/** Error text for this user: the owner sees the technical text, staff a respectful Marathi line (N5). */
+export function userError(x: unknown, isOwner: boolean): string {
+  if (x instanceof ApiError && x.message === 'monthly_budget_reached' && !isOwner) return 'या महिन्याची खर्च-मर्यादा संपली आहे. कृपया मालकांना कळवावे.';
+  if (x instanceof ApiError && x.message === 'run_active') return 'या प्रकरणाची प्रक्रिया आधीच चालू आहे. ती पूर्ण होईपर्यंत कृपया प्रतीक्षा करावी.';
+  const m = humanError(x);
+  if (isOwner) return m;
+  if ((x instanceof ApiError && x.message === 'dispatch_failed') || TECH.test(m) || /[A-Za-z]{5,}/.test(m.replace(/\b(PDF|Word|MB)\b/g, ''))) return STAFF_TECH;
+  return m;
+}
+/** Text after /api/run (glossary: प्रक्रिया, प्रतीक्षेत). The migration note is owner-only. */
+export function startText(r: RunStart, isOwner: boolean): string {
+  const base = r.queued
+    ? `प्रतीक्षेत — क्रमांक ${Number(r.position) || '?'}. आधीची प्रक्रिया संपल्यावर ही प्रक्रिया आपोआप सुरू होईल.`
+    : 'प्रक्रिया सुरू झाली.';
+  return r.outputs_dropped && isOwner ? `${base} मसुदे-निवड लागू झाली नाही (migration 0008 बाकी).` : base;
+}
+
 type St = 'wait' | 'case' | 'up' | 'run' | 'queued' | 'started' | 'err';
 interface Row {
   key: number; file: File; extras: Extra[]; work: WorkType; drafts: DraftKey[] | null; // null = default of the category
-  instr: string; showInstr: boolean; subject: string;
+  instr: string; showInstr: boolean; showWork: boolean; subject: string;
   st: St; pct: number; caseId: number | null; uploaded: number; msg: string; // uploaded = files done (main first)
 }
 
 const ST_TEXT: Record<St, string> = {
-  wait: 'प्रतीक्षा', case: 'प्रकरण नोंदवत आहे…', up: 'अपलोड', run: 'प्रक्रिया पाठवत आहे…', queued: '', started: '', err: '',
+  wait: 'प्रतीक्षा', case: 'प्रकरण नोंदवत आहे…', up: 'अपलोड', run: 'प्रक्रिया सुरू करत आहे…', queued: '', started: '', err: '',
 };
 
 export default function BulkUpload({ overBudget }: { overBudget: boolean }) {
   const toast = useToast();
+  const isOwner = useAuth().me?.role === 'owner';
   const { latestRuns } = useData();
   const [rows, setRows] = useState<Row[]>([]);
   const [bulkWork, setBulkWork] = useState<WorkType>(DEFAULT_WORK_TYPE);
@@ -60,14 +82,14 @@ export default function BulkUpload({ overBudget }: { overBudget: boolean }) {
   // other file of the same proposal (type "इतर", changeable)
   function addProposal(files: File[]) {
     const ok = files.filter(f => f.size <= MAX_BYTES);
-    if (ok.length < files.length) toast('50 MB पेक्षा मोठ्या फाइल वगळल्या', 'err');
+    if (ok.length < files.length) toast('50 MB पेक्षा मोठ्या फाइल वगळल्या आहेत.', 'err');
     const main = ok.find(isPdf);
-    if (!main) return ok.length ? toast('प्रस्तावाचा मुख्य PDF निवडा (फोटो असल्यास आधी PDF करा)', 'err') : undefined;
-    if (rowsRef.current.length >= BULK_MAX) return toast(`एका वेळी कमाल ${BULK_MAX} प्रस्ताव`, 'err');
+    if (!main) return ok.length ? toast('मुख्य प्रस्ताव PDF स्वरूपात असावा. कृपया प्रस्तावाचा PDF निवडावा (फोटो / Word असल्यास आधी PDF करावा).', 'err') : undefined;
+    if (rowsRef.current.length >= BULK_MAX) return toast(`एका वेळी कमाल ${BULK_MAX} प्रस्ताव पाठविता येतात.`, 'err');
     const extras = ok.filter(f => f !== main && /\.(pdf|docx?|jpe?g|png)$/i.test(f.name)).map(file => ({ file, kind: 'extra_doc' as InputKind }));
-    if (extras.length) toast(`“${main.name}” मुख्य प्रस्ताव; उरलेल्या ${extras.length} फाइल याच प्रस्तावाच्या इतर फाइल — प्रकार तपासा`, 'info');
+    if (extras.length) toast(`“${main.name}” हा मुख्य प्रस्ताव; उरलेल्या ${extras.length} फाइल याच प्रस्तावाच्या इतर फाइल म्हणून जोडल्या. कृपया त्यांचा प्रकार तपासावा.`, 'info');
     const fresh: Row = {
-      key: keyRef.current++, file: main, extras, work: bulkWork, drafts: null, instr: '', showInstr: false, subject: '',
+      key: keyRef.current++, file: main, extras, work: bulkWork, drafts: null, instr: '', showInstr: false, showWork: false, subject: '',
       st: 'wait', pct: 0, caseId: null, uploaded: 0, msg: '',
     };
     setRows(s => [...s, fresh]);
@@ -75,7 +97,7 @@ export default function BulkUpload({ overBudget }: { overBudget: boolean }) {
   }
   function addExtras(key: number, files: File[]) {
     const ok = files.filter(f => f.size <= MAX_BYTES && /\.(pdf|docx?|jpe?g|png)$/i.test(f.name));
-    if (ok.length < files.length) toast('50 MB पेक्षा मोठ्या / वेगळ्या प्रकारच्या फाइल वगळल्या', 'err');
+    if (ok.length < files.length) toast('50 MB पेक्षा मोठ्या / वेगळ्या प्रकारच्या फाइल वगळल्या आहेत.', 'err');
     setRows(s => s.map(r => (r.key === key ? { ...r, extras: [...r.extras, ...ok.map(file => ({ file, kind: 'extra_doc' as InputKind }))] } : r)));
   }
   const setAll = (w: WorkType) => {
@@ -90,7 +112,7 @@ export default function BulkUpload({ overBudget }: { overBudget: boolean }) {
     setBusy(true);
     try {
       const sp = await getSpend();
-      if (spendBlocked(sp)) { toast(budgetReachedText(sp.limit_usd), 'err'); setBusy(false); return; }
+      if (spendBlocked(sp)) { toast(isOwner ? budgetReachedText(sp.limit_usd) : 'या महिन्याची खर्च-मर्यादा संपली आहे. कृपया मालकांना कळवावे.', 'err'); setBusy(false); return; }
     } catch { /* the Worker still enforces the limit on /api/run */ }
     let stop = '';
     for (const r0 of todo.map(r => r.key)) {
@@ -118,10 +140,10 @@ export default function BulkUpload({ overBudget }: { overBudget: boolean }) {
         const started = await api<RunStart>('/api/run', {
           body: { case_id: caseId, instructions: r.instr.trim() || undefined, outputs: r.drafts ?? defaultDrafts(r) },
         });
-        patch(r.key, { st: started.queued ? 'queued' : 'started', msg: runStartText(started) });
+        patch(r.key, { st: started.queued ? 'queued' : 'started', msg: startText(started, isOwner) });
       } catch (x) {
-        if (x instanceof ApiError && x.message === 'run_active') { patch(r.key, { st: 'queued', msg: humanError(x) }); continue; }
-        const m = humanError(x);
+        if (x instanceof ApiError && x.message === 'run_active') { patch(r.key, { st: 'queued', msg: userError(x, isOwner) }); continue; }
+        const m = userError(x, isOwner);
         patch(r.key, { st: 'err', msg: m });
         // the monthly limit refuses every further run: do not send the rest (their files stay here for a later retry)
         if (x instanceof ApiError && x.message === 'monthly_budget_reached') stop = m;
@@ -129,7 +151,8 @@ export default function BulkUpload({ overBudget }: { overBudget: boolean }) {
     }
     setBusy(false);
     const failed = rowsRef.current.filter(r => r.st === 'err').length;
-    toast(failed ? `${failed} प्रस्ताव पाठवता आले नाहीत — त्या ओळी पाहा व पुन्हा दाबा` : 'सर्व प्रस्ताव रांगेत — एकामागून एक तयार होतील', failed ? 'err' : 'ok');
+    const nSent = rowsRef.current.filter(r => r.st === 'queued' || r.st === 'started').length;
+    toast(failed ? `${failed} प्रस्ताव पाठविता आले नाहीत. कृपया लाल ओळी पाहून बटण पुन्हा दाबावे.` : `${nSent} प्रस्ताव पाठवले — एकामागून एक तयार होतील`, failed ? 'err' : 'ok');
   }
 
   const drop = (e: DragEvent) => { e.preventDefault(); setOver(false); if (!busy) addProposal(Array.from(e.dataTransfer.files)); };
@@ -143,7 +166,7 @@ export default function BulkUpload({ overBudget }: { overBudget: boolean }) {
         className={`flex min-h-[110px] flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed p-4 text-center transition ${over ? 'border-saffron-500 bg-saffron-500/10' : 'border-slate-300 dark:border-navy-700'}`}
       >
         <div className="font-semibold">{rows.length ? `प्रस्ताव ${rows.length + 1} जोडा` : 'प्रस्ताव 1 जोडा'}</div>
-        <div className="text-sm text-slate-500 dark:text-slate-400">एका वेळी एकाच प्रस्तावाच्या फाइल निवडा: मुख्य PDF (व हवे तर त्याच प्रस्तावाच्या इतर PDF / Word / प्रतिमा) • कमाल {BULK_MAX} प्रस्ताव • काम एकामागून एक होईल</div>
+        <div className="text-sm text-slate-500 dark:text-slate-400">कृपया एका वेळी एकाच प्रस्तावाच्या फाइल निवडाव्यात: मुख्य PDF (व हवे असल्यास त्याच प्रस्तावाच्या इतर PDF / Word / प्रतिमा) • कमाल {BULK_MAX} प्रस्ताव • प्रक्रिया एकामागून एक होईल</div>
         <button type="button" className="btn-ghost" disabled={busy || rows.length >= BULK_MAX} onClick={() => inputRef.current?.click()}>＋ नवीन प्रस्ताव ({rows.length}/{BULK_MAX})</button>
         <input ref={inputRef} type="file" hidden multiple accept={EXTRA_ACCEPT} onChange={e => { addProposal(Array.from(e.target.files || [])); e.target.value = ''; }} />
       </div>
@@ -153,19 +176,21 @@ export default function BulkUpload({ overBudget }: { overBudget: boolean }) {
       {rows.length === 0 && addZone}
 
       {rows.length > 0 && (
-        <div className="card grid gap-3 p-3 sm:grid-cols-2">
+        <div className={`card grid gap-3 p-3 ${isOwner ? 'sm:grid-cols-2' : ''}`}>
           <label className="block min-w-0">
-            <span className="label">कामाचा प्रकार — सर्वांना</span>
+            <span className="label">कामाचा प्रकार — सर्व प्रस्तावांसाठी</span>
             <select className="input" value={bulkWork} disabled={busy} onChange={e => setAll(e.target.value as WorkType)}>
               {WORK_TYPES.map(w => <option key={w.id} value={w.id}>{w.label}</option>)}
             </select>
           </label>
-          <label className="block min-w-0">
-            <span className="label">विभाग / कार्यासन — सर्वांना</span>
-            <select className="input" value={desk} disabled={busy || sent.length > 0} onChange={e => setDesk(e.target.value)}>
-              {DESKS.map(d => <option key={d.id} value={d.id}>{d.label}</option>)}
-            </select>
-          </label>
+          {isOwner && (
+            <label className="block min-w-0">
+              <span className="label">विभाग / कार्यासन — सर्व प्रस्तावांसाठी</span>
+              <select className="input" value={desk} disabled={busy || sent.length > 0} onChange={e => setDesk(e.target.value)}>
+                {DESKS.map(d => <option key={d.id} value={d.id}>{d.label}</option>)}
+              </select>
+            </label>
+          )}
         </div>
       )}
 
@@ -190,19 +215,23 @@ export default function BulkUpload({ overBudget }: { overBudget: boolean }) {
                   onAdd={f => addExtras(r.key, f)}
                   onKind={(j, kind) => patch(r.key, { extras: r.extras.map((x, k) => (k === j ? { ...x, kind } : x)) })}
                   onRemove={j => patch(r.key, { extras: r.extras.filter((_, k) => k !== j) })} />
-                <label className="flex min-w-0 items-center gap-2 text-sm">
-                  <span className="shrink-0 font-semibold">कामाचा प्रकार</span>
-                  <select className="input min-h-tap min-w-0 py-1" disabled={locked(r) || !!r.caseId} value={r.work}
-                    onChange={e => patch(r.key, { work: e.target.value as WorkType, drafts: null })}>
-                    {WORK_TYPES.map(w => <option key={w.id} value={w.id}>{w.label}</option>)}
-                  </select>
-                </label>
+                {r.showWork || r.work !== bulkWork ? (
+                  <label className="flex min-w-0 items-center gap-2 text-sm">
+                    <span className="shrink-0 font-semibold">कामाचा प्रकार</span>
+                    <select className="input min-h-tap min-w-0 py-1" disabled={locked(r) || !!r.caseId} value={r.work}
+                      onChange={e => patch(r.key, { work: e.target.value as WorkType, drafts: null })}>
+                      {WORK_TYPES.map(w => <option key={w.id} value={w.id}>{w.label}</option>)}
+                    </select>
+                  </label>
+                ) : !locked(r) && !r.caseId && (
+                  <button type="button" className="min-h-tap text-sm font-semibold text-navy-700 underline dark:text-navy-200" aria-expanded={false} onClick={() => patch(r.key, { showWork: true })}>हा प्रस्ताव वेगळ्या प्रकाराचा ▼</button>
+                )}
                 <CompactDraftPicker value={drafts} onChange={v => patch(r.key, { drafts: v })} disabled={locked(r)} />
                 {r.showInstr ? (
-                  <textarea className="input min-h-[64px] text-sm" placeholder="विशेष सूचना (ऐच्छिक) — उदा. पत्र नको; नस्ती वित्त विभागाकडे पाठवा" disabled={locked(r)}
+                  <textarea className="input min-h-[96px] text-sm" placeholder="विशेष सूचना (ऐच्छिक) — उदा. पत्र नको; नस्ती वित्त विभागाकडे पाठवावी" disabled={locked(r)}
                     value={r.instr} onChange={e => patch(r.key, { instr: e.target.value })} />
                 ) : !locked(r) && (
-                  <button type="button" className="min-h-tap text-sm font-semibold text-navy-700 underline dark:text-navy-200" onClick={() => patch(r.key, { showInstr: true })}>+ विशेष सूचना (ऐच्छिक)</button>
+                  <button type="button" className="min-h-tap text-sm font-semibold text-navy-700 underline dark:text-navy-200" aria-expanded={false} onClick={() => patch(r.key, { showInstr: true })}>+ विशेष सूचना (ऐच्छिक)</button>
                 )}
                 {r.st !== 'wait' && (
                   <div className="space-y-1">
@@ -215,7 +244,7 @@ export default function BulkUpload({ overBudget }: { overBudget: boolean }) {
                       {r.caseId && (r.st === 'queued' || r.st === 'started') && (
                         <span className="flex items-center gap-2">
                           {run && <RunStateBadge run={run} />}
-                          <Link className="text-navy-700 underline dark:text-navy-200" to={`/cases/${r.caseId}`}>प्रकरण उघडा →</Link>
+                          <Link className="inline-flex min-h-tap items-center text-navy-700 underline dark:text-navy-200" to={`/cases/${r.caseId}`}>प्रकरण उघडा →</Link>
                         </span>
                       )}
                     </div>
@@ -233,12 +262,12 @@ export default function BulkUpload({ overBudget }: { overBudget: boolean }) {
         <div className="space-y-2">
           {(todo.length > 0 || busy) && <button type="button" className="btn-accent w-full text-lg" disabled={busy || !todo.length || overBudget} onClick={() => void go()}>
             {busy && <Spinner />}{' '}
-            {busy ? 'पाठवत आहे…' : todo.some(r => r.st === 'err') ? `↻ पुन्हा पाठवा (${todo.length})` : `रांगेत टाका (${todo.length})`}
+            {busy ? 'पाठवत आहे…' : todo.some(r => r.st === 'err') ? `↻ पुन्हा पाठवा (${todo.length})` : `टिप्पणी व मसुदे तयार करा — ${todo.length} प्रस्ताव`}
           </button>}
           {sent.length > 0 && !busy && (
             <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-900 dark:bg-green-900/30 dark:text-green-100">
-              <span><b>{sent.length}</b> प्रस्ताव रांगेत — प्रत्येक तयार होताच प्रकरणात उपलब्ध</span>
-              <Link className="font-semibold underline" to="/cases">प्रकरणे →</Link>
+              <span><b>{sent.length}</b> प्रस्ताव पाठवले — एकामागून एक तयार होतील. प्रत्येक प्रस्ताव तयार होताच तो ‘प्रकरणे’ मध्ये त्या प्रकरणात मिळेल. हे पान बंद केले तरी काम चालू राहील.</span>
+              <Link className="inline-flex min-h-tap items-center font-semibold underline" to="/cases">प्रकरणे →</Link>
             </div>
           )}
         </div>

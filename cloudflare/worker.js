@@ -36,8 +36,10 @@ const FILE_KINDS = ['proposal', 'extra_doc', 'reply', 'approval', 'court_notice'
 // drafts the user can tick for a run (C28 "कोणते मसुदे हवेत?"), in this fixed order; stored in runs.outputs
 const DRAFT_KEYS = ['letter', 'reminder', 'gr', 'corrigendum', 'circular', 'memo', 'notification', 'parawise',
   'do_letter', 'uo_note', 'endorsement', 'office_order', 'press_note', 'addendum', 'affidavit', 'lq'];   // 04.11.2026: last 8
-const KIND_NOT_READY = 'हा फाइल-प्रकार अजून सुरू नाही (मालकाने migration 0008 लागू करावे) — "इतर" निवडा';
-const BAD_OUTPUTS = 'मसुद्यांची निवड चुकीची — पान पुन्हा उघडा';
+// user-visible texts (UI audit 04.11.2026 X1/X2): respectful sentences; technical part for the owner in `detail`
+const KIND_NOT_READY = 'हा फाइल-प्रकार सध्या उपलब्ध नाही. कृपया "इतर" हा प्रकार निवडावा, ही विनंती.';
+const KIND_NOT_READY_DETAIL = 'migration 0008 लागू करणे आवश्यक आहे.';
+const BAD_OUTPUTS = 'मसुद्यांची निवड योग्य नाही. कृपया पान पुन्हा उघडून निवड करावी, ही विनंती.';
 const MAX_UPLOAD = 50 * 1024 * 1024;
 // ---------- draft edit (सुधारणा-चॅट; docs/DRAFT_EDIT_DESIGN.md points 3 + Addendum A, migration 0013) ----------
 // POST /api/edit targets: टिप्पणी, पत्र, आदेश-प्रारूप, परिच्छेदनिहाय उत्तर, शपथपत्र, विधानमंडळ उत्तर, GR सह प्रस्ताव PDF
@@ -49,19 +51,24 @@ const DEFAULT_MODEL_EDIT = 'claude-sonnet-5-5';
 const EDIT_STALE_MS = 30 * 60 * 1000;           // edit job timeout 20 min (edit-drafts.yml) + dispatch time
 const EDIT_STALE_REASON = 'वेळ संपली — कृपया सुधारणा पुन्हा पाठवावी, ही विनंती.';
 const NO_SPEC = "हे प्रकरण या सुविधेपूर्वीचे असल्याने सुधारणा-फाइल उपलब्ध नाही. कृपया 'पुन्हा तयार करा' हा पर्याय वापरावा, ही विनंती.";
-const EDIT_MIGRATION = 'Supabase मध्ये migration 0013 लागू करणे आवश्यक आहे.';
+const EDIT_MIGRATION = 'सुधारणा-सुविधा सध्या उपलब्ध नाही (तांत्रिक अडचण). कृपया मालकांना कळवावे, ही विनंती.';
+const EDIT_MIGRATION_DETAIL = 'Supabase मध्ये migration 0013 लागू करणे आवश्यक आहे.';
 const BAD_EDIT_TARGET = 'सुधारणा कोठे करावयाची हे यादीतील पर्यायांतून कृपया निवडावे, ही विनंती.';
 const EDIT_MSG_EMPTY = 'कृपया सुधारणा-संदेश नमूद करावा, ही विनंती.';
 const EDIT_MSG_LONG = `कृपया सुधारणा-संदेश ${EDIT_MSG_MAX} अक्षरांच्या मर्यादेत नमूद करावा, ही विनंती.`;
 const BAD_ATTACH = `जोडलेल्या फाइल चुकीच्या — या प्रकरणाच्या जास्तीत जास्त ${EDIT_ATTACH_MAX} फाइल (GR / इतर कागदपत्र / उत्तर / मान्यता / नोटीस) कृपया जोडाव्यात, ही विनंती.`;
+const SEARCH_UNAVAILABLE = 'नियम-उतारे शोध-सेवा जोडलेली नाही — कृपया मालकांनी सेटिंग्ज भरावीत.';
+const SEARCH_FAILED = 'नियम-उतारे शोध सध्या होऊ शकला नाही. कृपया थोड्या वेळाने पुन्हा प्रयत्न करावा, ही विनंती.';
 const SIGN_BUCKETS = ['proposals', 'outputs', 'gr-library'];
 // Run token (D4): created at dispatch, sent to GitHub in the payload. Single use for /api/engine/config (the secrets);
 // after that it is only good for /api/engine/fail and /api/engine/step (THIS run only, return nothing secret) until it expires.
 const RUN_TOKEN_TTL = 4 * 3600;                 // > job timeout (180 min) + queue time
 const STALE_MS = 3.5 * 3600 * 1000;             // queued/running longer than this = stuck (job timeout 180 min)
-const STALE_REASON = 'वेळ संपली — पुन्हा तयार करा';
-// dispatch to GitHub failed (A3 audit): the run row and the user see only this; the raw GitHub text stays in activity
-const DISPATCH_REASON = 'GitHub जोडणी अयशस्वी (token तपासा — सेटिंग्ज) — पुन्हा तयार करा';
+const STALE_REASON = "वेळ संपली. कृपया 'पुन्हा तयार करा' वापरावे, ही विनंती.";
+// dispatch to GitHub failed (A3 audit): the run row and the user see only this; the raw GitHub text stays in activity.
+// Staff-safe text; the app shows the owner the GitHub/token hint for it (dashboard-app lib/format.ts cleanReason).
+const DISPATCH_REASON = "प्रक्रिया सुरू होऊ शकली नाही (तांत्रिक कारण). कृपया 'पुन्हा तयार करा' वापरावे; अडचण राहिल्यास मालकांना कळवावे.";
+const DISPATCH_DETAIL = 'GitHub जोडणी अयशस्वी — सेटिंग्जमधील GitHub token तपासावा.';
 // Settings PUT: this value deletes a secret key (Settings "key काढा"); the Supabase service key can never be cleared
 const CLEAR = '__clear__';
 const UNCLEARABLE = ['supabase_service_key'];
@@ -70,15 +77,15 @@ const CASE_FIELDS = ['cr_no', 'cr_year', 'file_no', 'subject', 'category', 'prio
 // desk profiles (C30, tools/desks/<id>.json; app list dashboard-app/src/lib/constants.ts DESKS). Add an id here when a
 // profile json is added. cases.desk null = law-desk6 (migration 0009).
 export const DESK_IDS = ['law-desk6', 'hte-mashi5'];
-const BAD_DESK = 'विभाग / कार्यासन चुकीचे — यादीतील पर्याय निवडा';
+const BAD_DESK = 'विभाग / कार्यासन योग्य नाही. कृपया यादीतील पर्याय निवडावा, ही विनंती.';
 // work categories (C33, migration 0011; app list dashboard-app): service = सेवाविषयक प्रकरणे (default; cases.work_type
 // null = service), court = न्यायालयीन प्रकरणे, legislature = विधिमंडळ कामकाज, procurement = खरेदी विषयक बाबी
 export const WORK_TYPES = ['service', 'court', 'legislature', 'procurement'];
-const BAD_WORK_TYPE = 'कामाची श्रेणी चुकीची — यादीतील पर्याय निवडा';
+const BAD_WORK_TYPE = 'कामाची श्रेणी योग्य नाही. कृपया यादीतील पर्याय निवडावा, ही विनंती.';
 // cases.nasti_no (migration 0012) = the eOffice नस्ती file / receipt no. as shown on the नस्ती page (/nasti/), to link
 // the two; free text, at most NASTI_NO_MAX characters after trim; '' / null clears
 const NASTI_NO_MAX = 100;
-const BAD_NASTI_NO = `नस्ती क्रमांक चुकीचा — जास्तीत जास्त ${NASTI_NO_MAX} अक्षरे`;
+const BAD_NASTI_NO = `नस्ती क्रमांक योग्य नाही. कृपया तो जास्तीत जास्त ${NASTI_NO_MAX} अक्षरांत नमूद करावा, ही विनंती.`;
 // case columns added by later migrations: the case is saved without them until the migration is applied
 const OPTIONAL_CASE_COLS = { desk: '0009', work_type: '0011', nasti_no: '0012' };
 // member profile (migration 0012: members.display_name / designation / office / mine): stored once per member so the
@@ -86,7 +93,8 @@ const OPTIONAL_CASE_COLS = { desk: '0009', work_type: '0011', nasti_no: '0012' }
 const PROFILE_KEYS = ['display_name', 'designation', 'office', 'mine'];
 const PROFILE_MAX = 120;
 const PROFILE_LABELS = { display_name: 'नाव', designation: 'पदनाम', office: 'कार्यालय', mine: 'आपल्याकडे असलेले स्थान' };
-const PROFILE_MIGRATION = 'माहिती साठवता आली नाही — Supabase मध्ये migration 0012 लागू करा';
+const PROFILE_MIGRATION = 'माहिती जतन होऊ शकली नाही (तांत्रिक अडचण). कृपया मालकांना कळवावे, ही विनंती.';
+const PROFILE_MIGRATION_DETAIL = 'Supabase मध्ये migration 0012 लागू करणे आवश्यक आहे.';
 const profileOf = r => Object.fromEntries(PROFILE_KEYS.map(k => [k, r && r[k] != null ? String(r[k]) : '']));
 
 // PostgREST error: the browser gets only "db <status>" (no table/column text); code/detail stay for the Worker's own checks.
@@ -230,7 +238,7 @@ async function failRuns(cfg, filter, reason, actor = null) {
 // state 'queued' and dispatched_at null; dispatchNext hands the oldest one (FIFO: created_at, id) to GitHub when no run
 // is active. Active = running/queued and dispatched less than STALE_MS ago (a legacy running row without dispatched_at:
 // created less than STALE_MS ago). Column missing (migration not applied) → null: every run is dispatched at once.
-const ENGINE_END_REASON = 'इंजिन अयशस्वी — पुन्हा तयार करा';
+const ENGINE_END_REASON = "प्रक्रिया पूर्ण होऊ शकली नाही (तांत्रिक कारण). कृपया 'पुन्हा तयार करा' वापरावे; अडचण राहिल्यास मालकांना कळवावे.";
 const pgTime = ms => `"${new Date(ms).toISOString()}"`;
 // draft edit (migration 0013): edit runs (runs.kind 'edit') are dispatched at once and never take part in the queue —
 // neither as its active run nor as a waiting one. Column runs.kind missing (0013 not applied) → no edit runs exist:
@@ -253,7 +261,7 @@ async function activeRuns(db) {
     throw e;
   }
 }
-const BUDGET_WAIT = 'मासिक खर्च-मर्यादा गाठली — Settings मध्ये मर्यादा वाढवल्यावर आपोआप सुरू होईल';
+const BUDGET_WAIT = 'मासिक खर्च-मर्यादा पूर्ण झाली आहे. मालकांनी सेटिंग्जमध्ये मर्यादा वाढवल्यावर प्रक्रिया आपोआप सुरू होईल.';
 const waitingRuns = db => withoutEditRuns(db, 'runs?state=eq.queued&dispatched_at=is.null&select=id,case_id,created_at,step&order=created_at.asc,id.asc&limit=200').then(r => r || []);
 // stuck runs (queued/running too long since dispatch) → failed; runs waiting in the queue are never swept here.
 // Edit runs: a shorter limit (EDIT_STALE_MS since creation = dispatch); the 3.5 h sweep covers them too.
@@ -590,7 +598,7 @@ async function route(req, env, url) {
     const b = await req.json().catch(() => ({}));
     if (!tok || tok.run_id !== String(b.run_id || '')) return bad('bad token', 403);
     if (!cfg.supabase_url || !cfg.supabase_service_key) return bad('not configured', 503);
-    const reason = String(b.reason || 'इंजिन अयशस्वी — पुन्हा तयार करा').trim().slice(0, 300);
+    const reason = String(b.reason || ENGINE_END_REASON).trim().slice(0, 300);
     const rows = await failRuns(cfg, `id=eq.${Number(tok.run_id)}`, reason);
     const nx = await dispatchNext(env, cfg, url.origin, null);   // C33: the queue moves on
     return json({ ok: true, changed: rows.length, dispatched: nx.dispatched ? nx.dispatched.id : null });
@@ -649,7 +657,7 @@ async function route(req, env, url) {
     try {
       rows = await db.rest(`members?user_id=eq.${encodeURIComponent(user.id)}&select=role,${PROFILE_KEYS.join(',')}`, { method: 'PATCH', body: JSON.stringify(row) });
     } catch (e) {
-      if (PROFILE_KEYS.some(k => missingColumn(e, k))) return json({ error: 'migration_missing', reason: PROFILE_MIGRATION }, 409);
+      if (PROFILE_KEYS.some(k => missingColumn(e, k))) return json({ error: 'migration_missing', reason: PROFILE_MIGRATION, detail: PROFILE_MIGRATION_DETAIL }, 409);
       throw e;
     }
     const r = rows && rows[0];
@@ -837,7 +845,7 @@ async function route(req, env, url) {
       // approval / court_notice before migration 0008: enum value missing (22P02 invalid input value for enum file_kind)
       if (e instanceof DbError && ['approval', 'court_notice'].includes(kind) && (e.code === '22P02' || /enum/i.test(e.detail))) {
         console.log(`file_kind ${kind} missing (apply migration 0008)`);
-        return bad(KIND_NOT_READY, 409);
+        return json({ error: KIND_NOT_READY, detail: KIND_NOT_READY_DETAIL }, 409);
       }
       throw e;
     }
@@ -900,7 +908,7 @@ async function route(req, env, url) {
         await db.rest(`runs?id=eq.${run.id}`, { method: 'PATCH', body: JSON.stringify({ state: 'failed', step: DISPATCH_REASON, finished_at: new Date().toISOString() }) });
         await log(cfg, case_id, user.id, 'run_failed', { run_id: run.id, reason: DISPATCH_REASON, error: String(e.message || e).slice(0, 300) });
       }
-      return json({ error: 'dispatch_failed', reason: DISPATCH_REASON, run_id: run.id }, 502);
+      return json({ error: 'dispatch_failed', reason: DISPATCH_REASON, detail: DISPATCH_DETAIL, run_id: run.id }, 502);
     };
     if (act === null) {
       try {
@@ -962,7 +970,7 @@ async function route(req, env, url) {
       spec = await db.rest(`case_files?case_id=eq.${caseId}&kind=eq.spec&original_name=eq.spec.json&select=id&limit=1`);
     } catch (e) {
       // enum value 'spec' missing (22P02 invalid input value for enum file_kind): migration 0013 not applied
-      if (e instanceof DbError && (e.code === '22P02' || /enum/i.test(e.detail))) return json({ error: 'migration_missing', reason: EDIT_MIGRATION }, 409);
+      if (e instanceof DbError && (e.code === '22P02' || /enum/i.test(e.detail))) return json({ error: 'migration_missing', reason: EDIT_MIGRATION, detail: EDIT_MIGRATION_DETAIL }, 409);
       throw e;
     }
     if (!spec || !spec.length) return json({ error: 'no_spec', reason: NO_SPEC }, 409);
@@ -978,7 +986,7 @@ async function route(req, env, url) {
         [run] = await db.rest('runs', { method: 'POST', body: JSON.stringify(cur) });
         break;
       } catch (e) {
-        if (['kind', 'edit_target', 'edit_message', 'edit_attachments'].some(c => namesColumn(e, c))) return json({ error: 'migration_missing', reason: EDIT_MIGRATION }, 409);
+        if (['kind', 'edit_target', 'edit_message', 'edit_attachments'].some(c => namesColumn(e, c))) return json({ error: 'migration_missing', reason: EDIT_MIGRATION, detail: EDIT_MIGRATION_DETAIL }, 409);
         // runs.dispatched_at missing (migration 0011): the row without it (the edit run is dispatched at once anyway)
         if (!('dispatched_at' in cur) || !missingColumn(e, 'dispatched_at')) throw e;
         const { dispatched_at, ...rest } = cur;
@@ -991,7 +999,7 @@ async function route(req, env, url) {
     } catch (e) {
       await db.rest(`runs?id=eq.${Number(run.id)}`, { method: 'PATCH', body: JSON.stringify({ state: 'failed', step: DISPATCH_REASON, finished_at: new Date().toISOString() }) });
       await log(cfg, caseId, user.id, 'edit_failed', { run_id: run.id, reason: DISPATCH_REASON, error: String(e.message || e).slice(0, 300) });
-      return json({ error: 'dispatch_failed', reason: DISPATCH_REASON, run_id: run.id }, 502);
+      return json({ error: 'dispatch_failed', reason: DISPATCH_REASON, detail: DISPATCH_DETAIL, run_id: run.id }, 502);
     }
     await log(cfg, caseId, user.id, 'edit_requested', { run_id: run.id, target: b.target, message, attachments });
     return json(run);
@@ -1011,14 +1019,14 @@ async function route(req, env, url) {
   if (p === '/api/gr' && M === 'POST') {
     if (!canWrite(user)) return bad('read-only', 403);
     const { code } = await req.json();
-    if (!/^\d{16,20}$/.test(String(code || ''))) return bad('सांकेतांक: 16–20 digits');
+    if (!/^\d{16,20}$/.test(String(code || ''))) return bad('सांकेतांक 16 ते 20 अंकी असावा. कृपया योग्य सांकेतांक नमूद करावा, ही विनंती.');
     const srcs = [`https://gr.maharashtra.gov.in/Site/Upload/Government%20Resolutions/Marathi/${code}.pdf`, `https://archive.org/download/in.gov.maharashtra.gr.${code}/${code}.pdf`];
     let pdf = null, src = '';
     for (const s of srcs) {
       const r = await fetch(s, { redirect: 'follow' });
       if (r.ok) { const b = await r.arrayBuffer(); if (new TextDecoder().decode(b.slice(0, 5)) === '%PDF-') { pdf = b; src = s; break; } }
     }
-    if (!pdf) return bad('GR मिळाला नाही', 404);
+    if (!pdf) return bad('या सांकेतांकाचा GR मिळाला नाही.', 404);
     await db.upload('gr-library', `${code}.pdf`, pdf, 'application/pdf');
     const d = String(code);
     await db.rest('gr_library', { method: 'POST', body: JSON.stringify({ code: d, date: `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}`, storage_path: `gr-library/${d}.pdf`, source_url: src }), headers: { Prefer: 'resolution=merge-duplicates,return=representation' } });
@@ -1032,11 +1040,13 @@ async function route(req, env, url) {
     // GitHub qualifiers (repo:, org:, user:, path:, in:, language:, … — any `word:` token) are removed from q:
     // the search stays inside register/ of github_repo
     const q = (url.searchParams.get('q') || '').slice(0, 100).split(/\s+/).filter(t => t && !/[A-Za-z_]+:/.test(t)).join(' ');
-    if (!q || !cfg.github_repo || !cfg.github_token) return json([]);
+    if (!q) return json([]);
+    // R3 (UI audit): search service not set up → a Marathi reason, not an empty list that reads as "nothing found"
+    if (!cfg.github_repo || !cfg.github_token) return json({ error: 'search_unavailable', reason: SEARCH_UNAVAILABLE }, 503);
     const r = await fetch(`https://api.github.com/search/code?q=${encodeURIComponent(`${q} repo:${cfg.github_repo} path:register`)}&per_page=15`, {
       headers: { Authorization: `Bearer ${cfg.github_token}`, Accept: 'application/vnd.github.text-match+json', 'User-Agent': 'prastav-kaksha' },
     });
-    if (!r.ok) return bad(`search ${r.status}`, 502);
+    if (!r.ok) return json({ error: `search ${r.status}`, reason: SEARCH_FAILED }, 502);
     const j = await r.json();
     const repo = cfg.github_repo.toLowerCase();
     return json((j.items || []).filter(i => String((i.repository && i.repository.full_name) || '').toLowerCase() === repo).map(i => ({ path: i.path, frags: (i.text_matches || []).slice(0, 2).map(x => x.fragment) })));

@@ -1,4 +1,5 @@
 import { Component, type ReactNode } from 'react';
+import { viewerOwner } from '../lib/format';
 
 // ---- Stale chunks after a redeploy ("link not working"): old index.html asks for page files that no longer exist. ----
 // One automatic reload fetches the new build. The guard is keyed by the current build's entry script, so a new
@@ -30,7 +31,7 @@ export function reloadOnceForNewBuild(): boolean {
   return true;
 }
 
-/** Keeps the app usable when one page crashes and shows the error text (so Abhi can send a screenshot). */
+/** Keeps the app usable when one page crashes. The technical details (stack) only for the owner (UI audit X2). */
 export default class ErrorBoundary extends Component<{ children: ReactNode; resetKey?: string }, { err: Error | null; reloading: boolean }> {
   state = { err: null as Error | null, reloading: false };
   static getDerivedStateFromError(err: Error) {
@@ -47,19 +48,21 @@ export default class ErrorBoundary extends Component<{ children: ReactNode; rese
     if (this.state.reloading || isChunkError(this.state.err))
       return (
         <div className="card space-y-3 p-5" role="status">
-          <div className="text-lg font-bold">app ची नवीन आवृत्ती आली आहे — पान रीलोड करत आहे</div>
-          <button className="btn-primary min-h-tap" onClick={() => location.reload()}>पान रीलोड करा</button>
+          <div className="text-lg font-bold">नवीन आवृत्ती उपलब्ध झाली आहे — पान पुन्हा उघडत आहे.</div>
+          <button className="btn-primary min-h-tap" onClick={() => location.reload()}>पान पुन्हा उघडा</button>
         </div>
       );
     return (
       <div className="card space-y-3 p-5" role="alert">
         <div className="text-lg font-bold text-red-700 dark:text-red-300">हे पान उघडताना त्रुटी आली</div>
-        <p>उरलेले app चालू आहे — डावीकडून दुसरे पान उघडा, किंवा खालील बटणाने पान रीलोड करा. अडचण राहिल्यास या संदेशाचा screenshot पाठवा.</p>
+        <p>इतर पाने नेहमीप्रमाणे उपलब्ध आहेत. कृपया यादीतून दुसरे पान उघडावे किंवा खालील बटणाने हे पान पुन्हा उघडावे. अडचण राहिल्यास कृपया मालकांना कळवावे, ही विनंती.</p>
+        {viewerOwner() && (
         <details>
           <summary className="cursor-pointer text-sm text-slate-500">तांत्रिक तपशील</summary>
           <pre className="mt-2 overflow-x-auto whitespace-pre-wrap rounded-lg bg-slate-100 p-3 text-xs dark:bg-navy-800">{String(this.state.err.stack || this.state.err.message).slice(0, 1500)}</pre>
         </details>
-        <button className="btn-primary min-h-tap" onClick={() => location.reload()}>पान रीलोड करा</button>
+        )}
+        <button className="btn-primary min-h-tap" onClick={() => location.reload()}>पान पुन्हा उघडा</button>
       </div>
     );
   }

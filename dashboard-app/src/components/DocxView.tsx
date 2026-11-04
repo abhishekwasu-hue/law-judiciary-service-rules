@@ -8,13 +8,13 @@ let lib: Promise<typeof import('docx-preview')> | null = null;
 export const docxLib = () => (lib ||= import('docx-preview').catch(e => { lib = null; throw e; }));
 
 const NARROW = 768;
-const NEW_BUILD_MSG = 'app ची नवीन आवृत्ती आली आहे — पान रीलोड करत आहे';
+const NEW_BUILD_MSG = 'नवीन आवृत्ती उपलब्ध झाली आहे — पान पुन्हा उघडत आहे.';
 /** Marathi text for a load/render error; raw library (English) messages are not shown.
  *  An old tab after a redeploy cannot load the library chunk → reload once for the new build. */
 function errText(e: unknown): string {
   if (isChunkError(e) && reloadOnceForNewBuild()) return NEW_BUILD_MSG;
   const h = humanError(e);
-  return /[ऀ-ॿ]/.test(h) ? h : 'फाइल उघडता आली नाही — पुन्हा लोड करा किंवा डाउनलोड करून पाहा.';
+  return /[ऀ-ॿ]/.test(h) ? h : 'फाइल उघडता आली नाही. कृपया पुन्हा प्रयत्न करावा किंवा फाइल डाउनलोड करून पाहावी, ही विनंती.';
 }
 
 const BAD_URL = /^\s*(javascript|data|vbscript):/i;
@@ -46,7 +46,7 @@ export default function DocxView({ fileId }: { fileId: number }) {
   const host = useRef<HTMLDivElement>(null);
   const [state, setState] = useState<'load' | 'ok' | 'err'>('load');
   const [err, setErr] = useState('');
-  const [scaled, setScaled] = useState(false);
+  const [, setScaled] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -103,9 +103,7 @@ export default function DocxView({ fileId }: { fileId: number }) {
     <div>
       {state === 'load' && <div className="space-y-2"><Skeleton className="h-6 w-1/3" /><Skeleton className="h-[50vh] w-full" /></div>}
       {state === 'err' && <div className="rounded-lg bg-red-100 p-3 text-red-900 dark:bg-red-900/40 dark:text-red-100" role="alert">{err === NEW_BUILD_MSG ? err : `पूर्वावलोकन होऊ शकले नाही: ${err}`}</div>}
-      {state === 'ok' && scaled && <p className="mb-1 text-sm font-semibold text-slate-600 dark:text-slate-300">लहान पडद्यासाठी पान लहान दाखवले आहे — पूर्ण वाचनासाठी डाउनलोड करा.</p>}
       <div ref={host} className="docx-host max-h-[75vh] overflow-auto rounded-lg bg-slate-200 dark:bg-navy-950" hidden={state !== 'ok'} />
-      {state === 'ok' && <p className="mt-1 text-xs text-slate-500">पूर्वावलोकनात DVOT-SurekhMR फॉन्ट नसल्यास दुसरा फॉन्ट दिसतो; डाउनलोड फाइल मूळ आहे.</p>}
     </div>
   );
 }

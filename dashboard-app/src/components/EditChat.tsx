@@ -9,7 +9,7 @@ import {
   EDIT_ATTACH_ACCEPT, EDIT_ATTACH_DEFAULT, EDIT_ATTACH_KINDS, EDIT_MAX_CHARS, EDIT_MAX_FILES, EDIT_TARGETS, FILE_KIND_LABEL,
   editTargetLabel, isStale, runActive, type EditAttachKind, type EditTarget,
 } from '../lib/constants';
-import { cleanReason, fmtBytes, fmtDateTime, textOf } from '../lib/format';
+import { cleanReason as cleanReasonLib, fmtBytes, fmtDateTime, textOf } from '../lib/format';
 import type { CaseFile, EditChange, Run } from '../lib/types';
 import type { CaseCtx } from '../pages/CaseDetail';
 import { Chip, Modal, Spinner } from './ui';
@@ -18,6 +18,10 @@ import { useToast } from './Toast';
 import DocxView from './DocxView';
 
 const MAX_BYTES = 50 * 1024 * 1024;
+/** Failure reason via the lib helper (C13): the owner flag is passed for the isOwner-aware version; the older one-argument
+ *  version ignores it. */
+const reasonText = (s: string | null | undefined, isOwner: boolean) =>
+  (cleanReasonLib as (s: string | null | undefined, isOwner?: boolean) => string)(s, isOwner);
 const okExt = (name: string) => EDIT_ATTACH_ACCEPT.split(',').includes((name.match(/\.[A-Za-z0-9]+$/) || [''])[0].toLowerCase());
 /** A GR-looking file name (सांकेतांक digits or "GR") → pre-select GR; else इतर कागदपत्र. */
 const guessKind = (name: string): EditAttachKind => (/\d{16,20}|(^|[^a-z])gr([^a-z]|$)|शासन निर्णय/i.test(name) ? 'gr' : 'extra_doc');
@@ -96,7 +100,7 @@ function Turn({ r, ctx, names, onOpen }: { r: Run; ctx: CaseCtx; names: string[]
         <div className="flex flex-wrap items-center gap-2">
           {active ? (
             <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-100 px-2.5 py-0.5 text-sm font-bold text-blue-900 dark:bg-blue-900/40 dark:text-blue-100">
-              <Spinner className="h-3.5 w-3.5" /> {r.state === 'queued' ? 'रांगेत' : 'चालू'}
+              <Spinner className="h-3.5 w-3.5" /> {r.state === 'queued' ? 'प्रतीक्षेत' : 'चालू'}
             </span>
           ) : stale ? <Chip tone="red">वेळ संपली</Chip>
             : refused ? <Chip tone="amber">नाकारले</Chip>
@@ -106,7 +110,7 @@ function Turn({ r, ctx, names, onOpen }: { r: Run; ctx: CaseCtx; names: string[]
         </div>
         {refused && <div className="break-words text-sm text-amber-900 [overflow-wrap:anywhere] dark:text-amber-100">{textOf(res.refused)}</div>}
         {(r.state === 'failed' || stale) && (
-          <div className="break-words text-sm text-red-900 [overflow-wrap:anywhere] dark:text-red-200">{stale ? 'वेळ संपली — कृपया सुधारणा पुन्हा पाठवावी, ही विनंती.' : cleanReason(r.step) || 'कारण उपलब्ध नाही'}</div>
+          <div className="break-words text-sm text-red-900 [overflow-wrap:anywhere] dark:text-red-200">{stale ? 'वेळ संपली — कृपया सुधारणा पुन्हा पाठवावी, ही विनंती.' : reasonText(r.step, me?.role === 'owner') || 'कारण उपलब्ध नाही'}</div>
         )}
         {r.state === 'done' && !refused && (res.summary || r.summary) && <div className="break-words font-semibold [overflow-wrap:anywhere]">{res.summary || r.summary}</div>}
         {r.state === 'done' && !refused && Array.isArray(res.notes) && res.notes.map((n, i) => <div key={i} className="break-words rounded-lg bg-amber-50 px-2 py-1 text-sm text-amber-900 [overflow-wrap:anywhere] dark:bg-amber-900/30 dark:text-amber-100">ℹ️ {textOf(n)}</div>)}
@@ -188,13 +192,13 @@ export default function EditChat({ ctx }: { ctx: CaseCtx }) {
   function addFiles(list: FileList | File[]) {
     const add: Att[] = [];
     for (const f of Array.from(list)) {
-      if (!okExt(f.name)) { toast(`${f.name}: फक्त PDF / JPG / PNG / Word जोडता येते`, 'err'); continue; }
-      if (f.size > MAX_BYTES) { toast(`${f.name}: फाइल 50 MB पेक्षा मोठी`, 'err'); continue; }
+      if (!okExt(f.name)) { toast(`${f.name}: फक्त PDF / JPG / PNG / Word फाइल जोडता येते.`, 'err'); continue; }
+      if (f.size > MAX_BYTES) { toast(`${f.name}: फाइल 50 MB पेक्षा मोठी आहे — कृपया लहान फाइल जोडावी.`, 'err'); continue; }
       add.push({ key: `${f.name}-${f.size}-${Math.random()}`, file: f, kind: guessKind(f.name), pct: null });
     }
     setAtts(s => {
       const n = [...s, ...add];
-      if (n.length > EDIT_MAX_FILES) toast(`एका संदेशात जास्तीत जास्त ${EDIT_MAX_FILES} फाइल`, 'err');
+      if (n.length > EDIT_MAX_FILES) toast(`एका संदेशात जास्तीत जास्त ${EDIT_MAX_FILES} फाइल जोडता येतात.`, 'err');
       return n.slice(0, EDIT_MAX_FILES);
     });
     if (add.length) setText(t => (t.trim() ? t : EDIT_ATTACH_DEFAULT));
@@ -210,7 +214,7 @@ export default function EditChat({ ctx }: { ctx: CaseCtx }) {
     setConfirm(false);
     const message = text.trim();
     if (!tgt || !message || busy || active) return;
-    if (message.length > EDIT_MAX_CHARS) return toast(`संदेश ${EDIT_MAX_CHARS} अक्षरांपेक्षा लहान लिहा`, 'err');
+    if (message.length > EDIT_MAX_CHARS) return toast(`कृपया संदेश ${EDIT_MAX_CHARS} अक्षरांपेक्षा लहान लिहावा.`, 'err');
     setBusy(true);
     try {
       const ids: number[] = [];
@@ -282,7 +286,7 @@ export default function EditChat({ ctx }: { ctx: CaseCtx }) {
           </div>
         )}
         {!ctx.hasSpec ? (
-          <p className="rounded-lg bg-slate-100 px-3 py-2 text-sm text-slate-700 dark:bg-navy-800 dark:text-slate-200">हे प्रकरण या सुविधेपूर्वीचे आहे. बदलासाठी कृपया 'पुन्हा तयार करा' हा पर्याय वापरावा, ही विनंती.</p>
+          <p className="rounded-lg bg-slate-100 px-3 py-2 text-sm text-slate-700 dark:bg-navy-800 dark:text-slate-200">हे प्रकरण या सुविधेपूर्वीचे आहे. बदलासाठी कृपया 'संपूर्ण प्रकरण पुन्हा तयार करणे' हा पर्याय वापरावा, ही विनंती.</p>
         ) : !ctx.canWrite ? null : (
           <form onSubmit={ask} className="space-y-2">
             <label className="flex min-w-0 items-center gap-2 text-sm">
@@ -301,12 +305,12 @@ export default function EditChat({ ctx }: { ctx: CaseCtx }) {
                       <span className="text-slate-500">{fmtBytes(a.file.size)}</span>
                       {a.pct !== null ? <span className="inline-flex items-center gap-1 font-semibold text-blue-800 dark:text-blue-200"><Spinner className="h-3 w-3" /> {a.pct}%</span>
                         : a.id ? <span className="font-semibold text-green-800 dark:text-green-300">✓</span> : null}
-                      <select className="rounded border border-slate-300 bg-white px-1 py-0.5 text-xs dark:border-navy-700 dark:bg-navy-900" value={a.kind} disabled={busy || !!a.id}
+                      <select className="min-h-tap rounded border border-slate-300 bg-white px-1 py-0.5 text-xs dark:border-navy-700 dark:bg-navy-900" value={a.kind} disabled={busy || !!a.id}
                         aria-label={`${a.file.name}: प्रकार`} onChange={e => setAtts(s => s.map(x => (x.key === a.key ? { ...x, kind: e.target.value as EditAttachKind } : x)))}>
                         {EDIT_ATTACH_KINDS.map(k => <option key={k.id} value={k.id}>{k.label}</option>)}
                       </select>
-                      <button type="button" className="min-h-[28px] min-w-[28px] rounded font-bold text-slate-600 hover:bg-slate-200 dark:text-slate-300 dark:hover:bg-navy-700" disabled={busy}
-                        aria-label={`${a.file.name} काढा`} onClick={() => setAtts(s => s.filter(x => x.key !== a.key))}>✕</button>
+                      <button type="button" className="min-h-tap min-w-tap rounded font-bold text-slate-600 hover:bg-slate-200 dark:text-slate-300 dark:hover:bg-navy-700" disabled={busy}
+                        aria-label={`${a.file.name} काढावी`} onClick={() => setAtts(s => s.filter(x => x.key !== a.key))}>✕</button>
                     </li>
                   ))}
                 </ul>
@@ -323,7 +327,7 @@ export default function EditChat({ ctx }: { ctx: CaseCtx }) {
                 aria-label="सुधारणेचा संदेश"
               />
               <div className="flex items-center gap-2 px-2 pb-2">
-                <button type="button" className="btn-ghost min-h-tap min-w-tap px-2" disabled={busy || atts.length >= EDIT_MAX_FILES} title="फाइल जोडा (PDF / JPG / PNG / Word)" aria-label="फाइल जोडा" onClick={() => fileRef.current?.click()}>📎</button>
+                <button type="button" className="btn-ghost min-h-tap min-w-tap px-2" disabled={busy || atts.length >= EDIT_MAX_FILES} title="फाइल जोडावी (PDF / JPG / PNG / Word)" aria-label="फाइल जोडावी" onClick={() => fileRef.current?.click()}>📎</button>
                 <input ref={fileRef} type="file" hidden multiple accept={EDIT_ATTACH_ACCEPT} onChange={e => { const l = e.target.files; if (l?.length) addFiles(l); e.target.value = ''; }} />
                 <span className="min-w-0 truncate text-xs text-slate-500 dark:text-slate-400">{text.length > EDIT_MAX_CHARS - 200 ? `${text.length}/${EDIT_MAX_CHARS}` : fine ? 'Enter = कृपया पाठवावे • Shift+Enter = नवी ओळ' : ''}</span>
                 <button className="btn-primary ml-auto" disabled={!canSend}>{busy && <Spinner />} {busy && atts.some(a => !a.id) ? 'अपलोड…' : 'कृपया पाठवावे'}</button>

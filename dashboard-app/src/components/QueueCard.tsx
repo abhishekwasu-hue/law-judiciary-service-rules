@@ -1,4 +1,4 @@
-// "रांग" card (C33): runs are processed one by one by the Worker's sequential queue. Shows तयार (today) / चालू / रांगेत
+// "प्रतीक्षा-यादी" card (C33): runs are processed one by one by the Worker's sequential queue. Shows तयार (today) / चालू / रांगेत
 // with each waiting case's position and an estimated time, from the latest run of every case (useData, live via Realtime)
 // and the typical run time of recent runs (useTypicalRunSeconds — same basis as the run page's ETA).
 import { useEffect, useMemo, useState } from 'react';
@@ -59,12 +59,12 @@ export default function QueueCard({ className = '' }: { className?: string }) {
   const allLeft = rows.length ? Math.max(...rows.map(r => r.leftSec ?? 0)) : 0;
   const label = (r: Run) => {
     const c = cases.find(x => x.id === r.case_id);
-    return c ? crLabel(c) : `प्रकरण #${r.case_id}`;
+    return c ? crLabel(c) : `प्रकरण क्र. ${r.case_id}`;
   };
   return (
-    <section className={`card min-w-0 p-3 sm:p-4 ${className}`} aria-label="प्रक्रियेची रांग">
+    <section className={`card min-w-0 p-3 sm:p-4 ${className}`} aria-label="प्रक्रियेची प्रतीक्षा-यादी">
       <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-        <h2 className="text-lg font-bold">रांग</h2>
+        <h2 className="text-lg font-bold">प्रतीक्षा-यादी</h2>
         {rows.length > 0 && typical && (
           <span className="text-sm text-slate-600 dark:text-slate-300">सर्व पूर्ण: अंदाजे <b>~{fmtDuration(allLeft)}</b></span>
         )}
@@ -72,7 +72,7 @@ export default function QueueCard({ className = '' }: { className?: string }) {
       <div className="grid grid-cols-3 gap-2">
         <Num label="तयार (आज)" value={ready} tone="green" />
         <Num label="चालू" value={nRun} tone="blue" />
-        <Num label="रांगेत" value={nWait} tone="amber" />
+        <Num label="प्रतीक्षेत" value={nWait} tone="amber" />
       </div>
       {rows.length > 0 && (
         <ol className="mt-3 divide-y divide-slate-100 dark:divide-navy-800">
