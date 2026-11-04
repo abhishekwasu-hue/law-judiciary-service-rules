@@ -24,6 +24,8 @@ const runInserts = [];
 let deskColumn = true;            // false = migration 0009 not applied (cases.desk missing)
 const caseInserts = [];
 let kindEnum08 = true;            // false = migration 0008 not applied (file_kind lacks approval / court_notice)          // false = migration 0005 not applied (PostgREST 42703)
+let profileColumns = true;       // false = migration 0012 not applied (members profile columns missing)
+const memberPatches = [];
 let membersInsert = 'ok';         // 'conflict' = a parallel first request already inserted (409 23505)
 const cases = [{ id: 40, cr_no: '21', cr_year: 2026 }];
 let caseInsertRace = false;       // true = unique violation on insert although the pre-check found nothing
@@ -103,7 +105,14 @@ globalThis.fetch = async (u, opt = {}) => {
     if (t === 'Bearer stranger-jwt') return res({ id: 'u9', email: 'x@example.com' });
     return res({}, 401);
   }
-  if (u.startsWith(`${SB}/rest/v1/members?user_id=eq.`)) return res(members.filter(x => u.includes(x.user_id)).map(x => ({ role: x.role })));
+  if (u.startsWith(`${SB}/rest/v1/members?user_id=eq.`)) {
+    // migration 0012 (members.display_name/designation/office/mine) applied unless profileColumns = false
+    const sel = (new URL(u).searchParams.get('select') || 'role').split(',');
+    if (!profileColumns && (sel.length > 1 || opt.method === 'PATCH')) return res({ code: '42703', message: 'column members.display_name does not exist' }, 400);
+    const hit = members.filter(x => u.includes(x.user_id));
+    if (opt.method === 'PATCH') { const b = JSON.parse(opt.body); memberPatches.push({ u, body: b }); hit.forEach(x => Object.assign(x, b)); }
+    return res(hit.map(x => Object.fromEntries(sel.map(k => [k, x[k] ?? null]))));
+  }
   if (u === `${SB}/rest/v1/members`) {
     const row = JSON.parse(opt.body);
     if (membersInsert === 'conflict') { members.push(row); return res({ code: '23505', message: 'duplicate key value violates unique constraint "members_pkey"' }, 409); }
@@ -1063,4 +1072,117 @@ test('C33: monthly limit — waiting runs are not reserved; the check runs at di
     assert.match(blockedRun.step, /मासिक खर्च-मर्यादा गाठली/);
     assert.equal(dispatchBodies().length, n0 + 1, 'nothing dispatched past the limit');
   } finally { Q = null; monthRuns = []; }
+});
+
+// ---------- migration 0012: member profile (PATCH /api/me), cases.nasti_no, नस्ती page CSP ----------
+const ownerM = { authorization: 'Bearer owner-jwt' };
+const patchMe = (b, h = ownerM) => call('/api/me', { method: 'PATCH', headers: h, body: JSON.stringify(b) });
+const EMPTY_PROFILE = { display_name: '', designation: '', office: '', mine: '' };
+
+test('0012: GET /api/me returns the profile; without the columns → role only, empty profile', async () => {
+  const me = members.find(x => x.user_id === 'u1');
+  Object.assign(me, { display_name: 'अभि', designation: null, office: null, mine: null });
+  let u = await body(await call('/api/me', { headers: ownerM }));
+  assert.deepEqual(u, { id: 'u1', email: 'abhi@example.com', role: 'owner', profile: { ...EMPTY_PROFILE, display_name: 'अभि' } });
+  profileColumns = false;
+  try {
+    const r = await call('/api/me', { headers: ownerM });
+    assert.equal(r.status, 200);
+    u = await r.json();
+    assert.deepEqual(u, { id: 'u1', email: 'abhi@example.com', role: 'owner', profile: EMPTY_PROFILE });
+  } finally { profileColumns = true; me.display_name = null; }
+});
+
+test('0012: PATCH /api/me — trimmed own row, unknown keys ignored, too long 400, migration missing 409, non-member 403', async () => {
+  memberPatches.length = 0;
+  let r = await patchMe({ display_name: '  अभिषेक  ', designation: 'कार्यासन अधिकारी', office: 'विधि व न्याय विभाग', mine: 'कार्यासन-६, माझ्याकडे', role: 'staff', user_id: 'u9' });
+  assert.equal(r.status, 200, await r.clone().text());
+  assert.deepEqual(await r.json(), { id: 'u1', email: 'abhi@example.com', role: 'owner',
+    profile: { display_name: 'अभिषेक', designation: 'कार्यासन अधिकारी', office: 'विधि व न्याय विभाग', mine: 'कार्यासन-६, माझ्याकडे' } });
+  assert.equal(memberPatches.length, 1);
+  assert.match(memberPatches[0].u, /members\?user_id=eq\.u1&/, 'own row only');
+  assert.deepEqual(Object.keys(memberPatches[0].body).sort(), ['designation', 'display_name', 'mine', 'office'], 'role / user_id never written');
+  assert.equal(members.find(x => x.user_id === 'u1').role, 'owner');
+  // GET reflects it
+  assert.equal((await body(await call('/api/me', { headers: ownerM }))).profile.display_name, 'अभिषेक');
+  // '' / null clears
+  r = await patchMe({ office: '', mine: null });
+  assert.deepEqual((await r.json()).profile, { display_name: 'अभिषेक', designation: 'कार्यासन अधिकारी', office: '', mine: '' });
+  assert.deepEqual(memberPatches.at(-1).body, { office: null, mine: null });
+  // too long / wrong type / nothing → 400 Marathi, nothing written
+  const n = memberPatches.length;
+  r = await patchMe({ designation: 'प'.repeat(121) });
+  assert.equal(r.status, 400); assert.match((await r.json()).error, /पदनाम: जास्तीत जास्त 120 अक्षरे/);
+  assert.equal((await patchMe({ designation: '  ' + 'प'.repeat(120) + '  ' })).status, 200, '120 after trim is fine');
+  r = await patchMe({ office: 5 });
+  assert.equal(r.status, 400); assert.match((await r.json()).error, /कार्यालय/);
+  r = await patchMe({ foo: 'x' });
+  assert.equal(r.status, 400); assert.match((await r.json()).error, /बदलण्यासाठी माहिती नाही/);
+  assert.equal(memberPatches.length, n + 1);
+  // migration 0012 not applied
+  profileColumns = false;
+  try {
+    r = await patchMe({ display_name: 'x' });
+    assert.equal(r.status, 409);
+    assert.deepEqual(await r.json(), { error: 'migration_missing', reason: 'माहिती साठवता आली नाही — Supabase मध्ये migration 0012 लागू करा' });
+  } finally { profileColumns = true; }
+  // not a member / not signed in
+  assert.equal((await patchMe({ display_name: 'x' }, { authorization: 'Bearer stranger-jwt' })).status, 403);
+  assert.equal((await call('/api/me', { method: 'PATCH', body: '{}' })).status, 401);
+  Object.assign(members.find(x => x.user_id === 'u1'), { display_name: null, designation: null, office: null, mine: null });
+});
+
+test('0012: case nasti_no — create / PATCH trimmed, cleared, too long 400 Marathi; missing column → saved without it', async () => {
+  const create = b => call('/api/cases', { method: 'POST', headers: ownerM, body: JSON.stringify(b) });
+  const edit = (id, b) => call(`/api/cases/${id}`, { method: 'PATCH', headers: ownerM, body: JSON.stringify(b) });
+  caseInserts.length = 0;
+  let r = await create({ subject: 'x', nasti_no: '  LNJD-DESK6/12/2026-E  ' });
+  assert.equal(r.status, 200, await r.clone().text());
+  assert.equal(caseInserts.at(-1).nasti_no, 'LNJD-DESK6/12/2026-E');
+  r = await create({ subject: 'x', nasti_no: '   ' });
+  assert.equal(r.status, 200); assert.ok(!('nasti_no' in caseInserts.at(-1)), 'blank = not sent');
+  const n = caseInserts.length;
+  for (const v of ['न'.repeat(101), 12, ['a']]) {
+    r = await create({ subject: 'x', nasti_no: v });
+    assert.equal(r.status, 400, JSON.stringify(v));
+    assert.deepEqual(await r.json(), { error: 'नस्ती क्रमांक चुकीचा — जास्तीत जास्त 100 अक्षरे' });
+    assert.equal((await edit(43, { nasti_no: v })).status, 400);
+  }
+  assert.equal(caseInserts.length, n, 'nothing inserted for a bad nasti_no');
+  assert.equal((await create({ subject: 'x', nasti_no: 'न'.repeat(100) })).status, 200, '100 is fine');
+  r = await edit(43, { nasti_no: ' 1234567 ' });
+  assert.equal(r.status, 200); assert.equal(caseRows[43].nasti_no, '1234567');
+  r = await edit(43, { nasti_no: '' });
+  assert.equal(r.status, 200); assert.equal(caseRows[43].nasti_no, null, "'' clears");
+  r = await edit(43, { nasti_no: 'abc' });
+  r = await edit(43, { nasti_no: null });
+  assert.equal(r.status, 200); assert.equal(caseRows[43].nasti_no, null, 'null clears');
+  // migration 0012 not applied: the case is still saved, without nasti_no
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (u, opt = {}) => (String(u).startsWith(`${SB}/rest/v1/cases`) && ['POST', 'PATCH'].includes(opt.method) && 'nasti_no' in JSON.parse(opt.body)
+    ? new Response(JSON.stringify({ code: 'PGRST204', message: "Could not find the 'nasti_no' column of 'cases' in the schema cache" }), { status: 400 })
+    : realFetch(u, opt));
+  try {
+    caseInserts.length = 0;
+    r = await create({ subject: 'y', nasti_no: '42', desk: 'law-desk6' });
+    assert.equal(r.status, 200);
+    assert.deepEqual(caseInserts.map(x => 'nasti_no' in x), [false]);
+    assert.equal(caseInserts[0].desk, 'law-desk6', 'other fields kept');
+    r = await edit(43, { post: 'लिपिक', nasti_no: '42' });
+    assert.equal(r.status, 200); assert.equal(caseRows[43].post, 'लिपिक'); assert.equal(caseRows[43].nasti_no, null);
+    assert.equal((await edit(43, { nasti_no: '42' })).status, 200, 'PATCH of only nasti_no → row returned');
+  } finally { globalThis.fetch = realFetch; }
+});
+
+test('0012: नस्ती page CSP — connect-src without self (data: blob: only); app CSP unchanged', async () => {
+  for (const path of ['/nasti/', '/nasti/index.html']) {
+    const ncsp = (await call(path)).headers.get('content-security-policy');
+    const conn = ncsp.split('; ').find(d => d.startsWith('connect-src'));
+    assert.equal(conn, 'connect-src data: blob:', ncsp);
+    assert.match(ncsp, /script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:/);
+    assert.match(ncsp, /worker-src 'self' blob:/); assert.match(ncsp, /frame-ancestors 'self'/);
+    assert.match(ncsp, /default-src 'self' data: blob:/);
+  }
+  const csp = (await call('/cases/7')).headers.get('content-security-policy');
+  assert.ok(csp.includes(`connect-src 'self' ${SB}`), csp);
 });

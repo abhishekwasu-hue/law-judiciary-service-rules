@@ -48,7 +48,7 @@ const DISPATCH_REASON = 'GitHub जोडणी अयशस्वी (token त
 const CLEAR = '__clear__';
 const UNCLEARABLE = ['supabase_service_key'];
 // case fields the app may set (POST create, PATCH edit)
-const CASE_FIELDS = ['cr_no', 'cr_year', 'file_no', 'subject', 'category', 'priority', 'employee_name', 'post', 'office', 'received_from', 'received_via', 'inward_date', 'due_date', 'desk', 'work_type'];
+const CASE_FIELDS = ['cr_no', 'cr_year', 'file_no', 'subject', 'category', 'priority', 'employee_name', 'post', 'office', 'received_from', 'received_via', 'inward_date', 'due_date', 'desk', 'work_type', 'nasti_no'];
 // desk profiles (C30, tools/desks/<id>.json; app list dashboard-app/src/lib/constants.ts DESKS). Add an id here when a
 // profile json is added. cases.desk null = law-desk6 (migration 0009).
 export const DESK_IDS = ['law-desk6', 'hte-mashi5'];
@@ -57,8 +57,19 @@ const BAD_DESK = 'विभाग / कार्यासन चुकीचे 
 // null = service), court = न्यायालयीन प्रकरणे, legislature = विधिमंडळ कामकाज, procurement = खरेदी विषयक बाबी
 export const WORK_TYPES = ['service', 'court', 'legislature', 'procurement'];
 const BAD_WORK_TYPE = 'कामाची श्रेणी चुकीची — यादीतील पर्याय निवडा';
+// cases.nasti_no (migration 0012) = the eOffice नस्ती file / receipt no. as shown on the नस्ती page (/nasti/), to link
+// the two; free text, at most NASTI_NO_MAX characters after trim; '' / null clears
+const NASTI_NO_MAX = 100;
+const BAD_NASTI_NO = `नस्ती क्रमांक चुकीचा — जास्तीत जास्त ${NASTI_NO_MAX} अक्षरे`;
 // case columns added by later migrations: the case is saved without them until the migration is applied
-const OPTIONAL_CASE_COLS = { desk: '0009', work_type: '0011' };
+const OPTIONAL_CASE_COLS = { desk: '0009', work_type: '0011', nasti_no: '0012' };
+// member profile (migration 0012: members.display_name / designation / office / mine): stored once per member so the
+// नस्ती page need not ask again. mine = the नस्ती page's "आपल्याकडे असलेले स्थान" list (e.g. "कार्यासन-६, माझ्याकडे").
+const PROFILE_KEYS = ['display_name', 'designation', 'office', 'mine'];
+const PROFILE_MAX = 120;
+const PROFILE_LABELS = { display_name: 'नाव', designation: 'पदनाम', office: 'कार्यालय', mine: 'आपल्याकडे असलेले स्थान' };
+const PROFILE_MIGRATION = 'माहिती साठवता आली नाही — Supabase मध्ये migration 0012 लागू करा';
+const profileOf = r => Object.fromEntries(PROFILE_KEYS.map(k => [k, r && r[k] != null ? String(r[k]) : '']));
 
 // PostgREST error: the browser gets only "db <status>" (no table/column text); code/detail stay for the Worker's own checks.
 class DbError extends Error {
@@ -122,12 +133,20 @@ async function currentUser(req, cfg) {
   if (!r.ok) return null;
   const u = await r.json();
   const db = sb(cfg);
-  const memberRole = async () => {
-    const rows = await db.rest(`members?user_id=eq.${encodeURIComponent(u.id)}&select=role`);
-    return rows && rows.length ? rows[0].role : null;
+  // role + profile; profile columns missing (migration 0012 not applied) → role only, empty profile
+  const memberRow = async () => {
+    const q = `members?user_id=eq.${encodeURIComponent(u.id)}&select=role`;
+    let rows;
+    try {
+      rows = await db.rest(`${q},${PROFILE_KEYS.join(',')}`);
+    } catch (e) {
+      if (!PROFILE_KEYS.some(k => missingColumn(e, k))) throw e;
+      rows = await db.rest(q);
+    }
+    return rows && rows.length ? rows[0] : null;
   };
-  const role = await memberRole();
-  if (role) return { id: u.id, email: u.email, role };
+  const row = await memberRow();
+  if (row && row.role) return { id: u.id, email: u.email, role: row.role, profile: profileOf(row) };
   // first sign-in of the owner email given at setup → becomes owner, only with a confirmed e-mail address
   const confirmed = !!(u.email_confirmed_at || u.confirmed_at);
   if (confirmed && cfg.owner_email && u.email && u.email.toLowerCase() === cfg.owner_email.toLowerCase()) {
@@ -138,10 +157,11 @@ async function currentUser(req, cfg) {
     } catch (e) {
       if (!(e instanceof DbError && (e.status === 409 || e.code === '23505'))) throw e;
     }
-    if (ins && ins.length) return { id: u.id, email: u.email, role: 'owner' };
-    return { id: u.id, email: u.email, role: await memberRole() };
+    if (ins && ins.length) return { id: u.id, email: u.email, role: 'owner', profile: profileOf(null) };
+    const again = await memberRow();
+    return { id: u.id, email: u.email, role: again ? again.role : null, profile: profileOf(again) };
   }
-  return { id: u.id, email: u.email, role: null };
+  return { id: u.id, email: u.email, role: null, profile: profileOf(null) };
 }
 const canWrite = u => u && (u.role === 'owner' || u.role === 'staff');
 
@@ -297,7 +317,7 @@ export function normOutputs(v) {
 }
 const missingColumn = (e, col) => e instanceof DbError && (e.code === '42703' || e.code === 'PGRST204' || (new RegExp(col).test(e.detail) && /does not exist|could not find/i.test(e.detail)));
 
-// cases.desk (migration 0009) / cases.work_type (migration 0011) missing: write the case without that column and log;
+// cases.desk (migration 0009) / cases.work_type (migration 0011) / cases.nasti_no (migration 0012) missing: write the case without that column and log;
 // never fail the request
 async function writeCase(db, path, method, row, what) {
   let cur = row;
@@ -315,6 +335,17 @@ async function writeCase(db, path, method, row, what) {
       cur = rest;
     }
   }
+}
+
+// row.nasti_no: string → trimmed ('' → null), null stays null; false = not a string or longer than NASTI_NO_MAX
+function cleanNastiNo(row) {
+  const v = row.nasti_no;
+  if (v === null) return true;
+  if (typeof v !== 'string') return false;
+  const t = v.trim();
+  if (t.length > NASTI_NO_MAX) return false;
+  row.nasti_no = t || null;
+  return true;
 }
 
 async function findCrDup(db, crNo, crYear, exceptId = null) {
@@ -397,13 +428,15 @@ async function monthSpend(cfg) {
 // Needs wrangler.toml run_worker_first = true (otherwise static assets bypass the Worker).
 // App pages: inline scripts allowed by their sha256 (computed from the served HTML), Supabase REST/Realtime/Storage
 // in connect-src. The नस्ती page (/nasti/, the owner's own APK page: large inline scripts, eval in its Excel library)
-// gets a looser script policy; same origin as the app, framed only by the app (frame-ancestors 'self').
+// gets a looser script policy; same origin as the app, framed only by the app (frame-ancestors 'self'). Its connect-src
+// has no 'self' (only data: blob:): the page makes no fetch/XHR (only its own navigation GET and a blob: PDF.js worker),
+// so even injected HTML could not call /api with the session.
 const sha256b64 = async text => btoa(String.fromCharCode(...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)))));
 export async function cspFor(html, pathname, supabaseUrl) {
   const common = ["base-uri 'self'", "object-src 'none'", "frame-ancestors 'self'", "form-action 'self'"];
   if (pathname.startsWith('/nasti/') || pathname === '/nasti')
     return ["default-src 'self' data: blob:", "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:", "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: blob:", "font-src 'self' data:", "worker-src 'self' blob:", "connect-src 'self' data: blob:", ...common].join('; ');
+      "img-src 'self' data: blob:", "font-src 'self' data:", "worker-src 'self' blob:", "connect-src data: blob:", ...common].join('; ');
   const hashes = [];
   for (const m of html.matchAll(/<script(\s[^>]*)?>([\s\S]*?)<\/script>/gi)) {
     if (/\ssrc\s*=/i.test(m[1] || '') || !m[2]) continue;
@@ -540,6 +573,32 @@ async function route(req, env, url) {
   if (!user.role) return bad('not a member', 403);
   const db = sb(cfg);
 
+  // PATCH /api/me {any of display_name, designation, office, mine} → the user object as GET /api/me. Own row only
+  // (service role, user_id from the session); trimmed, each <= PROFILE_MAX chars, '' / null clears; unknown keys ignored.
+  // Profile columns missing (migration 0012) → 409 {error: 'migration_missing', reason}.
+  if (p === '/api/me' && M === 'PATCH') {
+    const b = await req.json().catch(() => null);
+    if (!b || typeof b !== 'object' || Array.isArray(b)) return bad('माहिती पाठवली नाही');
+    const row = {};
+    for (const k of PROFILE_KEYS) {
+      if (!(k in b)) continue;
+      const v = b[k];
+      if (v !== null && typeof v !== 'string') return bad(`${PROFILE_LABELS[k]}: मजकूर असावा`);
+      const t = (v || '').trim();
+      if (t.length > PROFILE_MAX) return bad(`${PROFILE_LABELS[k]}: जास्तीत जास्त ${PROFILE_MAX} अक्षरे`);
+      row[k] = t || null;
+    }
+    if (!Object.keys(row).length) return bad('बदलण्यासाठी माहिती नाही');
+    let rows;
+    try {
+      rows = await db.rest(`members?user_id=eq.${encodeURIComponent(user.id)}&select=role,${PROFILE_KEYS.join(',')}`, { method: 'PATCH', body: JSON.stringify(row) });
+    } catch (e) {
+      if (PROFILE_KEYS.some(k => missingColumn(e, k))) return json({ error: 'migration_missing', reason: PROFILE_MIGRATION }, 409);
+      throw e;
+    }
+    const r = rows && rows[0];
+    return json({ id: user.id, email: user.email, role: (r && r.role) || user.role, profile: profileOf(r || { ...user.profile, ...row }) });
+  }
   if (p === '/api/me') return json(user);
 
   // GET /api/spend (members) → {month, spent_usd, limit_usd (empty setting = 20), runs, reserved_usd (active runs at their estimate), active_runs}: runs.cost_usd this IST calendar month
@@ -635,6 +694,8 @@ async function route(req, env, url) {
     const row = Object.fromEntries(CASE_FIELDS.filter(k => b[k] !== undefined && b[k] !== '').map(k => [k, b[k]]));
     if (row.desk != null && !DESK_IDS.includes(row.desk)) return bad(BAD_DESK);
     if (row.work_type != null && !WORK_TYPES.includes(row.work_type)) return bad(BAD_WORK_TYPE);
+    if ('nasti_no' in row && !cleanNastiNo(row)) return bad(BAD_NASTI_NO);
+    if (row.nasti_no === null) delete row.nasti_no;
     const findDup = () => findCrDup(db, row.cr_no, row.cr_year);
     const dupId = await findDup();
     if (dupId !== null) return json({ error: 'duplicate_cr', existing_id: dupId }, 409);
@@ -665,6 +726,7 @@ async function route(req, env, url) {
     if (row.cr_year != null && !/^\d{4}$/.test(String(row.cr_year).trim())) return bad('cr_year: 4 digits');
     if (row.desk != null && !DESK_IDS.includes(row.desk)) return bad(BAD_DESK);
     if (row.work_type != null && !WORK_TYPES.includes(row.work_type)) return bad(BAD_WORK_TYPE);
+    if ('nasti_no' in row && !cleanNastiNo(row)) return bad(BAD_NASTI_NO);
     if (row.cr_no != null) row.cr_no = String(row.cr_no).trim();
     if (row.cr_year != null) row.cr_year = Number(String(row.cr_year).trim());
     const [cur] = (await db.rest(`cases?id=eq.${id}&select=id,cr_no,cr_year`)) || [];
