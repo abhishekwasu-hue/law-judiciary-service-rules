@@ -258,7 +258,7 @@ export default function EditChat({ ctx }: { ctx: CaseCtx }) {
       <div className="edit-head flex items-center justify-between gap-2 px-4 py-3">
         <div className="min-w-0">
           <h2 className="flex items-center gap-2 text-lg font-bold">✏️ सुधारणा-चॅट <span className={`${seen ? '' : 'blink-badge '}rounded-full bg-white px-2 py-0.5 text-xs font-bold text-orange-600`}>AI</span></h2>
-          <p className="text-sm text-white/90">मसुद्यात बदल हवा असल्यास कृपया येथे नमूद करावे</p>
+          <p className="text-sm text-white/90">टिप्पणी किंवा मसुद्यात (पत्र, शासन निर्णय इ.) बदल हवा असल्यास कृपया येथे नमूद करावे</p>
         </div>
         {turns.length > 0 && <span className="shrink-0 rounded-full bg-white/20 px-2 py-0.5 text-sm font-semibold">{turns.length} संदेश</span>}
       </div>
