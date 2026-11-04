@@ -8,6 +8,8 @@ export interface Case {
   due_date: string | null; assigned_to: string | null; created_at: string; updated_at: string;
   // migration 20261103000009_case_desk.sql: desk profile id (DESKS); null / absent = law-desk6
   desk?: string | null;
+  // migration 20261104000010_work_type_queue.sql: work category (WORK_TYPES); null / absent = service
+  work_type?: string | null;
 }
 export interface CaseFile {
   id: number; case_id: number; kind: string; storage_path: string; original_name: string;
@@ -24,6 +26,8 @@ export interface Run {
   last_step?: string | null;
   // migration 20261103000008_run_outputs.sql: drafts ticked for this run (DraftKey[]); null = legacy (engine decided)
   outputs?: string[] | null;
+  // migration 20261104000010_work_type_queue.sql: when the Worker sent this run to the engine; null = waiting in the queue
+  dispatched_at?: string | null;
 }
 export interface Letter {
   id: number; case_id: number; ref_no: string | null; addressed_to: string | null; sent_date: string | null;

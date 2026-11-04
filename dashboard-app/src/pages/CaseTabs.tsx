@@ -1,5 +1,5 @@
 import { lazy, Suspense, useMemo, useRef, useState, type FormEvent } from 'react';
-import { ApiError, api, downloadFile, humanError, uploadFile } from '../lib/api';
+import { ApiError, api, downloadFile, humanError, runStartText, uploadFile, type RunStart } from '../lib/api';
 import { ACTION_LABEL, EXTRA_OUTPUT_KINDS, FIELD_LABEL, FILE_KIND_LABEL, INPUT_KINDS, INPUT_KIND_LABEL, LETTER_STATUSES, RUN_STATE_LABEL, TONE_HEX, draftsText, runActive, runTone, type DraftKey, type InputKind } from '../lib/constants';
 import { sameDrafts, suggestDrafts } from '../lib/drafts';
 import DraftPicker from '../components/DraftPicker';
@@ -78,7 +78,7 @@ export function ReRun({ ctx, title = 'सुधारणा करून पु�
   const toast = useToast();
   const [text, setText] = useState(preset);
   // "कोणते मसुदे हवेत?": the suggestion from the case's files and runs until the user changes a chip
-  const suggestion = suggestDrafts(ctx.files, ctx.runs);
+  const suggestion = suggestDrafts(ctx.files, ctx.runs, ctx.c.work_type);
   const [drafts, setDraftsRaw] = useState<DraftKey[] | null>(presetDrafts ?? null);
   const chosen = drafts ?? suggestion.keys;
   const setDrafts = (v: DraftKey[]) => setDraftsRaw(sameDrafts(v, suggestion.keys) ? null : v);
@@ -91,9 +91,9 @@ export function ReRun({ ctx, title = 'सुधारणा करून पु�
     e.preventDefault();
     setBusy(true);
     try {
-      const started = await api<{ id: number; outputs_dropped?: boolean }>('/api/run', { body: { case_id: ctx.c.id, instructions: text.trim() || undefined, outputs: chosen } });
+      const started = await api<RunStart>('/api/run', { body: { case_id: ctx.c.id, instructions: text.trim() || undefined, outputs: chosen } });
       setPending(started.id);
-      toast(started.outputs_dropped ? 'प्रक्रिया सुरू झाली — मसुदे-निवड लागू झाली नाही (migration 0008 बाकी)' : 'प्रक्रिया पुन्हा सुरू झाली');
+      toast(runStartText(started, 'प्रक्रिया पुन्हा सुरू झाली'));
       setText('');
       setDraftsRaw(null);
     } catch (x) {

@@ -10,7 +10,9 @@ caching): this file, then tools/ENGINE_BRIEF.md, then the tool docstrings, then 
   received_via, inward_date, stage), `instructions`, `proposal_original_name`, `inputs` (each with `kind`,
   `original_name`, `version`, `local_path` relative to WORKDIR), `files` (all earlier files of the case, metadata only),
   `outputs` (the drafts the user ticked for THIS run, or null — section "Drafts ticked by the user") and
-  `reminder_next` (§4.21 number of the next स्मरणपत्र).
+  `reminder_next` (§4.21 number of the next स्मरणपत्र), `work_type` (C33 work category: service / court / legislature /
+  procurement; follow the "## Work type" block of this prompt; a rules_pending type: the general note under the existing
+  rules + its exact pending_warning line in status.json `warnings` and Study part 7).
 - `WORKDIR/in/proposal/<original name>` = the proposal PDF. More than one PDF there (e.g. a scan split in two): read ALL
   of them; the package's proposal = `proposal_original_name`; every other proposal PDF is handled like an extra_doc
   (below) + warning "पडताळणी अपूर्ण — प्रस्तावाच्या <k> PDF फाइल्स आल्या; '<name>' संलग्नक म्हणून जोडली — तपासा"
@@ -89,7 +91,10 @@ Expected cost per typical proposal (15 pages, 3 GRs; estimate, not yet measured 
    letter, `related` = []; पृ.N computed from the package order: proposal pages 1..n, then the enclosure pages in
    order; the note body DETAILED per brief [I4.29] — the 12 elements where they apply, nothing of the proposal left
    out, short sentences, the brief's [I4.30] quality checks; missing information / documents ONLY in the one
-   missing-info para just before the last para, essential items only, "____" in tables [I4.31]; the letter concise [I4.15]), /tmp/work/study_part0.json (part 0 as a build_study part), /tmp/work/status_core.json (summary,
+   missing-info para just before the last para, essential items only, "____" in tables [I4.31]; only references needed
+   to decide the demand, each fact once, office order with linking openers, one quote per sentence, पृ.N/प.वि. once
+   per document and no पृ. table column, 3-6 decisive facts in "उपरोक्त वस्तुस्थिती", no quote cut with "…" [I4.32];
+   the letter concise [I4.15]), /tmp/work/study_part0.json (part 0 as a build_study part), /tmp/work/status_core.json (summary,
    letter_needed, essential_points, grs_attached, grs_missing, case) — the drafts = case.json `outputs` <list or
    null> (section "Drafts ticked by the user": `letters` / `orders` / `parawise`; null -> also `parawise` / `order`
    when the brief's court / order-draft rules call for them) — and /tmp/work/related_plan.md (which GR/rule/
@@ -127,7 +132,10 @@ Expected cost per typical proposal (15 pages, 3 GRs; estimate, not yet measured 
    /tmp/work/study_part0.json; LOOK at the page images WORKDIR/pages/p-NN.png. Check and correct per your
    definition (incl. brief [I4.29]: each element present where it applies, no fact/condition of the proposal left out;
    brief [I4.30]: checks (1)–(7), and write review.json `coverage` + `contradictions`; brief [I4.31]: missing information /
-   documents only in the one missing-info para, essential items only, no such remark elsewhere, "____" in tables); after your edits run `python3 tools/lint_spec.py /tmp/work/spec.json` until LINT OK, then write the
+   documents only in the one missing-info para, essential items only, no such remark elsewhere, "____" in tables;
+   brief [I4.32]: remove references not needed to decide the demand (endorsement nos., copy lines, reminder history,
+   meta lines) and repeated facts, link the paras, split glued quotes, drop "पृ./प.वि." table columns, cut the fact
+   summary to 3-6 decisive lines without पृ. — minimal edits, never a fact the decision needs); after your edits run `python3 tools/lint_spec.py /tmp/work/spec.json` until LINT OK, then write the
    hashes and /tmp/work/review.json." If `changes` > 0: copy the corrected part 0 / note / letter text into
    study.json (parts 0, 5, 6), then lint -> build -> extract_check -> verify again.
    Always (also with `changes` 0; INSTRUCTIONS §4.30, Abhi 03.11.2026): append to study.json part 7 the blocks

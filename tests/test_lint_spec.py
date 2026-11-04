@@ -32,6 +32,16 @@ def load(p):
     return raw_load(p)
 
 
+def load_clean(p):
+    """A sample with the shortened-quote marks ("…" / "...") of its related extracts removed — test copy only, so a WARN
+    test starts from no WARN (C32 §4.32: CR122's related precedent extract is quoted with "..."; the sample is unchanged)."""
+    s = raw_load(p)
+    for it in s.get("related") or []:
+        if isinstance(it, dict) and isinstance(it.get("text"), list):
+            it["text"] = [t.replace("...", "").replace("…", "") if isinstance(t, str) else t for t in it["text"]]
+    return s
+
+
 def run(args, env=ENV):
     return subprocess.run([sys.executable] + args, capture_output=True, text=True, encoding="utf-8", env=env, cwd=ROOT)
 
@@ -63,10 +73,14 @@ class LintSpec(unittest.TestCase):
                 continue
             with self.subTest(spec=os.path.basename(p)):
                 self.assertEqual(L.lint_spec(raw_load(p)), [])
-                self.assertEqual(L.lint_warnings(raw_load(p)), [])   # approved samples: no WARN-level finding
+                # approved samples: no WARN-level finding, except C32 §4.32 "shortened quote" — the quoted text itself
+                # carries "…" / "..." and quote content is never altered (§1.1)
+                ws = [w for w in L.lint_warnings(raw_load(p)) if "shortened quote" not in w]
+                self.assertEqual(ws, [])
                 r = run([os.path.join(TOOLS, "lint_spec.py"), p])
                 self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
-                self.assertEqual(r.stdout.strip().splitlines(), ["LINT OK"])
+                lines = [ln for ln in r.stdout.strip().splitlines() if "shortened quote" not in ln]
+                self.assertEqual(lines, ["LINT OK"])
 
     # ---- §4.18 language (01.11.2026) ----
     def test_sau_not_shrimati(self):
@@ -491,7 +505,7 @@ class LintSpelling(unittest.TestCase):
     """02.11.2026: error level 'ध्द' / 'करुन' / 'प्रारुप' / 'अनुसरुन'; WARN level L11–L14 (STYLE_RESEARCH_LANG §5.2)."""
     @classmethod
     def setUpClass(cls):
-        cls.s122 = load(CR122)
+        cls.s122 = load_clean(CR122)
 
     def spec(self, para=None, intro=None, subject=None, related_text=None, related_heading=None):
         s = copy.deepcopy(self.s122)
@@ -721,7 +735,7 @@ class AuditA1Fixes(unittest.TestCase):
     """02.11.2026 (independent audit A1): "मा." phrases, REF_NO spellings, last-para routes (H5), अ.मु.स. (वित्त) route
     (H6, §8.3), "ही विनंती" only in request letters, "ध्द" in names, L11 warn-only."""
     def setUp(self):
-        self.s122 = load(CR122); self.s66 = load(CR66)
+        self.s122 = load_clean(CR122); self.s66 = load(CR66)
 
     def with_last(self, base, txt, ams=False):
         s = copy.deepcopy(base)
@@ -847,6 +861,80 @@ class AuditA1Fixes(unittest.TestCase):
         s = copy.deepcopy(self.s122); s["letter"]["subject"] = "विशेष वेतन मिळणेबाबत."
         self.assertEqual(L.lint_spec(s), [])
         self.assertTrue(any(w.startswith("letter.subject") and "णेबाबत" in w for w in L.lint_warnings(s)))
+
+
+    # ---- C32 §4.32 (Abhi 03.11.2026): relevance + एकसंध flow — WARN only, never an error ----
+    def flow(self, s):
+        self.assertEqual(L.lint_spec(s), [])   # never an error
+        return [w for w in L.lint_warnings(s) if "(§4.32)" in w]
+
+    def test_432_page_column_warn(self):
+        for col in ("पृ./प.वि.", "पृ.", "पृ. / प.वि."):
+            s = copy.deepcopy(self.s122); t = s["note"]["paras"][2]["table"]
+            t[0].append(col); [r.append("12") for r in t[1:]]
+            ws = self.flow(s)
+            self.assertTrue(any(w.startswith("note.paras[2].table[0]:") and "पृ./प.वि. column" in w for w in ws), (col, ws))
+        s = copy.deepcopy(self.s122); s["note"]["paras"][2]["table"][0][1] = "पृष्ठसंख्या"   # not a page column
+        self.assertEqual(self.flow(s), [])
+
+    def test_432_forwarding_trivia_warn(self):
+        for t in ("मा. उच्च न्यायालयाने पृष्ठांकन क्र. 12/2026 अन्वये प्रत पाठविली आहे.",
+                  "सदर पत्राची प्रत प्रमुख जिल्हा व सत्र न्यायाधीश यांना माहितीकरिता देण्यात आली आहे."):
+            s = copy.deepcopy(self.s122); s["note"]["paras"].insert(1, t)
+            self.assertTrue(any(w.startswith("note.paras[1]:") and "forwarding detail" in w for w in self.flow(s)), t)
+        s = copy.deepcopy(self.s122); s["note"]["paras"].insert(1, "अर्जात “पृष्ठांकन क्र. 12” असे नमूद आहे.")
+        self.assertEqual(self.flow(s), [])   # inside a quote: exempt
+
+    def test_432_quote_gluing_warn(self):
+        for t in ("सदर पत्रात “अ” असे नमूद आहे. तसेच, “ब” असे नमूद आहे.", "सदर पत्रात “अ” व “ब” असे नमूद आहे."):
+            s = copy.deepcopy(self.s122); s["note"]["paras"].insert(1, t)
+            self.assertTrue(any(w.startswith("note.paras[1]:") and "quote-gluing" in w for w in self.flow(s)), t)
+        s = copy.deepcopy(self.s122); s["note"]["paras"].insert(1, "सदर पत्रात “अ” असे नमूद आहे. तसेच, अर्जात “ब” असे नमूद आहे.")
+        self.assertEqual(self.flow(s), [])
+
+    def test_432_summary_item_page_ref_warn(self):
+        s = copy.deepcopy(self.s122)
+        s["note"]["paras"].insert(6, "उपरोक्त वस्तुस्थिती पुढीलप्रमाणे आहे:-")
+        s["note"]["sub"] = {"6": ["(1) पदोन्नती दि. 30.01.2010 रोजी झाली आहे (पृ.7/प.वि.).", "(2) विकल्प अर्ज दि. 24.01.2025 रोजी सादर झाला आहे."]}
+        ws = self.flow(s)
+        self.assertEqual([w.split(":")[0] for w in ws if "उपरोक्त वस्तुस्थिती" in w], ["note.sub.6[0]"], ws)
+        s["note"]["sub"]["6"][0] = "(1) पदोन्नती दि. 30.01.2010 रोजी झाली आहे."
+        self.assertEqual(self.flow(s), [])
+        # a page ref in an ordinary sub-point (not the summary list) is fine
+        s = copy.deepcopy(self.s122); s["note"]["sub"] = {"5": ["(1) अर्ज (पृ.15/प.वि.)."]}
+        self.assertEqual(self.flow(s), [])
+
+    def test_432_shortened_quote_warn(self):
+        s = copy.deepcopy(self.s122); s["note"]["paras"].insert(1, "अर्जात “वेतननिश्चिती … करण्यात यावी” असे नमूद आहे.")
+        self.assertTrue(any(w.startswith("note.paras[1]:") and "shortened quote" in w for w in self.flow(s)))
+        s = copy.deepcopy(self.s122); s["note"]["paras"].insert(1, "अर्जात “वेतननिश्चिती ... करण्यात यावी” असे नमूद आहे.")
+        self.assertTrue(any("shortened quote" in w for w in self.flow(s)))
+        s = copy.deepcopy(self.s122); s["related"][0]["text"] = ["“नियम … तरतूद”"]
+        self.assertTrue(any(w.startswith("related[0].text[0]:") and "shortened quote" in w for w in self.flow(s)))
+        s = copy.deepcopy(self.s122); s["note"]["paras"].insert(1, "सबब, … पत्राचे प्रारूप सादर केले आहे.")   # own text: exempt
+        self.assertEqual(self.flow(s), [])
+
+    def test_432_samples_own_construction_clean(self):
+        # the samples carry no §4.32 finding of their own construction (page columns, trivia, gluing, summary refs)
+        for p in SPECS:
+            sp = raw_load(p)
+            if "note" in sp:
+                with self.subTest(spec=os.path.basename(p)):
+                    self.assertEqual([w for w in L.lint_warnings(sp) if "(§4.32)" in w and "shortened quote" not in w], [])
+
+    def test_432_cli_warn_exit_0(self):
+        s = copy.deepcopy(self.s122); s["note"]["paras"].insert(1, "सदर पत्रात “अ” व “ब” असे नमूद आहे.")
+        d = tempfile.mkdtemp(prefix="lint432_")
+        try:
+            sp = os.path.join(d, "s.json")
+            with open(sp, "w", encoding="utf-8") as f:
+                json.dump(s, f, ensure_ascii=False)
+            r = run([os.path.join(TOOLS, "lint_spec.py"), sp])
+            self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+            self.assertIn("LINT OK", r.stdout)
+            self.assertIn("WARN note.paras[1]: quote-gluing", r.stdout)
+        finally:
+            shutil.rmtree(d, ignore_errors=True)
 
 
 if __name__ == "__main__":

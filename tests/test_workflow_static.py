@@ -142,6 +142,25 @@ class WorkflowStatic(unittest.TestCase):
             if re.match(r"[A-Za-z0-9_.-]+==", block):
                 self.assertIn("--hash=sha256:", block, block.split()[0])
 
+    def test_c33_queue_next_and_work_type(self):
+        """C33: the LAST step always calls /api/engine/next with the run token and never fails the job; the prompt gets the
+        work-type block from the root-owned snapshot, with a fallback that cannot fail the Claude step."""
+        d = load("process-proposal.yml")
+        last = d["jobs"]["run"]["steps"][-1]
+        self.assertTrue(str(last.get("name", "")).startswith("Dispatch the next queued run"))
+        self.assertEqual(last.get("if"), "always()")
+        self.assertIn("timeout-minutes", last)
+        run = last["run"]
+        self.assertIn('"$WORKER/api/engine/next"', run)
+        self.assertIn('Authorization: Bearer $RUN_TOKEN', run)
+        self.assertIn("|| echo", run)
+        self.assertTrue(run.rstrip().endswith("exit 0"))
+        self.assertNotIn("set -e", run)
+        main = step(d, "Process the proposal")["run"]
+        self.assertIn('WT_BLOCK=$(timeout 30 python3 -I "$T/work_type.py" prompt "$WT" 2>/dev/null) || WT_BLOCK=""', main)
+        self.assertIn('"$RP/runner-case.json" 2>/dev/null) || WT=service', main)
+        self.assertLess(main.index("$(cat tools/ENGINE_BRIEF.md)"), main.index("$WT_BLOCK"))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -30,6 +30,39 @@ function useTypicalRunUsd() {
   return v;
 }
 
+/** Compact form (bulk upload rows, C33): one line "मसुदे: …" with a "बदला" button that opens the same chips. */
+export function CompactDraftPicker({ value, onChange, disabled }: { value: DraftKey[]; onChange: (v: DraftKey[]) => void; disabled?: boolean }) {
+  const [open, setOpen] = useState(false);
+  const toggle = (k: DraftKey) => onChange(DRAFT_KEYS.filter(x => (x === k ? !value.includes(x) : value.includes(x))));
+  return (
+    <fieldset className="min-w-0 space-y-2" disabled={disabled}>
+      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 text-sm">
+        <span className="min-w-0"><span className="font-semibold">मसुदे:</span> <b className={value.length ? 'text-navy-700 dark:text-navy-100' : 'text-amber-800 dark:text-amber-200'}>{draftLabels(value)}</b></span>
+        <button type="button" className="min-h-tap rounded-md px-2 font-semibold text-navy-700 underline dark:text-navy-200" aria-expanded={open} onClick={() => setOpen(o => !o)}>
+          {open ? 'बंद ▲' : 'बदला ▼'}
+        </button>
+      </div>
+      {open && (
+        <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+          {DRAFT_KEYS.map(k => {
+            const on = value.includes(k);
+            return (
+              <button key={k} type="button" aria-pressed={on} onClick={() => toggle(k)}
+                className={`flex min-h-[40px] items-center justify-center gap-1 rounded-lg border-2 px-1.5 py-1 text-center text-sm font-semibold leading-tight transition disabled:opacity-50 ${
+                  on ? 'border-navy-700 bg-navy-700 text-white dark:border-navy-400 dark:bg-navy-500'
+                    : 'border-slate-300 bg-white text-slate-800 hover:bg-slate-100 dark:border-navy-700 dark:bg-navy-900 dark:text-slate-100 dark:hover:bg-navy-800'
+                }`}>
+                {on && <span aria-hidden="true">✓</span>}
+                {DRAFT_LABEL[k]}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </fieldset>
+  );
+}
+
 export default function DraftPicker({ value, onChange, suggestion, disabled }: {
   value: DraftKey[]; onChange: (v: DraftKey[]) => void; suggestion: Suggestion; disabled?: boolean;
 }) {

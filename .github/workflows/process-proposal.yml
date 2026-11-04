@@ -375,10 +375,16 @@ jobs:
           fi
 
           # ---- main run ----
+          # C33 work category: the rules block of tools/work_types/<id>.json (runner-side snapshot; id from the
+          # runner-private case meta). Never fails the step: unknown id -> service, any error -> empty block.
+          WT=$(python3 -I -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8")).get("work_type") or "service")' "$RP/runner-case.json" 2>/dev/null) || WT=service
+          WT_BLOCK=$(timeout 30 python3 -I "$T/work_type.py" prompt "$WT" 2>/dev/null) || WT_BLOCK=""
           # stable prefix first (prompt caching): prompt, brief, tool docstrings; run variables last
           PROMPT="$(cat tools/ENGINE_PROMPT.md)
 
           $(cat tools/ENGINE_BRIEF.md)
+
+          $WT_BLOCK
 
           ## Tool docstrings (also in /tmp/work/TOOL_DOCS.md)
           $(cat /tmp/work/TOOL_DOCS.md)
@@ -646,4 +652,20 @@ jobs:
             [ "${#TL[@]}" -gt 0 ] && { timeout 120 python3 -I "$T/run_timeline.py" report "$RP/timeline.json" "${TL[@]}" || true; }
           fi
           timeout 60 python3 -I "$T/run_timeline.py" stages "$RP/stages.tsv" "${JOB_T0:-}" "$RP/timeline.json" || true
+          exit 0
+      # C33 sequential queue: the job of this run has ended (done / failed / cancelled) -> the Worker dispatches the next
+      # queued run (POST /api/engine/next, run token; a run still queued/running is marked failed there). Never fails
+      # the job; the Worker's 5-min cron is the safety net when this call does not get through.
+      - name: Dispatch the next queued run
+        if: always()
+        timeout-minutes: 3
+        run: |
+          set -u
+          if [ -n "${RUN_TOKEN:-}" ] && [ -n "${WORKER:-}" ] && [ -n "${RUN_ID:-}" ]; then
+            jq -n --argjson id "$RUN_ID" '{run_id: $id}' |
+              curl -sS --max-time 60 --retry 3 -X POST -H "Authorization: Bearer $RUN_TOKEN" -H 'content-type: application/json' \
+                   --data-binary @- "$WORKER/api/engine/next" || echo "could not reach the Worker (cron dispatches the next run)"
+          else
+            echo "no run token / worker: nothing to do"
+          fi
           exit 0

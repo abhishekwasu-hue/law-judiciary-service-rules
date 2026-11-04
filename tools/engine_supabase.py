@@ -10,7 +10,10 @@ Commands ("deliver with warnings", Abhi 02.11.2026: drafts are never thrown away
                       drafts ticked for this run (runs.outputs in DRAFT_KEYS order; null = column missing or not set =
                       the engine's own choice), "reminder_next" (§4.21 N: 1 + earlier done runs that ticked "reminder") and "desk" (C30:
                       cases.desk, the desk profile tools/desks/<id>.json; missing column / null -> "law-desk6"; also in
-                      case_meta, and verify passes it as --desk). A proposal
+                      case_meta, and verify passes it as --desk), "work_type" (C33: cases.work_type checked with
+                      tools/work_type.py type_ids(); missing column / null / unknown -> "service"; also in case_meta,
+                      the workflow appends `work_type.py prompt <id>` to the prompt; finish adds a rules_pending
+                      type's pending_warning when status.json lacks it). A proposal
                       that is not a PDF or is password-protected is refused at once (Marathi reason, no model run).
                       <workdir>/case.json (case row, files, run, instructions); runs: state=running, started_at, step.
   case_meta <out.json> [<workdir>]
@@ -320,6 +323,43 @@ def case_desk(case):
     return d.strip() if isinstance(d, str) and DESK_ID_RE.match(d.strip()) else DEFAULT_DESK
 
 
+DEFAULT_WORK_TYPE = "service"
+
+
+def _work_type_mod():
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import work_type
+    return work_type
+
+
+def case_work_type(case):
+    """C33 (04.11.2026): the case's work category — cases.work_type (migration 20261104000010_work_type_queue.sql),
+    validated with tools/work_type.py type_ids(); a missing column, null, "" or an unknown id -> "service"."""
+    w = case.get("work_type") if isinstance(case, dict) else None
+    try:
+        ids = _work_type_mod().type_ids()
+    except Exception:
+        ids = [DEFAULT_WORK_TYPE]
+    return w.strip() if isinstance(w, str) and w.strip() in ids else DEFAULT_WORK_TYPE
+
+
+def case_work_type_of(case_id):
+    """case_work_type of a case read from Supabase; the column may not exist yet -> service."""
+    try:
+        return case_work_type((rest("GET", f"cases?id=eq.{case_id}&select=*") or [{}])[0])
+    except Exception:
+        return DEFAULT_WORK_TYPE
+
+
+def work_type_pending_warning(wt):
+    """the pending_warning of a rules_pending category (tools/work_types/<id>.json), else "" (one source of the text)."""
+    try:
+        t = _work_type_mod().load(wt)
+    except Exception:
+        return ""
+    return str(t.get("pending_warning") or "").strip() if t.get("status") == "rules_pending" else ""
+
+
 def case_desk_of(case_id):
     """case_desk of a case read from Supabase; the column may not exist yet (migration not applied) -> law-desk6."""
     try:
@@ -364,6 +404,7 @@ def cmd_fetch(work):
             "outputs": outputs,
             "reminder_next": reminder_next(runs, run["id"]),
             "desk": case_desk(case),   # C30: desk profile id (cases.desk; absent column / null -> law-desk6)
+            "work_type": case_work_type(case),   # C33: work category (cases.work_type; absent / unknown -> service)
             "proposal_original_name": prop[0]["original_name"],
             "original_name": prop[0]["original_name"],
             # the package PDF's LOCAL file name: the original name (upload prefix stripped, §4.16), shortened by fs_name
@@ -405,6 +446,9 @@ def cmd_case_meta(args):
         run = {}
     meta = {"proposal_original_name": name, "package_file": fs_name(strip_upload_prefix(safe_name(name))),
             "proposal_pages": pages, "outputs": norm_outputs(run.get("outputs"))}
+    wt = case_work_type_of(CASE)   # C33: the workflow adds tools/work_type.py's prompt block for it (absent = service)
+    if wt != DEFAULT_WORK_TYPE:
+        meta["work_type"] = wt
     desk = case_desk_of(CASE)
     if desk != DEFAULT_DESK:   # C30: only another desk is written (law-desk6 = verify's default)
         meta["desk"] = desk
@@ -577,6 +621,11 @@ def cmd_finish(out):
     # Abhi 03.11.2026 ("हे इशारे नोटिंग मध्ये नको … स्टडी … डॉक्युमेंट फाईल … त्याच्यामध्ये द्या"): the final warnings
     # (runs.warnings so far: verify / extracts / review / workflow lines + status.json warnings) go INTO the Study, end of
     # भाग 7, before it is uploaded; owner-only "मॉडेल:" / cost lines are left out by tools/study_warnings.py
+    # C33: a category without its own rules yet (rules_pending) always carries its pending warning (Study + run)
+    pend = work_type_pending_warning(case_work_type_of(CASE))
+    st_w0 = st.get("warnings") if isinstance(st.get("warnings"), list) else []
+    if pend and not any(str(x).strip() == pend for x in st_w0):
+        st["warnings"] = list(st_w0) + [pend]
     study_note = []
     try:
         cur_w = (rest("GET", f"runs?id=eq.{RUN}&select=warnings") or [{}])[0].get("warnings")
@@ -961,7 +1010,10 @@ REVIEW = (" You are the final approver. LOOK at the proposal page images (WORKDI
           "proposal, with पृ.) into review.json — for Study part 7 only, never into the note (INSTRUCTIONS §4.30). "
           "Missing information / documents (brief [I4.31], INSTRUCTIONS §4.31): only in the ONE para 'प्रस्तावासोबत "
           "खालील माहिती उपलब्ध नाही:-' just before the last para, essential items only; move any 'नमूद नाही / जोडलेले "
-          "नाही / उपलब्ध नाही / प्रस्तावासोबत नाही' remark elsewhere into it, and a missing table value becomes '____'.")
+          "नाही / उपलब्ध नाही / प्रस्तावासोबत नाही' remark elsewhere into it, and a missing table value becomes '____'. "
+          "Relevance + flow (brief [I4.32], INSTRUCTIONS §4.32): remove references not needed to decide the demand "
+          "(endorsement nos., copy lines, reminder history, meta lines) and repeated facts, link the paras, one quote per "
+          "sentence, no 'पृ./प.वि.' table column, fact summary 3-6 decisive lines without पृ.; minimal edits.")
 DRAFTER = (" Never stop or refuse: write every output you can. Missing C R/file no. → PREFIX Case<id>_<year>, ref_no "
            "'संकिर्ण-<year>/____/प्र.क्र.____/का.6'; unclear → 'अस्पष्ट'. Each problem you cannot resolve → report it in "
            "one line starting 'पडताळणी अपूर्ण — <what, where>' for status.json `warnings`. On a redraft request, fix "
@@ -972,7 +1024,9 @@ DRAFTER = (" Never stop or refuse: write every output you can. Missing C R/file 
            "they apply, no fact or condition of the proposal left out, short sentences, no opinion; the letter stays "
            "concise (§4.15, §4.20). Missing information / documents only in the ONE missing-info para just before the "
            "last para, essential items only; elsewhere (paras, tables, fact summary) no such remark, '____' in tables "
-           "(brief [I4.31]).")
+           "(brief [I4.31]). Only references needed to decide the demand, each fact once, office order with linking "
+           "openers, one quote per sentence, पृ.N/प.वि. once per document, no 'पृ./प.वि.' table column, 3-6 decisive "
+           "facts in 'उपरोक्त वस्तुस्थिती', no quote cut with '…' (brief [I4.32]).")
 WRITER = (" If an extract cannot be matched to its page, report it as 'पडताळणी अपूर्ण — उतारा …'; never invent text.")
 NEVER_STOP = (" Never stop: a missing C R / file no. / date is \"____\", an unreadable page or value is \"अस्पष्ट\", a "
               "GR that cannot be fetched goes to grs_missing — each with a warning line, never a reason to stop, refuse "

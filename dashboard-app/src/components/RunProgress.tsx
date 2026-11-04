@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { sb } from '../lib/supabase';
 import type { Run } from '../lib/types';
-import { RUN_STATE_LABEL, RUN_STEPS, STALE_REASON, isStale, runTone } from '../lib/constants';
+import { RUN_STATE_LABEL, RUN_STEPS, STALE_REASON, isStale, isWaiting, runTone } from '../lib/constants';
 import { asArray, cleanReason, criticalWarnings, fmtDateTime, isOwnerOnlyLine, studyWarningTexts, textOf } from '../lib/format';
 import { useAuth } from '../lib/auth';
 import { Chip, Progress, Spinner } from './ui';
@@ -120,18 +120,19 @@ export function useTypicalRunSeconds() {
     let alive = true;
     void sb()
       .from('runs')
-      .select('state,created_at,finished_at,duration_s,num_turns')
+      // '*' (not a column list): dispatched_at exists only after migration 0010; a missing column must not break the read
+      .select('*')
       .in('state', ['done', 'failed'])
       .not('finished_at', 'is', null)
       .order('finished_at', { ascending: false })
       .limit(20)
       .then(({ data }) => {
         if (!alive) return;
-        type R = { state: string; created_at: string; finished_at: string; duration_s: number | string | null; num_turns: number | null };
+        type R = { state: string; created_at: string; dispatched_at?: string | null; finished_at: string; duration_s: number | string | null; num_turns: number | null };
         const d = ((data as R[]) || [])
           .filter(r => r.state === 'done' || (r.num_turns ?? 0) >= 30)
           .slice(0, 10)
-          .map(r => (Date.parse(r.finished_at) - Date.parse(r.created_at)) / 1000)
+          .map(r => (Date.parse(r.finished_at) - Date.parse(r.dispatched_at || r.created_at)) / 1000) // queue wait not counted
           .filter(x => x > 0)
           .sort((a, b) => a - b);
         setV(d.length ? { sec: d[Math.floor(d.length / 2)], n: d.length } : { sec: DEFAULT_RUN_MIN * 60, n: 0 });
@@ -149,8 +150,8 @@ export function RunEta({ run }: { run: Run }) {
     const t = setInterval(() => setNow(Date.now()), 30000);
     return () => clearInterval(t);
   }, []);
-  if (!typical) return null;
-  const elapsed = Math.max(0, (now - Date.parse(run.created_at)) / 1000);
+  if (!typical || isWaiting(run)) return null;
+  const elapsed = Math.max(0, (now - Date.parse(run.dispatched_at || run.created_at)) / 1000);
   const left = typical.sec - elapsed;
   const basis = typical.n ? `मागील ${typical.n} प्रक्रियांच्या प्रत्यक्ष वेळेवरून` : 'प्राथमिक अंदाज';
   return (
@@ -231,19 +232,20 @@ export default function RunProgress({ run, retryHint }: { run: Run; retryHint?: 
     const t = setInterval(() => setNow(Date.now()), 5000);
     return () => clearInterval(t);
   }, [active]);
-  const elapsed = Math.max(0, (now - Date.parse(run.created_at)) / 1000);
+  const waiting = isWaiting(run);
+  const elapsed = waiting ? 0 : Math.max(0, (now - Date.parse(run.dispatched_at || run.created_at)) / 1000);
   const stepPct = Math.round((idx / (RUN_STEPS.length - 1)) * 100);
   const timePct = typical ? Math.min(95, Math.round((elapsed / typical.sec) * 100)) : 0;
   const pct = run.state === 'done' ? 100 : active ? Math.max(4, stepPct, timePct) : stepPct;
   // the GitHub runner is still starting / installing tools while the run row says queued
-  const preparing = run.state === 'queued' && !run.step && elapsed > 20;
+  const preparing = !waiting && run.state === 'queued' && !run.step && elapsed > 20;
   return (
     <div className="space-y-3" aria-live="polite">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           {active ? (
             <span className="inline-flex items-center gap-2 rounded-full bg-blue-100 px-3 py-1 text-sm font-bold text-blue-900 dark:bg-blue-900/40 dark:text-blue-100">
-              <Spinner className="h-4 w-4" /> {preparing ? 'तयारी चालू — सर्व्हर सुरू होत आहे' : 'प्रक्रिया चालू'}
+              <Spinner className="h-4 w-4" /> {waiting ? 'रांगेत — आधीची प्रक्रिया संपल्यावर आपोआप सुरू होईल' : preparing ? 'तयारी चालू — सर्व्हर सुरू होत आहे' : 'प्रक्रिया चालू'}
             </span>
           ) : (
             <Chip tone={stale ? 'red' : runTone(run.state)}>{stale ? 'वेळ संपली' : stateText(run.state)}</Chip>
@@ -291,6 +293,7 @@ export default function RunProgress({ run, retryHint }: { run: Run; retryHint?: 
 export function RunStateBadge({ run }: { run: Run | undefined }) {
   if (!run) return <span className="text-sm text-slate-500">—</span>;
   const stale = isStale(run);
+  if (!stale && isWaiting(run)) return <Chip tone="amber">⏳ रांगेत</Chip>;
   if (!stale && (run.state === 'queued' || run.state === 'running'))
     return (
       <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-100 px-2.5 py-0.5 text-sm font-bold text-blue-900 dark:bg-blue-900/40 dark:text-blue-100">

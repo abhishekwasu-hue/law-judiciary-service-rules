@@ -42,6 +42,10 @@ Checks
   "प्रस्तावासोबत खालील माहिती उपलब्ध नाही:-" (+ its table / unnumbered sub-points); no "नमूद नाही / जोडलेले नाही /
   उपलब्ध नाही / प्रस्तावासोबत नाही / प्रत नाही / सादर केलेली नाही" remark elsewhere; not two such paras (SOFT);
   WARN when that para is not just before the last (numbered or "सबब,") para
+ Note body (C32 §4.32, 03.11.2026; lint_spec.flow_warnings, WARN only — never FAIL, ALL OK unaffected): a table
+  header with a "पृ./प.वि." / "पृ." column; "पृष्ठांकन" / "माहितीकरिता देण्यात" outside quotes; quote-gluing "तसेच, “" /
+  "” व “"; an "उपरोक्त वस्तुस्थिती पुढीलप्रमाणे आहे:-" item with "पृ.N/प.वि."; a quoted “…” with "…" / "..." (also in
+  संबंधित माहिती)
  Note_and_Letter (whole file): no repo paths (register/, service-rules/, precedent-library/, pdf/, repo, रेपो)
  Letter (when present: a "प्रति," or "क्रमांक :-" paragraph):
   - starts on a new page / new section (page break or section break before the letterhead)
@@ -95,7 +99,7 @@ from lint_spec import (AMS, BANNED, BARE_CLOSING_RE, FIN, ID_RE, LH_EMAIL, RELAT
                        MISSING_FORM, MISSING_HEAD, SIGNERS, banned_hits, desk_signers, finance_problems, heading_problems, id_hits,
                        lang_hits, ma_hits, ns, num, part_no, ref_problems, repo_hits, requests_info, signer_problems,
                        style_hits, unquoted, warn_hits, PKG_WORD, draft_word_hits, related_source_problems,
-                       missing_scatter)
+                       missing_scatter, flow_warnings)
 INTRO_HEAD = "उपरोक्त विषयाबाबत"  # letter intro paragraph (lint_spec.INTRO_START begins with it)
 from clean_meta import docx_meta_problems, pdf_meta_problems  # noqa: E402 — C27 §4 (no tool / AI trace in metadata)
 import desk as _desk  # noqa: E402 — C30 (03.11.2026): desk profiles tools/desks/<id>.json
@@ -349,6 +353,13 @@ def main(argv):
         mp, mw = missing_scatter(nseq)
         check("missing information in ONE para §4.31 (note body)", mp)
         for x in mw:
+            warn(x)
+        # C32 §4.32 (Abhi 03.11.2026; lint_spec.flow_warnings): relevance + एकसंध flow — SOFT notes printed as WARN, never
+        # a FAIL: "पृ./प.वि." table column, "पृष्ठांकन" / "माहितीकरिता देण्यात", quote-gluing, a page ref in an
+        # "उपरोक्त वस्तुस्थिती" item, a shortened quote (note body and संबंधित माहिती)
+        nheads = [(f"note block {i + 1} (table)", b["text"].split("\n", 1)[0].split(" | "))
+                  for i, b in enumerate(bl[:note_end]) if b["kind"] == "tbl" and b["text"]]
+        for x in flow_warnings(nseq, nheads, [("संबंधित माहिती", rel_txt)] if rel_txt else []):
             warn(x)
         # WARN level (lint_spec.warn_hits: शुद्धलेखन नियम 1–4, 3, 12, 14) — printed, never a FAIL
         for where, t in (("note", note_txt), ("letter", letter_txt)):

@@ -70,15 +70,15 @@ content; section 0 wins over every ask / discuss / stop line (no interaction in 
 - [I4.29] DETAILED note (Abhi 03.11.2026: "note khupch short jhali detail asayla pahije"; model
   samples/specs/HTE_2026_overpayment-waiver_finance-concurrence.json). Facts and verbatim text only, no opinion
   [I1.1]; no fact, condition, amount, date or authority's point of the proposal left out. Elements in order, each
-  where it applies (skip, never invent): (1) para 1 cites EVERY covering letter (authority, no., date, पृ.N/प.वि.);
+  where it applies (skip, never invent): (1) para 1 cites EVERY covering letter (authority, no., date, पृ.N/प.वि.), once only [I4.32];
   (2) background/service table; (3) documents that create the issue (e.g. an appointment-order condition) verbatim;
   (4) benefit/amount/period tables, with the proposal's break-up + total; (5) each authority's letter (AG,
   Lokayukta, HC …): no., date, page + the relevant part verbatim; (6) present status; (7) complaint/court/
   Lokayukta timeline with dates and time limits; (8) replies to this dept's earlier queries, point-wise;
   (9) every applicable GR/circular para + rules + SC/HC judgments verbatim in the BODY (no., date, para, पृ.N/प.वि.),
-  with a table "अट / प्रस्तावातील स्थिती / पृ." where a provision lists conditions (status = proposal facts only,
-  else "____" [I4.31]); (10) "उपरोक्त वस्तुस्थिती पुढीलप्रमाणे आहे:-" + numbered facts
-  from the paras above; (11) the exact demand: amount (figures and words), provision, person + action after
+  with a table "अट / प्रस्तावातील स्थिती" (no पृ. column [I4.32]) where a provision lists conditions (status = proposal facts only,
+  else "____" [I4.31]); (10) "उपरोक्त वस्तुस्थिती पुढीलप्रमाणे आहे:-" + 3-6 decisive
+  facts from the paras above, one line each, no पृ., no quotes [I4.32]; (11) the exact demand: amount (figures and words), provision, person + action after
   approval; (12) the drafts sent with it [I4.28]. Sentences stay short [I4.18]; `related` keeps full extracts.
   The reviewer checks each element and that nothing of the proposal is left out.
 - [I4.30] Quality checks INSIDE the existing drafts (Abhi 03.11.2026: "fakt aaplya noting drafting cha darja
@@ -93,6 +93,17 @@ content; section 0 wins over every ask / discuss / stop line (no interaction in 
   opinions recorded as they are (no., date, पृ.N/प.वि.), never treated as binding; nothing beyond the record.
   Reviewer: checks (1)–(7), minimal fixes; review.json `coverage` [["<demand/condition>", "<where: para / पृ.N>",
   "हाताळले" | "नाही"]] and `contradictions` ["<what: A (पृ.) / B (पृ.)>"] ([] = none) go to Study part 7, never the note.
+- [I4.32] Relevance + एकसंध flow (Abhi 03.11.2026, CR132: "vinakarna upyogache naslele sandarbh noting mdhe dakhwile
+  aahet, tasech paragraph cha wachtana flow tutato"). Completeness [I4.29] stays for what decides the demand, but:
+  (a) only references needed to decide it; never endorsement/"पृष्ठांकन" nos., "प्रत … माहितीकरिता" lines, the office's
+  own reminder history (at most one clause "… स्मरणपत्र-5 द्वारे" in para 1/2), copy lines, meta lines ("वरील तरतुदी
+  नमूद आहेत"); covering letters only in para 1. (b) Each fact ONCE in the body: table OR quote OR sentence; quote
+  only where the wording matters (demand, objection, GR condition). (c) Order: reference -> who asks what (one
+  sentence) -> background -> issue -> provisions + condition table -> उपरोक्त वस्तुस्थिती -> missing info [I4.31] ->
+  सबब; open paras with a link ("सदर प्रकरणी", "त्यानुषंगाने", "याबाबत", "तथापि"); one quote per sentence with its own
+  subject, never "तसेच, “…” व “…”"; no mechanical "सदर शासन निर्णयातील परिच्छेद … मध्ये “…” असे नमूद आहे" chain.
+  (d) पृ.N/प.वि. once per document, at its first mention; no "पृ./प.वि." table column. (e) Never cut a quote with "…".
+  lint/verify WARN; the reviewer checks (a)-(e) and fixes minimally.
 - Page refs: only "पृ.N/प.वि.", N = page of the returned PDF (proposal 1..n, then reply/extra PDFs, then GR pages;
   from <pdf>.map.json). Reply pages: cite their package page, never an invented N.
   No repo paths, no internal ids (z6_0235 …).
@@ -192,6 +203,7 @@ Sources: GR22 = मराठी भाषा विभाग GR कपासू-
 - [I4.28] case.json `outputs` (ticked drafts; null = decide as above): EXACTLY those beside note/Study/package ([] = note
   only); letter + reminder -> spec `letters` [..]; last para names every draft ("… पत्राचे प्रारूप व शासन निर्णयाचे
   प्रारूप पृ.      /प.वि. वर मान्यतेस्तव सादर."); warnings: ENGINE_PROMPT "Drafts ticked by the user".
+- case.json `work_type` [C33]: follow the prompt's "## Work type" block; rules_pending -> general note + its warning line.
 - Missing petition no./date/संकेतांक etc. -> "____" + `warnings`; never stop. Build: tools/build_parawise.py,
   tools/build_order.py (lint_spec.py lints both keys). status.json `outputs_extra`.
 

@@ -3,7 +3,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { sb } from '../lib/supabase';
 import { useData, overdueIds } from '../lib/data';
 import { useCanWrite } from '../lib/auth';
-import { CATEGORIES, DEFAULT_DESK, DESKS, PRIORITIES, STAGES, deskLabel, stageTone } from '../lib/constants';
+import { CATEGORIES, DEFAULT_DESK, DESKS, PRIORITIES, STAGES, WORK_TYPES, WORK_TYPE_TONE, deskLabel, stageTone, workTypeLabel, workTypeOf } from '../lib/constants';
 import { caseSubject, crFromFileName, crLabel, fmtDate } from '../lib/format';
 import { ApiError, api, humanError } from '../lib/api';
 import type { Activity, Case, CaseFile, Letter, Member } from '../lib/types';
@@ -220,6 +220,7 @@ export default function CaseDetail() {
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-2xl font-bold">{title}{fileCr && <span className="ml-2 align-middle text-sm font-normal text-slate-500 dark:text-slate-400">(फाइलनावावरून)</span>}</h1>
+              <Chip tone={WORK_TYPE_TONE[workTypeOf(c)]}>{workTypeLabel(c.work_type)}</Chip>
               <Chip tone={stageTone(c.stage)}>{c.stage}</Chip>
               {c.priority === 'तातडीचे' && <Chip tone="amber">तातडीचे</Chip>}
               {overdue.has(c.id) && <Chip tone="red">मुदत संपली</Chip>}
@@ -297,7 +298,7 @@ function EditCase({ open, onClose, c, onSaved }: { open: boolean; onClose: () =>
     cr_no: x.cr_no || '', cr_year: x.cr_year ? String(x.cr_year) : '',
     file_no: x.file_no || '', subject: x.subject, category: x.category, priority: x.priority, employee_name: x.employee_name || '', post: x.post || '',
     office: x.office || '', received_from: x.received_from || '', received_via: x.received_via || '', inward_date: x.inward_date || '', due_date: x.due_date || '',
-    desk: x.desk || DEFAULT_DESK,
+    desk: x.desk || DEFAULT_DESK, work_type: workTypeOf(x) as string,
   });
   const [f, setF] = useState(pick(c));
   const [busy, setBusy] = useState(false);
@@ -345,6 +346,7 @@ function EditCase({ open, onClose, c, onSaved }: { open: boolean; onClose: () =>
         </div>
         <div className="sm:col-span-2"><Field label="विषय"><textarea className="input" value={f.subject ?? ''} onChange={set('subject')} /></Field></div>
         <div className="sm:col-span-2"><Field label="विभाग / कार्यासन"><select className="input" value={f.desk} onChange={set('desk')}>{DESKS.map(d => <option key={d.id} value={d.id}>{d.label}</option>)}</select></Field></div>
+        <Field label="कामाचा प्रकार"><select className="input" value={f.work_type} onChange={set('work_type')}>{WORK_TYPES.map(w => <option key={w.id} value={w.id}>{w.label}</option>)}</select></Field>
         <Field label="नस्ती क्र."><input className="input" value={f.file_no} onChange={set('file_no')} /></Field>
         <Field label="प्रवर्ग"><select className="input" value={f.category} onChange={set('category')}>{CATEGORIES.map(x => <option key={x}>{x}</option>)}</select></Field>
         <Field label="प्राधान्य"><select className="input" value={f.priority} onChange={set('priority')}>{PRIORITIES.map(x => <option key={x}>{x}</option>)}</select></Field>

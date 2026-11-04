@@ -78,6 +78,10 @@ WARN level (spec.json; note body and letter, text outside quotes; related and si
   - L12 नियम 14: halant before an abbreviation dot ("एम्.ए.", "पीएच्.डी.") -> "एम.ए.", "पीएच.डी."
   - L13 नियम 3 (आदरार्थी): त्याने/तिने -> त्यांनी, त्याचे/तिचे -> त्यांचे, त्याला/तिला -> त्यांना, त्याच्या/तिच्या -> त्यांच्या
   - L14 नियम 1–4 (अनुस्वार): "आपणास" -> "आपणांस"; "यांनां" / "यानां" -> "यांना"
+  - C32 §4.32 (03.11.2026, relevance + एकसंध flow; flow_warnings): note-body table header with a "पृ./प.वि." / "पृ."
+    column; "पृष्ठांकन" / "माहितीकरिता देण्यात" outside quotes; quote-gluing "तसेच, “" / "” व “"; an item of the
+    "उपरोक्त वस्तुस्थिती पुढीलप्रमाणे आहे:-" list with "पृ.N/प.वि."; a quoted “…” containing "…" / "..." (note body and
+    related extracts)
   - §4.28 (03.11.2026): the note's last para names every draft in the spec (letter "पत्राचे", reminder "स्मरणपत्राचे",
     order kinds "शासन निर्णयाचे / शुद्धिपत्रकाचे / …", parawise "परिच्छेदनिहाय"; drafts_unnamed)
 Desk (C30, 03.11.2026): spec "desk" names the profile tools/desks/<id>.json (absent = law-desk6, the Desk-6 values above);
@@ -867,6 +871,75 @@ def drafts_unnamed(spec):
     return miss
 
 
+# C32 §4.32 (Abhi 03.11.2026: "vinakarna upyogache naslele sandarbh noting mdhe dakhwile aahet … eksandh pna nahi"):
+# relevance + एकसंध flow — WARN level only (never an error; verify_outputs prints the same as "WARN: …"). Note body:
+# a table whose header row has a "पृ./प.वि." / "पृ." column (the ref goes in the sentence before the table); forwarding
+# trivia "पृष्ठांकन" / "माहितीकरिता देण्यात" outside quotes; quote-gluing "तसेच, “" / "” व “" (one quote per sentence);
+# an item of the "उपरोक्त वस्तुस्थिती पुढीलप्रमाणे आहे:-" list carrying "पृ.N/प.वि." (refs are in the body). Note body and
+# related extracts: a quoted “…” containing "…" or "..." (a shortened quote, §1.1).
+PAGE_COL_RE = re.compile(r"^\s*(?:पृ|पृष्ठ)\s*\.?\s*(?:क्र\s*\.?\s*)?(?:/\s*प\s*\.\s*वि\s*\.?)?\s*$")
+TRIVIA_RE = re.compile(r"पृष्ठांकन|माहितीकरिता\s+देण्यात")
+GLUE_RE = re.compile(r"तसेच\s*,\s*“|”\s*व\s*“")
+SUMMARY_HEAD_RE = re.compile(r"उपरोक्त\s+वस्तुस्थिती\s+(?:पुढीलप्रमाणे|खालीलप्रमाणे)")
+CURLY_QUOTE_RE = re.compile(r"“[^”]*”")
+SHORT_QUOTE_RE = re.compile(r"…|\.\.\.")
+FLOW_SRC = "(§4.32)"
+
+
+def flow_warnings(seq, headers=(), related=()):
+    """C32 §4.32 WARN-level findings. seq = the note body in print order [(label, text, is_para)] (lint: note_seq;
+    verify: the docx blocks); headers = [(label, [header cells])] of each note-body table; related = [(label, text)] of
+    the related extracts (only the shortened-quote rule). Returns ["<label>: <message>"]; never errors."""
+    W = []
+    def add(x):
+        if x not in W:
+            W.append(x)
+    for lab, cells in headers:
+        for c in cells or []:
+            if isinstance(c, str) and PAGE_COL_RE.match(c):
+                add(f"{lab}: table column '{c.strip()}' — no पृ./प.वि. column; give the reference once in the sentence "
+                    f"before the table {FLOW_SRC}")
+    for lab, t, _ in seq:
+        for m in TRIVIA_RE.finditer(unquoted(t)):
+            add(f"{lab}: forwarding detail '{m.group(0)}' — endorsement nos. / copies-for-information are not needed "
+                f"to decide the demand {FLOW_SRC}")
+        if GLUE_RE.search(t or ""):
+            add(f"{lab}: quote-gluing ('तसेच, “…' / '” व “') — one quote per sentence, with its own subject {FLOW_SRC}")
+    for lab, t in list((lab, t) for lab, t, _ in seq) + list(related):
+        for m in CURLY_QUOTE_RE.finditer(t or ""):
+            if SHORT_QUOTE_RE.search(m.group(0)):
+                add(f"{lab}: shortened quote ('…' / '...' inside “…”) — quote the passage in full (§1.1) {FLOW_SRC}")
+                break
+    for i, (lab, t, isp) in enumerate(seq):
+        if isp and SUMMARY_HEAD_RE.search(unquoted(t)):
+            j = i + 1
+            while j < len(seq) and not seq[j][2]:
+                if REF_LOOSE.search(seq[j][1] or ""):
+                    add(f"{seq[j][0]}: 'उपरोक्त वस्तुस्थिती' item carries a पृ./प.वि. reference — the summary has no "
+                        f"page refs (they are in the body) {FLOW_SRC}")
+                j += 1
+    return W
+
+
+def note_tables(n):
+    """[(JSON path, header row)] of every {"table": [...]} in the note body (first, paras, sub, closing)."""
+    out = []
+    def walk(o, path):
+        if isinstance(o, dict):
+            if isinstance(o.get("table"), list) and o["table"] and isinstance(o["table"][0], list):
+                out.append((f"{path}.table[0]", o["table"][0]))
+            for k, v in o.items():
+                if k != "table":
+                    walk(v, f"{path}.{k}")
+        elif isinstance(o, list):
+            for i, x in enumerate(o):
+                walk(x, f"{path}[{i}]")
+    for k in ("first", "paras", "sub", "closing"):
+        if k in n:
+            walk(n[k], f"note.{k}")
+    return out
+
+
 def lint_warnings(spec):
     """WARN-level findings "<JSON path>: <message>" (note body and letter outside quotes); never errors."""
     if not isinstance(spec, dict) or not isinstance(spec.get("note"), dict):
@@ -876,6 +949,8 @@ def lint_warnings(spec):
     letter = letter_strings(spec)
     W = [f"{path}: {m}" for path, t in body + letter for m in warn_hits(t)]
     W += missing_scatter(note_seq(n))[1]   # §4.31 placement
+    rel_txt = [(pth, t) for pth, t in strings(spec.get("related", []), "related") if re.search(r"\.text(\[|$)", pth)]
+    W += flow_warnings(note_seq(n), note_tables(n), rel_txt)   # C32 §4.32 relevance + flow
     W += [f"{last_para(n)[0]}: last para — does not name the draft {d} (§4.28: name every draft made, e.g. "
           f"'पत्राचे प्रारूप व शासन निर्णयाचे प्रारूप पृ.      /प.वि. वर मान्यतेस्तव सादर.')" for d in drafts_unnamed(spec)]
     return W

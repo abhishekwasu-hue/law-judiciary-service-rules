@@ -77,6 +77,14 @@ function settingError(msg: string): string | null {
   return `${SETTING_LABEL[m[1]]}: ${rule ? rule[1] : 'मूल्य योग्य नाही'}`;
 }
 
+// ---------- POST /api/run (C33: may answer {queued: true, position} when another case's run is active) ----------
+export interface RunStart { id: number; outputs_dropped?: boolean; queued?: boolean; position?: number }
+/** Short Marathi text of a /api/run answer: started now, or waiting in the sequential queue at position N. */
+export function runStartText(r: RunStart, startedText = 'अभ्यास सुरू झाला'): string {
+  const base = r.queued ? `रांगेत — क्रमांक ${Number(r.position) || '?'} (आधीची प्रक्रिया संपल्यावर आपोआप सुरू होईल)` : startedText;
+  return r.outputs_dropped ? `${base} — मसुदे-निवड लागू झाली नाही (migration 0008 बाकी)` : base;
+}
+
 // ---------- monthly spend limit (Worker GET /api/spend; POST /api/run → 402 monthly_budget_reached) ----------
 export interface Spend { month: string; spent_usd: number; limit_usd: number; runs: number; reserved_usd?: number; active_runs?: number }
 /** Same test as the Worker's /api/run (402): this month's spend + active runs at their estimate reach the limit. */

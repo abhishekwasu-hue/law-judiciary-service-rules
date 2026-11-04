@@ -8,6 +8,8 @@ import { ACTION_LABEL, CATEGORIES, STAGES, TONE_HEX, stageTone, type Tone } from
 import { crLabel, daysBetween, fmtDate, fmtDateTime, monthLabel, textOf, todayISO } from '../lib/format';
 import type { Activity } from '../lib/types';
 import { Empty, Section, Skeleton, Spinner } from '../components/ui';
+import QueueCard from '../components/QueueCard';
+import WorkTypeChips from '../components/WorkTypeChips';
 
 // Recharts is loaded only when the आलेख section is opened.
 const HomeCharts = lazy(() => import('../components/Charts').then(m => ({ default: m.HomeCharts })));
@@ -178,6 +180,8 @@ export default function Home() {
         <Link to="/new" className="btn-accent">+ नवीन प्रस्ताव</Link>
       </div>
       {errCard && <div className="order-first lg:col-span-2">{errCard}</div>}
+      <div className="order-first min-w-0 lg:col-span-2"><WorkTypeChips cases={cases} linkTo={id => (id ? `/cases?work=${id}` : '/cases')} /></div>
+      <QueueCard className="order-first lg:col-span-2" />
 
       <div className={`order-2 grid grid-cols-3 gap-2 sm:gap-3 lg:order-1 lg:col-span-2 ${isOwner ? 'lg:grid-cols-6' : 'sm:grid-cols-5'}`}>
         <Kpi label="नवीन" value={loading ? null : kpi.new} tone="navy" to="/cases?stage=प्राप्त" />

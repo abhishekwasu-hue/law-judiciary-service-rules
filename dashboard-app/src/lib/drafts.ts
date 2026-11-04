@@ -9,7 +9,8 @@ export interface Suggestion { keys: DraftKey[]; reason: string }
 const ordered = (v: readonly string[]): DraftKey[] => DRAFT_KEYS.filter(k => v.includes(k));
 
 /** runs: newest first (as useRuns gives them). Files without created_at (not uploaded yet) count as new. */
-export function suggestDrafts(files: FileLike[], runs: RunLike[] | null | undefined): Suggestion {
+/** workType (C33): a court case (न्यायालयीन प्रकरणे) without an earlier run pre-ticks parawise + letter, like a court notice. */
+export function suggestDrafts(files: FileLike[], runs: RunLike[] | null | undefined, workType?: string | null): Suggestion {
   const list = runs ?? [];
   const last = list[0];
   const since = (f: FileLike) => !last || !f.created_at || f.created_at > last.created_at;
@@ -17,6 +18,7 @@ export function suggestDrafts(files: FileLike[], runs: RunLike[] | null | undefi
   if (newOf('approval')) return { keys: ['gr'], reason: 'मान्यता प्राप्त' };
   if (newOf('reply')) return { keys: [], reason: 'उत्तर प्राप्त — नस्ती वित्त/सा.प्र.वि. कडे' };
   if (!list.length && files.some(f => f.kind === 'court_notice')) return { keys: ['letter', 'parawise'], reason: 'न्यायालयीन नोटीस' };
+  if (!list.length && workType === 'court') return { keys: ['letter', 'parawise'], reason: 'न्यायालयीन प्रकरण' };
   if (last && last.state === 'done') {
     const madeLetter = Array.isArray(last.outputs) ? last.outputs.includes('letter') : last.letter_needed === true;
     if (madeLetter) return { keys: ['reminder'], reason: 'मागील प्रक्रियेत पत्र; उत्तर अप्राप्त' };

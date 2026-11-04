@@ -1,7 +1,7 @@
 // node --test cloudflare/test/worker.test.mjs — Worker flows with an in-memory KV and a mocked Supabase/GitHub.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import worker from '../worker.js';
+import worker, { cronTick } from '../worker.js';
 
 function kv() {
   const m = new Map();
@@ -34,9 +34,67 @@ const authUsers = [{ id: 'au-old', email: 'Staff.Old@example.com' }]; // account
 const caseRows = { 40: { id: 40, cr_no: '21', cr_year: 2026, subject: 's' }, 43: { id: 43, cr_no: null, cr_year: null, subject: 's' } };
 const searchUrls = [];
 const letterRows = { 31: { id: 31, case_id: 7 }, 32: { id: 32, case_id: 7 }, 33: { id: 33, case_id: 7 } };
+// C33 queue: in-memory runs table (Q = { rows, nextId, hook }) for the queue queries; null = column missing (legacy)
+let Q = null;
+const STALE = 3.5 * 3600 * 1000;
+const isoNow = () => new Date().toISOString();
+async function queueDb(u, opt, res) {
+  const d = decodeURIComponent(u);
+  const M = opt.method || 'GET';
+  const rows = Q.rows;
+  const since = Date.now() - STALE;
+  const isActive = r => ['queued', 'running'].includes(r.state) &&
+    (r.dispatched_at ? new Date(r.dispatched_at).getTime() > since : r.state === 'running' && new Date(r.created_at).getTime() > since);
+  const byId = id => rows.find(r => r.id === Number(id));
+  if (Q.hook) await Q.hook(d, M);
+  if (/\/rest\/v1\/case_files\?case_id=eq\.\d+&kind=eq\.proposal/.test(d)) return res([{ id: 1 }]);
+  if (d === `${SB}/rest/v1/runs` && M === 'POST') {
+    const row = { id: Q.nextId++, state: 'queued', dispatched_at: null, created_at: new Date(Date.now() + Q.nextId).toISOString(), ...JSON.parse(opt.body) };
+    rows.push(row); return res([{ ...row }], 201);
+  }
+  if (M === 'GET' && d.startsWith(`${SB}/rest/v1/runs?state=in.(queued,running)&or=`)) return res(rows.filter(isActive).sort((a, b) => a.id - b.id).map(r => ({ ...r })));
+  if (M === 'GET' && d.startsWith(`${SB}/rest/v1/runs?state=eq.queued&dispatched_at=is.null`))
+    return res(rows.filter(r => r.state === 'queued' && !r.dispatched_at).sort((a, b) => a.created_at.localeCompare(b.created_at) || a.id - b.id).map(r => ({ ...r })));
+  if (M === 'GET' && d.startsWith(`${SB}/rest/v1/runs?case_id=eq.`) && d.includes('&or=')) {
+    const cid = Number(d.match(/case_id=eq\.(\d+)/)[1]);
+    return res(rows.filter(r => r.case_id === cid && ['queued', 'running'].includes(r.state) && (!r.dispatched_at || isActive(r))).map(r => ({ id: r.id })));
+  }
+  if (M === 'GET' && d.startsWith(`${SB}/rest/v1/runs?created_at=gte.`)) return res(rows.map(r => ({ cost_usd: r.cost_usd ?? null, created_at: r.created_at, state: r.state, dispatched_at: r.dispatched_at ?? null })).concat(monthRuns.map(r => ({ dispatched_at: r.created_at, ...r }))));
+  let m;
+  if (M === 'PATCH' && (m = d.match(/\/runs\?id=eq\.(\d+)&state=eq\.queued&dispatched_at=is\.null$/))) {
+    const r = byId(m[1]);
+    if (!r || r.state !== 'queued' || r.dispatched_at) return res([]);
+    Object.assign(r, JSON.parse(opt.body)); return res([{ ...r }]);
+  }
+  if (M === 'PATCH' && (m = d.match(/\/runs\?id=eq\.(\d+)&state=eq\.queued$/))) {
+    const r = byId(m[1]); if (!r || r.state !== 'queued') return res([]);
+    Object.assign(r, JSON.parse(opt.body)); Q.yields = (Q.yields || 0) + 1; return res([{ ...r }]);
+  }
+  if (M === 'PATCH' && (m = d.match(/\/runs\?id=eq\.(\d+)&state=in\.\(queued,running\)$/))) {
+    const r = byId(m[1]); if (!r || !['queued', 'running'].includes(r.state)) return res([]);
+    Object.assign(r, JSON.parse(opt.body)); return res([{ id: r.id, case_id: r.case_id }]);
+  }
+  if (M === 'PATCH' && (m = d.match(/\/runs\?id=eq\.(\d+)$/))) {
+    const r = byId(m[1]); if (!r) return res([]);
+    Object.assign(r, JSON.parse(opt.body)); return res([{ ...r }]);
+  }
+  if (M === 'PATCH' && d.startsWith(`${SB}/rest/v1/runs?or=`)) {
+    const out = rows.filter(r => ['queued', 'running'].includes(r.state) &&
+      (r.dispatched_at ? new Date(r.dispatched_at).getTime() < since : r.state === 'running' && new Date(r.created_at).getTime() < since));
+    out.forEach(r => Object.assign(r, JSON.parse(opt.body)));
+    return res(out.map(r => ({ id: r.id, case_id: r.case_id })));
+  }
+  return null;
+}
 globalThis.fetch = async (u, opt = {}) => {
   u = String(u); calls.push({ u, opt });
   const res = (o, s = 200) => new Response(JSON.stringify(o), { status: s });
+  // C33: without a queue table (Q null) the runs.dispatched_at column is "missing" (migration 0010 not applied) →
+  // the Worker dispatches at once, as the older tests expect
+  if (u.startsWith(`${SB}/rest/v1/runs`) && /dispatched_at/.test(decodeURIComponent(u) + (opt.body || ''))) {
+    if (!Q) return res({ code: '42703', message: 'column runs.dispatched_at does not exist' }, 400);
+  }
+  if (Q) { const q = await queueDb(u, opt, res); if (q) return q; }
   if (u === `${SB}/auth/v1/user`) {
     const t = opt.headers.Authorization;
     if (t === 'Bearer owner-jwt') return res({ id: 'u1', email: 'abhi@example.com', email_confirmed_at: '2026-11-01T10:00:00Z' });
@@ -779,4 +837,225 @@ test('C30: case desk — create/PATCH accept the profile ids only (400 Marathi);
     assert.equal(r.status, 200, 'desk-only edit: the case row comes back unchanged');
     assert.equal((await r.json()).id, 43);
   } finally { deskColumn = true; }
+});
+
+// ---------- C33: work_type + sequential queue ----------
+const owner33 = { authorization: 'Bearer owner-jwt' };
+const dispatchBodies = () => calls.filter(c => c.u.endsWith('/dispatches')).map(c => JSON.parse(c.opt.body).client_payload);
+const runCase = cid => call('/api/run', { method: 'POST', headers: owner33, body: JSON.stringify({ case_id: cid }) });
+const tokenOf = runId => [...env.SETTINGS.m.entries()].filter(([k, v]) => k.startsWith('run_token:') && JSON.parse(v).run_id === String(runId)).map(([k]) => k.slice(10)).pop();
+
+test('C33: case work_type — 4 ids only (400 Marathi); missing column → saved without it', async () => {
+  const create = b => call('/api/cases', { method: 'POST', headers: owner33, body: JSON.stringify(b) });
+  caseInserts.length = 0;
+  for (const w of ['service', 'court', 'legislature', 'procurement']) assert.equal((await create({ subject: 'x', work_type: w })).status, 200, w);
+  const r = await create({ subject: 'x', work_type: 'medical' });
+  assert.equal(r.status, 400);
+  assert.match((await r.json()).error, /कामाची श्रेणी/);
+  const pr = await call('/api/cases/40', { method: 'PATCH', headers: owner33, body: JSON.stringify({ work_type: 'x' }) });
+  assert.equal(pr.status, 400);
+  assert.equal((await call('/api/cases/40', { method: 'PATCH', headers: owner33, body: JSON.stringify({ work_type: 'court' }) })).status, 200);
+  assert.equal(caseRows[40].work_type, 'court');
+  // column missing (migration 0010 not applied): the case is still saved, without work_type
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = async (u, opt = {}) => (String(u).startsWith(`${SB}/rest/v1/cases`) && ['POST', 'PATCH'].includes(opt.method) && 'work_type' in JSON.parse(opt.body)
+    ? new Response(JSON.stringify({ code: 'PGRST204', message: "Could not find the 'work_type' column of 'cases' in the schema cache" }), { status: 400 })
+    : realFetch(u, opt));
+  try {
+    caseInserts.length = 0;
+    const ok = await create({ subject: 'y', work_type: 'court', desk: 'law-desk6' });
+    assert.equal(ok.status, 200);
+    assert.deepEqual(caseInserts.map(x => 'work_type' in x), [false], JSON.stringify(caseInserts));
+    assert.equal(caseInserts[0].desk, 'law-desk6', 'other fields kept');
+    assert.equal((await call('/api/cases/40', { method: 'PATCH', headers: owner33, body: JSON.stringify({ work_type: 'service' }) })).status, 200, 'PATCH of only work_type → row returned');
+  } finally { globalThis.fetch = realFetch; }
+});
+
+test('C33: one run at a time across cases — immediate when idle, else queued with FIFO position', async () => {
+  Q = { rows: [], nextId: 100 }; monthRuns = []; dispatchFail = false;
+  try {
+    const n0 = dispatchBodies().length;
+    const a = await body(await runCase(101));
+    assert.equal(a.queued, false); assert.ok(a.dispatched_at, 'dispatched_at set');
+    assert.equal(dispatchBodies().length, n0 + 1);
+    const b = await body(await runCase(102)), c = await body(await runCase(103));
+    assert.deepEqual([b.queued, b.position, c.queued, c.position], [true, 1, true, 2]);
+    assert.equal(dispatchBodies().length, n0 + 1, 'nothing more dispatched while one is active');
+    assert.equal(Q.rows.find(r => r.id === b.id).dispatched_at, null);
+    // one run per case stays: a queued run blocks its case
+    const dup = await runCase(102);
+    assert.equal(dup.status, 409); assert.equal((await dup.json()).run_id, b.id);
+    assert.ok(acts.some(x => x.action === 'run_queued' && x.detail.position === 2));
+
+    // engine/next with a wrong token → 403; with the run's token: the finished run → next in FIFO order
+    assert.equal((await call('/api/engine/next', { method: 'POST', headers: { authorization: 'Bearer nope' }, body: JSON.stringify({ run_id: a.id }) })).status, 403);
+    Q.rows.find(r => r.id === a.id).state = 'done';
+    let nx = await body(await call('/api/engine/next', { method: 'POST', headers: { authorization: `Bearer ${tokenOf(a.id)}` }, body: JSON.stringify({ run_id: a.id }) }));
+    assert.deepEqual(nx, { ok: true, changed: 0, dispatched: b.id });
+    assert.equal(dispatchBodies().at(-1).run_id, b.id);
+    assert.ok(acts.some(x => x.action === 'run_started' && x.detail.run_id === b.id && x.detail.from_queue));
+    // calling it again changes nothing (b is active)
+    nx = await body(await call('/api/engine/next', { method: 'POST', headers: { authorization: `Bearer ${tokenOf(a.id)}` }, body: JSON.stringify({ run_id: a.id }) }));
+    assert.equal(nx.dispatched, null);
+    // b's job ends while its run is still "running" (no finish, no fail): marked failed, then c goes
+    Q.rows.find(r => r.id === b.id).state = 'running';
+    nx = await body(await call('/api/engine/next', { method: 'POST', headers: { authorization: `Bearer ${tokenOf(b.id)}` }, body: JSON.stringify({ run_id: b.id }) }));
+    assert.deepEqual(nx, { ok: true, changed: 1, dispatched: c.id });
+    assert.equal(Q.rows.find(r => r.id === b.id).state, 'failed');
+    // engine/fail also moves the queue
+    const d = await body(await runCase(104));
+    assert.equal(d.position, 1);
+    const f = await body(await call('/api/engine/fail', { method: 'POST', headers: { authorization: `Bearer ${tokenOf(c.id)}` }, body: JSON.stringify({ run_id: c.id, reason: 'x' }) }));
+    assert.deepEqual(f, { ok: true, changed: 1, dispatched: d.id });
+  } finally { Q = null; }
+});
+
+test('C33: race-safe — parallel /api/run calls dispatch exactly one; claim race never dispatches two', async () => {
+  Q = { rows: [], nextId: 200 }; monthRuns = []; dispatchFail = false;
+  try {
+    const n0 = dispatchBodies().length;
+    const rs = await Promise.all([201, 202, 203, 204, 205].map(cid => runCase(cid).then(body)));
+    assert.equal(dispatchBodies().length, n0 + 1, 'exactly one dispatch');
+    assert.equal(rs.filter(r => r.queued === false).length, 1);
+    const active = Q.rows.filter(r => r.dispatched_at);
+    assert.equal(active.length, 1);
+    assert.equal(active[0].id, 200, 'the oldest run goes first');
+    // concurrent dispatchNext callers (sweep + engine/next + cron) after the active one ended → still one dispatch
+    active[0].state = 'done';
+    await Promise.all([
+      call('/api/runs/sweep', { method: 'POST', headers: owner33 }),
+      call('/api/engine/next', { method: 'POST', headers: { authorization: `Bearer ${tokenOf(200)}` }, body: JSON.stringify({ run_id: 200 }) }),
+      worker.scheduled({}, env, null),
+    ]);
+    assert.equal(dispatchBodies().length, n0 + 2, 'exactly one more dispatch');
+    assert.equal(dispatchBodies().at(-1).run_id, 201, 'FIFO');
+    // forced interleaving: two claimers both pass the first check, both claim → both see each other → both give
+    // back; nothing dispatched twice, the cron dispatches later
+    Q.rows.find(r => r.id === 201).state = 'done';
+    let gate = 0, release;
+    const both = new Promise(r => { release = r; });
+    Q.hook = async (d, M) => { if (M === 'GET' && d.includes('runs?state=eq.queued&dispatched_at=is.null')) { gate++; if (gate === 2) release(); await both; } };
+    const n1 = dispatchBodies().length;
+    // both callers hold at the waiting-list read until the other has reached it too
+    await Promise.all([call('/api/runs/sweep', { method: 'POST', headers: owner33 }), worker.scheduled({}, env, null)]);
+    Q.hook = null;
+    const dispatchedNow = dispatchBodies().length - n1;
+    assert.ok(dispatchedNow <= 1, 'never two at once');
+    assert.ok(Q.rows.filter(r => ['queued', 'running'].includes(r.state) && r.dispatched_at).length <= 1);
+    if (dispatchedNow === 0) {
+      await worker.scheduled({}, env, null);
+      assert.equal(dispatchBodies().length, n1 + 1, 'cron dispatches after a give-back');
+    }
+    assert.equal(dispatchBodies().at(-1).run_id, 202);
+  } finally { Q = null; }
+});
+
+test('C33: both claimers see each other → both give back, cron dispatches one', async () => {
+  Q = { rows: [], nextId: 300 }; monthRuns = []; dispatchFail = false;
+  try {
+    const t0 = Date.now() - 1000;
+    Q.rows.push({ id: 301, case_id: 31, state: 'queued', dispatched_at: null, created_at: new Date(t0).toISOString() },
+                { id: 302, case_id: 32, state: 'queued', dispatched_at: null, created_at: new Date(t0 + 1).toISOString() });
+    // simulate a second Worker that claimed 302 between our check and our verify
+    Q.hook = async (d, M) => {
+      if (M === 'PATCH' && d.endsWith('id=eq.301&state=eq.queued&dispatched_at=is.null')) Q.rows[1].dispatched_at = isoNow();
+    };
+    const n0 = dispatchBodies().length;
+    await worker.scheduled({}, env, null);
+    Q.hook = null;
+    assert.equal(dispatchBodies().length, n0, 'no dispatch when another claim is seen');
+    assert.equal(Q.rows[0].dispatched_at, null, 'claim given back');
+    Q.rows[1].dispatched_at = null;   // the other one gave back too
+    await worker.scheduled({}, env, null);
+    assert.equal(dispatchBodies().length, n0 + 1);
+    assert.equal(dispatchBodies().at(-1).run_id, 301);
+  } finally { Q = null; }
+});
+
+test('C33: GitHub dispatch failure → that run failed (Marathi), the next one is tried; own run → 502', async () => {
+  Q = { rows: [], nextId: 400 }; monthRuns = []; acts.length = 0;
+  try {
+    dispatchFail = true;
+    const r = await runCase(401);
+    assert.equal(r.status, 502);
+    assert.equal((await r.json()).reason, 'GitHub जोडणी अयशस्वी (token तपासा — सेटिंग्ज) — पुन्हा तयार करा');
+    assert.equal(Q.rows[0].state, 'failed');
+    assert.ok(acts.some(x => x.action === 'run_failed' && x.detail.run_id === 400 && /Bad credentials/.test(x.detail.error)));
+    // two waiting runs, GitHub down: both failed, nothing left hanging
+    const t0 = Date.now() - 1000;
+    Q.rows.push({ id: 402, case_id: 42, state: 'queued', dispatched_at: null, created_at: new Date(t0).toISOString() },
+                { id: 403, case_id: 43, state: 'queued', dispatched_at: null, created_at: new Date(t0 + 1).toISOString() });
+    let calls402 = 0;
+    const realFetch = globalThis.fetch;
+    globalThis.fetch = async (u, opt = {}) => {
+      if (String(u).endsWith('/dispatches') && calls402++ === 0) return new Response('{"message":"Bad credentials"}', { status: 401 });
+      return realFetch(u, opt);
+    };
+    dispatchFail = false;
+    try {
+      const out = await cronTick(env);
+      assert.deepEqual(out.failed, [402]);
+      assert.equal(out.dispatched, 403);
+    } finally { globalThis.fetch = realFetch; }
+    assert.equal(Q.rows.find(x => x.id === 402).step, 'GitHub जोडणी अयशस्वी (token तपासा — सेटिंग्ज) — पुन्हा तयार करा');
+  } finally { Q = null; dispatchFail = false; }
+});
+
+test('C33: sweep uses dispatch time; a long-waiting queued run is not swept; monthly limit keeps it queued', async () => {
+  Q = { rows: [], nextId: 500 }; monthRuns = [];
+  try {
+    const old = new Date(Date.now() - 5 * 3600 * 1000).toISOString();
+    Q.rows.push({ id: 501, case_id: 51, state: 'running', dispatched_at: old, created_at: old },
+                { id: 502, case_id: 52, state: 'queued', dispatched_at: null, created_at: old });
+    // limit reached at the moment of dispatch: 502 stays queued (not failed) with the Marathi wait text
+    monthRuns = [{ cost_usd: 25, created_at: new Date().toISOString(), state: 'done' }];
+    const n0 = dispatchBodies().length;
+    const sw = await body(await call('/api/runs/sweep', { method: 'POST', headers: owner33 }));
+    assert.deepEqual(sw, { ok: true, failed: [501], dispatched: null });
+    assert.equal(Q.rows[1].state, 'queued');
+    assert.equal(Q.rows[1].dispatched_at, null);
+    assert.equal(Q.rows[1].step, 'मासिक खर्च-मर्यादा गाठली — Settings मध्ये मर्यादा वाढवल्यावर आपोआप सुरू होईल');
+    await worker.scheduled({}, env, null);
+    assert.equal(dispatchBodies().length, n0, 'cron retries, still blocked');
+    // the owner raised the limit (here: the spend is gone) → the cron dispatches it
+    monthRuns = [];
+    await worker.scheduled({}, env, null);
+    assert.equal(dispatchBodies().length, n0 + 1);
+    assert.equal(dispatchBodies().at(-1).run_id, 502);
+    // queue the run back to test the sweep path too
+    Object.assign(Q.rows[1], { state: 'queued', dispatched_at: null });
+    const sw2 = await body(await call('/api/runs/sweep', { method: 'POST', headers: owner33 }));
+    assert.deepEqual(sw2, { ok: true, failed: [], dispatched: 502 });
+  } finally { Q = null; monthRuns = []; }
+});
+
+test('C33: monthly limit — waiting runs are not reserved; the check runs at dispatch (immediate path too)', async () => {
+  Q = { rows: [], nextId: 600 }; dispatchFail = false;
+  try {
+    const now = new Date().toISOString();
+    // 5 runs waiting: none of them is reserved
+    for (let i = 0; i < 5; i++) Q.rows.push({ id: 601 + i, case_id: 61 + i, state: 'queued', dispatched_at: null, created_at: now });
+    monthRuns = [{ cost_usd: 2, created_at: now, state: 'done' }];
+    let sp = await body(await call('/api/spend', { headers: owner33 }));
+    assert.deepEqual([sp.active_runs, sp.reserved_usd], [0, 0]);
+    // one dispatched: reserved at the estimate (median of finished = 2)
+    Q.rows[0].dispatched_at = now;
+    sp = await body(await call('/api/spend', { headers: owner33 }));
+    assert.deepEqual([sp.active_runs, sp.reserved_usd], [1, 2]);
+    Q.rows.length = 0;
+    // immediate path: no active run, but spent + reserved reaches the limit only at dispatch time → stays queued
+    monthRuns = [{ cost_usd: 19.5, created_at: now, state: 'done' }];
+    const n0 = dispatchBodies().length;
+    const r = await body(await runCase(670));   // 19.5 < 20 → accepted at /api/run
+    assert.equal(dispatchBodies().length, n0 + 1, 'below the limit: dispatched at once');
+    assert.equal(r.queued, false);
+    Q.rows[0].state = 'done'; Q.rows[0].cost_usd = 1;   // spend now 20.5 ≥ 20
+    const blockedRun = { id: 699, case_id: 69, state: 'queued', dispatched_at: null, created_at: now };
+    Q.rows.push(blockedRun);
+    const out = await cronTick(env);
+    assert.equal(out.dispatched, null);
+    assert.equal(blockedRun.state, 'queued');
+    assert.match(blockedRun.step, /मासिक खर्च-मर्यादा गाठली/);
+    assert.equal(dispatchBodies().length, n0 + 1, 'nothing dispatched past the limit');
+  } finally { Q = null; monthRuns = []; }
 });

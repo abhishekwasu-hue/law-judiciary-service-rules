@@ -1,0 +1,11 @@
+{
+ "id": "procurement",
+ "label": "खरेदी विषयक बाबी",
+ "status": "rules_pending",
+ "default_drafts": ["letter"],
+ "allowed_drafts": ["letter", "reminder", "gr", "corrigendum", "circular", "memo", "notification", "parawise"],
+ "rules_file": "tools/work_rules/procurement.md",
+ "samples_dir": "samples/work/procurement/",
+ "required_samples": ["खरेदी-प्रस्ताव टिप्पणी", "वित्तीय अधिकार / GeM संदर्भ", "पुरवठा आदेश"],
+ "pending_warning": "पडताळणी अपूर्ण — खरेदी विषयक बाबी: या श्रेणीचे स्वतंत्र नियम/नमुने अजून नाहीत; सर्वसाधारण नोंद तयार केली"
+}

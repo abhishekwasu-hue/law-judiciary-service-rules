@@ -586,7 +586,28 @@ class VerifyOutputs(unittest.TestCase):
 
     def test_good_has_no_warn(self):
         rc, out = self.run_verify(self.good)
-        self.assertNotIn("WARN:", out)
+        # C32 §4.32: CR122's related precedent extract is itself quoted with "..." (quote content never altered, §1.1)
+        self.assertEqual([ln for ln in out.splitlines() if ln.startswith("WARN:") and "shortened quote" not in ln], [], out)
+
+    def test_432_flow_warn_not_fail(self):
+        # C32 §4.32 (Abhi 03.11.2026): relevance + एकसंध flow findings are SOFT notes (WARN), never a FAIL
+        d = self.case("flow432")
+        def f(s):
+            t = s["note"]["paras"][2]["table"]; t[0].append("पृ./प.वि."); [r.append("12") for r in t[1:]]
+            s["note"]["paras"][0] += " सदर पत्राची प्रत माहितीकरिता देण्यात आली आहे."
+            s["note"]["paras"].insert(5, "अर्जात “वेतननिश्चिती” व “विकल्प … स्वीकारावा” असे नमूद आहे.")
+            s["note"]["paras"].insert(6, "उपरोक्त वस्तुस्थिती पुढीलप्रमाणे आहे:-")
+            s["note"]["sub"] = {"6": ["(1) पदोन्नती दि. 30.01.2010 रोजी झाली आहे (पृ.7/प.वि.).", "(2) विकल्प अर्ज दि. 24.01.2025 रोजी सादर झाला आहे."]}
+        build_note(self.spec_with(f), d)
+        rc, out = self.run_verify(d)
+        self.assertEqual(rc, 0, out)
+        self.assertIn("ALL OK", out)
+        self.assertNotIn("FAIL:", out)
+        warns = [ln for ln in out.splitlines() if ln.startswith("WARN:") and "(§4.32)" in ln]
+        for needle in ("(table): table column 'पृ./प.वि.'", "forwarding detail 'माहितीकरिता देण्यात'", "quote-gluing",
+                       "shortened quote", "'उपरोक्त वस्तुस्थिती' item carries a पृ./प.वि. reference"):
+            self.assertTrue(any(needle in w for w in warns), f"{needle}:\n{out}")
+        self.assertEqual(sum("'उपरोक्त वस्तुस्थिती' item" in w for w in warns), 1, out)   # only item (1)
 
     # ---- optional outputs (02.11.2026): <PREFIX>_Order_Draft.docx / <PREFIX>_Parawise.docx ----
     def test_extras_absent_no_lines(self):

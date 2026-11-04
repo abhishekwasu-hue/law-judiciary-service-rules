@@ -47,11 +47,17 @@ const DISPATCH_REASON = 'GitHub जोडणी अयशस्वी (token त
 const CLEAR = '__clear__';
 const UNCLEARABLE = ['supabase_service_key'];
 // case fields the app may set (POST create, PATCH edit)
-const CASE_FIELDS = ['cr_no', 'cr_year', 'file_no', 'subject', 'category', 'priority', 'employee_name', 'post', 'office', 'received_from', 'received_via', 'inward_date', 'due_date', 'desk'];
+const CASE_FIELDS = ['cr_no', 'cr_year', 'file_no', 'subject', 'category', 'priority', 'employee_name', 'post', 'office', 'received_from', 'received_via', 'inward_date', 'due_date', 'desk', 'work_type'];
 // desk profiles (C30, tools/desks/<id>.json; app list dashboard-app/src/lib/constants.ts DESKS). Add an id here when a
 // profile json is added. cases.desk null = law-desk6 (migration 0009).
 export const DESK_IDS = ['law-desk6', 'hte-mashi5'];
 const BAD_DESK = 'विभाग / कार्यासन चुकीचे — यादीतील पर्याय निवडा';
+// work categories (C33, migration 0010; app list dashboard-app): service = सेवाविषयक प्रकरणे (default; cases.work_type
+// null = service), court = न्यायालयीन प्रकरणे, legislature = विधिमंडळ कामकाज, procurement = खरेदी विषयक बाबी
+export const WORK_TYPES = ['service', 'court', 'legislature', 'procurement'];
+const BAD_WORK_TYPE = 'कामाची श्रेणी चुकीची — यादीतील पर्याय निवडा';
+// case columns added by later migrations: the case is saved without them until the migration is applied
+const OPTIONAL_CASE_COLS = { desk: '0009', work_type: '0010' };
 
 // PostgREST error: the browser gets only "db <status>" (no table/column text); code/detail stay for the Worker's own checks.
 class DbError extends Error {
@@ -179,6 +185,91 @@ async function failRuns(cfg, filter, reason, actor = null) {
   return rows || [];
 }
 
+// ---------- sequential queue (C33, migration 0010: runs.dispatched_at) ----------
+// One engine run at a time across ALL cases (Abhi 04.11.2026: "काम मात्र सिक्वेन्सनेस … वन बाय वन"). A run waits with
+// state 'queued' and dispatched_at null; dispatchNext hands the oldest one (FIFO: created_at, id) to GitHub when no run
+// is active. Active = running/queued and dispatched less than STALE_MS ago (a legacy running row without dispatched_at:
+// created less than STALE_MS ago). Column missing (migration not applied) → null: every run is dispatched at once.
+const ENGINE_END_REASON = 'इंजिन अयशस्वी — पुन्हा तयार करा';
+const pgTime = ms => `"${new Date(ms).toISOString()}"`;
+async function activeRuns(db) {
+  const since = pgTime(Date.now() - STALE_MS);
+  try {
+    return (await db.rest(`runs?state=in.(queued,running)&or=${encodeURIComponent(`(dispatched_at.gt.${since},and(dispatched_at.is.null,state.eq.running,created_at.gt.${since}))`)}&select=id,case_id,state,dispatched_at&order=id.asc`)) || [];
+  } catch (e) {
+    if (missingColumn(e, 'dispatched_at')) { console.log('runs.dispatched_at column missing (apply migration 0010); runs dispatched at once'); return null; }
+    throw e;
+  }
+}
+const BUDGET_WAIT = 'मासिक खर्च-मर्यादा गाठली — Settings मध्ये मर्यादा वाढवल्यावर आपोआप सुरू होईल';
+const waitingRuns = db => db.rest('runs?state=eq.queued&dispatched_at=is.null&select=id,case_id,created_at,step&order=created_at.asc,id.asc&limit=200').then(r => r || []);
+// stuck runs (queued/running too long since dispatch) → failed; runs waiting in the queue are never swept here
+async function sweepStale(cfg, actor) {
+  const before = Date.now() - STALE_MS;
+  try {
+    return await failRuns(cfg, `or=${encodeURIComponent(`(dispatched_at.lt.${pgTime(before)},and(dispatched_at.is.null,state.eq.running,created_at.lt.${pgTime(before)}))`)}`, STALE_REASON, actor);
+  } catch (e) {
+    if (!missingColumn(e, 'dispatched_at')) throw e;
+    return failRuns(cfg, `created_at=lt.${encodeURIComponent(new Date(before).toISOString())}`, STALE_REASON, actor);
+  }
+}
+// Dispatch the oldest waiting run when no run is active. Race-safe: (1) claim with a conditional PATCH (only one
+// request gets the row back); (2) after the claim, if any OTHER run is active the claim is given back (two claimers
+// that see each other both give back; the cron / next call dispatches later — never two at once). A failed GitHub
+// dispatch marks that run failed (DISPATCH_REASON) and the next one is tried.
+// → { legacy } (column missing) | { active } | { blocked } (monthly limit: the run stays queued) | { dispatched, failed: [ids] }
+async function dispatchNext(env, cfg, origin, actor = null, ownRunId = null) {
+  const db = sb(cfg);
+  const failed = [];
+  if (!cfg.github_repo || !cfg.github_token || !engineReady(cfg) || !origin) return { dispatched: null, failed, not_ready: true };
+  for (let i = 0; i < 20; i++) {
+    const act = await activeRuns(db);
+    if (act === null) return { legacy: true, dispatched: null, failed };
+    if (act.length) return { active: act[0].id, dispatched: null, failed };
+    const [next] = await waitingRuns(db);
+    if (!next) return { dispatched: null, failed };
+    // the existing monthly-limit check (as /api/run), at the moment of dispatch: reached → the run stays queued with
+    // BUDGET_WAIT as its step and nothing more is dispatched; the cron retries every 5 min
+    const sp = await monthSpend(cfg);
+    if (sp.spent_usd + sp.reserved_usd >= sp.limit_usd) {
+      if (next.step !== BUDGET_WAIT) await db.rest(`runs?id=eq.${Number(next.id)}&state=eq.queued&dispatched_at=is.null`, { method: 'PATCH', body: JSON.stringify({ step: BUDGET_WAIT }) });
+      return { blocked: 'monthly_budget_reached', run: next.id, dispatched: null, failed };
+    }
+    const claimed = (await db.rest(`runs?id=eq.${Number(next.id)}&state=eq.queued&dispatched_at=is.null`, {
+      method: 'PATCH', body: JSON.stringify({ dispatched_at: new Date().toISOString() }) })) || [];
+    if (!claimed.length) return { lost: next.id, dispatched: null, failed };
+    const run = claimed[0];
+    const again = (await activeRuns(db)) || [];
+    if (again.some(r => Number(r.id) !== Number(run.id))) {
+      await db.rest(`runs?id=eq.${Number(run.id)}&state=eq.queued`, { method: 'PATCH', body: JSON.stringify({ dispatched_at: null }) });
+      return { yielded: run.id, dispatched: null, failed };
+    }
+    try {
+      await env.SETTINGS.put('worker_origin', origin);
+      await dispatchRun(env, cfg, run, origin);
+    } catch (e) {
+      await db.rest(`runs?id=eq.${Number(run.id)}`, { method: 'PATCH', body: JSON.stringify({ state: 'failed', step: DISPATCH_REASON, finished_at: new Date().toISOString() }) });
+      await log(cfg, run.case_id, actor, 'run_failed', { run_id: run.id, reason: DISPATCH_REASON, error: String(e.message || e).slice(0, 300) });
+      failed.push(run.id);
+      continue;
+    }
+    await db.rest(`cases?id=eq.${Number(run.case_id)}`, { method: 'PATCH', body: JSON.stringify({ stage: 'अभ्यास चालू' }) });
+    // the caller's own run is logged by /api/run (with its instructions); a run taken from the queue is logged here
+    if (Number(run.id) !== Number(ownRunId)) await log(cfg, run.case_id, actor, 'run_started', { run_id: run.id, from_queue: true });
+    return { dispatched: run, failed };
+  }
+  return { dispatched: null, failed };
+}
+// cron (wrangler.toml [triggers]) safety net: sweep stuck runs, then dispatch the next waiting run
+async function cronTick(env) {
+  const cfg = await settings(env);
+  if (!(cfg.supabase_url && cfg.supabase_service_key)) return { skipped: 'not configured' };
+  const swept = await sweepStale(cfg, null);
+  const origin = (await env.SETTINGS.get('worker_origin')) || '';
+  const r = await dispatchNext(env, cfg, origin, null);
+  return { swept: swept.map(x => x.id), dispatched: r.dispatched ? r.dispatched.id : null, failed: r.failed };
+}
+
 // Single use of the config token, atomic in Postgres (M, QUALITY_AUDIT §7): only the request whose conditional PATCH
 // sets runs.config_taken_at gets a row back. true = taken now, false = taken before / no such run,
 // null = column not there yet (migration 0005 not applied) → the caller relies on the KV flag alone.
@@ -205,16 +296,23 @@ export function normOutputs(v) {
 }
 const missingColumn = (e, col) => e instanceof DbError && (e.code === '42703' || e.code === 'PGRST204' || (new RegExp(col).test(e.detail) && /does not exist|could not find/i.test(e.detail)));
 
-// cases.desk missing (migration 0009 not applied): write the case without `desk` and log; never fail the request
+// cases.desk (migration 0009) / cases.work_type (migration 0010) missing: write the case without that column and log;
+// never fail the request
 async function writeCase(db, path, method, row, what) {
-  try {
-    return (await db.rest(path, { method, body: JSON.stringify(row) })) || [];
-  } catch (e) {
-    if (!('desk' in row) || !missingColumn(e, 'desk')) throw e;
-    const { desk, ...rest } = row;
-    console.log(`cases.desk column missing (apply migration 0009); ${what} without desk=${desk}`);
-    if (!Object.keys(rest).length) return (await db.rest(`${path}${path.includes('?') ? '&' : '?'}select=*`)) || [];
-    return (await db.rest(path, { method, body: JSON.stringify(rest) })) || [];
+  let cur = row;
+  for (;;) {
+    try {
+      if (cur !== row && !Object.keys(cur).length) return (await db.rest(`${path}${path.includes('?') ? '&' : '?'}select=*`)) || [];
+      return (await db.rest(path, { method, body: JSON.stringify(cur) })) || [];
+    } catch (e) {
+      // the column named in the error; a bare "missing column" code without a name only when one optional column is sent
+      const sent = Object.keys(OPTIONAL_CASE_COLS).filter(k => k in cur && missingColumn(e, k));
+      const col = sent.find(k => new RegExp(`\\b${k}\\b`).test(e.detail)) || (sent.length === 1 ? sent[0] : null);
+      if (!col) throw e;
+      const { [col]: v, ...rest } = cur;
+      console.log(`cases.${col} column missing (apply migration ${OPTIONAL_CASE_COLS[col]}); ${what} without ${col}=${v}`);
+      cur = rest;
+    }
   }
 }
 
@@ -270,13 +368,23 @@ function runEstimate(cfg, finished) {
 }
 async function monthSpend(cfg) {
   const { month, start, end } = istMonth();
-  const rows = (await sb(cfg).rest(`runs?created_at=gte.${encodeURIComponent(start)}&created_at=lt.${encodeURIComponent(end)}&select=cost_usd,created_at,state`)) || [];
+  const q = `runs?created_at=gte.${encodeURIComponent(start)}&created_at=lt.${encodeURIComponent(end)}&select=cost_usd,created_at,state`;
+  let rows;
+  try {
+    rows = (await sb(cfg).rest(`${q},dispatched_at`)) || [];
+  } catch (e) {
+    if (!missingColumn(e, 'dispatched_at')) throw e;
+    rows = (await sb(cfg).rest(q)) || [];   // migration 0010 not applied: every queued run was dispatched at once
+  }
   const inMonth = rows.filter(r => r.created_at && istMonth(new Date(r.created_at).getTime()).month === month);
   const spent = inMonth.reduce((t, r) => t + (Number(r.cost_usd) || 0), 0);
   // queued/running runs (not stale) have no cost yet: each is reserved at the estimate, so runs started together
   // cannot jointly pass the limit
   const since = Date.now() - STALE_MS;
-  const isActive = r => (r.state === 'queued' || r.state === 'running') && new Date(r.created_at).getTime() > since;
+  // C33: a run still waiting in the queue (queued, dispatched_at null) is not reserved — the limit is checked when it
+  // is dispatched
+  const waiting = r => r.state === 'queued' && 'dispatched_at' in r && r.dispatched_at === null;
+  const isActive = r => (r.state === 'queued' || r.state === 'running') && !waiting(r) && new Date(r.dispatched_at || r.created_at).getTime() > since;   // queue: age from dispatch
   const active = inMonth.filter(isActive);
   const est = active.length ? runEstimate(cfg, inMonth.filter(r => r.state === 'done' || r.state === 'failed')) : 0;
   const reserved = active.reduce((t, r) => t + Math.max(0, est - (Number(r.cost_usd) || 0)), 0);
@@ -334,7 +442,13 @@ export default {
       return bad(String(e.message || e), 500);
     }
   },
+  // cron every 5 min (wrangler.toml [triggers]): stuck-run sweep + dispatch of the next queued run (C33 safety net)
+  async scheduled(event, env, ctx) {
+    const job = cronTick(env).then(r => console.log('cron', JSON.stringify(r))).catch(e => console.log('cron error', String(e.message || e)));
+    if (ctx && ctx.waitUntil) ctx.waitUntil(job); else await job;
+  },
 };
+export { cronTick };
 
 async function route(req, env, url) {
   const p = url.pathname, M = req.method;
@@ -388,7 +502,21 @@ async function route(req, env, url) {
     if (!cfg.supabase_url || !cfg.supabase_service_key) return bad('not configured', 503);
     const reason = String(b.reason || 'इंजिन अयशस्वी — पुन्हा तयार करा').trim().slice(0, 300);
     const rows = await failRuns(cfg, `id=eq.${Number(tok.run_id)}`, reason);
-    return json({ ok: true, changed: rows.length });
+    const nx = await dispatchNext(env, cfg, url.origin, null);   // C33: the queue moves on
+    return json({ ok: true, changed: rows.length, dispatched: nx.dispatched ? nx.dispatched.id : null });
+  }
+
+  // engine: the workflow's last step (if: always()) — the job of THIS run has ended. Run token, used or not. A run still
+  // queued/running then can never finish → failed (ENGINE_END_REASON); then the next queued run is dispatched (C33).
+  // → { ok, changed, dispatched: run id | null }
+  if (p === '/api/engine/next' && M === 'POST') {
+    const tok = await runToken(env, req);
+    const b = await req.json().catch(() => ({}));
+    if (!tok || tok.run_id !== String(b.run_id || '')) return bad('bad token', 403);
+    if (!cfg.supabase_url || !cfg.supabase_service_key) return bad('not configured', 503);
+    const rows = await failRuns(cfg, `id=eq.${Number(tok.run_id)}`, ENGINE_END_REASON);
+    const nx = await dispatchNext(env, cfg, url.origin, null);
+    return json({ ok: true, changed: rows.length, dispatched: nx.dispatched ? nx.dispatched.id : null });
   }
 
   // engine: live progress text from the Claude step, which has no Supabase key (H1, QUALITY_AUDIT §7). Run token,
@@ -419,12 +547,14 @@ async function route(req, env, url) {
     return json({ month, spent_usd, limit_usd, runs, reserved_usd, active_runs });
   }
 
-  // POST /api/runs/sweep → runs queued/running for more than 3.5 h are marked failed (called by the app on load)
+  // POST /api/runs/sweep → runs queued/running for more than 3.5 h since dispatch are marked failed (called by the app
+  // on load); runs waiting in the queue are not swept. Then the next queued run is dispatched (C33).
+  // → { ok, failed: [run ids], dispatched: run id | null }
   if (p === '/api/runs/sweep' && M === 'POST') {
     if (!canWrite(user)) return bad('read-only', 403);
-    const before = new Date(Date.now() - STALE_MS).toISOString();
-    const rows = await failRuns(cfg, `created_at=lt.${encodeURIComponent(before)}`, STALE_REASON, user.id);
-    return json({ ok: true, failed: rows.map(r => r.id) });
+    const rows = await sweepStale(cfg, user.id);
+    const nx = await dispatchNext(env, cfg, url.origin, user.id);
+    return json({ ok: true, failed: rows.map(r => r.id), dispatched: nx.dispatched ? nx.dispatched.id : null });
   }
 
   if (p === '/api/settings' && M === 'GET') {
@@ -503,6 +633,7 @@ async function route(req, env, url) {
     if (b.cr_year && !/^\d{4}$/.test(String(b.cr_year))) return bad('cr_year: 4 digits');
     const row = Object.fromEntries(CASE_FIELDS.filter(k => b[k] !== undefined && b[k] !== '').map(k => [k, b[k]]));
     if (row.desk != null && !DESK_IDS.includes(row.desk)) return bad(BAD_DESK);
+    if (row.work_type != null && !WORK_TYPES.includes(row.work_type)) return bad(BAD_WORK_TYPE);
     const findDup = () => findCrDup(db, row.cr_no, row.cr_year);
     const dupId = await findDup();
     if (dupId !== null) return json({ error: 'duplicate_cr', existing_id: dupId }, 409);
@@ -532,6 +663,7 @@ async function route(req, env, url) {
     if (row.cr_no != null && !/^\d+$/.test(String(row.cr_no).trim())) return bad('cr_no: digits only');
     if (row.cr_year != null && !/^\d{4}$/.test(String(row.cr_year).trim())) return bad('cr_year: 4 digits');
     if (row.desk != null && !DESK_IDS.includes(row.desk)) return bad(BAD_DESK);
+    if (row.work_type != null && !WORK_TYPES.includes(row.work_type)) return bad(BAD_WORK_TYPE);
     if (row.cr_no != null) row.cr_no = String(row.cr_no).trim();
     if (row.cr_year != null) row.cr_year = Number(String(row.cr_year).trim());
     const [cur] = (await db.rest(`cases?id=eq.${id}&select=id,cr_no,cr_year`)) || [];
@@ -609,6 +741,8 @@ async function route(req, env, url) {
   }
 
   // POST /api/run {case_id, instructions, outputs?} → runs row + dispatch. outputs (C28): ticked drafts, DRAFT_KEYS only
+  // C33 queue (migration 0010): → {...run, queued: false} dispatched now | {...run, queued: true, position} waiting
+  // (position 1 = next after the active run) | without the migration: the run row as before (dispatched at once)
   if (p === '/api/run' && M === 'POST') {
     if (!canWrite(user)) return bad('read-only', 403);
     if (!cfg.github_repo || !cfg.github_token || !engineReady(cfg)) return bad('Settings: GitHub repo/token and the AI key (Anthropic or the chosen engine provider) needed', 412);
@@ -623,9 +757,14 @@ async function route(req, env, url) {
     // queued/running runs count at their estimate (reserved_usd), so several runs started together cannot pass it
     if (sp.spent_usd + sp.reserved_usd >= sp.limit_usd) return json({ error: 'monthly_budget_reached', spent_usd: sp.spent_usd, limit_usd: sp.limit_usd, reserved_usd: sp.reserved_usd }, 402);
     // one run at a time per case (H3, QUALITY_AUDIT §7): a double tap / second tab / second user would start a second,
-    // paid run. Runs older than STALE_MS are stuck (swept), so they do not block.
-    const since = new Date(Date.now() - STALE_MS).toISOString();
-    const active = await db.rest(`runs?case_id=eq.${case_id}&state=in.(queued,running)&created_at=gt.${encodeURIComponent(since)}&select=id&order=created_at.desc&limit=1`);
+    // paid run. Runs older than STALE_MS (since dispatch) are stuck (swept), so they do not block; a run waiting in
+    // the queue (C33) always blocks.
+    const act = await activeRuns(db);   // null = migration 0010 not applied → immediate dispatch as before
+    const sinceIso = new Date(Date.now() - STALE_MS).toISOString();
+    const caseActive = act === null
+      ? `runs?case_id=eq.${case_id}&state=in.(queued,running)&created_at=gt.${encodeURIComponent(sinceIso)}&select=id&order=created_at.desc&limit=1`
+      : `runs?case_id=eq.${case_id}&state=in.(queued,running)&or=${encodeURIComponent(`(dispatched_at.is.null,dispatched_at.gt."${sinceIso}",created_at.gt."${sinceIso}")`)}&select=id&order=created_at.desc&limit=1`;
+    const active = await db.rest(caseActive);
     if (active && active.length) return json({ error: 'run_active', run_id: active[0].id }, 409);
     const runRow = { case_id, instructions: instructions || null, created_by: user.id };
     let run;
@@ -638,17 +777,38 @@ async function route(req, env, url) {
       [run] = await db.rest('runs', { method: 'POST', body: JSON.stringify(runRow) });
       run = { ...run, outputs_dropped: true };
     }
-    try {
-      await dispatchRun(env, cfg, run, url.origin);
-    } catch (e) {
+    const started = { run_id: run.id, instructions: instructions || '', outputs: outs.value, ...(run.outputs_dropped ? { outputs_dropped: true } : {}) };
+    const dispatchFailed = async e => {
       // A3 audit: the run row (red box, History) gets only the Marathi reason; the raw GitHub text goes to activity
-      await db.rest(`runs?id=eq.${run.id}`, { method: 'PATCH', body: JSON.stringify({ state: 'failed', step: DISPATCH_REASON, finished_at: new Date().toISOString() }) });
-      await log(cfg, case_id, user.id, 'run_failed', { run_id: run.id, reason: DISPATCH_REASON, error: String(e.message || e).slice(0, 300) });
+      if (e) {
+        await db.rest(`runs?id=eq.${run.id}`, { method: 'PATCH', body: JSON.stringify({ state: 'failed', step: DISPATCH_REASON, finished_at: new Date().toISOString() }) });
+        await log(cfg, case_id, user.id, 'run_failed', { run_id: run.id, reason: DISPATCH_REASON, error: String(e.message || e).slice(0, 300) });
+      }
       return json({ error: 'dispatch_failed', reason: DISPATCH_REASON, run_id: run.id }, 502);
+    };
+    if (act === null) {
+      try {
+        await dispatchRun(env, cfg, run, url.origin);
+      } catch (e) {
+        return dispatchFailed(e);
+      }
+    } else {
+      // C33 queue: the new run waits (dispatched_at null); dispatchNext takes the oldest waiting run if none is active
+      await env.SETTINGS.put('worker_origin', url.origin);
+      const nx = await dispatchNext(env, cfg, url.origin, user.id, run.id);
+      if (nx.failed.map(Number).includes(Number(run.id))) return dispatchFailed(null);   // marked failed + logged there
+      if (!nx.dispatched || Number(nx.dispatched.id) !== Number(run.id)) {
+        const waiting = await waitingRuns(db);
+        const i = waiting.findIndex(r => Number(r.id) === Number(run.id));
+        const position = i >= 0 ? i + 1 : waiting.length + 1;
+        await log(cfg, case_id, user.id, 'run_queued', { ...started, position });
+        return json({ ...run, queued: true, position, ...(nx.blocked ? { blocked: nx.blocked, step: BUDGET_WAIT } : {}) });
+      }
+      run = { ...run, dispatched_at: nx.dispatched.dispatched_at };
     }
     await db.rest(`cases?id=eq.${case_id}`, { method: 'PATCH', body: JSON.stringify({ stage: 'अभ्यास चालू' }) });
-    await log(cfg, case_id, user.id, 'run_started', { run_id: run.id, instructions: instructions || '', outputs: outs.value, ...(run.outputs_dropped ? { outputs_dropped: true } : {}) });
-    return json(run);
+    await log(cfg, case_id, user.id, 'run_started', started);
+    return json(act === null ? run : { ...run, queued: false });
   }
 
   // GET /api/files/:id → signed URL (10 min); ?download=1 keeps the original name

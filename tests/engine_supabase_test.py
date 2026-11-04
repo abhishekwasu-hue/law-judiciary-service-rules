@@ -968,5 +968,42 @@ check(r.returncode == 0 and run_row["state"] == "done" and rows["package_pdf"]["
       f"NAME_MAX finish: package row original_name = FULL stripped name, ASCII storage key ({rows.get('package_pdf')} {run_row.get('step')})")
 DB["case_files"][:] = saved
 
+# --- C33 (04.11.2026): work category cases.work_type -> case.json / case_meta; rules_pending warning at finish
+check(cj.get("work_type") == "service", f"C33 case.json: work_type column absent -> service ({cj.get('work_type')})")
+PEND = json.load(open(os.path.join(ROOT, "tools", "work_types", "legislature.json"), encoding="utf-8"))["pending_warning"]
+for wt, want in (("legislature", "legislature"), ("court", "court"), ("bogus", "service"), (None, "service"), ("", "service")):
+    DB["cases"][0]["work_type"] = wt
+    run_row.update(state="queued", step=None)
+    r = run("fetch", os.path.join(tmp, "case_wt"))
+    c = json.load(open(os.path.join(tmp, "case_wt", "case.json"), encoding="utf-8")) if r.returncode == 0 else {}
+    check(c.get("work_type") == want, f"C33 case.json work_type {wt!r} -> {want} ({c.get('work_type')} {r.stderr[:200]})")
+DB["cases"][0]["work_type"] = "legislature"
+cmw = os.path.join(tmp, "cm_wt.json")
+r = run("case_meta", cmw, os.path.join(tmp, "case_wt"))
+check(r.returncode == 0 and json.load(open(cmw, encoding="utf-8")).get("work_type") == "legislature", f"C33 case_meta: work_type ({r.stderr[:200]})")
+PN = max((f for f in DB["case_files"] if f["kind"] == "proposal"), key=lambda f: (str(f["created_at"]), f["version"], f["id"]))["original_name"]
+out = os.path.join(tmp, "out_wt"); os.makedirs(out)
+for n in ("CR130_2026_Note_and_Letter.docx", PN, PN + ".map.json"):
+    open(os.path.join(out, n), "wb").write(b"x" + n.encode())
+st_wt = {"state": "done", "summary": "s", "warnings": []}
+json.dump(st_wt, open(os.path.join(out, "status.json"), "w", encoding="utf-8"), ensure_ascii=False)
+real_study(os.path.join(out, "CR130_2026_Study.docx"))
+run_row.update(state="running", warnings=[])
+r = run("finish", out)
+check(r.returncode == 0 and run_row["warnings"].count(PEND) == 1, f"C33 finish: rules_pending warning added once ({run_row['warnings']} {r.stderr[:200]})")
+st_wt["warnings"] = [PEND]
+json.dump(st_wt, open(os.path.join(out, "status.json"), "w", encoding="utf-8"), ensure_ascii=False)
+real_study(os.path.join(out, "CR130_2026_Study.docx"))
+run_row.update(state="running", warnings=[])
+r = run("finish", out)
+check(r.returncode == 0 and run_row["warnings"].count(PEND) == 1, f"C33 finish: engine already wrote it -> not doubled ({run_row['warnings']})")
+DB["cases"][0]["work_type"] = "service"
+json.dump({"state": "done", "summary": "s", "warnings": []}, open(os.path.join(out, "status.json"), "w", encoding="utf-8"), ensure_ascii=False)
+real_study(os.path.join(out, "CR130_2026_Study.docx"))
+run_row.update(state="running", warnings=[])
+r = run("finish", out)
+check(r.returncode == 0 and not any("श्रेणीचे स्वतंत्र नियम" in w for w in run_row["warnings"]), "C33 finish: ready type -> no pending warning")
+DB["cases"][0].pop("work_type", None)
+
 srv.shutdown()
 print("ALL TESTS PASSED")

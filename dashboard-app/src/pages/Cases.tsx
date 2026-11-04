@@ -2,7 +2,9 @@ import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useData, overdueIds } from '../lib/data';
 import { useCanWrite } from '../lib/auth';
-import { CATEGORIES, STAGES, stageTone } from '../lib/constants';
+import { CATEGORIES, STAGES, WORK_TYPES, stageTone, workTypeLabel, workTypeOf } from '../lib/constants';
+import QueueCard from '../components/QueueCard';
+import WorkTypeChips from '../components/WorkTypeChips';
 import { crLabel, fmtDate } from '../lib/format';
 import { RunStateBadge } from '../components/RunProgress';
 import { humanError } from '../lib/api';
@@ -10,15 +12,15 @@ import type { Case, Run } from '../lib/types';
 import { Chip, Empty, SkeletonRows } from '../components/ui';
 import { useToast } from '../components/Toast';
 
-const FILTER_KEYS = ['q', 'category', 'stage', 'office', 'year', 'overdue'] as const;
+const FILTER_KEYS = ['q', 'work', 'category', 'stage', 'office', 'year', 'overdue'] as const;
 
 function exportCsv(rows: Case[], overdue: Set<number>) {
-  const head = ['C R क्र.', 'वर्ष', 'नस्ती क्र.', 'विषय', 'प्रवर्ग', 'टप्पा', 'प्राधान्य', 'कर्मचारी', 'पद', 'कार्यालय', 'आवक दिनांक', 'मुदत', 'मुदत संपली', 'नोंद दिनांक'];
+  const head = ['C R क्र.', 'वर्ष', 'नस्ती क्र.', 'विषय', 'कामाचा प्रकार', 'प्रवर्ग', 'टप्पा', 'प्राधान्य', 'कर्मचारी', 'पद', 'कार्यालय', 'आवक दिनांक', 'मुदत', 'मुदत संपली', 'नोंद दिनांक'];
   const esc = (v: unknown) => {
     const s = v == null ? '' : String(v);
     return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
-  const lines = [head, ...rows.map(c => [c.cr_no, c.cr_year, c.file_no, c.subject, c.category, c.stage, c.priority, c.employee_name, c.post, c.office, fmtDate(c.inward_date), fmtDate(c.due_date), overdue.has(c.id) ? 'होय' : '', fmtDate(c.created_at)])];
+  const lines = [head, ...rows.map(c => [c.cr_no, c.cr_year, c.file_no, c.subject, workTypeLabel(c.work_type), c.category, c.stage, c.priority, c.employee_name, c.post, c.office, fmtDate(c.inward_date), fmtDate(c.due_date), overdue.has(c.id) ? 'होय' : '', fmtDate(c.created_at)])];
   // UTF-8 BOM so Excel opens Devanagari correctly.
   const blob = new Blob(['﻿' + lines.map(r => r.map(esc).join(',')).join('\r\n')], { type: 'text/csv;charset=utf-8' });
   const a = document.createElement('a');
@@ -58,6 +60,7 @@ export default function Cases() {
   const rows = useMemo(() => {
     const q = (sp.get('q') || '').trim().toLowerCase();
     return cases.filter(c => {
+      if (sp.get('work') && workTypeOf(c) !== sp.get('work')) return false;
       if (sp.get('category') && c.category !== sp.get('category')) return false;
       if (sp.get('stage') && c.stage !== sp.get('stage')) return false;
       if (sp.get('office') && c.office !== sp.get('office')) return false;
@@ -94,6 +97,9 @@ export default function Cases() {
           <button className="btn-ghost" onClick={() => exportCsv(rows, overdue)} disabled={!rows.length}>⬇ Excel (CSV)</button>
         </div>
       </div>
+
+      <QueueCard />
+      <WorkTypeChips cases={cases} value={sp.get('work') || ''} onChange={v => setParam('work', v)} />
 
       <div className="card grid gap-2 p-3 sm:grid-cols-2 lg:grid-cols-6">
         <input ref={searchRef} className="input lg:col-span-2" type="search" placeholder="शोधा: C R क्र., विषय, कर्मचारी…  ( / )" value={sp.get('q') || ''} onChange={e => setParam('q', e.target.value)} aria-label="शोधा" />
@@ -146,7 +152,7 @@ export default function Cases() {
                     <td className="td whitespace-nowrap font-semibold"><Link to={`/cases/${c.id}`} onClick={e => e.stopPropagation()} className="underline-offset-2 hover:underline">{crLabel(c)}</Link>{c.priority === 'तातडीचे' && <span className="ml-1 text-saffron-600" title="तातडीचे">●</span>}</td>
                     <td className="td whitespace-nowrap"><RunStateBadge run={latestRuns.get(c.id)} /></td>
                     <td className="td max-w-md"><div className="line-clamp-2">{c.subject || <span className="text-slate-500">{latestRuns.get(c.id)?.summary || 'विषय PDF वरून येईल'}</span>}</div></td>
-                    <td className="td whitespace-nowrap">{c.category}</td>
+                    <td className="td whitespace-nowrap">{c.category}<div className="text-xs text-slate-500">{WORK_TYPES.find(w => w.id === workTypeOf(c))?.short}</div></td>
                     <td className="td">{c.office || '—'}</td>
                     <td className="td"><Chip tone={stageTone(c.stage)}>{c.stage}</Chip></td>
                     <td className="td whitespace-nowrap">{overdue.has(c.id) ? <Chip tone="red">मुदत संपली</Chip> : fmtDate(c.due_date)}</td>
@@ -161,7 +167,7 @@ export default function Cases() {
                 <Link to={`/cases/${c.id}`} className="card block p-3">
                   <div className="flex items-center justify-between gap-2">
                     <span className="font-bold">{crLabel(c)}{c.priority === 'तातडीचे' && <span className="ml-1 text-saffron-600">●</span>}</span>
-                    {overdue.has(c.id) ? <Chip tone="red">मुदत संपली</Chip> : <span className="text-sm text-slate-500">{c.category}</span>}
+                    {overdue.has(c.id) ? <Chip tone="red">मुदत संपली</Chip> : <span className="truncate text-sm text-slate-500">{WORK_TYPES.find(w => w.id === workTypeOf(c))?.short} • {c.category}</span>}
                   </div>
                   <div className="mt-1 line-clamp-2">{c.subject || <span className="text-slate-500">{latestRuns.get(c.id)?.summary || 'विषय PDF वरून येईल'}</span>}</div>
                   <div className="mt-2 flex flex-wrap items-center gap-2"><Chip tone={stageTone(c.stage)}>{c.stage}</Chip>{latestRuns.get(c.id) && <RunStateBadge run={latestRuns.get(c.id)} />}</div>

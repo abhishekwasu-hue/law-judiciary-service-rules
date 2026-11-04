@@ -3,7 +3,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import CommandPalette from './CommandPalette';
 import { useData } from '../lib/data';
-import { isStale } from '../lib/constants';
+import { isStale, isWaiting } from '../lib/constants';
 import { crLabel } from '../lib/format';
 import { Spinner } from './ui';
 import ErrorBoundary from './ErrorBoundary';
@@ -16,7 +16,10 @@ function ActiveRunsBar() {
   return (
     <div className="no-print mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-blue-900 dark:border-blue-900 dark:bg-blue-900/30 dark:text-blue-100" role="status">
       <Spinner className="h-4 w-4" />
-      <span className="font-bold">{active.length} प्रक्रिया चालू — दुसऱ्या पानावर गेलात तरी काम चालूच राहते</span>
+      <span className="font-bold">{(() => {
+        const w = active.filter(isWaiting).length;
+        return `${active.length - w} प्रक्रिया चालू${w ? `, ${w} रांगेत` : ''} — दुसऱ्या पानावर गेलात तरी काम चालूच राहते`;
+      })()}</span>
       {active.map(r => {
         const c = cases.find(x => x.id === r.case_id);
         return (

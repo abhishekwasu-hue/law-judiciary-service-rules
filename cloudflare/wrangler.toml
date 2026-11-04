@@ -14,3 +14,8 @@ run_worker_first = true
 [[kv_namespaces]]
 binding = "SETTINGS"
 id = "a366dfbd5d92462e900b583fed5e8eed"
+
+# C33 sequential queue: every 5 min sweep stuck runs and dispatch the next queued run (safety net; the workflow's last
+# step and the app's sweep normally move the queue)
+[triggers]
+crons = ["*/5 * * * *"]

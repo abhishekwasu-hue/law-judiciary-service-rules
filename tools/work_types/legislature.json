@@ -1,0 +1,11 @@
+{
+ "id": "legislature",
+ "label": "विधिमंडळ कामकाज",
+ "status": "rules_pending",
+ "default_drafts": ["letter"],
+ "allowed_drafts": ["letter", "reminder", "gr", "corrigendum", "circular", "memo", "notification", "parawise"],
+ "rules_file": "tools/work_rules/legislature.md",
+ "samples_dir": "samples/work/legislature/",
+ "required_samples": ["तारांकित प्रश्न + उत्तर-प्रारूप + टिप्पणी", "अतारांकित प्रश्न + उत्तर", "लक्षवेधी सूचना + निवेदन", "आश्वासन-पूर्ती"],
+ "pending_warning": "पडताळणी अपूर्ण — विधिमंडळ कामकाज: या श्रेणीचे स्वतंत्र नियम/नमुने अजून नाहीत; सर्वसाधारण नोंद तयार केली"
+}

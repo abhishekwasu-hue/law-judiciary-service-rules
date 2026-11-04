@@ -27,6 +27,23 @@ export const DEFAULT_DESK = 'law-desk6';
 export const deskLabel = (id: string | null | undefined) =>
   (DESKS.find(d => d.id === (id || DEFAULT_DESK)) ?? { label: id || '' }).label;
 
+/** Work categories (C33, cases.work_type; migration 20261104000010_work_type_queue.sql). Ids mirror the Worker's
+ *  WORK_TYPES (cloudflare/worker.js) and the engine's case.json "work_type". cases.work_type null = DEFAULT_WORK_TYPE. */
+export const WORK_TYPES = [
+  { id: 'service', label: 'सेवाविषयक प्रकरणे', short: 'सेवाविषयक' },
+  { id: 'court', label: 'न्यायालयीन प्रकरणे', short: 'न्यायालयीन' },
+  { id: 'legislature', label: 'विधिमंडळ कामकाज', short: 'विधिमंडळ' },
+  { id: 'procurement', label: 'खरेदी विषयक बाबी', short: 'खरेदी' },
+] as const;
+export type WorkType = (typeof WORK_TYPES)[number]['id'];
+export const DEFAULT_WORK_TYPE: WorkType = 'service';
+export const workTypeOf = (c: { work_type?: string | null }): WorkType =>
+  (WORK_TYPES.find(w => w.id === c.work_type)?.id ?? DEFAULT_WORK_TYPE);
+export const workTypeLabel = (id: string | null | undefined) =>
+  (WORK_TYPES.find(w => w.id === (id || DEFAULT_WORK_TYPE)) ?? { label: id || '' }).label;
+/** Chip colour per category (fixed per category so it is recognised at a glance; red/green stay for failed/done). */
+export const WORK_TYPE_TONE: Record<WorkType, Tone> = { service: 'navy', court: 'amber', legislature: 'blue', procurement: 'slate' };
+
 export const PRIORITIES = ['सामान्य', 'तातडीचे'] as const;
 export const LETTER_STATUSES = ['मसुदा', 'पाठवले', 'उत्तर प्राप्त', 'स्मरणपत्र'] as const;
 
@@ -62,10 +79,13 @@ export function runTone(s: string): Tone {
 /** A run queued/running longer than this is stuck (engine job timeout 180 min). Same limit as the Worker's /api/runs/sweep. */
 export const STALE_MS = 3.5 * 3600 * 1000;
 export const STALE_REASON = 'वेळ संपली — पुन्हा तयार करा';
-export const isStale = (r: { state: string; created_at: string }) =>
-  (r.state === 'queued' || r.state === 'running') && Date.now() - new Date(r.created_at).getTime() > STALE_MS;
+export const isStale = (r: { state: string; created_at: string; dispatched_at?: string | null }) =>
+  (r.state === 'queued' || r.state === 'running') && !isWaiting(r)
+  && Date.now() - new Date(r.dispatched_at || r.created_at).getTime() > STALE_MS;
+/** C33 sequential queue: queued and not yet sent to the engine (dispatched_at null). Legacy rows (column absent) = dispatched. */
+export const isWaiting = (r: { state: string; dispatched_at?: string | null }) => r.state === 'queued' && r.dispatched_at === null;
 /** Run in progress (blocks a new run). A stale run does not block. */
-export const runActive = (r: { state: string; created_at: string } | null | undefined) =>
+export const runActive = (r: { state: string; created_at: string; dispatched_at?: string | null } | null | undefined) =>
   !!r && (r.state === 'queued' || r.state === 'running') && !isStale(r);
 
 /** Live progress steps (prompt §6.2). Keys = the exact runs.step texts written by the engine (tools/ENGINE_PROMPT.md rule 4). */
@@ -111,7 +131,7 @@ export function draftsText(v: unknown): string {
 export const EXTRA_OUTPUT_KINDS = ['order_draft', 'parawise'] as const;
 
 export const ACTION_LABEL: Record<string, string> = {
-  case_created: 'प्रकरण नोंदवले', case_updated: 'तपशील बदलला', file_uploaded: 'फाइल अपलोड', run_started: 'अभ्यास सुरू',
+  case_created: 'प्रकरण नोंदवले', case_updated: 'तपशील बदलला', file_uploaded: 'फाइल अपलोड', run_started: 'अभ्यास सुरू', run_queued: 'प्रक्रिया रांगेत',
   stage_changed: 'टप्पा बदलला', letter_saved: 'पत्र नोंदवले', letter_updated: 'पत्राची नोंद बदलली', letter_reply_received: 'पत्राचे उत्तर प्राप्त',
   run_done: 'अभ्यास पूर्ण', run_failed: 'अभ्यास अयशस्वी', run_warning: 'अभ्यास-सूचना',
   case_cr_duplicate: 'C R आधीच दुसऱ्या प्रकरणात', case_filled_from_pdf: 'तपशील PDF वरून भरला', case_fill_skipped: 'PDF वरून तपशील भरता आला नाही',
@@ -119,7 +139,7 @@ export const ACTION_LABEL: Record<string, string> = {
 
 /** Marathi names of case / letter fields (History details, Settings errors). */
 export const FIELD_LABEL: Record<string, string> = {
-  cr_no: 'C R क्र.', cr_year: 'वर्ष', cr: 'C R', file_no: 'नस्ती क्र.', subject: 'विषय', category: 'प्रवर्ग', priority: 'प्राधान्य',
+  cr_no: 'C R क्र.', cr_year: 'वर्ष', cr: 'C R', file_no: 'नस्ती क्र.', subject: 'विषय', category: 'प्रवर्ग', work_type: 'कामाचा प्रकार', priority: 'प्राधान्य',
   employee_name: 'कर्मचारी', post: 'पद', office: 'कार्यालय', received_from: 'कोणाकडून प्राप्त', received_via: 'मार्ग',
   inward_date: 'आवक दिनांक', due_date: 'मुदत', ref_no: 'पत्र क्र.', addressed_to: 'कोणाला', sent_date: 'पाठवल्याचा दिनांक',
   reply_due: 'उत्तराची मुदत', reply_received_date: 'उत्तर प्राप्त दिनांक', status: 'स्थिती', stage: 'टप्पा',

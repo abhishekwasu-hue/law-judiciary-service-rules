@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, type DragEvent, type FormEvent } from 'react';
-import { Link } from 'react-router-dom';
-import { ApiError, api, budgetReachedText, fmtUsd, getSpend, humanError, spendBlocked, uploadFile, type Spend } from '../lib/api';
+import { Link, useSearchParams } from 'react-router-dom';
+import { ApiError, api, budgetReachedText, fmtUsd, getSpend, humanError, runStartText, spendBlocked, uploadFile, type RunStart, type Spend } from '../lib/api';
 import { useAuth, useCanWrite } from '../lib/auth';
-import { CATEGORIES, DEFAULT_DESK, DESKS, INPUT_KINDS, INPUT_KIND_LABEL, PRIORITIES, isStale, type DraftKey, type InputKind } from '../lib/constants';
+import { CATEGORIES, DEFAULT_DESK, DEFAULT_WORK_TYPE, DESKS, INPUT_KINDS, INPUT_KIND_LABEL, PRIORITIES, WORK_TYPES, isStale, isWaiting, type DraftKey, type InputKind } from '../lib/constants';
 import { sameDrafts, suggestDrafts } from '../lib/drafts';
 import { crLabel, fmtBytes } from '../lib/format';
 import { guessSubject } from '../lib/pdf';
@@ -11,6 +11,7 @@ import { Field, Progress, Section, Spinner } from '../components/ui';
 import { useToast } from '../components/Toast';
 import RunProgress, { useRuns } from '../components/RunProgress';
 import DraftPicker from '../components/DraftPicker';
+import BulkUpload, { BULK_MAX } from '../components/BulkUpload';
 
 const MAX = 50 * 1024 * 1024;
 /** Types for the other files (the proposal has its own drop zone). */
@@ -56,9 +57,14 @@ export default function NewProposal() {
   const overBudget = !!spend && spendBlocked(spend);
   const [proposal, setProposal] = useState<File | null>(null);
   const [extras, setExtras] = useState<Extra[]>([]);
-  const [f, setF] = useState({ cr_no: '', cr_year: '', file_no: '', subject: '', category: '', priority: 'सामान्य', desk: DEFAULT_DESK as string, instructions: '' });
+  const [f, setF] = useState({ cr_no: '', cr_year: '', file_no: '', subject: '', category: '', priority: 'सामान्य', desk: DEFAULT_DESK as string, work_type: DEFAULT_WORK_TYPE as string, instructions: '' });
+  // C33: एक प्रस्ताव / अनेक प्रस्ताव (bulk) — kept in the URL (?bulk=1); several PDFs dropped on the single zone open bulk
+  const [sp, setSp] = useSearchParams();
+  const bulk = sp.get('bulk') === '1';
+  const [bulkInit, setBulkInit] = useState<File[] | undefined>(undefined);
+  const [queuedPos, setQueuedPos] = useState<number | null>(null);
   // "कोणते मसुदे हवेत?": follows the suggestion (from the file types) until the user changes a chip
-  const suggestion = suggestDrafts(extras.map(x => ({ kind: x.kind })), []);
+  const suggestion = suggestDrafts(extras.map(x => ({ kind: x.kind })), [], f.work_type);
   const [drafts, setDraftsRaw] = useState<DraftKey[] | null>(null); // null = untouched → the suggestion
   const chosen = drafts ?? suggestion.keys;
   const setDrafts = (v: DraftKey[]) => setDraftsRaw(sameDrafts(v, suggestion.keys) ? null : v);
@@ -99,7 +105,14 @@ export default function NewProposal() {
   if (!canWrite) return <div className="card p-6 text-center">आपल्याला फक्त वाचण्याची परवानगी आहे.</div>;
 
   async function pickProposal(files: File[]) {
-    const p = files.find(x => x.type === 'application/pdf' || /\.pdf$/i.test(x.name));
+    const pdfs = files.filter(x => x.type === 'application/pdf' || /\.pdf$/i.test(x.name));
+    if (pdfs.length > 1 && !created) {
+      // several proposals at once → bulk mode with these files (one case each)
+      setBulkInit(pdfs);
+      setSp({ bulk: '1' }, { replace: true });
+      return;
+    }
+    const p = pdfs[0];
     if (!p) {
       const photo = files.some(x => /^image\//.test(x.type) || /\.(jpe?g|png|heic|webp)$/i.test(x.name));
       return toast(photo ? 'फोटो असल्यास आधी PDF करा (फोनवर: Scan / Print → PDF म्हणून जतन) व तो PDF निवडा' : 'प्रस्ताव PDF असावा', 'err');
@@ -143,7 +156,7 @@ export default function NewProposal() {
       if (!c) {
         c = await api<Case>('/api/cases', {
           // every identity field is optional; empty ones are filled by the engine from the निर्देशपत्र
-          body: Object.fromEntries(Object.entries({ cr_no: f.cr_no.trim(), cr_year: f.cr_year.trim() ? Number(f.cr_year) : '', file_no: f.file_no.trim(), subject: f.subject.trim(), category: f.category, priority: f.priority, desk: f.desk }).filter(([, v]) => v !== '')),
+          body: Object.fromEntries(Object.entries({ cr_no: f.cr_no.trim(), cr_year: f.cr_year.trim() ? Number(f.cr_year) : '', file_no: f.file_no.trim(), subject: f.subject.trim(), category: f.category, priority: f.priority, desk: f.desk, work_type: f.work_type }).filter(([, v]) => v !== '')),
         });
         setCreated(c);
         setDupId(null);
@@ -164,9 +177,10 @@ export default function NewProposal() {
         }
       }
       try {
-        const started = await api<{ id: number; outputs_dropped?: boolean }>('/api/run', { body: { case_id: c.id, instructions: f.instructions.trim() || undefined, outputs: chosen } });
+        const started = await api<RunStart>('/api/run', { body: { case_id: c.id, instructions: f.instructions.trim() || undefined, outputs: chosen } });
         setPendingRun(started.id);
-        toast(started.outputs_dropped ? 'अभ्यास सुरू झाला — मसुदे-निवड लागू झाली नाही (migration 0008 बाकी)' : 'अभ्यास सुरू झाला');
+        setQueuedPos(started.queued ? Number(started.position) || null : null);
+        toast(runStartText(started));
       } catch (x) {
         if (x instanceof ApiError && x.message === 'run_active') {
           setPendingRun(Number((x.data as { run_id?: number } | undefined)?.run_id) || null);
@@ -192,7 +206,8 @@ export default function NewProposal() {
     setProposal(null);
     setExtras([]);
     setDraftsRaw(null);
-    setF({ cr_no: '', cr_year: '', file_no: '', subject: '', category: '', priority: 'सामान्य', desk: DEFAULT_DESK as string, instructions: '' });
+    setF({ cr_no: '', cr_year: '', file_no: '', subject: '', category: '', priority: 'सामान्य', desk: DEFAULT_DESK as string, work_type: DEFAULT_WORK_TYPE as string, instructions: '' });
+    setQueuedPos(null);
     setUps([]);
     setCreated(null);
     setRunErr('');
@@ -200,10 +215,35 @@ export default function NewProposal() {
     setDupId(null);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
+  const modeToggle = (
+    <div className="inline-flex rounded-lg border border-slate-300 p-0.5 dark:border-navy-700" role="group" aria-label="अपलोड पद्धत">
+      {([['', 'एक प्रस्ताव'], ['1', `अनेक प्रस्ताव (कमाल ${BULK_MAX})`]] as const).map(([v, l]) => (
+        <button key={v} type="button" aria-pressed={(v === '1') === bulk} disabled={busy || (!!v && locked)}
+          className={`min-h-tap rounded-md px-3 font-semibold ${(v === '1') === bulk ? 'bg-navy-700 text-white' : ''}`}
+          onClick={() => setSp(v ? { bulk: '1' } : {}, { replace: true })}>{l}</button>
+      ))}
+    </div>
+  );
+  if (bulk)
+    return (
+      <div className="space-y-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h1 className="text-2xl font-bold">नवीन प्रस्ताव</h1>
+          {modeToggle}
+        </div>
+        {overBudget && spend && (
+          <div className="rounded-lg border border-red-300 bg-red-50 px-4 py-3 font-bold text-red-900 dark:border-red-800 dark:bg-red-900/30 dark:text-red-100" role="alert">
+            {isOwner ? budgetReachedText(spend.limit_usd) : `या महिन्याची खर्च-मर्यादा (${fmtUsd(spend.limit_usd)}) संपली — मालकाने सेटिंग्जमध्ये मर्यादा वाढवावी`}
+          </div>
+        )}
+        <BulkUpload initial={bulkInit} overBudget={overBudget} />
+      </div>
+    );
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold">नवीन प्रस्ताव</h1>
+        {modeToggle}
         {(proposal || created || ups.length > 0) && (
           <button type="button" className="btn-ghost" onClick={reset} disabled={busy} title="हे पान रिकामे करा; आधीचे प्रकरण प्रकरणे मध्ये राहील">
             ↺ रीसेट — नवीन प्रस्ताव
@@ -222,6 +262,7 @@ export default function NewProposal() {
           <Section title={created ? `स्थिती — ${crLabel(created)}` : 'स्थिती'} right={created ? <Link className="btn-ghost" to={`/cases/${created.id}`}>प्रकरण उघडा →</Link> : undefined}>
             <div className="space-y-4">
               {runErr && <div className="rounded-lg bg-red-100 px-3 py-2 text-red-900 dark:bg-red-900/40 dark:text-red-100" role="alert">अभ्यास सुरू झाला नाही: {runErr}</div>}
+              {run && isWaiting(run) && queuedPos && <div className="rounded-lg bg-amber-100 px-3 py-2 font-bold text-amber-900 dark:bg-amber-900/40 dark:text-amber-100" role="status">⏳ रांगेत — क्रमांक {queuedPos}</div>}
               {run ? <RunProgress run={run} /> : !runErr && <div className="text-slate-500">{busy ? 'फाइल अपलोड होत आहे…' : 'प्रतीक्षा…'}</div>}
               {ups.length > 0 && (
                 <ul className="space-y-3">
@@ -288,6 +329,9 @@ export default function NewProposal() {
         )}
         <Section title="तपशील">
           <div className="space-y-4">
+            <Field label="कामाचा प्रकार">
+              <select className="input" disabled={locked} value={f.work_type} onChange={set('work_type')}>{WORK_TYPES.map(w => <option key={w.id} value={w.id}>{w.label}</option>)}</select>
+            </Field>
             <Field label="विभाग / कार्यासन" hint="नोंद व पत्राची रचना (शीर्ष, सही-साखळी, पत्राचा क्रमांक) या कार्यासनाप्रमाणे.">
               <select className="input" disabled={locked} value={f.desk} onChange={set('desk')}>{DESKS.map(d => <option key={d.id} value={d.id}>{d.label}</option>)}</select>
             </Field>
