@@ -242,8 +242,20 @@ export default function CaseDetail() {
   const dupCr = dupDet.cr ? `C R ${String(dupDet.cr)}` : '';
   const dupOther = dupDet.existing_id ? cases.find(x => x.id === Number(dupDet.existing_id)) : undefined;
   const dupOtherLabel = dupOther?.cr_no ? crLabel(dupOther) : dupCr || (dupDet.existing_id ? `प्रकरण क्र. ${dupDet.existing_id}` : '');
-  const openEdit = () => {
+  // owner 05.11.2026 "सुधारणा बटन not working": the link did nothing when the URL was already ?tab=note&edit=1 — now it
+  // switches to the टिप्पणी tab, scrolls to the chat and puts the cursor in the message box every time
+  const openEdit = (e?: { preventDefault: () => void }) => {
+    e?.preventDefault();
     if (!editSeen) { setEditSeen(true); try { localStorage.setItem(EDIT_SEEN_KEY, '1'); } catch { /* storage blocked */ } }
+    if (sp.get('tab') !== 'note') setSp(p => { const n = new URLSearchParams(p); n.set('tab', 'note'); return n; }, { replace: true });
+    let tries = 0;
+    const go = () => {
+      const box = document.getElementById('edit-chat');
+      if (!box) { if (++tries < 30) window.setTimeout(go, 100); return; }
+      box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      window.setTimeout(() => (document.getElementById('edit-msg') as HTMLTextAreaElement | null)?.focus({ preventScroll: true }), 400);
+    };
+    window.setTimeout(go, 50);
   };
   return (
     <div className="space-y-4">
@@ -286,8 +298,8 @@ export default function CaseDetail() {
           ctx={ctx}
           after={canWrite && hasSpec && (
             // C4: the one edit entry on the case page; pulses only until the सुधारणा-चॅट is first used
-            <Link to="?tab=note&edit=1" onClick={openEdit} className="edit-cta inline-flex min-h-tap min-w-0 items-center justify-center gap-1.5 rounded-lg px-3 font-bold" style={editSeen ? { animation: 'none' } : undefined}>
-              <span className="rounded-full bg-white px-1.5 text-sm font-black text-orange-600">AI</span> सुधारणा {!editSeen && <span className="blink-dot" aria-hidden="true" />}
+            <Link to="?tab=note" onClick={openEdit} className="edit-cta inline-flex min-h-tap min-w-0 items-center justify-center gap-1.5 rounded-lg px-3 font-bold" style={editSeen ? { animation: 'none' } : undefined}>
+              <span className="rounded-full bg-white px-1.5 text-sm font-black text-blue-700">AI</span> सुधारणा {!editSeen && <span className="blink-dot" aria-hidden="true" />}
             </Link>
           )}
         />

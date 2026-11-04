@@ -262,7 +262,7 @@ export default function EditChat({ ctx }: { ctx: CaseCtx }) {
 
   const canSend = !!tgt && !!text.trim() && !busy && !active;
   return (
-    <section ref={boxRef} className={`card edit-panel relative min-w-0 scroll-mt-20 overflow-hidden ${seen ? 'seen' : ''} ${drag ? 'ring-4 ring-saffron-500' : ''}`} aria-label="सुधारणा" {...dragProps}>
+    <section id="edit-chat" ref={boxRef} className={`card edit-panel relative min-w-0 scroll-mt-20 overflow-hidden ${seen ? 'seen' : ''} ${drag ? 'ring-4 ring-saffron-500' : ''}`} aria-label="सुधारणा" {...dragProps}>
       <div className="edit-head flex items-center justify-between gap-2 px-4 py-3">
         <div className="min-w-0">
           <h2 className="flex items-center gap-2 text-lg font-bold">✏️ सुधारणा-चॅट <span className={`${seen ? '' : 'blink-badge '}rounded-full bg-white px-3 py-1 text-base font-black text-orange-600 shadow`}>AI</span></h2>
