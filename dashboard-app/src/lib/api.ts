@@ -109,12 +109,19 @@ export function humanError(e: unknown): string {
     return typeof r === 'string' && r ? r : 'सर्व्हरचा डेटाबेस अद्ययावत नाही (migration बाकी) — मालकाने migration लागू करावे';
   }
   if (msg === 'profile_unsupported') return 'सर्व्हर अद्ययावत नाही — माहिती जतन झाली नाही (Worker deploy बाकी)';
+  if (msg === 'no_spec') {
+    const r = e instanceof ApiError ? (e.data as { reason?: unknown } | undefined)?.reason : undefined;
+    return typeof r === 'string' && r ? r : "या प्रकरणाची सुधारणा-फाइल नाही (जुने प्रकरण) — 'पुन्हा तयार करा' वापरा";
+  }
   if (msg === 'run_active') return 'या प्रकरणाची प्रक्रिया आधीच चालू आहे — ती संपेपर्यंत थांबा';
   if (msg === 'dispatch_failed') return DISPATCH_REASON;
   if (msg === 'duplicate_cr') {
     const id = e instanceof ApiError ? Number((e.data as { existing_id?: unknown } | undefined)?.existing_id) : NaN;
     return `हा C R क्र. / वर्ष आधीच प्रकरण #${Number.isFinite(id) ? id : '?'} मध्ये आहे`;
   }
+  // any refusal that carries a Marathi `reason` (Worker 409s: no_spec, migration_missing, bad attachment …)
+  const reason = e instanceof ApiError ? (e.data as { reason?: unknown } | undefined)?.reason : undefined;
+  if (typeof reason === 'string' && looksMarathi(reason)) return reason;
   const se = settingError(msg);
   if (se) return se;
   for (const [re, mr] of MARATHI) if (re.test(msg)) return mr;
@@ -154,7 +161,7 @@ export async function api<T = unknown>(path: string, opt: { method?: string; bod
 }
 
 /** Raw-body upload with progress (XHR so upload.onprogress works). */
-export async function uploadFile(caseId: number, kind: InputKind, file: File, onProgress?: (pct: number) => void): Promise<{ id: number }> {
+export async function uploadFile(caseId: number, kind: InputKind | 'gr', file: File, onProgress?: (pct: number) => void): Promise<{ id: number }> {
   const t = await token();
   return new Promise((resolve, reject) => {
     const x = new XMLHttpRequest();

@@ -16,14 +16,15 @@ function useTypicalRunUsd() {
     let alive = true;
     void sb()
       .from('runs')
-      .select('cost_usd')
+      // '*': runs.kind exists only after migration 0013 (a missing column must not break the read); edit runs left out
+      .select('*')
       .eq('state', 'done')
       .not('cost_usd', 'is', null)
       .order('created_at', { ascending: false })
-      .limit(20)
+      .limit(40)
       .then(({ data }) => {
         if (!alive) return;
-        const c = ((data as { cost_usd: number | string | null }[]) || []).map(r => Number(r.cost_usd)).filter(Number.isFinite).sort((a, b) => a - b);
+        const c = ((data as { kind?: string | null; cost_usd: number | string | null }[]) || []).filter(r => r.kind !== 'edit').slice(0, 20).map(r => Number(r.cost_usd)).filter(Number.isFinite).sort((a, b) => a - b);
         setV(c.length ? (c.length % 2 ? c[(c.length - 1) / 2] : (c[c.length / 2 - 1] + c[c.length / 2]) / 2) : DEFAULT_RUN_USD);
       });
     return () => { alive = false; };

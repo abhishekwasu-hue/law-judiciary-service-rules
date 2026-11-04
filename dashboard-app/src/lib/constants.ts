@@ -144,10 +144,41 @@ export function draftsText(v: unknown): string {
  *  note when the engine produced them. */
 export const EXTRA_OUTPUT_KINDS = ['order_draft', 'parawise', 'affidavit', 'lq_answer'] as const;
 
+/** सुधारणा-चॅट (docs/DRAFT_EDIT_DESIGN.md §3, §6): POST /api/edit targets, their labels and the output kind each one edits.
+ *  Offered only when that output file exists for the case. */
+export const EDIT_TARGETS = [
+  { id: 'note', label: 'नोंद', kind: 'note_letter' },
+  { id: 'letter', label: 'पत्र', kind: 'note_letter' },
+  { id: 'order', label: 'आदेश-प्रारूप', kind: 'order_draft' },
+  { id: 'parawise', label: 'परिच्छेदनिहाय उत्तर', kind: 'parawise' },
+  { id: 'affidavit', label: 'शपथपत्र', kind: 'affidavit' },
+  { id: 'lq', label: 'विधानमंडळ उत्तर', kind: 'lq_answer' },
+  // Addendum A: add a GR / document to the returned PDF (attachments or GR सांकेतांक in the message)
+  { id: 'package', label: 'GR सह प्रस्ताव PDF', kind: 'package_pdf' },
+] as const;
+export type EditTarget = (typeof EDIT_TARGETS)[number]['id'];
+export const editTargetLabel = (id: string | null | undefined) => EDIT_TARGETS.find(t => t.id === id)?.label || '';
+export const EDIT_MAX_CHARS = 2000;
+/** Addendum A: files attached in the chat — uploaded first (POST /api/upload, kind gr / extra_doc), then their ids go with
+ *  POST /api/edit `attachments` (≤ 5). */
+export const EDIT_MAX_FILES = 5;
+export const EDIT_ATTACH_KINDS = [{ id: 'extra_doc', label: 'इतर कागदपत्र' }, { id: 'gr', label: 'GR' }] as const;
+export type EditAttachKind = (typeof EDIT_ATTACH_KINDS)[number]['id'];
+export const EDIT_ATTACH_ACCEPT = '.pdf,.jpg,.jpeg,.png,.doc,.docx';
+/** Text put in an empty message box when files are attached (a message is required). */
+export const EDIT_ATTACH_DEFAULT = 'जोडलेली कागदपत्रे GR सह PDF मध्ये जोडा';
+/** Internal file kinds never listed, viewed or downloaded in the app ('spec' = the drafts' source, kept for edits). */
+export const HIDDEN_FILE_KINDS = ['spec'] as const;
+export const isHiddenFile = (f: { kind: string }) => (HIDDEN_FILE_KINDS as readonly string[]).includes(f.kind);
+/** A सुधारणा-चॅट run (runs.kind = 'edit'). Old rows / old DB (no column) = full run. Edit runs never count as the case's
+ *  processing run (progress card, queue, badges, "पुन्हा तयार करा"). */
+export const isEditRun = (r: { kind?: string | null } | null | undefined) => r?.kind === 'edit';
+
 export const ACTION_LABEL: Record<string, string> = {
   case_created: 'प्रकरण नोंदवले', case_updated: 'तपशील बदलला', file_uploaded: 'फाइल अपलोड', run_started: 'अभ्यास सुरू', run_queued: 'प्रक्रिया रांगेत',
   stage_changed: 'टप्पा बदलला', letter_saved: 'पत्र नोंदवले', letter_updated: 'पत्राची नोंद बदलली', letter_reply_received: 'पत्राचे उत्तर प्राप्त',
   run_done: 'अभ्यास पूर्ण', run_failed: 'अभ्यास अयशस्वी', run_warning: 'अभ्यास-सूचना',
+  edit_requested: 'सुधारणा मागवली', edit_done: 'सुधारणा तयार', edit_failed: 'सुधारणा अयशस्वी',
   case_cr_duplicate: 'C R आधीच दुसऱ्या प्रकरणात', case_filled_from_pdf: 'तपशील PDF वरून भरला', case_fill_skipped: 'PDF वरून तपशील भरता आला नाही',
 };
 

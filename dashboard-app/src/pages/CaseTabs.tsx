@@ -1,8 +1,9 @@
 import { lazy, Suspense, useMemo, useRef, useState, type FormEvent } from 'react';
 import { ApiError, api, downloadFile, humanError, runStartText, uploadFile, type RunStart } from '../lib/api';
-import { ACTION_LABEL, EXTRA_OUTPUT_KINDS, FIELD_LABEL, FILE_KIND_LABEL, INPUT_KINDS, INPUT_KIND_LABEL, LETTER_STATUSES, RUN_STATE_LABEL, TONE_HEX, draftsText, runActive, runTone, type DraftKey, type InputKind } from '../lib/constants';
+import { ACTION_LABEL, EXTRA_OUTPUT_KINDS, FIELD_LABEL, FILE_KIND_LABEL, INPUT_KINDS, INPUT_KIND_LABEL, LETTER_STATUSES, RUN_STATE_LABEL, TONE_HEX, draftsText, editTargetLabel, runActive, runTone, type DraftKey, type InputKind } from '../lib/constants';
 import { sameDrafts, suggestDrafts } from '../lib/drafts';
 import DraftPicker from '../components/DraftPicker';
+import EditChat from '../components/EditChat';
 import { asArray, cleanReason, daysBetween, fmtDate, fmtDateTime, isCriticalWarning, textOf, todayISO } from '../lib/format';
 import { diffLines, type DiffLine } from '../lib/diff';
 import type { Activity, CaseFile, Letter, Run } from '../lib/types';
@@ -22,6 +23,8 @@ const ofKind = (files: CaseFile[], kind: string) =>
   files.filter(f => f.kind === kind).sort((a, b) => (a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : b.version - a.version));
 const latestRun = (runs: Run[] | null) => runs?.[0];
 const latestDone = (runs: Run[] | null) => runs?.find(r => r.state === 'done');
+/** A सुधारणा run of the case is queued / running (the Worker refuses a full run then: run_active). */
+const editBusy = (ctx: CaseCtx) => (ctx.editRuns ?? []).some(r => runActive(r));
 
 interface GrItem { code?: string; date?: string; title?: string; pages?: unknown; page?: unknown }
 const grItem = (v: unknown): GrItem => (v && typeof v === 'object' ? (v as GrItem) : { title: textOf(v) });
@@ -85,7 +88,7 @@ export function ReRun({ ctx, title = 'सुधारणा करून पु�
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState<number | null>(null); // dispatched run whose Realtime row is not here yet (H3)
   const r = latestRun(ctx.runs);
-  const running = runActive(r) || (pending !== null && !(ctx.runs ?? []).some(x => x.id === pending)); // a failed or stale (> 3.5 h) latest run does not block
+  const running = runActive(r) || editBusy(ctx) || (pending !== null && !(ctx.runs ?? []).some(x => x.id === pending)); // a failed or stale (> 3.5 h) latest run does not block
   if (!ctx.canWrite) return null;
   async function go(e: FormEvent) {
     e.preventDefault();
@@ -110,7 +113,7 @@ export function ReRun({ ctx, title = 'सुधारणा करून पु�
         <textarea className="input min-h-[80px]" placeholder="उदा. पत्रात फक्त सेवापुस्तकाची प्रत मागवा…" value={text} onChange={e => setText(e.target.value)} />
       </Field>
       <button className="btn-primary" disabled={busy || running}>{busy && <Spinner />} {running ? 'प्रक्रिया चालू…' : 'पुन्हा तयार करा'}</button>
-      {running && <p className="text-sm text-slate-500 dark:text-slate-400">प्रक्रिया चालू — संपल्यावर वापरा.</p>}
+      {running && <p className="text-sm text-slate-500 dark:text-slate-400">{editBusy(ctx) && !runActive(r) ? 'सुधारणा चालू — संपल्यावर वापरा.' : 'प्रक्रिया चालू — संपल्यावर वापरा.'}</p>}
     </form>
   );
 }
@@ -252,7 +255,7 @@ export function NoteTab({ ctx }: { ctx: CaseCtx }) {
   return (
     <div className="space-y-4">
       <RunBanner ctx={ctx} />
-      <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
+      <div className="grid gap-4 lg:grid-cols-[1fr_360px] xl:grid-cols-[1fr_400px]">
         <div className="card min-w-0 p-3">
           {!sel ? <Empty icon="📄" title="टिप्पणी अजून तयार नाही" hint="प्रक्रिया तयार झाल्यावर येथे दिसेल." /> : (
             <>
@@ -268,7 +271,8 @@ export function NoteTab({ ctx }: { ctx: CaseCtx }) {
             </>
           )}
         </div>
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-4">
+          <EditChat ctx={ctx} />
           {run?.letter_needed && points.length > 0 && (
             <Section title="पत्रातील अत्यावश्यक मुद्दे">
               <ol className="list-decimal space-y-1 pl-6">{points.map((p, i) => <li key={i}>{textOf(p)}</li>)}</ol>
@@ -460,7 +464,7 @@ export function LettersTab({ ctx }: { ctx: CaseCtx }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const set = (k: keyof typeof f) => (e: { target: { value: string } }) => setF(s => ({ ...s, [k]: e.target.value }));
   const replies = ofKind(ctx.files, 'reply');
-  const busyRun = runActive(latestRun(ctx.runs));
+  const busyRun = runActive(latestRun(ctx.runs)) || editBusy(ctx);
 
   async function create(e: FormEvent) {
     e.preventDefault();
@@ -606,9 +610,11 @@ export function activityText(x: Activity): string {
     case 'file_uploaded': return `${FILE_KIND_LABEL[String(d.kind)] || textOf(d.kind)}: ${textOf(d.name)} (आवृत्ती ${textOf(d.version)})`;
     case 'run_started': return [run, d.outputs_dropped ? 'मसुदे-निवड लागू झाली नाही (migration 0008 बाकी)' : draftsText(d.outputs) && `मसुदे: ${draftsText(d.outputs)}`, d.instructions ? `सूचना: ${textOf(d.instructions)}` : ''].filter(Boolean).join(' • ');
     case 'run_done': {
-      const files = asArray(d.files).map(f => (f && typeof f === 'object' ? textOf((f as { name?: unknown }).name) : textOf(f))).filter(Boolean);
+      const files = asArray(d.files).filter(f => !(f && typeof f === 'object' && (f as { kind?: unknown }).kind === 'spec'))
+        .map(f => (f && typeof f === 'object' ? textOf((f as { name?: unknown }).name) : textOf(f))).filter(n => n && !/^(spec|enclosures)\.json$/.test(n));
       return [run, files.length ? `फाइल: ${files.join(', ')}` : ''].filter(Boolean).join(' • ');
     }
+    case 'edit_requested': return [d.run_id != null ? `सुधारणा क्र. ${textOf(d.run_id)}` : '', editTargetLabel(textOf(d.target)), textOf(d.message)].filter(Boolean).join(' • ');
     case 'run_failed': return [run, cleanReason(textOf(d.reason))].filter(Boolean).join(' • ');
     case 'run_warning': return [run, textOf(d.warning)].filter(Boolean).join(' • ');
     case 'case_created': return d.cr ? `C R ${textOf(d.cr)}` : '';
@@ -628,7 +634,8 @@ export function activityText(x: Activity): string {
 
 export function HistoryTab({ ctx }: { ctx: CaseCtx }) {
   const items = useMemo(() => {
-    const a = ctx.activity.map(x => ({
+    // the drafts' source file (kind spec) is internal: its upload rows are not shown
+    const a = ctx.activity.filter(x => !(x.action === 'file_uploaded' && x.detail?.kind === 'spec')).map(x => ({
       at: x.at,
       key: `a${x.id}`,
       title: ACTION_LABEL[x.action] || 'इतर नोंद',
@@ -645,8 +652,16 @@ export function HistoryTab({ ctx }: { ctx: CaseCtx }) {
       who: x.created_by ? ctx.members.get(x.created_by) || '' : '',
       tone: runTone(x.state),
     }));
-    return [...a, ...r].sort((p, q) => (p.at < q.at ? 1 : -1));
-  }, [ctx.activity, ctx.runs, ctx.members]);
+    const e = (ctx.editRuns || []).map(x => ({
+      at: x.finished_at || x.started_at || x.created_at,
+      key: `e${x.id}`,
+      title: `सुधारणा क्र. ${x.id}: ${x.state === 'done' ? (x.edit_result?.refused ? 'नाकारले' : 'तयार') : RUN_STATE_LABEL[x.state] || x.state}`,
+      text: [editTargetLabel(x.edit_target), x.edit_message, x.state === 'failed' ? cleanReason(x.step) : x.edit_result?.refused || x.edit_result?.summary || ''].filter(Boolean).join(' • '),
+      who: x.created_by ? ctx.members.get(x.created_by) || '' : '',
+      tone: x.state === 'done' && x.edit_result?.refused ? ('amber' as const) : runTone(x.state),
+    }));
+    return [...a, ...r, ...e].sort((p, q) => (p.at < q.at ? 1 : -1));
+  }, [ctx.activity, ctx.runs, ctx.editRuns, ctx.members]);
 
   if (!items.length) return <div className="card"><Empty icon="🕘" title="इतिहास नाही" /></div>;
   return (

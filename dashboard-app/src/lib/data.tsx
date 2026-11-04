@@ -4,6 +4,7 @@ import { sb } from './supabase';
 import { api } from './api';
 import { useCanWrite } from './auth';
 import type { Case, Letter, Run } from './types';
+import { isEditRun } from './constants';
 import { addDaysISO, crLabel, todayISO } from './format';
 import { useToast } from '../components/Toast';
 
@@ -51,7 +52,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
       if (!r.error) {
         const m = new Map<number, Run>();
         for (const x of (r.data as Run[]) || []) {
-          if (!m.has(x.case_id)) m.set(x.case_id, x);
+          // सुधारणा-चॅट runs never stand for the case's processing state (list badges, queue, global bar)
+          if (!isEditRun(x) && !m.has(x.case_id)) m.set(x.case_id, x);
           runState.current.set(x.id, x.state);
         }
         setLatestRuns(m);
@@ -121,9 +123,13 @@ export function DataProvider({ children }: { children: ReactNode }) {
         if ((prev === 'queued' || prev === 'running') && (row.state === 'done' || row.state === 'failed')) {
           const c = casesRef.current.find(x => x.id === row.case_id);
           const label = c ? crLabel(c) : `प्रकरण #${row.case_id}`;
-          if (row.state === 'done') toast(`${label}: प्रक्रिया तयार — प्रकरणे मध्ये पाहा`, 'ok');
+          if (isEditRun(row)) {
+            if (row.state === 'done') toast(`${label}: ${row.edit_result?.refused ? 'सुधारणा नाकारली — कारण प्रकरणात पाहा' : 'सुधारणा तयार — नवीन आवृत्ती उपलब्ध'}`, row.edit_result?.refused ? 'err' : 'ok');
+            else toast(`${label}: सुधारणा अयशस्वी — प्रकरणात कारण पाहा`, 'err');
+          } else if (row.state === 'done') toast(`${label}: प्रक्रिया तयार — प्रकरणे मध्ये पाहा`, 'ok');
           else toast(`${label}: प्रक्रिया अयशस्वी — प्रकरण उघडून "पुन्हा तयार करा" दाबा`, 'err');
         }
+        if (isEditRun(row)) return;
         setLatestRuns(s => {
           const cur = s.get(row.case_id);
           if (cur && cur.id > row.id) return s;

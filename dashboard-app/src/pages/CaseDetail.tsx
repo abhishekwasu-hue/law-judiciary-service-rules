@@ -3,10 +3,10 @@ import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { sb } from '../lib/supabase';
 import { useData, overdueIds } from '../lib/data';
 import { useCanWrite } from '../lib/auth';
-import { CATEGORIES, DEFAULT_DESK, DESKS, PRIORITIES, STAGES, WORK_TYPES, WORK_TYPE_TONE, deskLabel, stageTone, workTypeLabel, workTypeOf } from '../lib/constants';
+import { CATEGORIES, DEFAULT_DESK, DESKS, PRIORITIES, STAGES, WORK_TYPES, WORK_TYPE_TONE, deskLabel, isEditRun, isHiddenFile, stageTone, workTypeLabel, workTypeOf } from '../lib/constants';
 import { caseSubject, crFromFileName, crLabel, fmtDate } from '../lib/format';
 import { ApiError, api, humanError } from '../lib/api';
-import type { Activity, Case, CaseFile, Letter, Member } from '../lib/types';
+import type { Activity, Case, CaseFile, Letter, Member, Run } from '../lib/types';
 import { Chip, Empty, Field, Modal, Skeleton, Spinner } from '../components/ui';
 import { useToast } from '../components/Toast';
 import { StudyWarningsLine, useRuns } from '../components/RunProgress';
@@ -28,7 +28,12 @@ export interface CaseCtx {
   letters: Letter[];
   activity: Activity[];
   members: Map<string, string>;
+  /** full processing runs only, newest first (edit runs left out — docs/DRAFT_EDIT_DESIGN.md §6) */
   runs: ReturnType<typeof useRuns>;
+  /** सुधारणा-चॅट runs (runs.kind = 'edit'), newest first */
+  editRuns: Run[] | null;
+  /** the case has a drafts' source file (kind 'spec') → the सुधारणा chat can be used */
+  hasSpec: boolean;
   reloadFiles: () => Promise<void>;
   reloadLetters: () => Promise<void>;
   reloadActivity: () => Promise<void>;
@@ -48,7 +53,10 @@ export default function CaseDetail() {
   const [activity, setActivity] = useState<Activity[]>([]);
   const [members, setMembers] = useState<Map<string, string>>(new Map());
   const [editOpen, setEditOpen] = useState(false);
-  const runs = useRuns(id || null);
+  const allRuns = useRuns(id || null);
+  const runs = useMemo(() => (allRuns ? allRuns.filter(r => !isEditRun(r)) : null), [allRuns]);
+  const editRuns = useMemo(() => (allRuns ? allRuns.filter(isEditRun) : null), [allRuns]);
+  const [hasSpec, setHasSpec] = useState(false);
 
   const c = cases.find(x => x.id === id) ?? single ?? null;
   // the case currently shown: responses that arrive for an earlier id are dropped
@@ -66,6 +74,7 @@ export default function CaseDetail() {
     setShownId(id);
     setSingle(undefined);
     setFiles([]);
+    setHasSpec(false);
     setLetters([]);
     setActivity([]);
     setLoadErr(false);
@@ -93,7 +102,10 @@ export default function CaseDetail() {
       const { data, error } = await sb().from('case_files').select('*').eq('case_id', id).order('version', { ascending: false }).order('created_at', { ascending: false });
       if (curId.current !== id) return;
       if (error) return setLoadErr(true);
-      setFiles((data as CaseFile[]) || []);
+      const rows = (data as CaseFile[]) || [];
+      // internal kinds (spec) are never listed / downloaded anywhere in the app
+      setHasSpec(rows.some(f => f.kind === 'spec'));
+      setFiles(rows.filter(f => !isHiddenFile(f)));
     } catch {
       if (curId.current === id) setLoadErr(true);
     }
@@ -144,13 +156,15 @@ export default function CaseDetail() {
   }, [id]);
 
   // When the latest run finishes, its outputs appear in case_files (not in the Realtime publication) → reload.
+  // An edit run (सुधारणा) also stores new file versions when it ends.
   const latestState = runs?.[0]?.state;
+  const latestEdit = editRuns?.[0] ? `${editRuns[0].id}:${editRuns[0].state}` : '';
   useEffect(() => {
-    if (latestState === 'done' || latestState === 'failed') {
+    if (latestState === 'done' || latestState === 'failed' || /:(done|failed)$/.test(latestEdit)) {
       void reloadFiles();
       void reloadActivity();
     }
-  }, [latestState, reloadFiles, reloadActivity]);
+  }, [latestState, latestEdit, reloadFiles, reloadActivity]);
   useEffect(() => {
     void reloadActivity();
   }, [c?.stage, reloadActivity]);
@@ -192,7 +206,7 @@ export default function CaseDetail() {
     }
   }
 
-  const ctx: CaseCtx = { c, files, letters, activity, members, runs, reloadFiles, reloadLetters, reloadActivity, canWrite };
+  const ctx: CaseCtx = { c, files, letters, activity, members, runs, editRuns, hasSpec, reloadFiles, reloadLetters, reloadActivity, canWrite };
   // Title: C R of the case; else the C R in an output file name, marked as such — but not when the engine reported
   // that C R as a duplicate of another case (two cases would show the same heading, A3 audit)
   const hasDupNotice = activity.some(a => a.action === 'case_cr_duplicate');

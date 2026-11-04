@@ -32,6 +32,20 @@ export interface Run {
   outputs?: string[] | null;
   // migration 20261104000011_work_type_queue.sql: when the Worker sent this run to the engine; null = waiting in the queue
   dispatched_at?: string | null;
+  // migration 20261104000013_draft_edits.sql (docs/DRAFT_EDIT_DESIGN.md): 'edit' = a सुधारणा-चॅट run; absent / null = 'full'
+  kind?: 'full' | 'edit' | null;
+  edit_target?: string | null;
+  edit_message?: string | null;
+  edit_result?: EditResult | null;
+  /** Addendum A: case_files ids attached to the edit message (if the Worker stores them) */
+  edit_attachments?: number[] | null;
+}
+/** runs.edit_result of an edit run (tools/edit_drafts.py). `files` = output kinds rebuilt (case_files.kind). */
+export interface EditChange { where?: string | null; before?: string | null; after?: string | null }
+export interface EditResult {
+  summary?: string | null; changes?: EditChange[] | null; files?: string[] | null; cost_usd?: number | string | null; refused?: string | null;
+  /** Addendum A: items appended to the returned PDF */
+  attached?: { title?: string | null; pages?: string | number | null }[] | null;
 }
 export interface Letter {
   id: number; case_id: number; ref_no: string | null; addressed_to: string | null; sent_date: string | null;

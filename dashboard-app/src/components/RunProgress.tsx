@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { sb } from '../lib/supabase';
 import type { Run } from '../lib/types';
-import { RUN_STATE_LABEL, RUN_STEPS, STALE_REASON, isStale, isWaiting, runTone } from '../lib/constants';
+import { RUN_STATE_LABEL, RUN_STEPS, STALE_REASON, isEditRun, isStale, isWaiting, runTone } from '../lib/constants';
 import { asArray, cleanReason, criticalWarnings, fmtDateTime, isOwnerOnlyLine, studyWarningTexts, textOf } from '../lib/format';
 import { useAuth } from '../lib/auth';
 import { Chip, Progress, Spinner } from './ui';
@@ -125,11 +125,12 @@ export function useTypicalRunSeconds() {
       .in('state', ['done', 'failed'])
       .not('finished_at', 'is', null)
       .order('finished_at', { ascending: false })
-      .limit(20)
+      .limit(40)
       .then(({ data }) => {
         if (!alive) return;
-        type R = { state: string; created_at: string; dispatched_at?: string | null; finished_at: string; duration_s: number | string | null; num_turns: number | null };
+        type R = { kind?: string | null; state: string; created_at: string; dispatched_at?: string | null; finished_at: string; duration_s: number | string | null; num_turns: number | null };
         const d = ((data as R[]) || [])
+          .filter(r => !isEditRun(r)) // सुधारणा runs take a minute or two — not a processing run
           .filter(r => r.state === 'done' || (r.num_turns ?? 0) >= 30)
           .slice(0, 10)
           .map(r => (Date.parse(r.finished_at) - Date.parse(r.dispatched_at || r.created_at)) / 1000) // queue wait not counted
