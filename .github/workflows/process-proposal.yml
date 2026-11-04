@@ -400,13 +400,17 @@ jobs:
           MODEL_REVIEW=$MODEL_REVIEW
           MODEL_STRONG=$MODEL_STRONG
           BUDGET_USD=${BUDGET_USD:-0.75}"
-          ARGS=(-p "$PROMPT" --dangerously-skip-permissions --max-turns 400 --output-format stream-json --verbose
+          # the prompt goes in on stdin, never as one argv string: Linux refuses a single argument over 128 KiB
+          # (MAX_ARG_STRLEN) and prompt + brief + tool docstrings reached ~164 KB on 04.11.2026 (run #12 "Argument list
+          # too long"). The runner writes it to its private dir; the shell redirect is opened by the runner, not `engine`.
+          printf '%s' "$PROMPT" > "$RP/prompt.txt"
+          ARGS=(-p --dangerously-skip-permissions --max-turns 400 --output-format stream-json --verbose
                 --agents /tmp/work/agents.json --tools "Bash,Read,Write,Edit,Glob,Grep,Agent" "${MARGS[@]}")
           rc=0
           : > "$RP/claude.json"; : > "$RP/claude.err"
           if [ -z "$SKIP_MAIN" ]; then
             touch "$RP/claude.started"   # "Record failure" stores the cost (--killed) if this step is cancelled
-            timeout -k 60 "${MAIN_S}s" "${ERUN[@]}" "${AUTH[@]}" "${INDIR[@]}" claude "${ARGS[@]}" \
+            timeout -k 60 "${MAIN_S}s" "${ERUN[@]}" "${AUTH[@]}" "${INDIR[@]}" claude "${ARGS[@]}" < "$RP/prompt.txt" \
               > >(STAMP "$RP/claude.stream.tsv" "$RP/claude.json") 2> "$RP/claude.err" || rc=$?
             stamp_wait "$RP/claude.stream.tsv"
             echo "main run (${ENG_USED:-claude}) exit $rc"; tail -n 20 "$RP/claude.err" || true
@@ -435,7 +439,7 @@ jobs:
                 rc=0
                 : > "$RP/claude.json"
                 timeout -k 60 "${FB_S}s" "${ERUN[@]}" ANTHROPIC_BASE_URL=http://127.0.0.1:4000 ANTHROPIC_AUTH_TOKEN="$MK" \
-                  "${INDIR[@]}" claude "${ARGS[@]}" > >(STAMP "$RP/claude.stream.tsv" "$RP/claude.json") 2> "$RP/claude.err" || rc=$?
+                  "${INDIR[@]}" claude "${ARGS[@]}" < "$RP/prompt.txt" > >(STAMP "$RP/claude.stream.tsv" "$RP/claude.json") 2> "$RP/claude.err" || rc=$?
                 stamp_wait "$RP/claude.stream.tsv"
                 echo "fallback run exit $rc"; tail -n 20 "$RP/claude.err" || true
                 FB_USED="$FALLBACK_PROVIDER"

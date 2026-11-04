@@ -164,3 +164,18 @@ class WorkflowStatic(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PromptViaStdin(unittest.TestCase):
+    """04.11.2026 run #12: "/usr/bin/timeout: Argument list too long" — the main prompt (prompt + brief + tool docstrings,
+    ~164 KB) exceeded Linux's 128 KiB limit for ONE argv string. The main and fallback runs read it from stdin."""
+
+    def test_main_prompt_on_stdin(self):
+        y = open(os.path.join(ROOT, ".github/workflows/process-proposal.yml"), encoding="utf-8").read()
+        self.assertNotIn('-p "$PROMPT"', y)
+        self.assertIn('printf \'%s\' "$PROMPT" > "$RP/prompt.txt"', y)
+        self.assertEqual(y.count('claude "${ARGS[@]}" < "$RP/prompt.txt"'), 2)
+
+    def test_part1_prompt_small(self):
+        n = len(open(os.path.join(ROOT, "tools/ENGINE_PART1_PROMPT.md"), encoding="utf-8").read().encode())
+        self.assertLess(n, 100_000)
