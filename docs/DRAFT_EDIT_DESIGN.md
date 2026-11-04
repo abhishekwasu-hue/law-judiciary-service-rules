@@ -54,3 +54,22 @@ one message = one edit run**, any number of edits one after another. Study edits
 
 ## Not in phase 1
 Study edits; edits that need the proposal, GRs or a new draft type (full run); cases processed before this change (no spec).
+
+## Addendum A (04.11.2026, Abhi: "साधारणता सुधारणा या स्टडी फाईल मध्ये करायची गरज पडत नाही, जीआर सह पीडीएफ यामध्ये एखादा आणखी कागदपत्र किंवा जीआर युजरला अटॅच करायचा असल्यास … चॅट बॉक्समध्ये डॉक्युमेंट अपलोड करायची सुद्धा सुविधा पाहिजे … चॅट बॉक्स हा … Claude session … धर्तीवर")
+- Study edits: not needed (decided).
+- **Attachments in the chat (📎, drag-drop, several files):** each file is uploaded first with the existing upload API
+  (`kind` `gr` for a GR / rule PDF, else `extra_doc`; PDF / JPG / PNG; Word only if the edit job can convert it, else a
+  Marathi refusal "PDF करून जोडा"), then `POST /api/edit {case_id, target, message, attachments: [case_files.id, …]}`
+  (≤ 5, each must belong to the case; the files' rows are created by the upload as today).
+- **New target `package`** ("GR सह प्रस्ताव PDF"). The message may also name GRs by सांकेतांक (16–18 digits, found by regex
+  in the message, not by the model) → downloaded from the official URL
+  `https://gr.maharashtra.gov.in/Site/Upload/Government%20Resolutions/Marathi/<code>.pdf` (else archive.org mirror).
+- **Persist `enclosures.json`** with the spec (same kind `spec`, original_name `enclosures.json`), so the package can be
+  rebuilt with `tools/pkg3.py` (proposal from storage + saved enclosures + the new ones appended at the END → existing
+  पृ.N/प.वि. stay valid; only the total in "पृ. i / N" changes; bookmarks for the new items; no highlights on the new items
+  unless the message gives exact lines). New package version keeps the original file name (§4.16).
+- **Order in the edit job:** attachments + GR codes → rebuild package → the new page ranges are known → ONE model call that
+  gets the target part of the spec, the message, the new page ranges ("<title>: पृ.a-b/प.वि.") and the text layer of the
+  attached files (capped, for quoting) → spec ops (e.g. a new para / related extract citing the new pages) → lint → rebuild →
+  upload. Message that only attaches (no text change asked) → no model call at all (cost 0).
+- `edit_result` gets `attached: [{title, pages}]`.
