@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """build_order.py <spec.json> <outdir> <PREFIX> [--no-lint]
-Draft of a Government order of the Section (शासन निर्णय / शासन शुद्धिपत्रक / शासन परिपत्रक / ज्ञापन / अधिसूचना) ->
+Draft of a Government order of the Section (शासन निर्णय / शासन शुद्धिपत्रक / शासन परिपत्रक / ज्ञापन / अधिसूचना /
+पृष्ठांकन / कार्यालयीन आदेश / प्रसिद्धीपत्रक / शासन पूरकपत्र) ->
 <outdir>/<PREFIX>_Order_Draft.docx (+ <PREFIX>_Order_Draft.pdf preview via LibreOffice, warning only if absent).
 First runs tools/lint_order.py on the spec and stops (exit 1, problems printed) on errors; --no-lint or env LINT_SKIP=1
 skips it. Exit 1 when the spec has no "order" / "orders" key or a built text run is not DVOT-SurekhMR
@@ -17,7 +18,8 @@ Desk (C30, 03.11.2026): spec "desk" (or an order's own "desk") names the profile
 address, default signers, English lines (absent = law-desk6; unknown values print "____" / "(          )").
 spec.json (only the "desk", "order" / "orders" keys are read; other keys such as "note" may sit beside them):
 {"order": {
-  "type": "gr" | "corrigendum" | "circular" | "memo" | "notification",
+  "type": "gr" | "corrigendum" | "circular" | "memo" | "notification"
+          | "endorsement" | "office_order" | "press_note" | "addendum",   # last four: docs/FORMS_RESEARCH_ORDERS.md
   "subject": "...बाबत.",                          # printed on top (GR / शुद्धिपत्रक / परिपत्रक) or top centre (ज्ञापन);
                                                    #   not printed for अधिसूचना
   "ref_no": "संकिर्ण-2026/____/प्र.क्र.____/का.6",
@@ -42,11 +44,34 @@ spec.json (only the "desk", "order" / "orders" keys are read; other keys such as
   "english": {"ref_no": "Misc-2026/____/C.R.____/D-VI", "date": "____ November, 2026",
               "operative": ["In exercise of the powers conferred by ...", {"table": [[...]]}],
               "signer": {"name": "( ____ )", "designation": "Deputy Legal Adviser-cum-Deputy Secretary"},
-              "copies": ["...", "Select file (Desk-6)"]}   # notification: English version on a new page
+              "copies": ["...", "Select file (Desk-6)"]},  # notification: English version on a new page
+  # --- endorsement (पृष्ठांकन; NPM परिशिष्ट-27, MMOP App. 10.8): no subject / वाचा; printed
+  #     "(<forwarded> या खाली.)", the क्रमांक / department / address / दिनांक block on the right, then
+  #     "<forward_to joined ', ' … ' व '> यांजकडे <purpose> पाठविण्यात येत आहे.", optional "operative" lines (GADT 12.22),
+  #     Governor line + signer; "copies" optional ("प्रत,")
+  "forwarded": "प्रबंधक, उच्च न्यायालय (अपील शाखा), मुंबई यांच्या ____ या संबंधीच्या पत्र क्रमांक ____, दिनांक __.__.2026",
+  "forward_to": ["प्रमुख जिल्हा व सत्र न्यायाधीश, ____"],
+  "purpose": "माहितीसाठी व आवश्यक कार्यवाहीसाठी",
+  # --- office_order (कार्यालयीन आदेश; NPM परिशिष्ट-31, GADT 12.16, MMOP App. 10.10): subject centred on top, heading
+  #     block without a number line, "कार्यालयीन आदेश", operative[0] after "क्रमांक :- <ref_no>, ", paras 2., 3.;
+  #     "आदेशानुसार," (no Governor line, no salutation / subscription) + signer; "copies" printed one per line without a
+  #     heading ("… यांना माहितीसाठी.")
+  # --- press_note (प्रसिद्धीपत्रक; NPM परिशिष्ट-32, para 102(11), MMOP App. 10.11): no department block, no signer, no
+  #     copies; "प्रसिद्धीपत्रक" / "number" (default "____") / "saka_date" (default "____") / "date" / "time" (right;
+  #     default "____ वाजता.") / subject (title, centred) / operative paras (unnumbered)
+  "cites": ["विधि व न्याय विभाग, शासन निर्णय क्रमांक ..., दि. ..."],   # press_note: the GR / notification announced;
+  #     each must also appear in an operative para (NPM 102(11): "… अधिसूचना निर्गमित केल्याचा संदर्भ न चुकता नमूद करावा.")
+  # --- addendum (शासन पूरकपत्र; GADT 12.9 "शासन निर्णयाच्या मसुद्याप्रमाणेच"): GR layout, "शासन पूरकपत्र क्रमांक :- ",
+  #     optional "प्रस्तावना :-", "शासन पूरकपत्र :-", then per addition "<at> खालील मजकूर समाविष्ट करण्यात येत आहे:-" /
+  #     "“<text>”"; para 2 "संदर्भाधीन शासन निर्णयातील उर्वरित तरतुदी आहे तशाच लागू राहतील." (added unless an operative
+  #     para already says "लागू राहतील" / "कायम राहतील"), operative 3., …, concurrence, website line (default on)
+  "additions": [{"at": "संदर्भाधीन शासन निर्णयातील परिच्छेद 2 नंतर", "text": "..."}]
 }}
 The tool adds the heading block, "वाचा :-", "प्रस्तावना :-", "शासन निर्णय :-" / "शासन शुद्धिपत्रक :-" / "परिपत्रक :-" /
-"ज्ञापन :-" / "अधिसूचना", the website line, "महाराष्ट्राचे राज्यपाल यांच्या आदेशानुसार व नावाने," and the signer — do not
-write them in operative (lint_order.py refuses)."""
+"ज्ञापन :-" / "अधिसूचना" / "कार्यालयीन आदेश" / "प्रसिद्धीपत्रक" / "शासन पूरकपत्र :-", the website line,
+"महाराष्ट्राचे राज्यपाल यांच्या आदेशानुसार व नावाने," / "आदेशानुसार," and the signer — do not write them in operative
+(lint_order.py refuses). Keys a type's specimen has no place for (e.g. "read" on an office order) are not printed
+(lint_order.py warns)."""
 import os, sys, json, shutil, subprocess
 
 import docx
@@ -60,7 +85,7 @@ from clean_meta import clean_docx  # noqa: E402 — C27 §4
 from mkdocs import FONT, setfont, fix_styles, nomirror, add_table, LET_T  # noqa: E402
 from desk import load_desk, desk_id_of, blank as _blank, sign_name as _sign_name  # noqa: E402 — C30 desk profiles
 
-TYPES = ("gr", "corrigendum", "circular", "memo", "notification")
+TYPES = ("gr", "corrigendum", "circular", "memo", "notification", "endorsement", "office_order", "press_note", "addendum")
 # C30 (03.11.2026): department / address / signers / English lines come from the desk profile (tools/desks/<id>.json,
 # spec "desk", default law-desk6); the constants below are the default profile's values (kept for callers and tests)
 _DEFAULT = load_desk(None)["order"]
@@ -69,11 +94,14 @@ ADDRESS = _DEFAULT["office"]
 GOVERNOR = "महाराष्ट्राचे राज्यपाल यांच्या आदेशानुसार व नावाने,"
 GOVERNOR_EN = "By order and in the name of the Governor of Maharashtra,"
 NUMBER_LABEL = {"gr": "शासन निर्णय क्रमांक :- ", "corrigendum": "शासन शुद्धिपत्रक क्रमांक :- ",
-                "circular": "शासन परिपत्रक क्रमांक :- ", "memo": "क्रमांक :- ", "notification": "क्रमांक :- "}
+                "circular": "शासन परिपत्रक क्रमांक :- ", "memo": "क्रमांक :- ", "notification": "क्रमांक :- ",
+                "endorsement": "क्रमांक :- ", "office_order": "क्रमांक :- ", "addendum": "शासन पूरकपत्र क्रमांक :- "}
 BODY_HEAD = {"gr": "शासन निर्णय :-", "corrigendum": "शासन शुद्धिपत्रक :-", "circular": "परिपत्रक :-",
-             "memo": "ज्ञापन :-", "notification": "अधिसूचना"}
+             "memo": "ज्ञापन :-", "notification": "अधिसूचना", "office_order": "कार्यालयीन आदेश",
+             "press_note": "प्रसिद्धीपत्रक", "addendum": "शासन पूरकपत्र :-"}
 COPIES_HEAD = {"gr": "प्रत,", "corrigendum": "प्रत,", "circular": "प्रत,", "memo": "प्रत :-",
-               "notification": "प्रत सादर अग्रेषित :-"}
+               "notification": "प्रत सादर अग्रेषित :-", "endorsement": "प्रत,", "addendum": "प्रत,",
+               "office_order": ""}   # office_order: lines without a heading (GADT 12.16 specimen, p.39); press_note: none
 # decision B5 (docs/COURT_AND_ORDERS_RESEARCH.md); संकेतांक left blank in the draft
 WEBSITE = {
     "gr": "सदर शासन निर्णय महाराष्ट्र शासनाच्या www.maharashtra.gov.in या संकेतस्थळावर उपलब्ध करण्यात आला असून त्याचा संकेतांक ____ असा आहे. हा शासन निर्णय डिजिटल स्वाक्षरीने साक्षांकित करून काढण्यात येत आहे.",
@@ -81,14 +109,27 @@ WEBSITE = {
     "circular": "सदर शासन परिपत्रक महाराष्ट्र शासनाच्या www.maharashtra.gov.in या संकेतस्थळावर उपलब्ध करण्यात आले असून त्याचा संकेतांक ____ असा आहे. हे शासन परिपत्रक डिजिटल स्वाक्षरीने साक्षांकित करून काढण्यात येत आहे.",
     "memo": "सदर ज्ञापन महाराष्ट्र शासनाच्या www.maharashtra.gov.in या संकेतस्थळावर उपलब्ध करण्यात आले असून त्याचा संकेतांक ____ असा आहे. हे ज्ञापन डिजिटल स्वाक्षरीने साक्षांकित करून काढण्यात येत आहे.",
     "notification": "सदर अधिसूचना महाराष्ट्र शासनाच्या www.maharashtra.gov.in या संकेतस्थळावर उपलब्ध करण्यात आली असून तिचा संकेतांक ____ असा आहे. ही अधिसूचना डिजिटल स्वाक्षरीने साक्षांकित करून काढण्यात येत आहे.",
+    # live addenda carry this line: L&J 24.12.2025 (202512241441162012), Finance 10.02.2015 (201502101737353205)
+    "addendum": "सदर शासन पूरकपत्र महाराष्ट्र शासनाच्या www.maharashtra.gov.in या संकेतस्थळावर उपलब्ध करण्यात आले असून त्याचा संकेतांक ____ असा आहे. हे शासन पूरकपत्र डिजिटल स्वाक्षरीने साक्षांकित करून काढण्यात येत आहे.",
 }
-WEBSITE_DEFAULT = {"gr": True, "corrigendum": True, "circular": True, "memo": False, "notification": False}
+WEBSITE_DEFAULT = {"gr": True, "corrigendum": True, "circular": True, "memo": False, "notification": False,
+                   "addendum": True, "endorsement": False, "office_order": False, "press_note": False}
 SIGNER_DEFAULT = dict(_DEFAULT["signer"])          # decision B4
 SIGNER_NOTIF = dict(_DEFAULT["signer_notification"])
 SIGNER_EN = dict(_DEFAULT["english"]["signer"])
 CORR_INSTEAD = "या ऐवजी"
 CORR_CLOSING = "उपरोक्त बदलाव्यतिरिक्त संदर्भाधीन शासन निर्णयातील इतर तरतुदी कायम राहतील."
 KEEP = "कायम राहतील"
+# addendum (docs/FORMS_RESEARCH_ORDERS.md §4): insertion line (verb from NPM परिशिष्ट-32 "… नवीन नियम समाविष्ट करून
+# सुधारणा …") and closing para (L&J शासन निर्णय पूरकपत्र 17.01.2023, 202301181508556412, para 3: "… मूळ शासन निर्णयातील
+# उर्वरित तरतुदी आहे तशाच लागू राहतील.")
+ADD_INSERT = "खालील मजकूर समाविष्ट करण्यात येत आहे:-"
+ADD_CLOSING = "संदर्भाधीन शासन निर्णयातील उर्वरित तरतुदी आहे तशाच लागू राहतील."
+ADD_KEEP = ("लागू राहतील", "कायम राहतील")
+OFFICE_SIGNOFF = "आदेशानुसार,"          # NPM परिशिष्ट-31 (MMOP App. 10.10 "By order,")
+ENDORSE_BELOW = "या खाली."              # NPM परिशिष्ट-27 "(… पत्र क्रमांक … दिनांक … या खाली.)"
+ENDORSE_SENT = "यांजकडे {purpose} पाठविण्यात येत आहे."   # NPM परिशिष्ट-27
+PRESS_TIME = "____ वाजता."              # NPM परिशिष्ट-32 "दुपारी २-३० वाजता."
 EN_ADDRESS = list(_DEFAULT["english"]["office"])
 SIGN_INDENT = Cm(7.0)
 
@@ -158,7 +199,7 @@ def heading_block(D, o, dk=None):
         D.p(DEPT, bold=True, align=WA.CENTER, after=0)
     else:
         D.p(DEPT, bold=True, align=WA.CENTER, after=0)
-        if t != "notification":   # notification: the number opens the operative para (NPM परि.-26; 060)
+        if t not in ("notification", "office_order"):   # number opens the operative para (NPM परि.-26, 060; परि.-31)
             D.p(NUMBER_LABEL[t] + o["ref_no"], bold=True, align=WA.CENTER, after=0)
     D.p(ADDRESS, align=WA.CENTER, after=0)
     D.p("दिनांक :- " + o["date"], align=WA.CENTER, after=10)
@@ -235,16 +276,84 @@ def build_many(orders, out, author=None, spec=None):
     D.d.save(out); clean_docx(out, author)
 
 
+def join_names(xs):
+    """"अ", "अ व ब", "अ, ब व क" (GADT 12.24 specimen: "… उप सचिव, विभागीय अधिकारी, अवर सचिव, कार्यासन अधिकारी यांना")."""
+    xs = [x.strip() for x in ([xs] if isinstance(xs, str) else (xs or [])) if isinstance(x, str) and x.strip()]
+    if not xs:
+        return "____"
+    return xs[0] if len(xs) == 1 else ", ".join(xs[:-1]) + " व " + xs[-1]
+
+
+def plain_paras(D, items):
+    """unnumbered paragraphs (first-line tab), tables / sub-points allowed: press note body, endorsement extra lines."""
+    for it in items or []:
+        if isinstance(it, dict) and "table" in it:
+            D.table(it["table"])
+        elif isinstance(it, dict) and "sub" in it:
+            for s in it["sub"]:
+                D.p(s, left=Cm(2.0), first=Cm(-0.8))
+        elif isinstance(it, str) and it.strip():
+            D.p("\t" + it.strip())
+
+
+def build_endorsement(D, o, dk):
+    """पृष्ठांकन: NPM परिशिष्ट-27 (p.94), MMOP App. 10.8 (p.75). Bracketed description of the paper forwarded, the
+    number block on the right, the forwarding sentence, Governor line + signer."""
+    fw = str(o.get("forwarded") or "____").strip().rstrip(".").strip()
+    D.p(f"({fw} {ENDORSE_BELOW})", after=10)
+    for x in (NUMBER_LABEL["endorsement"] + o["ref_no"], dk["department"], dk["office"], "दिनांक :- " + o["date"]):
+        D.p(x, align=WA.LEFT, left=SIGN_INDENT, after=0)
+    D.p("", after=6)
+    purpose = str(o.get("purpose") or "____").strip()
+    D.p("\t" + join_names(o.get("forward_to")) + " " + ENDORSE_SENT.format(purpose=purpose))
+    plain_paras(D, o.get("operative"))
+    sign_block(D, GOVERNOR, signer(o, dk))
+    copies_block(D, COPIES_HEAD["endorsement"], o.get("copies"))
+
+
+def build_office_order(D, o, dk):
+    """कार्यालयीन आदेश: NPM परिशिष्ट-31 (p.97) + GADT 12.16 specimen (pp.38-39). Subject on top (like a memo), heading
+    block, "कार्यालयीन आदेश", "क्रमांक :- …, <operative[0]>", 2., 3., "आदेशानुसार," + signer, recipients below."""
+    subject_block(D, o, centre=True)
+    heading_block(D, o, dk)
+    D.p(BODY_HEAD["office_order"], bold=True, align=WA.CENTER, after=8, size=13)
+    ops = list(o.get("operative") or [])
+    if ops and isinstance(ops[0], str):
+        ops[0] = f"{NUMBER_LABEL['office_order']}{o['ref_no']}, {ops[0].strip()}"
+    numbered(D, ops)
+    sign_block(D, OFFICE_SIGNOFF, signer(o, dk))
+    for c in [c for c in (o.get("copies") or []) if isinstance(c, str) and c.strip()]:
+        D.p(c.strip(), after=4)
+
+
+def build_press_note(D, o):
+    """प्रसिद्धीपत्रक: NPM परिशिष्ट-32 (p.98), MMOP App. 10.11 (p.78). No department block, no signature, no copies."""
+    D.p(BODY_HEAD["press_note"], bold=True, align=WA.CENTER, after=4, size=13)
+    D.p(str(o.get("number") or "____").strip(), align=WA.CENTER, after=8)
+    D.p(str(o.get("saka_date") or "____").strip(), align=WA.LEFT, after=0)
+    D.p(o["date"].strip(), align=WA.LEFT, after=0)
+    D.p(str(o.get("time") or PRESS_TIME).strip(), align=WA.RIGHT, after=4)
+    if o.get("subject"):
+        D.p(o["subject"].strip(), bold=True, align=WA.CENTER, after=8)
+    plain_paras(D, o.get("operative"))
+
+
 def build_into(D, o, dk=None):
     dk = dk or order_desk(o)
     t = o["type"]
+    if t == "endorsement":
+        return build_endorsement(D, o, dk)
+    if t == "office_order":
+        return build_office_order(D, o, dk)
+    if t == "press_note":
+        return build_press_note(D, o)
     if t != "notification":
         subject_block(D, o, centre=(t == "memo"))
     heading_block(D, o, dk)
     if t == "notification":
         D.p(BODY_HEAD[t], bold=True, align=WA.CENTER, after=8, size=13)
     read_block(D, o.get("read"))
-    if t == "gr" and o.get("preamble"):
+    if t in ("gr", "addendum") and o.get("preamble"):   # addendum: all three live L&J addenda have प्रस्तावना
         D.p("प्रस्तावना :-", bold=True, underline=True, after=4)
         for x in o["preamble"]:
             D.p("\t" + x.strip())
@@ -259,6 +368,14 @@ def build_into(D, o, dk=None):
         ops = [x for x in o.get("operative") or []]
         if not any(isinstance(x, str) and KEEP in x for x in ops):
             ops = [CORR_CLOSING] + ops
+        k = numbered(D, ops, start_unnumbered=False, k=2)
+    elif t == "addendum":   # GADT 12.9: like the corrigendum, in the GR draft form; additions instead of corrections
+        for a in o.get("additions") or []:
+            D.p(f"\t{a['at'].strip()} {ADD_INSERT}")
+            D.p(f"\t“{a['text'].strip()}”")
+        ops = [x for x in o.get("operative") or []]
+        if not any(isinstance(x, str) and any(w in x for w in ADD_KEEP) for x in ops):
+            ops = [ADD_CLOSING] + ops
         k = numbered(D, ops, start_unnumbered=False, k=2)
     elif t == "notification":
         ops = list(o.get("operative") or [])

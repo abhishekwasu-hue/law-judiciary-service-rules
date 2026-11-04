@@ -7,16 +7,25 @@ when there is none, exit 1 otherwise. Warnings are printed "WARN <JSON path>: <m
 Functions: lint_order(spec) -> [problems], lint_order_warnings(spec) -> [warnings].
 
 Rules
-  - order.type one of gr / corrigendum / circular / memo / notification
-  - required: ref_no, date, copies (all); subject (all but notification); read + preamble + operative (gr);
-    read + corrections [{read, instead_of, read_as}] (corrigendum); operative (circular, memo, notification);
-    addressee (memo); english {ref_no, operative, copies} (notification)
+  - order.type one of gr / corrigendum / circular / memo / notification / endorsement / office_order / press_note /
+    addendum (the last four: docs/FORMS_RESEARCH_ORDERS.md)
+  - required: ref_no, date (all but press_note: date only); copies (all but endorsement — optional — and press_note —
+    not allowed, the NPM परिशिष्ट-32 specimen has no प्रत list); subject (all but notification / endorsement);
+    read + preamble + operative (gr); read + corrections [{read, instead_of, read_as}] (corrigendum); operative
+    (circular, memo, notification, office_order, press_note); addressee (memo); english {ref_no, operative, copies}
+    (notification); forwarded + forward_to + purpose ("…साठी", NPM परिशिष्ट-27) (endorsement); cites — each also
+    quoted in an operative para, NPM 102(11) (press_note); read + additions [{at, text}] (addendum, text without “…”)
+  - press_note date also "<month> DD, YYYY" (NPM परिशिष्ट-32 "एप्रिल २९, १९५८")
+  - website line: not for endorsement / office_order / press_note (no such line in their specimens)
+  - office_order: no salutation / subscription in operative (MMOP 10.1(8) "no salutation or subscription")
+  - endorsement "forwarded": the bare description — the tool adds "(" … " या खाली.)"
   - ref_no "संकिर्ण-<year>/<file no or ____>/प्र.क्र.<n or ____>/का.6" ("संकीर्ण-" also accepted: the file no. as the
     निर्देशपत्र writes it — audit A1, 02.11.2026); date "__.__.2026" / "DD.MM.YYYY" /
     "____ <month>, 2026" / "DD <month>, YYYY"
-  - website line (decision B5) not switched off for gr / corrigendum / circular
-  - the tool adds the Governor line ("महाराष्ट्राचे राज्यपाल यांच्या आदेशानुसार व नावाने,"), the website line and the
-    body headings: operative / preamble must not contain them
+  - website line (decision B5) not switched off for gr / corrigendum / circular / addendum
+  - the tool adds the Governor line ("महाराष्ट्राचे राज्यपाल यांच्या आदेशानुसार व नावाने,"), "आदेशानुसार,", the
+    website line and the body headings (incl. a line "कार्यालयीन आदेश" / "प्रसिद्धीपत्रक", "शासन पूरकपत्र :-", "… या खाली.)"):
+    operative / preamble must not contain them
   - copies: last item contains "निवड नस्ती"
   - desk (C30, 03.11.2026): spec "desk" / order "desk" -> tools/desks/<id>.json: the ref_no form (order.ref_pattern) and
     the copy-line hint come from the profile (absent = law-desk6, the form above); an unknown desk id is an error
@@ -32,7 +41,7 @@ Rules
   - C27 (02.11.2026): lint_spec.draft_word_hits on the own text and the english block — no "पॅकेज", no warning /
     working word, no AI / automation word (outside “…” quotes)
 WARN: lint_spec.warn_hits on the same own text; gr / memo without a concurrence para (specimen para 3: Finance
-concurrence or delegated powers)."""
+concurrence or delegated powers); a key the type's specimen has no place for (not printed — NOT_PRINTED)."""
 import os, re, sys, json
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -40,12 +49,24 @@ sys.path.insert(0, HERE)
 import lint_spec  # noqa: E402  (reused, not edited)
 import desk as _desk  # noqa: E402 — C30 (03.11.2026): desk profiles tools/desks/<id>.json
 
-TYPES = ("gr", "corrigendum", "circular", "memo", "notification")
+TYPES = ("gr", "corrigendum", "circular", "memo", "notification", "endorsement", "office_order", "press_note", "addendum")
 REF_RE = re.compile("^(?:" + _desk.load_desk(None)["order"]["ref_pattern"] + ")$")   # default desk (law-desk6)
 DATE_RE = re.compile(r"^(?:[0-9_]{2}\.[0-9_]{2}\.[0-9]{4}|(?:[0-9]{1,2}|_{2,})\s+[ऀ-ॿ]+,\s*[0-9]{4})$")
+PRESS_DATE_RE = re.compile(r"^[ऀ-ॿ]+\s+(?:[0-9]{1,2}|_{2,}),\s*[0-9]{4}$")   # NPM परिशिष्ट-32 "एप्रिल २९, १९५८"
 GOV = "राज्यपाल यांच्या आदेशानुसार"
 WEB = "www.maharashtra.gov.in"
-HEADS = ("प्रस्तावना :-", "शासन निर्णय :-", "शासन शुद्धिपत्रक :-", "परिपत्रक :-", "ज्ञापन :-")
+HEADS = ("प्रस्तावना :-", "शासन निर्णय :-", "शासन शुद्धिपत्रक :-", "परिपत्रक :-", "ज्ञापन :-", "शासन पूरकपत्र :-")
+# headings / lines of the new types that are also ordinary words: refused only as a whole line
+LINE_HEADS = ("कार्यालयीन आदेश", "प्रसिद्धीपत्रक", "आदेशानुसार", "अधिसूचना")
+BELOW = "या खाली.)"
+NO_SALUTE = re.compile(r"महोदय|महोदया|आपला\s+विश्वासू|आपली\s+विश्वासू|^\s*आपला\s*,|^\s*आपली\s*,")
+PURPOSE_RE = re.compile(r"साठी$")
+NO_WEBSITE = ("endorsement", "office_order", "press_note")
+# keys a type's specimen has no place for: build_order.py does not print them (WARN)
+NOT_PRINTED = {"endorsement": ("subject", "read", "preamble", "concurrence", "addressee"),
+               "office_order": ("read", "preamble", "concurrence", "addressee"),
+               "press_note": ("ref_no", "read", "preamble", "concurrence", "addressee", "signer"),
+               "addendum": ("addressee",)}
 SELECT = "निवड नस्ती"
 MEMO_RE = re.compile(r"कळविण्याचा\s+मला\s+आदेश\s+आहे|कळविण्यात\s+येते\s+की")
 ENABLE_RE = re.compile(r"कलम.*(?:अन्वये|द्वारे)\s+प्रदान\s+करण्यात\s+आलेल्या\s+अधिकारा(?:ंचा|चा)\s+वापर\s+करून", re.S)
@@ -79,6 +100,14 @@ def own_text(o):
             out.append((f"order.corrections[{i}].read", c["read"], True))
     out += [(f"order.copies[{i}]", c, False) for i, c in enumerate(o.get("copies") or []) if isinstance(c, str)]
     if _s(o.get("addressee")): out.append(("order.addressee", o["addressee"], False))
+    # new types (docs/FORMS_RESEARCH_ORDERS.md): endorsement description / recipients / purpose; addendum additions
+    if _s(o.get("forwarded")): out.append(("order.forwarded", o["forwarded"], True))
+    fts = [o["forward_to"]] if isinstance(o.get("forward_to"), str) else (o.get("forward_to") or [])
+    out += [(f"order.forward_to[{i}]", x, False) for i, x in enumerate(fts) if isinstance(x, str)]
+    if _s(o.get("purpose")): out.append(("order.purpose", o["purpose"], True))
+    for i, a in enumerate(o.get("additions") or []):
+        if isinstance(a, dict):
+            out += [(f"order.additions[{i}].{k}", a[k], True) for k in ("at", "text") if _s(a.get(k))]
     return out
 
 
@@ -134,12 +163,15 @@ def lint_one(o, desk=None):
             P.append(f"order.{key}: required for {t} — missing or empty")
         return ok
 
-    if need("ref_no") and not ref_re.match(o["ref_no"].strip()):
+    if t != "press_note" and need("ref_no") and not ref_re.match(o["ref_no"].strip()):   # press note: no file number
         P.append(f"order.ref_no: क्रमांक — '{o['ref_no']}' not '{dk['ref_hint']}'")
-    if need("date") and not DATE_RE.match(o["date"].strip()):
-        P.append(f"order.date: दिनांक — '{o['date']}' not '__.__.2026' / '____ <month>, 2026'")
-    if t != "notification": need("subject")
-    need("copies", "list")
+    if need("date") and not (DATE_RE.match(o["date"].strip()) or (t == "press_note" and PRESS_DATE_RE.match(o["date"].strip()))):
+        P.append(f"order.date: दिनांक — '{o['date']}' not '__.__.2026' / '____ <month>, 2026'"
+                 + (" / '<month> ____, 2026'" if t == "press_note" else ""))
+    if t not in ("notification", "endorsement"): need("subject")
+    if t not in ("endorsement", "press_note"): need("copies", "list")   # endorsement: optional (NPM परि.-27 has none)
+    if t == "press_note" and any(_s(c) for c in (o.get("copies") or [])):
+        P.append("order.copies: प्रसिद्धीपत्रक — the specimen (NPM परिशिष्ट-32) has no प्रत list; remove it")
     if t == "gr":
         need("read", "list"); need("preamble", "list"); need("operative", "list")
     elif t == "corrigendum":
@@ -154,10 +186,36 @@ def lint_one(o, desk=None):
                         P.append(f"order.corrections[{i}].{k}: required — missing or empty")
                     elif k != "read" and re.search(r"[“”]", c[k]):
                         P.append(f"order.corrections[{i}].{k}: quotes — the tool adds “…”; give the bare text")
+    elif t == "addendum":
+        need("read", "list")
+        ads = o.get("additions")
+        if not isinstance(ads, list) or not ads:
+            P.append("order.additions: required for addendum — missing or empty")
+        else:
+            for i, a in enumerate(ads):
+                for k in ("at", "text"):
+                    if not (isinstance(a, dict) and _s(a.get(k))):
+                        P.append(f"order.additions[{i}].{k}: required — missing or empty")
+                    elif k == "text" and re.search(r"[“”]", a[k]):
+                        P.append(f"order.additions[{i}].text: quotes — the tool adds “…”; give the bare text")
+    elif t == "endorsement":
+        if need("forwarded"):
+            fw = o["forwarded"].strip()
+            if fw.startswith("(") or fw.endswith(")") or re.search(r"या\s+खाली\s*\.?\s*\)?\s*$", fw):
+                P.append("order.forwarded: पृष्ठांकन — give the bare description; the tool adds '(' … ' या खाली.)' "
+                         "(NPM परिशिष्ट-27)")
+        ft = o.get("forward_to")
+        if not ((isinstance(ft, str) and _s(ft)) or (isinstance(ft, list) and any(_s(x) for x in ft))):
+            P.append("order.forward_to: required for endorsement — missing or empty")
+        if need("purpose") and not PURPOSE_RE.search(o["purpose"].strip()):
+            P.append("order.purpose: पृष्ठांकन — '…साठी' (NPM परिशिष्ट-27: 'माहितीसाठी/आवश्यक कार्यवाहीसाठी/अभिप्रायासाठी "
+                     "अथवा निकालात काढण्यासाठी')")
     else:
         need("operative", "list")
-    if t in ("gr", "corrigendum", "circular") and o.get("website_line") is False:
+    if t in ("gr", "corrigendum", "circular", "addendum") and o.get("website_line") is False:
         P.append(f"order.website_line: website line — required for {t} (decision B5)")
+    if t in NO_WEBSITE and o.get("website_line") is True:
+        P.append(f"order.website_line: website line — not in the {t} specimen (docs/FORMS_RESEARCH_ORDERS.md)")
     sg = o.get("signer")
     if sg is not None and not (isinstance(sg, dict) and all(_s(sg.get(k)) for k in ("name", "designation"))):
         P.append("order.signer: signer — {name, designation} strings")
@@ -171,6 +229,21 @@ def lint_one(o, desk=None):
             P.append(f"{path}: website line — added by the tool (website_line); remove it")
         if any(h in x for h in HEADS):
             P.append(f"{path}: heading — body headings are added by the tool")
+        elif t in ("endorsement", "office_order", "press_note", "addendum") and (
+                x.strip().rstrip(":-,. ").strip() in LINE_HEADS or BELOW in x):
+            P.append(f"{path}: heading — '{x.strip()[:40]}' is added by the tool")
+        if t == "office_order" and NO_SALUTE.search(x):
+            P.append(f"{path}: कार्यालयीन आदेश — no salutation / subscription (MMOP 10.1(8); NPM परिशिष्ट-31)")
+    if t == "press_note":
+        cites = [o["cites"]] if isinstance(o.get("cites"), str) else (o.get("cites") or [])
+        cites = [c for c in cites if _s(c)]
+        if not cites:
+            P.append("order.cites: required for press_note — the GR / notification announced (NPM 102(11))")
+        body = " ".join(x for _, x in _texts(o.get("operative"), "order.operative"))
+        for i, c in enumerate(cites):
+            if c.strip() not in body:
+                P.append(f"order.cites[{i}]: प्रसिद्धीपत्रक — the reference must be stated in the text (operative), "
+                         "NPM 102(11): 'अशी अधिसूचना निर्गमित केल्याचा संदर्भ न चुकता नमूद करावा'")
     ops = o.get("operative") or []
     first = ops[0] if ops and isinstance(ops[0], str) else ""
     if t == "memo":
@@ -219,6 +292,9 @@ def lint_order_warnings(spec):
 
 def warn_one(o):
     W = [f"{path}: {m}" for path, x, _ in own_text(o) for m in lint_spec.warn_hits(x)]
+    for k in NOT_PRINTED.get(o.get("type"), ()):
+        if o.get(k) not in (None, "", [], {}):
+            W.append(f"order.{k}: not printed — the {o['type']} specimen has no place for it (docs/FORMS_RESEARCH_ORDERS.md)")
     if o.get("type") in ("gr", "memo") and not _s(o.get("concurrence")):
         W.append("order.concurrence: no concurrence para — specimen para 3 (Finance concurrence or delegated powers; NPM परि.-23/25)")
     return W
