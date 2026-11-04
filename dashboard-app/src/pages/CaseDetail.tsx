@@ -38,6 +38,8 @@ export interface CaseCtx {
   reloadLetters: () => Promise<void>;
   reloadActivity: () => Promise<void>;
   canWrite: boolean;
+  /** the case's display title (C R, or C R from the file name, or प्रकरण #id) — same as the page header */
+  title: string;
 }
 
 export default function CaseDetail() {
@@ -206,12 +208,12 @@ export default function CaseDetail() {
     }
   }
 
-  const ctx: CaseCtx = { c, files, letters, activity, members, runs, editRuns, hasSpec, reloadFiles, reloadLetters, reloadActivity, canWrite };
   // Title: C R of the case; else the C R in an output file name, marked as such — but not when the engine reported
   // that C R as a duplicate of another case (two cases would show the same heading, A3 audit)
   const hasDupNotice = activity.some(a => a.action === 'case_cr_duplicate');
   const fileCr = !c.cr_no && !hasDupNotice ? crFromFileName(files.find(f => /^CR\d+_\d{4}_/.test(f.original_name))?.original_name) : null;
   const title = c.cr_no ? crLabel(c) : fileCr || `प्रकरण #${c.id}`;
+  const ctx: CaseCtx = { c, files, letters, activity, members, runs, editRuns, hasSpec, reloadFiles, reloadLetters, reloadActivity, canWrite, title };
   return (
     <div className="space-y-4">
       <div className="no-print">
@@ -247,6 +249,11 @@ export default function CaseDetail() {
               <select className="input w-auto" value={c.stage} onChange={e => void changeStage(e.target.value)} aria-label="टप्पा बदला">
                 {STAGES.map(s => <option key={s}>{s}</option>)}
               </select>
+              {hasSpec && (
+                <Link to="?tab=note&edit=1" className="edit-cta inline-flex min-h-tap items-center gap-1.5 rounded-lg px-3 font-bold">
+                  ✏️ सुधारणा <span className="blink-dot" aria-hidden="true" />
+                </Link>
+              )}
               <button className="btn-ghost" onClick={() => setEditOpen(true)}>✎ तपशील</button>
             </div>
           )}

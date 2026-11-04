@@ -14,7 +14,6 @@ import type { CaseFile, EditChange, Run } from '../lib/types';
 import type { CaseCtx } from '../pages/CaseDetail';
 import { Chip, Modal, Spinner } from './ui';
 import CasePicker from './CasePicker';
-import { crLabel } from '../lib/format';
 import { useToast } from './Toast';
 import DocxView from './DocxView';
 
@@ -156,6 +155,9 @@ export default function EditChat({ ctx }: { ctx: CaseCtx }) {
   const [view, setView] = useState<CaseFile | null>(null);
   // Abhi 04.11.2026: the case is chosen by the user and confirmed before every message (no tokens spent on a wrong case)
   const [pick, setPick] = useState(false);
+  // glow + "नवीन" until the user first uses the chat (this browser only)
+  const [seen, setSeen] = useState(() => { try { return localStorage.getItem('edit_chat_seen') === '1'; } catch { return false; } });
+  const markSeen = () => { if (seen) return; setSeen(true); try { localStorage.setItem('edit_chat_seen', '1'); } catch { /* storage blocked */ } };
   const [confirm, setConfirm] = useState(false);
   const [sp] = useSearchParams();
   const boxRef = useRef<HTMLElement>(null);
@@ -251,14 +253,17 @@ export default function EditChat({ ctx }: { ctx: CaseCtx }) {
 
   const canSend = !!tgt && !!text.trim() && !busy && !active;
   return (
-    <section ref={boxRef} className={`card relative min-w-0 scroll-mt-20 ${drag ? 'ring-4 ring-saffron-500' : ''}`} aria-label="सुधारणा" {...dragProps}>
-      <div className="flex items-center justify-between gap-2 border-b border-slate-200 px-4 py-3 dark:border-navy-800">
-        <h2 className="text-base font-bold">✏️ सुधारणा</h2>
-        {turns.length > 0 && <span className="text-sm text-slate-500 dark:text-slate-400">{turns.length} संदेश</span>}
+    <section ref={boxRef} className={`card edit-panel relative min-w-0 scroll-mt-20 overflow-hidden ${seen ? 'seen' : ''} ${drag ? 'ring-4 ring-saffron-500' : ''}`} aria-label="सुधारणा" {...dragProps}>
+      <div className="edit-head flex items-center justify-between gap-2 px-4 py-3">
+        <div className="min-w-0">
+          <h2 className="flex items-center gap-2 text-lg font-bold">✏️ सुधारणा-चॅट {!seen && <span className="blink-badge rounded-full bg-white px-2 py-0.5 text-xs font-bold text-orange-600">नवीन</span>}</h2>
+          <p className="text-sm text-white/90">मसुद्यात बदल हवा असल्यास कृपया येथे नमूद करावे</p>
+        </div>
+        {turns.length > 0 && <span className="shrink-0 rounded-full bg-white/20 px-2 py-0.5 text-sm font-semibold">{turns.length} संदेश</span>}
       </div>
       <div className="flex min-w-0 items-center justify-between gap-2 border-b border-slate-200 bg-navy-50 px-4 py-2 text-sm dark:border-navy-800 dark:bg-navy-800/60">
         <div className="min-w-0">
-          <span className="font-semibold">प्रकरण:</span> <b>{crLabel(ctx.c)}</b>
+          <span className="font-semibold">प्रकरण:</span> <b>{ctx.title}</b>
           {ctx.c.subject && <div className="truncate text-slate-600 dark:text-slate-300" title={ctx.c.subject}>{ctx.c.subject}</div>}
         </div>
         <button type="button" className="btn-ghost shrink-0 px-2 text-sm" onClick={() => setPick(true)}>कृपया प्रकरण बदलावे</button>
@@ -312,6 +317,7 @@ export default function EditChat({ ctx }: { ctx: CaseCtx }) {
                 maxLength={EDIT_MAX_CHARS}
                 disabled={busy}
                 onChange={e => setText(e.target.value)}
+                onFocus={markSeen}
                 onKeyDown={onKey}
                 aria-label="सुधारणेचा संदेश"
               />
@@ -324,7 +330,7 @@ export default function EditChat({ ctx }: { ctx: CaseCtx }) {
             </div>
             {confirm && (
               <div className="space-y-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-100" role="alertdialog" aria-label="पुष्टी">
-                <div>हा बदल <b>{crLabel(ctx.c)}</b>{ctx.c.subject ? <> ({ctx.c.subject.length > 60 ? `${ctx.c.subject.slice(0, 60)}…` : ctx.c.subject})</> : null} च्या <b>{editTargetLabel(tgt)}</b> मध्ये करावयाचा आहे{atts.length ? ` • ${atts.length} फाइल जोडणार` : ''} — कृपया खात्री करावी.</div>
+                <div>हा बदल <b>{ctx.title}</b>{ctx.c.subject ? <> ({ctx.c.subject.length > 60 ? `${ctx.c.subject.slice(0, 60)}…` : ctx.c.subject})</> : null} च्या <b>{editTargetLabel(tgt)}</b> मध्ये करावयाचा आहे{atts.length ? ` • ${atts.length} फाइल जोडणार` : ''} — कृपया खात्री करावी.</div>
                 <div className="flex flex-wrap gap-2">
                   <button type="button" className="btn-primary" onClick={() => void send()}>✓ होय, कृपया पाठवावे</button>
                   <button type="button" className="btn-ghost" onClick={() => setConfirm(false)}>✕ नाही, थांबावे</button>
