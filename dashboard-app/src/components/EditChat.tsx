@@ -2,7 +2,7 @@
 // (POST /api/edit); only the asked change is made to the chosen draft and a new file version is stored. Files can be
 // attached (📎 / drag-drop): uploaded first with /api/upload (kind gr / extra_doc), their ids go with the edit.
 import { useEffect, useMemo, useRef, useState, type DragEvent, type FormEvent, type KeyboardEvent, type ReactNode } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { ApiError, api, downloadFile, humanError, uploadFile } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import {
@@ -13,6 +13,8 @@ import { cleanReason, fmtBytes, fmtDateTime, textOf } from '../lib/format';
 import type { CaseFile, EditChange, Run } from '../lib/types';
 import type { CaseCtx } from '../pages/CaseDetail';
 import { Chip, Modal, Spinner } from './ui';
+import CasePicker from './CasePicker';
+import { crLabel } from '../lib/format';
 import { useToast } from './Toast';
 import DocxView from './DocxView';
 
@@ -152,6 +154,14 @@ export default function EditChat({ ctx }: { ctx: CaseCtx }) {
   const [sent, setSent] = useState<Run[]>([]); // rows returned by POST /api/edit, until Realtime brings them
   const [names, setNames] = useState<Map<number, string[]>>(new Map()); // run id → attached file names (this session)
   const [view, setView] = useState<CaseFile | null>(null);
+  // Abhi 04.11.2026: the case is chosen by the user and confirmed before every message (no tokens spent on a wrong case)
+  const [pick, setPick] = useState(false);
+  const [confirm, setConfirm] = useState(false);
+  const [sp] = useSearchParams();
+  const boxRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (sp.get('edit') === '1') boxRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [sp]);
   const fileRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const fine = useMemo(() => typeof window !== 'undefined' && !!window.matchMedia?.('(pointer: fine)').matches, []);
@@ -188,8 +198,13 @@ export default function EditChat({ ctx }: { ctx: CaseCtx }) {
     if (add.length && targets.some(t => t.id === 'package') && !target) setTarget('package');
   }
 
-  async function send(e?: FormEvent) {
+  function ask(e?: FormEvent) {
     e?.preventDefault();
+    if (!tgt || !text.trim() || busy || active) return;
+    setConfirm(true);
+  }
+  async function send() {
+    setConfirm(false);
     const message = text.trim();
     if (!tgt || !message || busy || active) return;
     if (message.length > EDIT_MAX_CHARS) return toast(`संदेश ${EDIT_MAX_CHARS} अक्षरांपेक्षा लहान लिहा`, 'err');
@@ -225,7 +240,7 @@ export default function EditChat({ ctx }: { ctx: CaseCtx }) {
     // desktop: Enter sends, Shift+Enter new line; phone: Enter = new line (send button)
     if (fine && e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
-      void send();
+      ask();
     }
   }
   const dragProps = ctx.canWrite && ctx.hasSpec ? {
@@ -236,11 +251,19 @@ export default function EditChat({ ctx }: { ctx: CaseCtx }) {
 
   const canSend = !!tgt && !!text.trim() && !busy && !active;
   return (
-    <section className={`card relative min-w-0 ${drag ? 'ring-4 ring-saffron-500' : ''}`} aria-label="सुधारणा" {...dragProps}>
+    <section ref={boxRef} className={`card relative min-w-0 scroll-mt-20 ${drag ? 'ring-4 ring-saffron-500' : ''}`} aria-label="सुधारणा" {...dragProps}>
       <div className="flex items-center justify-between gap-2 border-b border-slate-200 px-4 py-3 dark:border-navy-800">
         <h2 className="text-base font-bold">✏️ सुधारणा</h2>
         {turns.length > 0 && <span className="text-sm text-slate-500 dark:text-slate-400">{turns.length} संदेश</span>}
       </div>
+      <div className="flex min-w-0 items-center justify-between gap-2 border-b border-slate-200 bg-navy-50 px-4 py-2 text-sm dark:border-navy-800 dark:bg-navy-800/60">
+        <div className="min-w-0">
+          <span className="font-semibold">प्रकरण:</span> <b>{crLabel(ctx.c)}</b>
+          {ctx.c.subject && <div className="truncate text-slate-600 dark:text-slate-300" title={ctx.c.subject}>{ctx.c.subject}</div>}
+        </div>
+        <button type="button" className="btn-ghost shrink-0 px-2 text-sm" onClick={() => setPick(true)}>प्रकरण बदला</button>
+      </div>
+      <CasePicker open={pick} onClose={() => setPick(false)} />
       {drag && (
         <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-amber-50/90 text-lg font-bold text-navy-800 dark:bg-navy-900/90 dark:text-white">📎 फाइल येथे सोडा</div>
       )}
@@ -255,7 +278,7 @@ export default function EditChat({ ctx }: { ctx: CaseCtx }) {
         {!ctx.hasSpec ? (
           <p className="rounded-lg bg-slate-100 px-3 py-2 text-sm text-slate-700 dark:bg-navy-800 dark:text-slate-200">हे प्रकरण जुने आहे — बदलासाठी 'पुन्हा तयार करा' वापरा</p>
         ) : !ctx.canWrite ? null : (
-          <form onSubmit={send} className="space-y-2">
+          <form onSubmit={ask} className="space-y-2">
             <label className="flex min-w-0 items-center gap-2 text-sm">
               <span className="shrink-0 font-semibold">कशात</span>
               <select className="input min-w-0 py-1" value={tgt} disabled={busy} onChange={e => setTarget(e.target.value as EditTarget)} aria-label="सुधारणा कशात">
@@ -299,6 +322,16 @@ export default function EditChat({ ctx }: { ctx: CaseCtx }) {
                 <button className="btn-primary ml-auto" disabled={!canSend}>{busy && <Spinner />} {busy && atts.some(a => !a.id) ? 'अपलोड…' : 'पाठवा'}</button>
               </div>
             </div>
+            {confirm && (
+              <div className="space-y-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-100" role="alertdialog" aria-label="पुष्टी">
+                <div>हा बदल <b>{crLabel(ctx.c)}</b>{ctx.c.subject ? <> ({ctx.c.subject.length > 60 ? `${ctx.c.subject.slice(0, 60)}…` : ctx.c.subject})</> : null} च्या <b>{editTargetLabel(tgt)}</b> मध्ये करायचा{atts.length ? ` • ${atts.length} फाइल जोडणार` : ''} — बरोबर?</div>
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" className="btn-primary" onClick={() => void send()}>✓ होय, पाठवा</button>
+                  <button type="button" className="btn-ghost" onClick={() => setConfirm(false)}>✕ नाही</button>
+                  <button type="button" className="btn-ghost" onClick={() => { setConfirm(false); setPick(true); }}>प्रकरण बदला</button>
+                </div>
+              </div>
+            )}
             <p className="text-xs text-slate-500 dark:text-slate-400">एका संदेशात अनेक सुधारणा लिहू शकता • फक्त सांगितलेलाच बदल होईल{active ? ' • प्रक्रिया चालू — संपल्यावर पाठवा' : ''}</p>
           </form>
         )}

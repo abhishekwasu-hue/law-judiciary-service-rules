@@ -80,7 +80,9 @@ class H(BaseHTTPRequestHandler):
 
 
 def run(*args, **extra):
-    env = dict(os.environ, SUPABASE_URL=BASE, SUPABASE_SERVICE_KEY=KEY, CASE_ID="7", RUN_ID="11", PYTHONIOENCODING="utf-8", **extra)
+    # ENGINE_WORK_DIR: no spec.json / enclosures.json unless a test gives a work dir (draft edit, migration 0013)
+    env = dict(os.environ, SUPABASE_URL=BASE, SUPABASE_SERVICE_KEY=KEY, CASE_ID="7", RUN_ID="11", PYTHONIOENCODING="utf-8",
+               **{"ENGINE_WORK_DIR": os.path.join(tempfile.gettempdir(), "no-such-engine-work"), **extra})
     return subprocess.run([sys.executable, TOOL, *args], env=env, capture_output=True, text=True, encoding="utf-8")
 
 
@@ -1071,6 +1073,46 @@ run_row.update(state="running", warnings=[])
 r = run("finish", out)
 check(r.returncode == 0 and not any("श्रेणीचे स्वतंत्र नियम" in w for w in run_row["warnings"]), "C33 finish: ready type -> no pending warning")
 DB["cases"][0].pop("work_type", None)
+
+# --- draft edit (docs/DRAFT_EDIT_DESIGN.md point 1 + Addendum A): spec.json + enclosures.json kept as kind spec
+ow = os.path.join(tmp, "work_spec"); os.makedirs(ow)
+json.dump({"note": {"paras": ["सादर."]}}, open(os.path.join(ow, "spec.json"), "w", encoding="utf-8"), ensure_ascii=False)
+json.dump([{"file": "pdf/gr/x.pdf", "pages": "1"}], open(os.path.join(ow, "enclosures.json"), "w", encoding="utf-8"))
+json.dump({"state": "done", "summary": "s", "warnings": []}, open(os.path.join(out, "status.json"), "w", encoding="utf-8"), ensure_ascii=False)
+real_study(os.path.join(out, "CR130_2026_Study.docx"))
+run_row.update(state="running", warnings=[]); LOG.clear()
+r = run("finish", out, ENGINE_WORK_DIR=ow)
+srows = sorted((f for f in DB["case_files"] if f["kind"] == "spec"), key=lambda f: f["original_name"])
+check(r.returncode == 0 and run_row["state"] == "done" and not run_row["warnings"]
+      and [(f["original_name"], f["version"], f["storage_path"]) for f in srows]
+      == [("enclosures.json", 1, "outputs/7/spec/v1/enclosures.json"), ("spec.json", 1, "outputs/7/spec/v1/spec.json")]
+      and json.loads(STORE["outputs/7/spec/v1/spec.json"]) == {"note": {"paras": ["सादर."]}},
+      f"draft edit finish: spec.json + enclosures.json -> kind spec, one version, rows ({srows} {run_row['warnings']} {r.stderr[:200]})")
+sh = next(l["h"] for l in LOG if l["m"] == "POST" and l["path"] == "/storage/v1/object/outputs/7/spec/v1/spec.json")
+check(sh.get("Content-Type") == "application/json", "draft edit finish: spec content-type json")
+# next run: version 2; enclosures.json absent -> only spec.json, stderr line, no warning
+os.remove(os.path.join(ow, "enclosures.json"))
+real_study(os.path.join(out, "CR130_2026_Study.docx"))
+run_row.update(state="running", warnings=[])
+r = run("finish", out, ENGINE_WORK_DIR=ow)
+v2 = [f["original_name"] for f in DB["case_files"] if f["kind"] == "spec" and f["version"] == 2]
+check(r.returncode == 0 and v2 == ["spec.json"] and not run_row["warnings"] and "enclosures.json not found" in r.stderr,
+      f"draft edit finish: absent enclosures.json skipped with a log line ({v2} {run_row['warnings']})")
+# no work files at all (default work dir) -> nothing, no warning, done (all finish tests above)
+n_spec = sum(f["kind"] == "spec" for f in DB["case_files"])
+real_study(os.path.join(out, "CR130_2026_Study.docx"))
+run_row.update(state="running", warnings=[])
+r = run("finish", out)
+check(r.returncode == 0 and run_row["state"] == "done" and sum(f["kind"] == "spec" for f in DB["case_files"]) == n_spec
+      and not run_row["warnings"] and "spec.json" in r.stderr, "draft edit finish: spec.json absent -> skipped, run done")
+# migration 0013 not applied: enum refuses kind spec -> warning naming 0013, run still done, no orphan object
+REJECT_KINDS.add("spec"); run_row.update(state="running", warnings=[])
+real_study(os.path.join(out, "CR130_2026_Study.docx"))
+r = run("finish", out, ENGINE_WORK_DIR=ow)
+check(r.returncode == 0 and run_row["state"] == "done" and any("0013" in w and "सुधारणा-फाइल" in w for w in run_row["warnings"])
+      and "outputs/7/spec/v3/spec.json" not in STORE and sum(f["kind"] == "spec" for f in DB["case_files"]) == n_spec,
+      f"draft edit finish, enum missing: warning names migration 0013, run done, orphan removed ({run_row['warnings']})")
+REJECT_KINDS.clear()
 
 srv.shutdown()
 print("ALL TESTS PASSED")

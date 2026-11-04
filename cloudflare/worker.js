@@ -13,9 +13,11 @@ const PLAIN_KEYS = ['supabase_url', 'supabase_anon_key', 'github_repo', 'github_
   'part1_provider', 'gemini_model', 'part1_model', 'fallback_provider', 'fallback_model', 'fallback_model_light',
   'engine_provider', 'engine_model', 'engine_model_light', 'cloudflare_account_id', 'ollama_base_url',
   // engine tiers read by tools/engine_supabase.py engine_config (QUALITY_AUDIT §7): escalation model, reasoning effort
-  'model_strong', 'effort'];
+  'model_strong', 'effort',
+  // draft edit (docs/DRAFT_EDIT_DESIGN.md): model of tools/edit_drafts.py (one Messages API call); empty = DEFAULT_MODEL_EDIT
+  'model_edit'];
 const PROVIDERS = { part1_provider: ['', 'claude', ...AI_PROVIDERS], fallback_provider: ['', ...AI_PROVIDERS], engine_provider: ['', 'claude', ...AI_PROVIDERS] };
-const MODEL_KEYS = ['gemini_model', 'part1_model', 'fallback_model', 'fallback_model_light', 'engine_model', 'engine_model_light'];
+const MODEL_KEYS = ['gemini_model', 'part1_model', 'fallback_model', 'fallback_model_light', 'engine_model', 'engine_model_light', 'model_edit'];
 // providers this configuration uses (engine / fallback / part 1); 'claude' and '' are Anthropic
 const usedProviders = cfg => [...new Set([cfg.engine_provider, cfg.fallback_provider, cfg.part1_provider].filter(p => AI_PROVIDERS.includes(p)))];
 const providerReady = (cfg, p) => !!cfg[PROVIDER_KEY[p]] || (p === 'ollama' && !!cfg.ollama_base_url);
@@ -28,14 +30,30 @@ const LETTER_STATUS = ['मसुदा', 'पाठवले', 'उत्तर
 const DEFAULT_RUN_USD = 0.75;                   // estimate for a running run when nothing better is known
 const isId = v => /^\d+$/.test(String(v ?? ''));
 const ALL_KEYS = [...SECRET_KEYS, ...PLAIN_KEYS];
-// upload kinds (C28, migration 0008: approval = वित्त/सा.प्र.वि. मान्यता, court_notice = न्यायालयीन नोटीस)
-const FILE_KINDS = ['proposal', 'extra_doc', 'reply', 'approval', 'court_notice'];
+// upload kinds (C28, migration 0008: approval = वित्त/सा.प्र.वि. मान्यता, court_notice = न्यायालयीन नोटीस;
+// gr = a GR / rule PDF attached in the draft-edit chat, docs/DRAFT_EDIT_DESIGN.md Addendum A — enum value since 0001)
+const FILE_KINDS = ['proposal', 'extra_doc', 'reply', 'approval', 'court_notice', 'gr'];
 // drafts the user can tick for a run (C28 "कोणते मसुदे हवेत?"), in this fixed order; stored in runs.outputs
 const DRAFT_KEYS = ['letter', 'reminder', 'gr', 'corrigendum', 'circular', 'memo', 'notification', 'parawise',
   'do_letter', 'uo_note', 'endorsement', 'office_order', 'press_note', 'addendum', 'affidavit', 'lq'];   // 04.11.2026: last 8
 const KIND_NOT_READY = 'हा फाइल-प्रकार अजून सुरू नाही (मालकाने migration 0008 लागू करावे) — "इतर" निवडा';
 const BAD_OUTPUTS = 'मसुद्यांची निवड चुकीची — पान पुन्हा उघडा';
 const MAX_UPLOAD = 50 * 1024 * 1024;
+// ---------- draft edit (सुधारणा-चॅट; docs/DRAFT_EDIT_DESIGN.md points 3 + Addendum A, migration 0013) ----------
+// POST /api/edit targets: नोंद, पत्र, आदेश-प्रारूप, परिच्छेदनिहाय उत्तर, शपथपत्र, विधानमंडळ उत्तर, GR सह प्रस्ताव PDF
+export const EDIT_TARGETS = ['note', 'letter', 'order', 'parawise', 'affidavit', 'lq', 'package'];
+const EDIT_MSG_MAX = 2000;
+const EDIT_ATTACH_MAX = 5;
+const EDIT_ATTACH_KINDS = ['gr', 'extra_doc', 'reply', 'approval', 'court_notice'];   // case_files kinds that may be attached
+const DEFAULT_MODEL_EDIT = 'claude-sonnet-5-5';
+const EDIT_STALE_MS = 30 * 60 * 1000;           // edit job timeout 20 min (edit-drafts.yml) + dispatch time
+const EDIT_STALE_REASON = 'वेळ संपली — सुधारणा पुन्हा पाठवा';
+const NO_SPEC = "या प्रकरणाची सुधारणा-फाइल नाही (जुने प्रकरण) — 'पुन्हा तयार करा' वापरा";
+const EDIT_MIGRATION = 'Supabase मध्ये migration 0013 लागू करा';
+const BAD_EDIT_TARGET = 'सुधारणा कोठे करायची ते चुकीचे — यादीतील पर्याय निवडा';
+const EDIT_MSG_EMPTY = 'सुधारणा-संदेश लिहा';
+const EDIT_MSG_LONG = `सुधारणा-संदेश जास्तीत जास्त ${EDIT_MSG_MAX} अक्षरे`;
+const BAD_ATTACH = `जोडलेल्या फाइल चुकीच्या — या प्रकरणाच्या जास्तीत जास्त ${EDIT_ATTACH_MAX} फाइल (GR / इतर कागदपत्र / उत्तर / मान्यता / नोटीस) जोडा`;
 const SIGN_BUCKETS = ['proposals', 'outputs', 'gr-library'];
 // Run token (D4): created at dispatch, sent to GitHub in the payload. Single use for /api/engine/config (the secrets);
 // after that it is only good for /api/engine/fail and /api/engine/step (THIS run only, return nothing secret) until it expires.
@@ -177,7 +195,8 @@ async function dispatchRun(env, cfg, run, origin) {
   const r = await fetch(`https://api.github.com/repos/${cfg.github_repo}/dispatches`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${cfg.github_token}`, Accept: 'application/vnd.github+json', 'User-Agent': 'prastav-kaksha' },
-    body: JSON.stringify({ event_type: 'process_proposal', client_payload: { case_id: run.case_id, run_id: run.id, token, worker: origin } }),
+    // draft edit (migration 0013): an edit run starts tools/edit_drafts.py (edit-drafts.yml), same payload/token scheme
+    body: JSON.stringify({ event_type: run.kind === 'edit' ? 'edit_drafts' : 'process_proposal', client_payload: { case_id: run.case_id, run_id: run.id, token, worker: origin } }),
   });
   if (!r.ok) throw new Error(`dispatch ${r.status}: ${(await r.text()).slice(0, 200)}`);
 }
@@ -202,7 +221,7 @@ async function failRuns(cfg, filter, reason, actor = null) {
   });
   if (rows && rows.length)
     await db.rest('activity', { method: 'POST', headers: { Prefer: 'return=minimal' },
-      body: JSON.stringify(rows.map(r => ({ case_id: r.case_id, actor, action: 'run_failed', detail: { run_id: r.id, reason } }))) });
+      body: JSON.stringify(rows.map(r => ({ case_id: r.case_id, actor, action: r.kind === 'edit' ? 'edit_failed' : 'run_failed', detail: { run_id: r.id, reason } }))) });   // edit runs: migration 0013
   return rows || [];
 }
 
@@ -213,26 +232,47 @@ async function failRuns(cfg, filter, reason, actor = null) {
 // created less than STALE_MS ago). Column missing (migration not applied) → null: every run is dispatched at once.
 const ENGINE_END_REASON = 'इंजिन अयशस्वी — पुन्हा तयार करा';
 const pgTime = ms => `"${new Date(ms).toISOString()}"`;
+// draft edit (migration 0013): edit runs (runs.kind 'edit') are dispatched at once and never take part in the queue —
+// neither as its active run nor as a waiting one. Column runs.kind missing (0013 not applied) → no edit runs exist:
+// the same query without the filter.
+const namesColumn = (e, col) => e instanceof DbError && (e.code === '42703' || e.code === 'PGRST204') && new RegExp(`\\b${col}\\b`).test(e.detail);
+async function withoutEditRuns(db, path) {
+  try {
+    return await db.rest(`${path}&kind=neq.edit`);
+  } catch (e) {
+    if (!namesColumn(e, 'kind')) throw e;
+    return db.rest(path);
+  }
+}
 async function activeRuns(db) {
   const since = pgTime(Date.now() - STALE_MS);
   try {
-    return (await db.rest(`runs?state=in.(queued,running)&or=${encodeURIComponent(`(dispatched_at.gt.${since},and(dispatched_at.is.null,state.eq.running,created_at.gt.${since}))`)}&select=id,case_id,state,dispatched_at&order=id.asc`)) || [];
+    return (await withoutEditRuns(db, `runs?state=in.(queued,running)&or=${encodeURIComponent(`(dispatched_at.gt.${since},and(dispatched_at.is.null,state.eq.running,created_at.gt.${since}))`)}&select=id,case_id,state,dispatched_at&order=id.asc`)) || [];
   } catch (e) {
     if (missingColumn(e, 'dispatched_at')) { console.log('runs.dispatched_at column missing (apply migration 0011); runs dispatched at once'); return null; }
     throw e;
   }
 }
 const BUDGET_WAIT = 'मासिक खर्च-मर्यादा गाठली — Settings मध्ये मर्यादा वाढवल्यावर आपोआप सुरू होईल';
-const waitingRuns = db => db.rest('runs?state=eq.queued&dispatched_at=is.null&select=id,case_id,created_at,step&order=created_at.asc,id.asc&limit=200').then(r => r || []);
-// stuck runs (queued/running too long since dispatch) → failed; runs waiting in the queue are never swept here
+const waitingRuns = db => withoutEditRuns(db, 'runs?state=eq.queued&dispatched_at=is.null&select=id,case_id,created_at,step&order=created_at.asc,id.asc&limit=200').then(r => r || []);
+// stuck runs (queued/running too long since dispatch) → failed; runs waiting in the queue are never swept here.
+// Edit runs: a shorter limit (EDIT_STALE_MS since creation = dispatch); the 3.5 h sweep covers them too.
 async function sweepStale(cfg, actor) {
   const before = Date.now() - STALE_MS;
+  let rows;
   try {
-    return await failRuns(cfg, `or=${encodeURIComponent(`(dispatched_at.lt.${pgTime(before)},and(dispatched_at.is.null,state.eq.running,created_at.lt.${pgTime(before)}))`)}`, STALE_REASON, actor);
+    rows = await failRuns(cfg, `or=${encodeURIComponent(`(dispatched_at.lt.${pgTime(before)},and(dispatched_at.is.null,state.eq.running,created_at.lt.${pgTime(before)}))`)}`, STALE_REASON, actor);
   } catch (e) {
     if (!missingColumn(e, 'dispatched_at')) throw e;
-    return failRuns(cfg, `created_at=lt.${encodeURIComponent(new Date(before).toISOString())}`, STALE_REASON, actor);
+    rows = await failRuns(cfg, `created_at=lt.${encodeURIComponent(new Date(before).toISOString())}`, STALE_REASON, actor);
   }
+  let edits = [];
+  try {
+    edits = await failRuns(cfg, `kind=eq.edit&created_at=lt.${encodeURIComponent(new Date(Date.now() - EDIT_STALE_MS).toISOString())}`, EDIT_STALE_REASON, actor);
+  } catch (e) {
+    if (!namesColumn(e, 'kind')) throw e;   // migration 0013 not applied: no edit runs
+  }
+  return rows.concat(edits);
 }
 // Dispatch the oldest waiting run when no run is active. Race-safe: (1) claim with a conditional PATCH (only one
 // request gets the row back); (2) after the claim, if any OTHER run is active the claim is given back (two claimers
@@ -303,6 +343,22 @@ async function takeConfig(cfg, runId) {
   } catch (e) {
     if (e instanceof DbError && (e.code === '42703' || e.code === 'PGRST204' || (/config_taken_at/.test(e.detail) && /does not exist|could not find/i.test(e.detail)))) return null;
     throw e;
+  }
+}
+
+// One run per case (H3): the case's queued/running run (full or edit), not stuck. legacy = runs.dispatched_at missing.
+function caseActivePath(caseId, legacy) {
+  const sinceIso = new Date(Date.now() - STALE_MS).toISOString();
+  return legacy
+    ? `runs?case_id=eq.${Number(caseId)}&state=in.(queued,running)&created_at=gt.${encodeURIComponent(sinceIso)}&select=id&order=created_at.desc&limit=1`
+    : `runs?case_id=eq.${Number(caseId)}&state=in.(queued,running)&or=${encodeURIComponent(`(dispatched_at.is.null,dispatched_at.gt."${sinceIso}",created_at.gt."${sinceIso}")`)}&select=id&order=created_at.desc&limit=1`;
+}
+async function caseActiveRun(db, caseId) {
+  try {
+    return (await db.rest(caseActivePath(caseId, false))) || [];
+  } catch (e) {
+    if (!missingColumn(e, 'dispatched_at')) throw e;
+    return (await db.rest(caseActivePath(caseId, true))) || [];
   }
 }
 
@@ -519,7 +575,7 @@ async function route(req, env, url) {
     if ((await takeConfig(cfg, tok.run_id)) === false) return bad('bad token', 403);
     const exp = tok.exp || Math.floor(Date.now() / 1000) + RUN_TOKEN_TTL;
     await env.SETTINGS.put(tok.key, JSON.stringify({ run_id: tok.run_id, used: true, exp }), { expiration: exp });
-    const out = { anthropic_api_key: cfg.anthropic_api_key, model: cfg.model, model_light: cfg.model_light || '', model_review: cfg.model_review || '', budget_usd: cfg.budget_usd || '', model_strong: cfg.model_strong || '', effort: cfg.effort || '', supabase_url: cfg.supabase_url, supabase_service_key: cfg.supabase_service_key };
+    const out = { anthropic_api_key: cfg.anthropic_api_key, model: cfg.model, model_light: cfg.model_light || '', model_review: cfg.model_review || '', budget_usd: cfg.budget_usd || '', model_strong: cfg.model_strong || '', effort: cfg.effort || '', model_edit: cfg.model_edit || DEFAULT_MODEL_EDIT, supabase_url: cfg.supabase_url, supabase_service_key: cfg.supabase_service_key };
     // other providers: a key is sent only when its provider is chosen (A: part 1 on Gemini; C: fallback provider)
     // a provider key leaves the Worker only when that provider is chosen (engine / fallback / part 1)
     for (const pv of usedProviders(cfg)) if (cfg[PROVIDER_KEY[pv]]) out[PROVIDER_KEY[pv]] = cfg[PROVIDER_KEY[pv]];
@@ -822,12 +878,9 @@ async function route(req, env, url) {
     // one run at a time per case (H3, QUALITY_AUDIT §7): a double tap / second tab / second user would start a second,
     // paid run. Runs older than STALE_MS (since dispatch) are stuck (swept), so they do not block; a run waiting in
     // the queue (C33) always blocks.
+    // (full or edit: an active edit run of the case blocks a full run too — draft edit, migration 0013)
     const act = await activeRuns(db);   // null = migration 0011 not applied → immediate dispatch as before
-    const sinceIso = new Date(Date.now() - STALE_MS).toISOString();
-    const caseActive = act === null
-      ? `runs?case_id=eq.${case_id}&state=in.(queued,running)&created_at=gt.${encodeURIComponent(sinceIso)}&select=id&order=created_at.desc&limit=1`
-      : `runs?case_id=eq.${case_id}&state=in.(queued,running)&or=${encodeURIComponent(`(dispatched_at.is.null,dispatched_at.gt."${sinceIso}",created_at.gt."${sinceIso}")`)}&select=id&order=created_at.desc&limit=1`;
-    const active = await db.rest(caseActive);
+    const active = await db.rest(caseActivePath(case_id, act === null));
     if (active && active.length) return json({ error: 'run_active', run_id: active[0].id }, 409);
     const runRow = { case_id, instructions: instructions || null, created_by: user.id };
     let run;
@@ -872,6 +925,76 @@ async function route(req, env, url) {
     await db.rest(`cases?id=eq.${case_id}`, { method: 'PATCH', body: JSON.stringify({ stage: 'अभ्यास चालू' }) });
     await log(cfg, case_id, user.id, 'run_started', started);
     return json(act === null ? run : { ...run, queued: false });
+  }
+
+  // POST /api/edit {case_id, target, message, attachments?} → the edit run row ({id, case_id, kind: 'edit', edit_target,
+  // edit_message, edit_attachments, dispatched_at, state 'queued', …}), dispatched at once as repository_dispatch
+  // `edit_drafts` (docs/DRAFT_EDIT_DESIGN.md point 3 + Addendum A; migration 0013). Never waits in the C33 queue; one
+  // run per case (full or edit). target ∈ EDIT_TARGETS; message trimmed 1..EDIT_MSG_MAX; attachments = ≤ EDIT_ATTACH_MAX
+  // case_files ids of THIS case, kinds EDIT_ATTACH_KINDS (uploaded first with /api/upload). Errors: 403 read-only;
+  // 412 settings; 400 {error} Marathi; 409 {error: 'migration_missing' | 'no_spec', reason} | {error: 'run_active', run_id};
+  // 402 monthly_budget_reached (as /api/run); 502 dispatch_failed (as /api/run).
+  if (p === '/api/edit' && M === 'POST') {
+    if (!canWrite(user)) return bad('read-only', 403);
+    if (!cfg.github_repo || !cfg.github_token || !cfg.anthropic_api_key) return bad('Settings: GitHub repo/token and the Anthropic key needed', 412);
+    const b = await req.json().catch(() => null);
+    if (!b || typeof b !== 'object' || Array.isArray(b)) return bad('माहिती पाठवली नाही');
+    if (!isId(b.case_id)) return bad('case_id required');
+    const caseId = Number(b.case_id);
+    if (!EDIT_TARGETS.includes(b.target)) return bad(BAD_EDIT_TARGET);
+    if (typeof b.message !== 'string' || !b.message.trim()) return bad(EDIT_MSG_EMPTY);
+    const message = b.message.trim();
+    if (message.length > EDIT_MSG_MAX) return bad(EDIT_MSG_LONG);
+    let attachments = [];
+    if (b.attachments !== undefined && b.attachments !== null) {
+      const a = b.attachments;
+      if (!Array.isArray(a) || a.length > EDIT_ATTACH_MAX || a.some(x => (typeof x !== 'number' && typeof x !== 'string') || !isId(x))) return bad(BAD_ATTACH);
+      attachments = [...new Set(a.map(Number))];
+      if (attachments.length) {
+        const rows = (await db.rest(`case_files?id=in.(${attachments.join(',')})&case_id=eq.${caseId}&select=id,kind`)) || [];
+        if (rows.length !== attachments.length || rows.some(r => !EDIT_ATTACH_KINDS.includes(r.kind))) return bad(BAD_ATTACH);
+      }
+    }
+    // the spec of the last full run (tools/engine_supabase.py finish); also for target 'package' (enclosures.json may
+    // be missing for older runs — the edit job handles that)
+    let spec;
+    try {
+      spec = await db.rest(`case_files?case_id=eq.${caseId}&kind=eq.spec&original_name=eq.spec.json&select=id&limit=1`);
+    } catch (e) {
+      // enum value 'spec' missing (22P02 invalid input value for enum file_kind): migration 0013 not applied
+      if (e instanceof DbError && (e.code === '22P02' || /enum/i.test(e.detail))) return json({ error: 'migration_missing', reason: EDIT_MIGRATION }, 409);
+      throw e;
+    }
+    if (!spec || !spec.length) return json({ error: 'no_spec', reason: NO_SPEC }, 409);
+    const sp = await monthSpend(cfg);
+    if (sp.spent_usd + sp.reserved_usd >= sp.limit_usd) return json({ error: 'monthly_budget_reached', spent_usd: sp.spent_usd, limit_usd: sp.limit_usd, reserved_usd: sp.reserved_usd }, 402);
+    const active = await caseActiveRun(db, caseId);
+    if (active.length) return json({ error: 'run_active', run_id: active[0].id }, 409);
+    let cur = { case_id: caseId, kind: 'edit', edit_target: b.target, edit_message: message, edit_attachments: attachments,
+      created_by: user.id, dispatched_at: new Date().toISOString() };
+    let run;
+    for (;;) {
+      try {
+        [run] = await db.rest('runs', { method: 'POST', body: JSON.stringify(cur) });
+        break;
+      } catch (e) {
+        if (['kind', 'edit_target', 'edit_message', 'edit_attachments'].some(c => namesColumn(e, c))) return json({ error: 'migration_missing', reason: EDIT_MIGRATION }, 409);
+        // runs.dispatched_at missing (migration 0011): the row without it (the edit run is dispatched at once anyway)
+        if (!('dispatched_at' in cur) || !missingColumn(e, 'dispatched_at')) throw e;
+        const { dispatched_at, ...rest } = cur;
+        cur = rest;
+      }
+    }
+    run = { ...run, kind: 'edit' };
+    try {
+      await dispatchRun(env, cfg, run, url.origin);
+    } catch (e) {
+      await db.rest(`runs?id=eq.${Number(run.id)}`, { method: 'PATCH', body: JSON.stringify({ state: 'failed', step: DISPATCH_REASON, finished_at: new Date().toISOString() }) });
+      await log(cfg, caseId, user.id, 'edit_failed', { run_id: run.id, reason: DISPATCH_REASON, error: String(e.message || e).slice(0, 300) });
+      return json({ error: 'dispatch_failed', reason: DISPATCH_REASON, run_id: run.id }, 502);
+    }
+    await log(cfg, caseId, user.id, 'edit_requested', { run_id: run.id, target: b.target, message, attachments });
+    return json(run);
   }
 
   // GET /api/files/:id → signed URL (10 min); ?download=1 keeps the original name

@@ -43,6 +43,9 @@ Commands ("deliver with warnings", Abhi 02.11.2026: drafts are never thrown away
                       reminder / do_letter / uo_note are in the Note_and_Letter; a
                       listed kind whose file is absent -> warning); absence is fine; more than one of a kind, or a refused upload (enum value missing until
                       migration 0006 / 0010 is applied) -> a runs.warnings line, never a failure.
+                      Draft edit (04.11.2026, docs/DRAFT_EDIT_DESIGN.md): $ENGINE_WORK_DIR (default /tmp/work)
+                      spec.json + enclosures.json -> kind "spec", outputs/<case>/spec/v<n>/<name> (one version for
+                      both); absent -> a stderr line only; refused (migration 0013 not applied) -> a runs.warnings line.
   claude_result <claude.json> [<stderr file>] [<exit code>] [--part1 <part1.json>] [--part1-no-cost] [--first <first.json>]
                 [--killed] [--wall <seconds>] [--status <status.json>] [--gateway-cost F --gateway-provider P]
                       Claude Code `--output-format json` result(s) -> runs.cost_usd and num_turns = SUM of the main run,
@@ -614,6 +617,52 @@ def upload_extras(out, st=None):
     return done, warns
 
 
+# Draft edit (docs/DRAFT_EDIT_DESIGN.md point 1 + Addendum A, 04.11.2026): the run's spec.json (every draft is built
+# from it) and enclosures.json (what tools/pkg3.py put into the package) are kept as file kind `spec`, so
+# tools/edit_drafts.py can change a draft / add to the package without a full run. Both files of one run get the SAME
+# version: <case>/spec/v<n>/spec.json and <case>/spec/v<n>/enclosures.json (ASCII names, no storage_name: both are .json).
+# Not shown in the app's file lists. ENGINE_WORK_DIR overrides /tmp/work (tests).
+SPEC_FILES = ("spec.json", "enclosures.json")
+SPEC_MIGRATION = "0013"
+
+
+def work_dir():
+    return os.environ.get("ENGINE_WORK_DIR") or "/tmp/work"
+
+
+def upload_spec():
+    """-> (uploaded [{kind, name, version}], warnings). An absent file is skipped with a log line (stderr); a refused
+    upload (enum value `spec` missing before migration 0013) is a warning, never a failure."""
+    wd = work_dir()
+    present = []
+    for n in SPEC_FILES:
+        p = os.path.join(wd, n)
+        if os.path.isfile(p):
+            present.append((n, p))
+        else:
+            print(f"engine_supabase: {p} not found — not kept for draft edits", file=sys.stderr)
+    if not present:
+        return [], []
+    put, done = [], []
+    try:
+        ver = next_version("spec")
+        for n, p in present:
+            path = f"{CASE}/spec/v{ver}/{n}"
+            http("POST", f"{BASE}/storage/v1/object/outputs/{enc(path)}", open(p, "rb").read(),
+                 {"Content-Type": "application/json", "x-upsert": "true"})
+            put.append({"kind": "spec", "name": n, "version": ver, "path": path})
+        for u in put:
+            insert_row(u)
+            done.append(u)
+    except Exception as e:
+        for u in put:
+            if u not in done:
+                drop_object(u["path"])  # no row -> no orphan object
+        return ([{"kind": u["kind"], "name": u["name"], "version": u["version"]} for u in done],
+                [f"सुधारणा-फाइल ({', '.join(n for n, _ in present)}) जतन झाली नाही (Supabase migration {SPEC_MIGRATION} लागू आहे का?) — {str(e)[:160]}"[:300]])
+    return [{"kind": u["kind"], "name": u["name"], "version": u["version"]} for u in done], []
+
+
 def cmd_finish(out):
     try:
         st = json.load(open(os.path.join(out, "status.json"), encoding="utf-8"))
@@ -685,6 +734,9 @@ def cmd_finish(out):
     uploaded = [{"kind": u["kind"], "name": u["name"], "version": u["version"]} for u in put]
     extra, extra_warn = upload_extras(out, st)
     uploaded += extra
+    spec_up, spec_warn = upload_spec()   # draft edit: spec.json + enclosures.json (kind spec)
+    uploaded += spec_up
+    extra_warn += spec_warn
     lst = lambda k: st.get(k) if isinstance(st.get(k), list) else []
     patch_run({"state": "done", "finished_at": now(), "step": "तयार", "summary": st.get("summary") or "",
                "letter_needed": bool(st.get("letter_needed")), "essential_points": lst("essential_points"),

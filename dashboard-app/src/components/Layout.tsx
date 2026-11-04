@@ -7,6 +7,7 @@ import { isStale, isWaiting } from '../lib/constants';
 import { crLabel } from '../lib/format';
 import { Modal, Spinner } from './ui';
 import ProfileForm from './ProfileForm';
+import CasePicker from './CasePicker';
 import ErrorBoundary from './ErrorBoundary';
 
 /** Global bar on every page: runs still processing, each a link to its case (Abhi 01.11.2026 — progress must not "disappear" when he leaves the page). */
@@ -107,7 +108,7 @@ function LogoutButton({ className, label }: { className: string; label: string }
 }
 
 /** Phone header: settings (owner) + logout behind one "⋯" button so the header fits 360 px. */
-function MoreMenu({ isOwner, onProfile }: { isOwner: boolean; onProfile: () => void }) {
+function MoreMenu({ isOwner, onProfile, onEdit }: { isOwner: boolean; onProfile: () => void; onEdit: () => void }) {
   const [open, setOpen] = useState(false);
   const [ask, setAsk] = useState(false);
   const closeAsk = useCallback(() => setAsk(false), []);
@@ -158,6 +159,9 @@ function MoreMenu({ isOwner, onProfile }: { isOwner: boolean; onProfile: () => v
       </button>
       {open && (
         <div ref={menu} id="more-menu" role="menu" aria-label="अधिक पर्याय" className="card absolute right-0 top-full z-40 mt-1 w-48 overflow-hidden py-1">
+          <button role="menuitem" className={item} onClick={() => { setOpen(false); onEdit(); }}>
+            <span aria-hidden="true">✏️</span> सुधारणा
+          </button>
           <button role="menuitem" className={item} onClick={() => { setOpen(false); onProfile(); }}>
             <span aria-hidden="true">👤</span> माझी माहिती
           </button>
@@ -186,6 +190,7 @@ export default function Layout() {
   const nav = useNavigate();
   const [palette, setPalette] = useState(false);
   const [profile, setProfile] = useState(false);
+  const [pick, setPick] = useState(false); // ✏️ सुधारणा: choose the case first
   const closeProfile = useCallback(() => setProfile(false), []);
 
   useEffect(() => {
@@ -230,6 +235,9 @@ export default function Layout() {
           <button className="btn-ghost w-full justify-between" onClick={() => setPalette(true)}>
             झटपट शोध <kbd className="rounded border px-1 text-xs">Ctrl K</kbd>
           </button>
+          <button className="btn-ghost w-full justify-start" onClick={() => setPick(true)}>
+            <span aria-hidden="true">✏️</span> सुधारणा (प्रकरण निवडा)
+          </button>
           <button className="btn-ghost w-full justify-start" onClick={() => setProfile(true)}>
             <span aria-hidden="true">👤</span> माझी माहिती
           </button>
@@ -251,7 +259,7 @@ export default function Layout() {
           <div className="flex shrink-0 items-center gap-1">
             <button className="btn-ghost min-h-tap min-w-tap px-2 text-sm font-semibold" onClick={() => setPalette(true)}>शोध</button>
             <ThemeToggle />
-            <MoreMenu isOwner={me?.role === 'owner'} onProfile={() => setProfile(true)} />
+            <MoreMenu isOwner={me?.role === 'owner'} onProfile={() => setProfile(true)} onEdit={() => setPick(true)} />
           </div>
         </header>
         <main className="mx-auto w-full max-w-7xl px-4 pb-28 pt-4 md:pb-10 md:pt-6">
@@ -275,6 +283,7 @@ export default function Layout() {
         </nav>
       </div>
       <CommandPalette open={palette} onClose={() => setPalette(false)} />
+      <CasePicker open={pick} onClose={() => setPick(false)} />
       <Modal open={profile} onClose={closeProfile} title="माझी माहिती">
         <p className="mb-3 text-sm text-slate-600 dark:text-slate-300">नस्ती अद्ययावत स्थिती पानात हीच माहिती वापरली जाते.</p>
         <ProfileForm onDone={closeProfile} onSkip={closeProfile} skipLabel="रद्द" />

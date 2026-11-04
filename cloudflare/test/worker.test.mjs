@@ -36,6 +36,12 @@ const authUsers = [{ id: 'au-old', email: 'Staff.Old@example.com' }]; // account
 const caseRows = { 40: { id: 40, cr_no: '21', cr_year: 2026, subject: 's' }, 43: { id: 43, cr_no: null, cr_year: null, subject: 's' } };
 const searchUrls = [];
 const letterRows = { 31: { id: 31, case_id: 7 }, 32: { id: 32, case_id: 7 }, 33: { id: 33, case_id: 7 } };
+// draft edit (migration 0013): editColumns false = runs.kind / edit_* and file_kind 'spec' missing; specCases = case ids
+// with a spec.json row; fileRows = case_files rows for the attachments check; editStale = edit rows the non-queue sweep hits
+let editColumns = true;
+const specCases = new Set();
+const fileRows = [];
+let editStale = [];
 // C33 queue: in-memory runs table (Q = { rows, nextId, hook }) for the queue queries; null = column missing (legacy)
 let Q = null;
 const STALE = 3.5 * 3600 * 1000;
@@ -49,14 +55,16 @@ async function queueDb(u, opt, res) {
     (r.dispatched_at ? new Date(r.dispatched_at).getTime() > since : r.state === 'running' && new Date(r.created_at).getTime() > since);
   const byId = id => rows.find(r => r.id === Number(id));
   if (Q.hook) await Q.hook(d, M);
+  const noEdit = d.includes('&kind=neq.edit');   // draft edit: the queue ignores kind 'edit'
+  const queueRow = r => !noEdit || r.kind !== 'edit';
   if (/\/rest\/v1\/case_files\?case_id=eq\.\d+&kind=eq\.proposal/.test(d)) return res([{ id: 1 }]);
   if (d === `${SB}/rest/v1/runs` && M === 'POST') {
     const row = { id: Q.nextId++, state: 'queued', dispatched_at: null, created_at: new Date(Date.now() + Q.nextId).toISOString(), ...JSON.parse(opt.body) };
     rows.push(row); return res([{ ...row }], 201);
   }
-  if (M === 'GET' && d.startsWith(`${SB}/rest/v1/runs?state=in.(queued,running)&or=`)) return res(rows.filter(isActive).sort((a, b) => a.id - b.id).map(r => ({ ...r })));
+  if (M === 'GET' && d.startsWith(`${SB}/rest/v1/runs?state=in.(queued,running)&or=`)) return res(rows.filter(isActive).filter(queueRow).sort((a, b) => a.id - b.id).map(r => ({ ...r })));
   if (M === 'GET' && d.startsWith(`${SB}/rest/v1/runs?state=eq.queued&dispatched_at=is.null`))
-    return res(rows.filter(r => r.state === 'queued' && !r.dispatched_at).sort((a, b) => a.created_at.localeCompare(b.created_at) || a.id - b.id).map(r => ({ ...r })));
+    return res(rows.filter(r => r.state === 'queued' && !r.dispatched_at).filter(queueRow).sort((a, b) => a.created_at.localeCompare(b.created_at) || a.id - b.id).map(r => ({ ...r })));
   if (M === 'GET' && d.startsWith(`${SB}/rest/v1/runs?case_id=eq.`) && d.includes('&or=')) {
     const cid = Number(d.match(/case_id=eq\.(\d+)/)[1]);
     return res(rows.filter(r => r.case_id === cid && ['queued', 'running'].includes(r.state) && (!r.dispatched_at || isActive(r))).map(r => ({ id: r.id })));
@@ -80,6 +88,12 @@ async function queueDb(u, opt, res) {
     const r = byId(m[1]); if (!r) return res([]);
     Object.assign(r, JSON.parse(opt.body)); return res([{ ...r }]);
   }
+  if (M === 'PATCH' && (m = d.match(/\/runs\?kind=eq\.edit&created_at=lt\.([^&]+)&state=in\.\(queued,running\)$/))) {
+    const lim = new Date(m[1]).getTime();
+    const out = rows.filter(r => r.kind === 'edit' && ['queued', 'running'].includes(r.state) && new Date(r.created_at).getTime() < lim);
+    out.forEach(r => Object.assign(r, JSON.parse(opt.body)));
+    return res(out.map(r => ({ id: r.id, case_id: r.case_id, kind: r.kind })));
+  }
   if (M === 'PATCH' && d.startsWith(`${SB}/rest/v1/runs?or=`)) {
     const out = rows.filter(r => ['queued', 'running'].includes(r.state) &&
       (r.dispatched_at ? new Date(r.dispatched_at).getTime() < since : r.state === 'running' && new Date(r.created_at).getTime() < since));
@@ -96,6 +110,20 @@ globalThis.fetch = async (u, opt = {}) => {
   if (u.startsWith(`${SB}/rest/v1/runs`) && /dispatched_at/.test(decodeURIComponent(u) + (opt.body || ''))) {
     if (!Q) return res({ code: '42703', message: 'column runs.dispatched_at does not exist' }, 400);
   }
+  if (u.startsWith(`${SB}/rest/v1/runs`) && !editColumns) {
+    let b = {}; try { b = JSON.parse(opt.body || '{}') || {}; } catch { /* not JSON */ }
+    if (/[?&]kind=/.test(decodeURIComponent(u)) || 'kind' in b) return res({ code: '42703', message: 'column runs.kind does not exist' }, 400);
+  }
+  if (u.startsWith(`${SB}/rest/v1/case_files?case_id=eq.`) && u.includes('kind=eq.spec')) {
+    if (!editColumns) return res({ code: '22P02', message: 'invalid input value for enum file_kind: "spec"' }, 400);
+    return res(specCases.has(Number(u.match(/case_id=eq\.(\d+)/)[1])) ? [{ id: 900 }] : []);
+  }
+  if (u.startsWith(`${SB}/rest/v1/case_files?id=in.(`)) {
+    const ids = decodeURIComponent(u).match(/id=in\.\(([^)]*)\)/)[1].split(',').map(Number);
+    const cid = Number(u.match(/case_id=eq\.(\d+)/)[1]);
+    return res(fileRows.filter(f => ids.includes(f.id) && f.case_id === cid).map(f => ({ id: f.id, kind: f.kind })));
+  }
+  if (!Q && u.startsWith(`${SB}/rest/v1/runs?kind=eq.edit&created_at=lt.`) && opt.method === 'PATCH') return res(editStale);
   if (Q) { const q = await queueDb(u, opt, res); if (q) return q; }
   if (u === `${SB}/auth/v1/user`) {
     const t = opt.headers.Authorization;
@@ -168,6 +196,7 @@ globalThis.fetch = async (u, opt = {}) => {
   if (u.startsWith(`${SB}/rest/v1/case_files?case_id=eq.7&kind=eq.reply`)) return res([]);
   if (u.startsWith(`${SB}/rest/v1/case_files?case_id=eq.7&kind=eq.approval`)) return res([{ version: 1 }]);
   if (u.startsWith(`${SB}/rest/v1/case_files?case_id=eq.7&kind=eq.court_notice`)) return res([]);
+  if (u.startsWith(`${SB}/rest/v1/case_files?case_id=eq.7&kind=eq.gr&`)) return res([]);
   if (u.startsWith(`${SB}/rest/v1/case_files?id=eq.1&`)) return res([{ storage_path: 'outputs/7/study/v1/a.docx', original_name: 'a.docx' }]);
   if (u.startsWith(`${SB}/rest/v1/case_files?id=eq.2&`)) return res([{ storage_path: 'backups/7/x', original_name: 'x' }]);
   if (u === `${SB}/rest/v1/case_files` && opt.method === 'POST') {
@@ -1185,4 +1214,155 @@ test('0012: नस्ती page CSP — connect-src without self (data: blob: o
   }
   const csp = (await call('/cases/7')).headers.get('content-security-policy');
   assert.ok(csp.includes(`connect-src 'self' ${SB}`), csp);
+});
+
+// ---------- draft edit (docs/DRAFT_EDIT_DESIGN.md point 3 + Addendum A, migration 0013): POST /api/edit ----------
+const editCall = (b, h = owner33) => call('/api/edit', { method: 'POST', headers: h, body: JSON.stringify(b) });
+const dispatchEvents = () => calls.filter(c => c.u.endsWith('/dispatches')).map(c => JSON.parse(c.opt.body));
+const NO_SPEC_TXT = "या प्रकरणाची सुधारणा-फाइल नाही (जुने प्रकरण) — 'पुन्हा तयार करा' वापरा";
+
+test('draft edit: /api/edit dispatches edit_drafts at once (dispatched_at), queue ignores edit runs, one run per case both ways', async () => {
+  Q = { rows: [], nextId: 700 }; monthRuns = []; dispatchFail = false; acts.length = 0;
+  [701, 702, 703].forEach(c => specCases.add(c));
+  try {
+    const n0 = dispatchEvents().length;
+    let r = await editCall({ case_id: 701, target: 'note', message: '  परि. 3 मधील दुसरी ओळ काढा  ' });
+    assert.equal(r.status, 200, await r.clone().text());
+    const e = await r.json();
+    assert.deepEqual([e.kind, e.edit_target, e.edit_message, e.state], ['edit', 'note', 'परि. 3 मधील दुसरी ओळ काढा', 'queued']);
+    assert.deepEqual(e.edit_attachments, []);
+    assert.ok(e.dispatched_at, 'dispatched_at set (never waits in the queue)');
+    const ev = dispatchEvents();
+    assert.equal(ev.length, n0 + 1);
+    assert.equal(ev.at(-1).event_type, 'edit_drafts');
+    assert.deepEqual(Object.keys(ev.at(-1).client_payload).sort(), ['case_id', 'run_id', 'token', 'worker'], 'same payload as process_proposal');
+    assert.equal(ev.at(-1).client_payload.run_id, e.id);
+    assert.ok(tokenOf(e.id), 'run token stored');
+    assert.ok(acts.some(x => x.action === 'edit_requested' && x.detail.run_id === e.id && x.detail.target === 'note'));
+    // the queue ignores the active edit run: a full run of another case is dispatched at once (process_proposal)
+    const f = await body(await runCase(702));
+    assert.equal(f.queued, false, 'edit run is not the queue\'s active run');
+    assert.equal(dispatchEvents().at(-1).event_type, 'process_proposal');
+    // a second full run waits behind the full one only (position 1)
+    const g = await body(await runCase(705));
+    assert.deepEqual([g.queued, g.position], [true, 1]);
+    // one run per case, both ways
+    r = await runCase(701);
+    assert.equal(r.status, 409); assert.deepEqual(await r.json(), { error: 'run_active', run_id: e.id });
+    r = await editCall({ case_id: 701, target: 'letter', message: 'x' });
+    assert.equal(r.status, 409); assert.deepEqual(await r.json(), { error: 'run_active', run_id: e.id });
+    r = await editCall({ case_id: 702, target: 'note', message: 'x' });
+    assert.equal(r.status, 409); assert.deepEqual(await r.json(), { error: 'run_active', run_id: f.id });
+    // a waiting (not yet dispatched) full run blocks an edit of its case too
+    specCases.add(705);
+    r = await editCall({ case_id: 705, target: 'note', message: 'x' });
+    assert.equal(r.status, 409); assert.equal((await r.json()).run_id, g.id);
+    // the edit run ends → nothing moves in the queue (the full run 702 is still active)
+    const nx = await body(await call('/api/engine/next', { method: 'POST', headers: { authorization: `Bearer ${tokenOf(e.id)}` }, body: JSON.stringify({ run_id: e.id }) }));
+    assert.deepEqual(nx, { ok: true, changed: 1, dispatched: null });
+    // /api/engine/step works for edit runs unchanged
+    const e2 = await body(await editCall({ case_id: 703, target: 'package', message: 'हा GR जोडा' }));
+    const st = await body(await call('/api/engine/step', { method: 'POST', headers: { authorization: `Bearer ${tokenOf(e2.id)}` }, body: JSON.stringify({ run_id: e2.id, step: 'सुधारणा करत आहे' }) }));
+    assert.equal(st.changed, 1); assert.equal(Q.rows.find(x => x.id === e2.id).step, 'सुधारणा करत आहे');
+    // engine config of an edit run: model_edit default, then the KV setting
+    let ec = await body(await call(`/api/engine/config?run_id=${e2.id}`, { headers: { authorization: `Bearer ${tokenOf(e2.id)}` } }));
+    assert.equal(ec.model_edit, 'claude-sonnet-5-5');
+    assert.ok(ec.supabase_url && ec.supabase_service_key && ec.anthropic_api_key, 'edit job gets Supabase + Anthropic');
+    assert.equal((await call('/api/settings', { method: 'PUT', headers: owner33, body: JSON.stringify({ model_edit: 'bad name!' }) })).status, 400);
+    assert.equal((await call('/api/settings', { method: 'PUT', headers: owner33, body: JSON.stringify({ model_edit: 'claude-haiku-4-5' }) })).status, 200);
+    assert.equal((await body(await call('/api/settings', { headers: owner33 }))).model_edit, 'claude-haiku-4-5');
+    Q.rows.find(x => x.id === e2.id).state = 'done';
+    const e3 = await body(await editCall({ case_id: 703, target: 'order', message: 'y' }));
+    ec = await body(await call(`/api/engine/config?run_id=${e3.id}`, { headers: { authorization: `Bearer ${tokenOf(e3.id)}` } }));
+    assert.equal(ec.model_edit, 'claude-haiku-4-5');
+    env.SETTINGS.m.delete('model_edit');
+  } finally { Q = null; }
+});
+
+test('draft edit: validation — target, message, attachments (this case, kinds, ≤ 5), no_spec, read-only, budget, dispatch failure', async () => {
+  Q = { rows: [], nextId: 750 }; monthRuns = []; dispatchFail = false;
+  specCases.add(751); specCases.add(752);
+  fileRows.push({ id: 81, case_id: 751, kind: 'gr' }, { id: 82, case_id: 751, kind: 'study' }, { id: 83, case_id: 777, kind: 'gr' },
+    { id: 84, case_id: 752, kind: 'extra_doc' }, { id: 85, case_id: 752, kind: 'gr' });
+  const err = async (b, status, re) => { const r = await editCall(b); assert.equal(r.status, status, JSON.stringify(b)); const j = await r.json(); if (re) assert.match(j.error, re); return j; };
+  try {
+    await err({ case_id: 751, target: 'study', message: 'x' }, 400, /सुधारणा कोठे करायची ते चुकीचे/);
+    await err({ case_id: 751, message: 'x' }, 400, /सुधारणा कोठे करायची/);
+    await err({ case_id: 751, target: 'note', message: '   ' }, 400, /सुधारणा-संदेश लिहा/);
+    await err({ case_id: 751, target: 'note' }, 400, /सुधारणा-संदेश लिहा/);
+    await err({ case_id: 751, target: 'note', message: 'क'.repeat(2001) }, 400, /जास्तीत जास्त 2000 अक्षरे/);
+    await err({ case_id: 'x', target: 'note', message: 'x' }, 400);
+    await err({ case_id: 751, target: 'note', message: 'x', attachments: [83] }, 400, /जोडलेल्या फाइल चुकीच्या/);   // other case
+    await err({ case_id: 751, target: 'note', message: 'x', attachments: [82] }, 400, /जोडलेल्या फाइल चुकीच्या/);   // kind study
+    await err({ case_id: 751, target: 'note', message: 'x', attachments: [81, 1, 2, 3, 4, 5] }, 400, /जास्तीत जास्त 5/);
+    await err({ case_id: 751, target: 'note', message: 'x', attachments: ['x'] }, 400, /जोडलेल्या फाइल/);
+    await err({ case_id: 751, target: 'note', message: 'x', attachments: 81 }, 400, /जोडलेल्या फाइल/);
+    // no spec (old case) — also for the package target
+    assert.deepEqual(await err({ case_id: 799, target: 'package', message: 'x' }, 409), { error: 'no_spec', reason: NO_SPEC_TXT });
+    // read-only role
+    const me = members.find(x => x.user_id === 'u1');
+    me.role = 'senior';
+    try { assert.equal((await editCall({ case_id: 751, target: 'note', message: 'x' })).status, 403); } finally { me.role = 'owner'; }
+    // monthly limit → as /api/run
+    monthRuns = [{ cost_usd: 25, created_at: new Date().toISOString(), state: 'done' }];
+    assert.equal((await err({ case_id: 751, target: 'note', message: 'x' }, 402)).error, 'monthly_budget_reached');
+    monthRuns = [];
+    // ok: 2000 characters after trim, attachments deduplicated in order
+    const r = await editCall({ case_id: 752, target: 'package', message: '  ' + 'क'.repeat(2000) + ' ', attachments: [84, '85', 84] });
+    assert.equal(r.status, 200, await r.clone().text());
+    const e = await r.json();
+    assert.deepEqual(e.edit_attachments, [84, 85]); assert.equal(e.edit_message.length, 2000); assert.equal(e.edit_target, 'package');
+    // GitHub dispatch failure → the edit run failed (Marathi), 502
+    Q.rows.find(x => x.id === e.id).state = 'done';
+    dispatchFail = true;
+    const f = await editCall({ case_id: 751, target: 'note', message: 'x', attachments: [81] });
+    assert.equal(f.status, 502);
+    const fj = await f.json();
+    assert.equal(fj.error, 'dispatch_failed');
+    assert.equal(Q.rows.find(x => x.id === fj.run_id).state, 'failed');
+    assert.ok(acts.some(x => x.action === 'edit_failed' && x.detail.run_id === fj.run_id));
+  } finally { Q = null; dispatchFail = false; monthRuns = []; }
+});
+
+test('draft edit: migration 0013 missing → 409 migration_missing; the queue still works without runs.kind; edit sweep at 30 min', async () => {
+  Q = { rows: [], nextId: 800 }; monthRuns = []; dispatchFail = false;
+  specCases.add(801);
+  try {
+    editColumns = false;
+    let r = await editCall({ case_id: 801, target: 'note', message: 'x' });
+    assert.equal(r.status, 409);
+    assert.deepEqual(await r.json(), { error: 'migration_missing', reason: 'Supabase मध्ये migration 0013 लागू करा' });
+    const a = await body(await runCase(802));
+    assert.equal(a.queued, false, 'queue without runs.kind: filter dropped');
+    const b = await body(await runCase(803));
+    assert.deepEqual([b.queued, b.position], [true, 1]);
+    const sw = await body(await call('/api/runs/sweep', { method: 'POST', headers: owner33 }));
+    assert.deepEqual(sw.failed, [], 'sweep without runs.kind');
+    editColumns = true;
+    Q.rows.length = 0;
+    // stale edit run (31 min) → failed with its own reason; a 31-min full run and a 10-min edit run are not swept
+    const t31 = new Date(Date.now() - 31 * 60 * 1000).toISOString(), t10 = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+    Q.rows.push({ id: 811, case_id: 81, kind: 'edit', state: 'running', dispatched_at: t31, created_at: t31 },
+                { id: 812, case_id: 82, kind: 'full', state: 'running', dispatched_at: t31, created_at: t31 },
+                { id: 813, case_id: 83, kind: 'edit', state: 'running', dispatched_at: t10, created_at: t10 });
+    const sw2 = await body(await call('/api/runs/sweep', { method: 'POST', headers: owner33 }));
+    assert.deepEqual(sw2.failed, [811]);
+    assert.equal(Q.rows[0].state, 'failed'); assert.equal(Q.rows[0].step, 'वेळ संपली — सुधारणा पुन्हा पाठवा');
+    assert.deepEqual([Q.rows[1].state, Q.rows[2].state], ['running', 'running']);
+    assert.ok(acts.some(x => Array.isArray(x) && x.some(y => y.action === 'edit_failed' && y.detail.run_id === 811)), 'activity edit_failed');
+    // without the queue column (migration 0011): the edit row is inserted without dispatched_at, dispatched at once
+    Q = null;
+    specCases.add(7);
+    r = await editCall({ case_id: 7, target: 'letter', message: 'x' });
+    assert.equal(r.status, 200, await r.clone().text());
+    assert.equal(dispatchEvents().at(-1).event_type, 'edit_drafts');
+    assert.ok(!('dispatched_at' in runInserts.at(-1)), 'row without dispatched_at');
+    assert.equal(runInserts.at(-1).kind, 'edit');
+  } finally { Q = null; editColumns = true; }
+});
+
+test('draft edit: upload accepts kind gr (chat attachment)', async () => {
+  const r = await call('/api/upload?case_id=7&kind=gr', { method: 'POST', headers: { ...owner33, 'x-file-name': encodeURIComponent('202605051234567812.pdf'), 'content-type': 'application/pdf' }, body: '%PDF-1' });
+  assert.equal(r.status, 200, await r.clone().text());
+  assert.equal((await r.json()).kind, 'gr');
 });
