@@ -58,10 +58,9 @@ export default function NewProposal() {
   const [proposal, setProposal] = useState<File | null>(null);
   const [extras, setExtras] = useState<Extra[]>([]);
   const [f, setF] = useState({ cr_no: '', cr_year: '', file_no: '', subject: '', category: '', priority: 'सामान्य', desk: DEFAULT_DESK as string, work_type: DEFAULT_WORK_TYPE as string, instructions: '' });
-  // C33: एक प्रस्ताव / अनेक प्रस्ताव (bulk) — kept in the URL (?bulk=1); several PDFs dropped on the single zone open bulk
+  // C33: एक प्रस्ताव / अनेक प्रस्ताव (bulk) — kept in the URL (?bulk=1); several files picked in एक प्रस्ताव stay with that one proposal
   const [sp, setSp] = useSearchParams();
   const bulk = sp.get('bulk') === '1';
-  const [bulkInit, setBulkInit] = useState<File[] | undefined>(undefined);
   const [queuedPos, setQueuedPos] = useState<number | null>(null);
   // "कोणते मसुदे हवेत?": follows the suggestion (from the file types) until the user changes a chip
   const suggestion = suggestDrafts(extras.map(x => ({ kind: x.kind })), [], f.work_type);
@@ -106,11 +105,14 @@ export default function NewProposal() {
 
   async function pickProposal(files: File[]) {
     const pdfs = files.filter(x => x.type === 'application/pdf' || /\.pdf$/i.test(x.name));
-    if (pdfs.length > 1 && !created) {
-      // several proposals at once → bulk mode with these files (one case each)
-      setBulkInit(pdfs);
-      setSp({ bulk: '1' }, { replace: true });
-      return;
+    // several files picked: they belong to THIS proposal (Abhi 04.11.2026) — the first PDF is the proposal, the rest
+    // become its other files (type "इतर", changeable); never split into several proposals
+    if (files.length > 1 && pdfs.length && !created) {
+      const rest = files.filter(x => x !== pdfs[0] && /\.(pdf|docx?|jpe?g|png)$/i.test(x.name));
+      if (rest.length) {
+        addExtras(rest);
+        toast(`“${pdfs[0].name}” प्रस्ताव; उरलेल्या ${rest.length} फाइल याच प्रस्तावाच्या इतर फाइल — प्रकार तपासा`, 'info');
+      }
     }
     const p = pdfs[0];
     if (!p) {
@@ -236,7 +238,7 @@ export default function NewProposal() {
             {isOwner ? budgetReachedText(spend.limit_usd) : `या महिन्याची खर्च-मर्यादा (${fmtUsd(spend.limit_usd)}) संपली — मालकाने सेटिंग्जमध्ये मर्यादा वाढवावी`}
           </div>
         )}
-        <BulkUpload initial={bulkInit} overBudget={overBudget} />
+        <BulkUpload overBudget={overBudget} />
       </div>
     );
   return (
@@ -295,7 +297,7 @@ export default function NewProposal() {
                 {!locked && <button type="button" className="btn-ghost min-w-tap px-2" onClick={() => setProposal(null)} aria-label="काढा">✕</button>}
               </div>
             ) : (
-              <DropZone label="प्रस्ताव PDF येथे ओढा" hint="एकच PDF • कमाल 50 MB • फाइलनाव जसेच्या तसे राहील • फोटो असल्यास आधी PDF करा" accept="application/pdf,.pdf" onFiles={pickProposal} />
+              <DropZone label="प्रस्ताव PDF येथे ओढा" hint="मुख्य PDF (हवे तर त्याच प्रस्तावाच्या इतर फाइलसह) • कमाल 50 MB • फाइलनाव जसेच्या तसे राहील • फोटो असल्यास आधी PDF करा" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" multiple onFiles={pickProposal} />
             )}
             <DropZone label="इतर फाइल (ऐच्छिक)" hint="उत्तर / मान्यता / न्यायालयीन नोटीस / इतर • PDF / Word / प्रतिमा • प्रकार खाली निवडा" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" multiple onFiles={addExtras} />
             {extras.length > 0 && (
