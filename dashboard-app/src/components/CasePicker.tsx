@@ -18,8 +18,8 @@ export default function CasePicker({ open, onClose }: { open: boolean; onClose: 
     return cases.filter(c => !t || `${crLabel(c)} ${c.cr_no ?? ''} ${c.subject ?? ''} ${c.file_no ?? ''}`.toLowerCase().includes(t)).slice(0, 50);
   }, [cases, q]);
   return (
-    <Modal open={open} onClose={onClose} title="✏️ सुधारणा — कृपया प्रकरण निवडावे">
-      <input className="input mb-3" autoFocus placeholder="C R क्र. / विषय / नस्ती क्र." value={q} onChange={e => setQ(e.target.value)} aria-label="प्रकरण शोधा" />
+    <Modal open={open} onClose={onClose} title="✏️ मसुद्यात सुधारणा — कृपया प्रकरण निवडावे">
+      <input className="input mb-3" autoFocus placeholder="C R क्र., विषय किंवा नस्ती क्र." value={q} onChange={e => setQ(e.target.value)} aria-label="प्रकरण शोधा" />
       {list.length === 0 ? <p className="text-sm text-slate-500">या शोधानुसार प्रकरण आढळले नाही.</p> : (
         <ul className="max-h-[60vh] space-y-1 overflow-y-auto">
           {list.map(c => (

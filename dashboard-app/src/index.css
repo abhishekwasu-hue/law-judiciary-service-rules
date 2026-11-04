@@ -59,3 +59,16 @@
 /* AI सहाय्यक floating button */
 .ai-fab { background: linear-gradient(100deg, #4338ca, #f97316); box-shadow: 0 6px 20px rgba(67, 56, 202, .35); animation: cta-pulse 2s ease-in-out infinite; }
 @media (prefers-reduced-motion: reduce) { .ai-fab { animation: none; } }
+/* while the floating AI button is shown (AiAssistant toggles body.ai-fab-on), toasts move above it so neither covers the
+   other (phone: button bottom 4.25rem + 3.5rem high; desktop: bottom 1.5rem + 4rem high). Toast.tsx has no class of its
+   own, so its stack is matched by its fixed live region. */
+body.ai-fab-on .toast-stack,
+body.ai-fab-on div.fixed[aria-live="polite"] { bottom: calc(8.5rem + env(safe-area-inset-bottom)); }
+@media (min-width: 768px) {
+  body.ai-fab-on .toast-stack,
+  body.ai-fab-on div.fixed[aria-live="polite"] { bottom: 6.5rem; }
+}
+/* the phone slim bar on /nasti: the running-process dot */
+.run-dot { display: inline-block; width: .6rem; height: .6rem; border-radius: 9999px; background: #2563eb; box-shadow: 0 0 0 0 rgba(37, 99, 235, .6); animation: run-dot 1.6s ease-out infinite; }
+@keyframes run-dot { 0% { box-shadow: 0 0 0 0 rgba(37, 99, 235, .6); } 100% { box-shadow: 0 0 0 7px rgba(37, 99, 235, 0); } }
+@media (prefers-reduced-motion: reduce) { .run-dot { animation: none; } }

@@ -35,7 +35,7 @@ function CaseChat({ id, onBack }: { id: number; onBack: () => void }) {
   const fileCr = !c.cr_no ? crFromFileName(files.find(f => /^CR\d+_\d{4}_/.test(f.original_name))?.original_name) : null;
   const ctx: CaseCtx = {
     c, files, letters: [], activity: [], members: new Map(), runs, editRuns, hasSpec, reloadFiles,
-    reloadLetters: async () => {}, reloadActivity: async () => {}, canWrite, title: c.cr_no ? crLabel(c) : fileCr || `प्रकरण #${c.id}`,
+    reloadLetters: async () => {}, reloadActivity: async () => {}, canWrite, title: c.cr_no ? crLabel(c) : fileCr || `प्रकरण क्र. ${c.id}`,
   };
   const ready = files.some(f => f.kind === 'note_letter' || f.kind === 'package_pdf');
   return (
@@ -48,6 +48,11 @@ function CaseChat({ id, onBack }: { id: number; onBack: () => void }) {
   );
 }
 
+/** Where the floating AI button is shown (owner decision 04.11.2026): every page for writers, except the नस्ती page and the
+ *  case page (/cases/:id — there the header "AI सुधारणा" button is the one entry). Layout uses it for the bottom padding. */
+export const aiFabShown = (pathname: string, canWrite: boolean) =>
+  canWrite && !pathname.startsWith('/nasti') && !/^\/cases\/\d+/.test(pathname);
+
 export default function AiAssistant() {
   const canWrite = useCanWrite();
   const { cases } = useData();
@@ -55,9 +60,6 @@ export default function AiAssistant() {
   const [open, setOpen] = useState(false);
   const [caseId, setCaseId] = useState<number | null>(null);
   const [q, setQ] = useState('');
-  // on a case page the assistant starts with that case
-  const pageCase = Number((loc.pathname.match(/^\/cases\/(\d+)/) || [])[1]) || null;
-  useEffect(() => { if (open && caseId === null && pageCase) setCaseId(pageCase); }, [open, pageCase, caseId]);
   useEffect(() => {
     if (!open) return;
     const k = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
@@ -68,14 +70,23 @@ export default function AiAssistant() {
     const t = q.trim().toLowerCase();
     return cases.filter(c => !t || `${crLabel(c)} ${c.cr_no ?? ''} ${c.subject ?? ''} ${c.file_no ?? ''}`.toLowerCase().includes(t)).slice(0, 40);
   }, [cases, q]);
-  if (!canWrite || loc.pathname.startsWith('/nasti')) return null;
+  const shown = aiFabShown(loc.pathname, canWrite);
+  // the page changed to one without the button (e.g. a case was opened from the list) → close the panel
+  useEffect(() => { if (!shown) setOpen(false); }, [shown]);
+  useEffect(() => {
+    document.body.classList.toggle('ai-fab-on', shown && !open);
+    return () => document.body.classList.remove('ai-fab-on');
+  }, [shown, open]);
+  if (!shown) return null;
   return (
     <>
       {!open && (
-        <button type="button" onClick={() => setOpen(true)} aria-label="AI सहाय्यक — प्रस्तावात बदल"
-          className="ai-fab no-print fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] right-3 z-40 flex items-center gap-2 rounded-full py-2 pl-2 pr-4 text-white md:bottom-6 md:right-6">
-          <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-lg font-black text-orange-600 shadow">AI</span>
-          <span className="text-left leading-tight"><b className="block text-base">AI सहाय्यक</b><span className="text-xs text-white/90">प्रस्तावात बदल हवा?</span></span>
+        // phone: one 56 px round "AI" button (the label only from sm), so it does not cover the content; Layout adds
+        // bottom padding while it is shown, and toasts sit above it (index.css .ai-fab-on)
+        <button type="button" onClick={() => setOpen(true)} aria-label="AI सहाय्यक — प्रस्तावात बदल" title="AI सहाय्यक — प्रस्तावात बदल"
+          className="ai-fab no-print fixed bottom-[calc(4.25rem+env(safe-area-inset-bottom))] right-3 z-40 flex h-14 w-14 items-center justify-center rounded-full text-white sm:h-auto sm:w-auto sm:justify-start sm:gap-2 sm:py-2 sm:pl-2 sm:pr-4 md:bottom-6 md:right-6">
+          <span className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-lg font-black text-orange-600 shadow sm:h-12 sm:w-12">AI</span>
+          <span className="hidden text-left leading-tight sm:block"><b className="block text-base">AI सहाय्यक</b><span className="text-xs text-white/90">प्रस्तावात बदल हवा?</span></span>
         </button>
       )}
       {open && (

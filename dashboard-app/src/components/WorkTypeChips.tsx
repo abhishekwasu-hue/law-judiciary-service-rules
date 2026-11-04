@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { WORK_TYPES, workTypeOf } from '../lib/constants';
 import type { Case } from '../lib/types';
 
-const base = 'inline-flex min-h-tap items-center gap-1.5 rounded-full border-2 px-3 text-sm font-semibold transition';
+const base = 'inline-flex min-h-tap shrink-0 items-center gap-1.5 rounded-full border-2 px-3 text-sm font-semibold transition';
 const on = 'border-navy-700 bg-navy-700 text-white dark:border-navy-400 dark:bg-navy-500';
 const off = 'border-slate-300 bg-white text-slate-800 hover:bg-slate-100 dark:border-navy-700 dark:bg-navy-900 dark:text-slate-100 dark:hover:bg-navy-800';
 
@@ -14,7 +14,8 @@ export default function WorkTypeChips({ cases, value = '', onChange, linkTo }: {
   const count = (id: string) => cases.filter(c => workTypeOf(c) === id).length;
   const items = [{ id: '', label: 'सर्व', n: cases.length }, ...WORK_TYPES.map(w => ({ id: w.id as string, label: w.short, n: count(w.id) }))];
   return (
-    <div className="flex flex-wrap gap-2" role={linkTo ? undefined : 'group'} aria-label="कामाचा प्रकार">
+    // phone: one row that scrolls sideways (two wrapped rows pushed the lists down — UI audit S2 / S4); wider: wraps
+    <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0" role={linkTo ? undefined : 'group'} aria-label="कामाचा प्रकार">
       {items.map(x => {
         const active = !linkTo && value === x.id;
         const inner = (
