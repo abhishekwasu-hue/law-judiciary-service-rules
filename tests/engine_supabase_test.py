@@ -1272,8 +1272,10 @@ prun = lambda *a: subprocess.run([sys.executable, TOOL, *a], env=penv, capture_o
 run_row.update(state="queued", warnings=[])
 n0 = len(LOG)
 r = prun("fetch", os.path.join(tmp, "case_proxy"))
-check(r.returncode == 0 and run_row["state"] == "running"
-      and open(os.path.join(tmp, "case_proxy", "in", "proposal", PROP), "rb").read() == b"%PDF new",
+cjp = json.load(open(os.path.join(tmp, "case_proxy", "case.json"), encoding="utf-8")) if r.returncode == 0 else {}
+pp = [f for f in cjp.get("inputs", []) if f["kind"] == "proposal"]
+check(r.returncode == 0 and run_row["state"] == "running" and pp
+      and open(os.path.join(tmp, "case_proxy", pp[0]["local_path"]), "rb").read().startswith(b"%PDF"),
       f"proxy: fetch (REST + Storage) through /api/engine/sb ({r.stderr.strip()[:200]})")
 r = prun("warn", "प्रॉक्सी इशारा"); check(r.returncode == 0 and "प्रॉक्सी इशारा" in run_row["warnings"], "proxy: warn")
 r = prun("step", "प्रॉक्सी पायरी"); check(r.returncode == 0 and run_row["step"] == "प्रॉक्सी पायरी", "proxy: step (direct DB write, not /api/engine/step)")

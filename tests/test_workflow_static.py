@@ -159,6 +159,21 @@ class WorkflowStatic(unittest.TestCase):
             if re.match(r"[A-Za-z0-9_.-]+==", block):
                 self.assertIn("--hash=sha256:", block, block.split()[0])
 
+    def test_engine_requirements_hash_locked(self):
+        """S-F14: tools/requirements-engine.txt = the whole tree with sha256; every install of it requires the hashes."""
+        req = open(os.path.join(ROOT, "tools", "requirements-engine.txt"), encoding="utf-8").read()
+        for pin in ("pymupdf==2.0 ", "python-docx==1.2.0 ", "docxcompose==2.2.0 ", "lxml=="):
+            self.assertIn(pin, req)
+        for block in re.split(r"(?m)^(?=[A-Za-z0-9_.-]+==)", req):
+            if re.match(r"[A-Za-z0-9_.-]+==", block):
+                self.assertIn("--hash=sha256:", block, block.split()[0])
+        for n in ("process-proposal.yml", "edit-drafts.yml", "tests.yml"):
+            t = open(os.path.join(WF, n), encoding="utf-8").read()
+            lines = [l for l in t.splitlines() if "pip install" in l and "requirements-engine.txt" in l]
+            self.assertTrue(lines, n)
+            for l in lines:
+                self.assertIn("--require-hashes --only-binary=:all: -r", l, n)
+
     def test_c33_queue_next_and_work_type(self):
         """C33: the LAST step always calls /api/engine/next with the run token and never fails the job; the prompt gets the
         work-type block from the root-owned snapshot, with a fallback that cannot fail the Claude step."""

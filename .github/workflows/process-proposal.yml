@@ -143,7 +143,7 @@ jobs:
           trap 'echo "साधने install झाली नाहीत (apt/pip/npm) — पुन्हा तयार करा." > "$RP/fail_reason.txt"' ERR
           # audit 05.11 T-H: apt (system packages), pip (setup-python's site-packages) and npm (setup-node's global
           # prefix) write to separate places, so they run in parallel; each log is printed, a failure fails the step
-          ( pip install -r "$T/requirements-engine.txt" ) > "$RP/pip.log" 2>&1 & PIP_PID=$!
+          ( pip install --require-hashes --only-binary=:all: -r "$T/requirements-engine.txt" ) > "$RP/pip.log" 2>&1 & PIP_PID=$!
           ( npm install -g "@anthropic-ai/claude-code@$CLAUDE_CODE_VERSION" ) > "$RP/npm.log" 2>&1 & NPM_PID=$!
           APT_RC=0
           { sudo apt-get update -y && sudo apt-get install -y poppler-utils tesseract-ocr tesseract-ocr-mar libreoffice-writer fonts-freefont-ttf; } || APT_RC=$?

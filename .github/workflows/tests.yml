@@ -28,7 +28,8 @@ jobs:
           set -euo pipefail
           sudo apt-get update -y
           sudo apt-get install -y fonts-freefont-ttf poppler-utils
-          pip install -r tools/requirements-engine.txt pytest pyyaml==6.0.2
+          pip install --require-hashes --only-binary=:all: -r tools/requirements-engine.txt   # S-F14: hash-locked tree (incl. pyyaml)
+          pip install pytest
       - name: Python tests
         run: python -m pytest -q tests
       - name: Worker tests

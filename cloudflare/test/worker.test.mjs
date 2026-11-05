@@ -1856,3 +1856,117 @@ test('U1 + P1 + S-F5 + P2: /nasti = the app; hashed assets immutable; CSP withou
   // /api/public-config unchanged
   assert.deepEqual(await body(await call('/api/public-config')), { configured: true, supabase_url: SB, supabase_anon_key: 'anon' });
 });
+
+// ---------- S-F1 / S-F2 engine isolation (docs/ENGINE_ISOLATION.md): KV engine_isolation, DB token, /api/engine/sb ----------
+test('engine isolation: config without service key + DB token; /api/engine/sb scoped to the run\'s case; off unchanged', async () => {
+  const realFetch = globalThis.fetch;
+  const seen = [];
+  const files = [{ case_id: 7, storage_path: 'proposals/7/proposal/v1/file.pdf' }];
+  globalThis.fetch = async (u, opt = {}) => {
+    u = String(u); seen.push({ u, opt });
+    const res = (o, s = 200) => new Response(JSON.stringify(o), { status: s, headers: { 'content-type': 'application/json' } });
+    if (u.startsWith(`${SB}/rest/v1/runs?id=eq.11&state=in.(queued,running)&config_taken_at=is.null`)) return res([{ id: 11 }]);
+    if (u === `${SB}/rest/v1/runs?id=eq.11&select=id,case_id`) return res([{ id: 11, case_id: 7 }]);
+    if (u.startsWith(`${SB}/rest/v1/case_files?case_id=eq.7&storage_path=eq.`)) {
+      const sp = decodeURIComponent(u.match(/storage_path=eq\.([^&]+)/)[1]);
+      return res(files.filter(f => f.storage_path === sp).map(() => ({ id: 1 })));
+    }
+    if (u.startsWith(`${SB}/rest/v1/`)) return res([{ ok: true }]);
+    if (u.startsWith(`${SB}/storage/v1/object/`)) return new Response('%PDF obj', { status: 200, headers: { 'content-type': 'application/pdf' } });
+    throw new Error('unexpected fetch ' + u);
+  };
+  try {
+    const e2 = { SETTINGS: kv(), ASSETS: env.ASSETS };
+    for (const [k, v] of Object.entries({ owner_email: 'abhi@example.com', supabase_url: SB, supabase_anon_key: 'anon',
+      supabase_service_key: 'service-secret-1234', anthropic_api_key: 'sk-ant-x' })) await e2.SETTINGS.put(k, v);
+    const c2 = (path, opt = {}) => worker.fetch(new Request('https://desk.example' + path, opt), e2);
+    const exp = Math.floor(Date.now() / 1000) + 3600;
+    const cfgCall = async t => { await e2.SETTINGS.put(`run_token:${t}`, JSON.stringify({ run_id: '11', used: false, exp }));
+      return c2('/api/engine/config?run_id=11', { headers: { Authorization: `Bearer ${t}` } }); };
+
+    // off (absent / 'off'): exactly the old answer — service key, no DB token
+    let r = await cfgCall('a'.repeat(48)); let j = await r.json();
+    assert.equal(r.status, 200);
+    assert.equal(j.supabase_service_key, 'service-secret-1234');
+    assert.ok(!('db_token' in j) && !('engine_isolation' in j), 'off: no new fields');
+    assert.equal([...e2.SETTINGS.m.keys()].filter(k => k.startsWith('run_db:')).length, 0, 'off: no DB token issued');
+    await e2.SETTINGS.put('engine_isolation', 'off');
+    j = await (await cfgCall('b'.repeat(48))).json();
+    assert.equal(j.supabase_service_key, 'service-secret-1234');
+
+    // on: no service key, a DB token scoped to run 11 / case 7
+    await e2.SETTINGS.put('engine_isolation', 'on');
+    r = await cfgCall('c'.repeat(48)); j = await r.json();
+    assert.equal(r.status, 200);
+    assert.ok(!('supabase_service_key' in j), 'on: the service key never leaves the Worker');
+    assert.equal(j.engine_isolation, 'on');
+    assert.match(j.db_token, /^[0-9a-f]{48}$/);
+    assert.equal(j.anthropic_api_key, 'sk-ant-x', 'the runner still gets the Anthropic key (for its local gateway)');
+    assert.deepEqual(JSON.parse(e2.SETTINGS.m.get(`run_db:${j.db_token}`)), { run_id: '11', case_id: '7', exp });
+    const DT = j.db_token;
+    const sbx = (path, opt = {}, tok = DT) => c2('/api/engine/sb' + path, { ...opt, headers: { Authorization: `Bearer ${tok}`, ...(opt.headers || {}) } });
+    const st = async (path, opt, tok) => (await sbx(path, opt, tok)).status;
+    const J = b => ({ body: JSON.stringify(b), headers: { 'content-type': 'application/json', Prefer: 'return=minimal' } });
+
+    // token: the DB token only (not the run token, not a made-up one)
+    assert.equal(await st('/rest/v1/runs?id=eq.11&select=*', {}, 'c'.repeat(48)), 403, 'run token is not a DB token');
+    assert.equal(await st('/rest/v1/runs?id=eq.11&select=*', {}, 'f'.repeat(48)), 403);
+    assert.equal(await st('/rest/v1/runs?id=eq.11&select=*', {}, ''), 403);
+
+    // REST: own run / case only, forwarded with the service key
+    seen.length = 0;
+    assert.equal(await st('/rest/v1/runs?id=eq.11&select=*'), 200);
+    assert.equal(seen[0].u, `${SB}/rest/v1/runs?id=eq.11&select=*`);
+    assert.equal(seen[0].opt.headers.Authorization, 'Bearer service-secret-1234');
+    assert.equal(await st('/rest/v1/runs?case_id=eq.7&select=*&order=id.asc'), 200);
+    assert.equal(await st('/rest/v1/runs?id=eq.12&select=*'), 403, 'another run');
+    assert.equal(await st('/rest/v1/runs?case_id=eq.8&select=*'), 403, 'another case');
+    assert.equal(await st('/rest/v1/runs?select=*'), 403, 'no filter');
+    assert.equal(await st('/rest/v1/runs?id=eq.11&select=*,cases(*)'), 403, 'no embedding');
+    assert.equal(await st('/rest/v1/runs?id=eq.11&or=(id.eq.12)'), 403, 'no or=');
+    assert.equal(await st('/rest/v1/members?select=*'), 403, 'table not allowed');
+    assert.equal(await st('/rest/v1/runs?id=eq.11&state=in.(queued,running)&select=id,state', { method: 'PATCH', ...J({ state: 'done', step: 'तयार' }) }), 200);
+    assert.equal(await st('/rest/v1/runs?id=eq.11', { method: 'PATCH', ...J({ case_id: 8 }) }), 403, 'run field not allowed');
+    assert.equal(await st('/rest/v1/runs?id=eq.11', { method: 'PATCH', ...J({ state: 'queued' }) }), 403, 'state value');
+    assert.equal(await st('/rest/v1/runs?case_id=eq.7', { method: 'PATCH', ...J({ step: 'x' }) }), 403, 'PATCH only by run id');
+    assert.equal(await st('/rest/v1/runs?id=eq.11', { method: 'DELETE' }), 405);
+    assert.equal(await st('/rest/v1/cases?id=eq.7&select=*'), 200);
+    assert.equal(await st('/rest/v1/cases?id=eq.8&select=*'), 403);
+    assert.equal(await st('/rest/v1/cases?cr_no=eq.21&cr_year=eq.2026&id=neq.7&select=id&limit=1'), 200, 'C R duplicate check (ids only)');
+    assert.equal(await st('/rest/v1/cases?cr_no=eq.21&cr_year=eq.2026&id=neq.7&select=*&limit=1'), 403, 'other cases: ids only');
+    assert.equal(await st('/rest/v1/cases?id=eq.7', { method: 'PATCH', ...J({ stage: 'मसुदा तयार' }) }), 200);
+    assert.equal(await st('/rest/v1/cases?id=eq.7', { method: 'PATCH', ...J({ desk: 'x' }) }), 403);
+    assert.equal(await st('/rest/v1/case_files?case_id=eq.7&select=*&order=created_at.asc'), 200);
+    assert.equal(await st('/rest/v1/case_files?case_id=eq.8&select=*'), 403);
+    const row = { case_id: 7, kind: 'study', storage_path: 'outputs/7/study/v3/file.docx', original_name: 'अ.docx', version: 3, uploaded_by: null };
+    assert.equal(await st('/rest/v1/case_files', { method: 'POST', ...J(row) }), 200);
+    assert.equal(await st('/rest/v1/case_files', { method: 'POST', ...J({ ...row, storage_path: 'outputs/7/spec/v2/r11/spec.json', kind: 'spec' }) }), 200);
+    assert.equal(await st('/rest/v1/case_files', { method: 'POST', ...J({ ...row, case_id: 8 }) }), 403);
+    assert.equal(await st('/rest/v1/case_files', { method: 'POST', ...J({ ...row, kind: 'proposal' }) }), 403, 'only output kinds');
+    assert.equal(await st('/rest/v1/case_files', { method: 'POST', ...J({ ...row, storage_path: 'outputs/8/study/v3/file.docx' }) }), 403);
+    assert.equal(await st('/rest/v1/activity', { method: 'POST', ...J({ case_id: 7, actor: null, action: 'run_done', detail: {} }) }), 200);
+    assert.equal(await st('/rest/v1/activity', { method: 'POST', ...J({ case_id: 7, actor: 'u1', action: 'run_done', detail: {} }) }), 403);
+    assert.equal(await st('/rest/v1/activity', { method: 'POST', ...J({ case_id: 8, actor: null, action: 'run_done', detail: {} }) }), 403);
+
+    // Storage: write / delete only outputs/<case>/…; read own outputs or an object a case_files row of the case names
+    const up = { method: 'POST', body: 'PK..', headers: { 'content-type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' } };
+    seen.length = 0;
+    assert.equal(await st('/storage/v1/object/outputs/7/study/v3/file.docx', up), 200);
+    assert.equal(seen[0].u, `${SB}/storage/v1/object/outputs/7/study/v3/file.docx`);
+    assert.equal(seen[0].opt.headers['x-upsert'], 'true');
+    assert.equal(await st('/storage/v1/object/outputs/8/study/v3/file.docx', up), 403, 'another case');
+    assert.equal(await st('/storage/v1/object/proposals/7/proposal/v9/file.pdf', up), 403, 'inputs are never written');
+    assert.equal(await st('/storage/v1/object/outputs/7/study/v3/file.docx', { ...up, headers: { 'content-type': 'text/html' } }), 415);
+    assert.equal(await st('/storage/v1/object/outputs/7/study/v3/file.docx', { method: 'DELETE' }), 200);
+    assert.equal(await st('/storage/v1/object/outputs/7/../8/x/v1/file.pdf'), 403, 'no ..');
+    r = await sbx('/storage/v1/object/proposals/7/proposal/v1/file.pdf');
+    assert.equal(r.status, 200); assert.equal(await r.text(), '%PDF obj');
+    assert.equal(await st('/storage/v1/object/proposals/8/proposal/v1/file.pdf'), 403, 'no case_files row of this case');
+    assert.equal(await st('/storage/v1/object/backups/7/x'), 403, 'bucket');
+    assert.equal(await st('/storage/v1/object/outputs/7/study/v1/file.docx'), 200, 'own outputs readable');
+
+    // expired DB token
+    await e2.SETTINGS.put(`run_db:${'e'.repeat(48)}`, JSON.stringify({ run_id: '11', case_id: '7', exp: 1 }));
+    assert.equal(await st('/rest/v1/runs?id=eq.11&select=*', {}, 'e'.repeat(48)), 403, 'expired');
+  } finally { globalThis.fetch = realFetch; }
+});
