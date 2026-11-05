@@ -69,6 +69,15 @@
   no rule dropped). Gap: tools/verify_outputs.py does not check the _Affidavit / _LQ_Answer files yet.
 
 ## Pending
+27. **Self-hosted runner on Abhi's VPS (05.11.2026, Abhi: "Ok go ahead", "दोन्ही मान्य आहे"; no money for GitHub Actions):**
+    deploy/vps-runner/ (Dockerfile pinned by digest, entrypoint, cleanup hooks, vps-setup.sh), docs/VPS_RUNNER.md (Marathi owner
+    steps). All workflows: runs-on ${{ fromJSON(vars.RUNS_ON || '"ubuntu-latest"') }} — repo variable RUNS_ON =
+    ["self-hosted","prastav"] moves jobs to the VPS; delete it to go back (Actions quota resets 1 December; AdvanceTradingPlatform
+    used $296.80 of the $309.98 included in November). Container: --cpus 1.5 --memory 5g, SYS_ADMIN + apparmor unconfined for the
+    sandbox bind mount, no NET_ADMIN (engine_isolation must stay off), cleanup wipes every job's files. Worker EDIT_STALE_MS 30 ->
+    90 min (one runner: an edit can wait behind a full run). Owner steps: runner token, ONE command block on the VPS, variable
+    RUNS_ON, Settings "एकाच वेळी चालणारे run" = 1, then Deploy app. Not yet verified on the VPS (image build, mount in container,
+    setup-python, a full run).
 26. **GitHub Actions blocked (05.11.2026 from 14:49 UTC):** every job fails at once with "The job was not started because recent
     account payments have failed or your spending limit needs to be increased" — engine runs, edits, tests and Deploy app cannot
     run until Abhi fixes GitHub → Settings → Billing and plans (payment / Actions spending limit). Nothing to deploy right now:
