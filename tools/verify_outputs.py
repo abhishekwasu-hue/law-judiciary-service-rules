@@ -41,6 +41,9 @@ Checks
  Note body and letter (§4.18, text outside “…” quotes only): no 'सौ.'; 'श्री.' followed by a space; letter: no 'तात्काळ'
  Note body and letter (§4.19, outside quotes, lint_spec.lang_hits): no '.:-', no 'करुन' / 'प्रारुप' / 'अनुसरुन', a space after
   'दि.' / 'क्र.' / 'प्र. क्र.' in running text (file nos. / codes with '/' or '-' skipped); missing-info para 'नाही:-'
+ Note body (C1 / C2, Abhi 05.11.2026, options आ): no incoming letter number (lint_spec.note_letter_no_hits — "क्र." /
+  "क्रमांक" + a number near a पत्र-word, outside quotes; GR / case / own file numbers excepted); the missing-info para lists
+  its items inline "(1) …; (2) …." (FAIL when not; WARN for a table right after it)
  Note body (§4.31, 03.11.2026; lint_spec.missing_scatter, outside quotes): missing information / documents only in ONE para
   "प्रस्तावासोबत खालील माहिती उपलब्ध नाही:-" (+ its table / unnumbered sub-points); no "नमूद नाही / जोडलेले नाही /
   उपलब्ध नाही / प्रस्तावासोबत नाही / प्रत नाही / सादर केलेली नाही" remark elsewhere; not two such paras (SOFT);
@@ -122,7 +125,8 @@ from lint_spec import (AMS, BANNED, BARE_CLOSING_RE, FIN, ID_RE, LH_EMAIL, RELAT
                        lang_hits, ma_hits, ns, num, part_no, ref_problems, repo_hits, requests_info, signer_problems,
                        style_hits, unquoted, warn_hits, PKG_WORD, draft_word_hits, related_source_problems,
                        missing_scatter, flow_warnings, DO_FIRST_PERSON_RE, SUMMARY_HEAD_RE, summary_problems,
-                       NUMLIST, LAST_FORMS, out, redact, details_arg, set_details, details_active)
+                       NUMLIST, LAST_FORMS, out, redact, details_arg, set_details, details_active,
+                       MISSING_HEAD_RE, MISSING_INLINE_RE, MISSING_INLINE_MSG, note_letter_no_hits)
 from mkdocs import DO_WISH, DO_SUBSCRIPTION  # noqa: E402 — अर्धशासकीय पत्र ending (GAD specimen)
 INTRO_HEAD = "उपरोक्त विषयाबाबत"  # letter intro paragraph (lint_spec.INTRO_START begins with it)
 UO_LINE_RE = re.compile(r"^\S.*विभागाकडे\s+अनौपचारिक\s+संदर्भ\s+कार्यासन(?:\s|$)")   # note "uo" block (mkdocs.uo_lines)
@@ -579,6 +583,21 @@ def main(argv):
         check("missing information in ONE para §4.31 (note body)", mp)
         for x in mw:
             warn(x)
+        # C2 (Abhi 05.11.2026, option आ): the missing-info para lists its items inline "(1) …; (2) …." — not a table
+        nb = [b for b in bl[:note_end] if ns(b["text"])]
+        mi = []
+        for i, b in enumerate(nb):
+            t = re.sub(r"^[0-9०-९]+\.\s*", "", ns(b["text"]))
+            if b["kind"] == "p" and MISSING_HEAD_RE.match(ns(unquoted(t))):
+                if not MISSING_INLINE_RE.search(t):
+                    mi.append(f"note: {MISSING_INLINE_MSG}")
+                if i + 1 < len(nb) and nb[i + 1]["kind"] == "tbl":
+                    warn(f"note: table after the missing-info para — {MISSING_INLINE_MSG}")
+        check("missing-info items inline §4.31(अ) C2 (note body)", mi)
+        # C1 (Abhi 05.11.2026, option आ): no incoming letter number anywhere in the note body (lint_spec.note_letter_no_hits;
+        # outside quotes and पृ.N/प.वि.; GR / case / own file numbers excepted)
+        check("no incoming letter no. in the note §4.29 C1 (note body)",
+              [f"note block {i + 1}: '{x}'" for i, b in enumerate(bl[:note_end]) for x in note_letter_no_hits(b["text"])])
         # C32 §4.34 (Abhi 03.11.2026; lint_spec.flow_warnings): relevance + एकसंध flow — SOFT notes printed as WARN, never
         # a FAIL: "पृ./प.वि." table column, "पृष्ठांकन" / "माहितीकरिता देण्यात", quote-gluing, a page ref in an
         # "उपरोक्त वस्तुस्थिती" item, a shortened quote (note body and संबंधित माहिती)

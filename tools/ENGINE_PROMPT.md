@@ -87,7 +87,8 @@ Cost: measured $3.0–3.9 per full run, Opus 90–96 % of it (docs/AUDIT_2026-11
    letter, `related` = []; पृ.N computed from the package order: proposal pages 1..n, then the enclosure pages in
    order; the note body DETAILED per brief [I4.29] — the 12 elements where they apply, nothing of the proposal left
    out, short sentences, the brief's [I4.30] quality checks; missing information / documents ONLY in the one
-   missing-info para just before the last para, essential items only, "____" in tables [I4.31]; only references needed
+   missing-info para just before the last para, items inline "(1) …; (2) …." (no table), essential items only, "____"
+   in tables [I4.31]; no incoming letter no. anywhere in the note [I4.36]; only references needed
    to decide the demand, each fact once, office order with linking openers, one quote per sentence, पृ.N/प.वि. once
    per document and no पृ. table column, 3-6 decisive facts in "उपरोक्त वस्तुस्थिती", no quote cut with "…" [I4.34];
    the letter concise [I4.15]), /tmp/work/study_part0.json (part 0 as a build_study part), /tmp/work/status_core.json (summary,
@@ -144,7 +145,8 @@ Cost: measured $3.0–3.9 per full run, Opus 90–96 % of it (docs/AUDIT_2026-11
    /tmp/work/study_part0.json; LOOK at the page images WORKDIR/pages/p-NN.png. Check and correct per your
    definition (incl. brief [I4.29]: each element present where it applies, no fact/condition of the proposal left out;
    brief [I4.30]: checks (1)–(7), and write review.json `coverage` + `contradictions`; brief [I4.31]: missing information /
-   documents only in the one missing-info para, essential items only, no such remark elsewhere, "____" in tables;
+   documents only in the one missing-info para, items inline (no table), essential items only, no such remark
+   elsewhere, "____" in tables; brief [I4.36]: drop any incoming letter no. from the note (keep authority + date);
    brief [I4.34]: remove references not needed to decide the demand (endorsement nos., copy lines, reminder history,
    meta lines) and repeated facts, link the paras, split glued quotes, drop "पृ./प.वि." table columns, cut the fact
    summary to 3-6 decisive lines without पृ. — minimal edits, never a fact the decision needs); after your edits run `python3 tools/lint_spec.py /tmp/work/spec.json` until LINT OK, then write the
@@ -284,7 +286,7 @@ Court or MAT about a writ petition (रिट याचिका), O.A. (मू�
 on the page images):
 - Note (INSTRUCTIONS §4.32, brief [I4.32]; model samples/specs/WP35697_2026_old-pension_finance-opinion.json): para 1 as
   PROPOSAL_SOP Step 4b (B9: "<सहायक सरकारी वकील, मा. उच्च न्यायालय, …> यांच्या पृ.N/प.वि. वरील दि. __ रोजीच्या पत्रास
-  अनुसरून सादर."); the FIRST numbered para = the petition (petitioners, court, petition type + no., पृ.N/प.वि., "कृपया
+  अनुसरून सादर."; no GP / AGP letter, petition received directly: just "सादर." — Abhi 05.11.2026, C3 option अ); the FIRST numbered para = the petition (petitioners, court, petition type + no., पृ.N/प.वि., "कृपया
   पहावी.") and ALL respondents in the petition's order in flowing sentences ("सदर याचिकेत <R1> यांना प्रतिवादी क्र. 1, …
   आणि <Rn> यांना प्रतिवादी क्र. N करण्यात आले आहे (पृ.N/प.वि.).", Marathi designations, e.g. Registrar General =
   महाप्रबंधक, मा. उच्च न्यायालय) + the verification date — no choppy "प्रतिवादी क्र. 1 …;" list, no separate respondents

@@ -106,14 +106,16 @@ Rules (binding):
    "शुद्धिपत्रक", "द्ध" (not "ध्द"); a request in a letter ends "…उपलब्ध करून देण्यात यावी, ही विनंती."; no "तात्काळ".
 5. Page references only as "पृ.N/प.वि." (N, N-M or N,M) with N inside the package pages given in the context. Never
    write "पॅकेज", "इशारा", "स्रोत", "जसाच्या तसा", "अस्पष्ट", "टीप :", "मागवावे", "TODO", "AI", "model", "—" or "→".
-6. Missing information / documents only in the ONE para "प्रस्तावासोबत खालील माहिती उपलब्ध नाही:-", just before the
-   last ("सबब, …") para; nowhere else remarks like "नमूद नाही" / "उपलब्ध नाही". The last para keeps an approved form.
+6. Missing information / documents only in the ONE para "प्रस्तावासोबत खालील माहिती उपलब्ध नाही:- (1) …; (2) ….",
+   items inline in that para, never a table (§4.31, 05.11.2026), just before the last ("सबब, …") para; nowhere else
+   remarks like "नमूद नाही" / "उपलब्ध नाही". The last para keeps an approved form.
    No words such as "दिसून येते", "माझ्या मते", "कदाचित", "ठरवावे".
 7. Note paras: items of "paras" are strings (numbered automatically 2., 3., …; "first" is para 1 — never type a para
    number) or tables {"table": [[header cells], [row cells], …], "bold_last": false}. Keep the signer chain as it is.
    Para 1 of the टिप्पणी ("first") names each covering letter by its authority, date and पृ.N/प.वि. only and never
-   carries a letter number (INSTRUCTIONS §4.29(1)); when you touch para 1, drop any "क्र. …" of a covering letter and
-   keep the date.
+   carries a letter number (INSTRUCTIONS §4.29(1)); the same for every letter anywhere in the टिप्पणी (§4.29(5),
+   §4.30(7), 05.11.2026): when you touch a para, drop any "क्र. …" of an incoming letter and keep the date (GR, petition
+   and case numbers stay).
    A letter table asks only for data; documents go in a numbered list after it.
 
 Reply strictly as JSON: {"ops": [...], "summary": "...", "refuse": ""}.

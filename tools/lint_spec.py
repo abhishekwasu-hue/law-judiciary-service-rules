@@ -24,6 +24,13 @@ Rules (spec.json)
     digits, blank "पृ.      /प.वि."); "“…”" quotes are skipped in related; page range 1..N only with --pages N
   - note.first ends with "सादर."; no letter number in it — "क्र." / "क्रमांक" + a token with "/" outside quotes and
     पृ.N/प.वि. (a petition / application / case no. excepted) (§4.29(1), audit 05.11.2026 Q-F7 / R-F2)
+  - C1 (Abhi 05.11.2026, option आ; §4.29(1)/(5), §4.30(7), §4.36): no incoming letter number anywhere else in the note
+    body either (paras incl. table cells, sub, closing; outside quotes and पृ.N/प.वि.): "क्र." / "क्रमांक" + a token with a
+    digit or "/" within 4 words after or 6 words before a पत्र-word (पत्र, पत्रास, पत्रान्वये, स्मरणपत्र …); GR / case /
+    order words right before "क्र." (शासन निर्णय, परिपत्रक, याचिका, अर्ज, प्र. क्र., अ.क्र. …) and the Section's own file
+    no. ("संकिर्ण-…") excepted (note_letter_no_hits)
+  - C2 (Abhi 05.11.2026, option आ; §4.18, §4.31(अ)): the missing-info para lists its items inline after ":-" — "(1) …;
+    (2) …." (error when no inline "(1)"; WARN for a table right after the para; missing_inline_problems)
   - last note para (note.closing if not blank, else the last text item of note.paras) is one of the SOP forms:
     "सबब, … पत्राचे प्रारूप पृ.  /प.वि. वर मान्यतेस्तव सादर. मान्य झाल्यास पत्र निर्गमित करण्यात येईल." or
     "सबब, … वित्त विभागाच्या मान्यतेस्तव सादर करण्यात येत आहे." or (several drafts, INSTRUCTIONS §4.28, 03.11.2026)
@@ -731,6 +738,8 @@ def lint_spec(spec, pages=None):
         P.append("note.first: first para — must end with 'सादर.'")
     if isinstance(first, str):
         P += [f"note.first: {x}" for x in first_letter_no_problems(first)]   # §4.29(1), audit 05.11.2026 Q-F7 / R-F2
+    P += note_letter_no_problems(n)   # C1 (05.11.2026): no incoming letter no. anywhere in the note body
+    P += missing_inline_problems(n)[0]   # C2 (05.11.2026): missing-info items inline, not a table
     paras = n.get("paras", [])
     if not isinstance(paras, list):
         P.append("note.paras: structure — must be a list"); paras = []
@@ -1081,6 +1090,89 @@ def first_letter_no_problems(first):
     return out
 
 
+# C1 (Abhi 05.11.2026, option आ — INSTRUCTIONS §4.29(1)/(5), §4.30(7), §4.36; ERROR): no incoming letter number anywhere in
+# the note body (first, paras incl. table cells, sub, closing) — every letter is cited by authority, date and पृ.N/प.वि.
+# only. A letter number = "क्र." / "क्रमांक" + a token with a digit or "/" that stands within 4 words after a पत्र-word
+# (पत्र, पत्रा, पत्रास, पत्रान्वये, स्मरणपत्र, अ.शा.पत्र …; not परिपत्रक / शुद्धिपत्रक / पत्रक) or within 6 words before
+# one ("क्र. 12/2026 दि. … रोजीच्या पत्रान्वये"). Not a letter number: the word right before "क्र." is a GR / case /
+# order word (शासन निर्णय, परिपत्रक, अधिसूचना, आदेश, याचिका, अर्ज, अपील, प्रकरण, दावा, प्र. क्र., अ.क्र., नस्ती, उमेदवार,
+# नियम, सांकेतांक …), or the number is the Section's own file no. ("संकिर्ण-…" / "संकीर्ण-…"). Text inside “…”
+# quotes, पृ.N/प.वि. references, "संबंधित माहिती" and the letter (ref_no, refs "आपले पत्र क्र. …") are not checked.
+LETTER_WORD_RE = re.compile(r"(?<![ऀ-ॿ])(?:स्मरण)?पत्र(?!क)[ऀ-ॿ]*")
+NOTE_NO_RE = re.compile(r"(?<![ऀ-ॿ])(?:क्र\.|क्रमांक)\s*:?\s*-?\s*(\S*[/0-9०-९]\S*)")
+NOT_LETTER_WORD_RE = re.compile(r"^(?:प्र\.?|अ\.?|जी\.?आर\.?|याचिक|अर्ज|अपील|प्रकरण|दाव|निर्णय|परिपत्रक|शुद्धिपत्रक|पूरकपत्र"
+                                r"|अधिसूचन|आदेश|सांकेतांक|नस्ती|उमेदवार|नियम|ज्ञापन|कलम|खाते|petition|application|g\.?r\.?)",
+                                re.I)
+OWN_FILE_NO_RE = re.compile(r"^संकि?ी?र्ण-")
+NOTE_LETTER_NO_MSG = ("टिप्पणीत पत्राचा क्रमांक नको — प्राधिकारी, दिनांक व पृ.N/प.वि. पुरेसे "
+                      "(§4.29(1)/(5), §4.30(7), 05.11.2026 C1 पर्याय आ)")
+
+
+def _word(w):
+    return w.strip(",;:()[]{}\"'“”‘’")
+
+
+def note_letter_no_hits(text):
+    """C1: incoming letter numbers in one note string (outside quotes and पृ.N/प.वि.) -> list of matched snippets."""
+    t = REF_LOOSE.sub(" ", unquoted(text or ""))
+    out = []
+    for m in NOTE_NO_RE.finditer(t):
+        tok = _word(m.group(1))
+        if OWN_FILE_NO_RE.match(tok):
+            continue
+        head = t[:m.start()]
+        before = [_word(w) for w in head.split()]
+        if head and not head[-1].isspace() and before:   # "प्र.क्र." / "अ.क्र.": the same token's prefix
+            prev = before[-1]
+        else:
+            prev = before[-1] if before else ""
+        if prev and NOT_LETTER_WORD_RE.match(prev):
+            continue
+        hit = any(LETTER_WORD_RE.search(w) for w in before[-4:])
+        if not hit:
+            for w in [_word(x) for x in t[m.end():].split()][:6]:
+                if NOTE_NO_RE.match(w) or w in ("क्र.", "क्रमांक") or NOT_LETTER_WORD_RE.match(w):
+                    break
+                if LETTER_WORD_RE.search(w):
+                    hit = True; break
+        if hit:
+            out.append(ns(t[max(0, m.start() - 25):m.end()]))
+    return out
+
+
+def note_letter_no_problems(n):
+    """C1 over the note body except note.first (first_letter_no_problems covers it): [] = ok."""
+    P = []
+    for k in ("paras", "sub", "closing"):
+        if k in n:
+            for path, t in strings(n[k], f"note.{k}"):
+                P += [f"{path}: incoming letter no. '{x}' — {NOTE_LETTER_NO_MSG}" for x in note_letter_no_hits(t)]
+    return P
+
+
+# C2 (Abhi 05.11.2026, option आ — INSTRUCTIONS §4.18, §4.31(अ), §4.36): the missing-info para lists its items inline
+# "प्रस्तावासोबत खालील माहिती उपलब्ध नाही:- (1) …; (2) …." — not a table (ERROR: no inline "(1)" after ":-"; WARN: a
+# table right after the para). The letter's information-request table (§4.20) is unchanged.
+MISSING_INLINE_RE = re.compile(r":-\s*\(\s*[1१]\s*\)")
+MISSING_INLINE_MSG = ("missing-info para — items inline '(1) …; (2) ….', not a table "
+                      "(§4.18, §4.31(अ), 05.11.2026 C2 पर्याय आ)")
+
+
+def missing_inline_problems(n):
+    """C2: (problems, warnings) for the spec note's missing-info para(s)."""
+    P, W = [], []
+    paras = n.get("paras") if isinstance(n.get("paras"), list) else []
+    for i, x in enumerate(paras):
+        if not (isinstance(x, str) and MISSING_HEAD_RE.match(ns(unquoted(x)))):
+            continue
+        if not MISSING_INLINE_RE.search(ns(x)):
+            P.append(f"note.paras[{i}]: {MISSING_INLINE_MSG}")
+        nxt = paras[i + 1] if i + 1 < len(paras) else None
+        if isinstance(nxt, dict) and "table" in nxt:
+            W.append(f"note.paras[{i + 1}]: table after the missing-info para — {MISSING_INLINE_MSG}")
+    return P, W
+
+
 # Q-F8 (WARN, §4.29(10) / §4.34(आ)): the "उपरोक्त वस्तुस्थिती पुढीलप्रमाणे आहे:-" list has 3 to 6 decisive facts, one line
 # each, no “…” quote (the quotes are in the body)
 SUMMARY_MIN, SUMMARY_MAX = 3, 6
@@ -1275,6 +1367,7 @@ def lint_warnings(spec):
     letter = letter_strings(spec)
     W = [f"{path}: {m}" for path, t in body + letter for m in warn_hits(t)]
     W += missing_scatter(note_seq(n))[1]   # §4.31 placement
+    W += missing_inline_problems(n)[1]   # C2 (05.11.2026): a table after the missing-info para
     rel_txt = [(pth, t) for pth, t in strings(spec.get("related", []), "related") if re.search(r"\.text(\[|$)", pth)]
     W += flow_warnings(note_seq(n), note_tables(n), rel_txt)   # C32 §4.34 relevance + flow
     W += [f"{last_para(n)[0]}: last para — does not name the draft {d} (§4.28: name every draft made, e.g. "
