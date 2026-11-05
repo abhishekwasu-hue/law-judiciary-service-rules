@@ -29,6 +29,8 @@ const providerReady = (cfg, p) => !!cfg[PROVIDER_KEY[p]] || (p === 'ollama' && !
 // the main run needs the Anthropic key unless another provider (with its key) runs the engine
 const engineReady = cfg => (AI_PROVIDERS.includes(cfg.engine_provider) ? providerReady(cfg, cfg.engine_provider) : !!cfg.anthropic_api_key);
 const MODEL_NAME = /^[A-Za-z0-9][A-Za-z0-9._:@\/-]{1,99}$/;
+// model_edit: tools/edit_drafts.py calls the Anthropic Messages API directly (no LiteLLM gateway) → Claude model ids only
+const CLAUDE_MODEL = /^claude-[A-Za-z0-9][A-Za-z0-9._:@-]{0,92}$/;
 const EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'];
 const REQUIRED_KEYS = ['supabase_url', 'supabase_anon_key', 'owner_email']; // never saved empty (Settings PUT)
 const LETTER_STATUS = ['मसुदा', 'पाठवले', 'उत्तर प्राप्त', 'स्मरणपत्र']; // = letters.status CHECK (migration 0001)
@@ -950,7 +952,7 @@ async function route(req, env, url) {
     if ((await takeConfig(cfg, tok.run_id)) === false) return bad('bad token', 403);
     const exp = tok.exp || Math.floor(Date.now() / 1000) + RUN_TOKEN_TTL;
     await env.SETTINGS.put(tok.key, JSON.stringify({ run_id: tok.run_id, used: true, exp }), { expiration: exp });
-    const out = { anthropic_api_key: cfg.anthropic_api_key, model: cfg.model, model_light: cfg.model_light || '', model_review: cfg.model_review || '', budget_usd: cfg.budget_usd || '', model_strong: cfg.model_strong || '', effort: cfg.effort || '', model_edit: cfg.model_edit || DEFAULT_MODEL_EDIT, supabase_url: cfg.supabase_url, supabase_service_key: cfg.supabase_service_key };
+    const out = { anthropic_api_key: cfg.anthropic_api_key, model: cfg.model, model_light: cfg.model_light || '', model_review: cfg.model_review || '', budget_usd: cfg.budget_usd || '', model_strong: cfg.model_strong || '', effort: cfg.effort || '', model_edit: CLAUDE_MODEL.test(String(cfg.model_edit || '').trim()) ? String(cfg.model_edit).trim() : DEFAULT_MODEL_EDIT, supabase_url: cfg.supabase_url, supabase_service_key: cfg.supabase_service_key };
     // other providers: a key is sent only when its provider is chosen (A: part 1 on Gemini; C: fallback provider)
     // a provider key leaves the Worker only when that provider is chosen (engine / fallback / part 1)
     for (const pv of usedProviders(cfg)) if (cfg[PROVIDER_KEY[pv]]) out[PROVIDER_KEY[pv]] = cfg[PROVIDER_KEY[pv]];
@@ -1093,6 +1095,8 @@ async function route(req, env, url) {
       return bad('ollama_base_url: http(s)://host[:port][/path]');
     for (const k of MODEL_KEYS)
       if (k in b && b[k] !== null && String(b[k]).trim() !== '' && !MODEL_NAME.test(String(b[k]).trim())) return bad(`${k}: model name`);
+    if ('model_edit' in b && b.model_edit !== null && String(b.model_edit).trim() !== '' && !CLAUDE_MODEL.test(String(b.model_edit).trim()))
+      return bad('model_edit: claude model name');
     // model_strong: empty / none = off; effort: one of EFFORTS or empty (= engine default)
     if ('model_strong' in b && b.model_strong !== null) {
       const v = String(b.model_strong).trim();

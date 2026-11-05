@@ -115,7 +115,13 @@ Commands ("deliver with warnings", Abhi 02.11.2026: drafts are never thrown away
                       (If the run is already failed, the earlier, more specific reason is kept.)"""
 import datetime, glob, json, mimetypes, os, re, subprocess, sys, urllib.error, urllib.parse, urllib.request
 
-INPUT_KINDS = ("proposal", "extra_doc", "reply", "approval", "court_notice")   # approval / court_notice: C28 (03.11.2026)
+INPUT_KINDS = ("proposal", "extra_doc", "reply", "approval", "court_notice", "gr")   # approval / court_notice: C28 (03.11.2026)
+# Pending 18 (05.11.2026): a GR / document attached in the draft-edit chat (docs/DRAFT_EDIT_DESIGN.md Addendum A) is an
+# input of every LATER full run too, and that run's package keeps it: kind `gr` rows (only the chat makes them: an
+# uploaded GR PDF, or a GR fetched by सांकेतांक and stored by tools/edit_drafts.py) and the case_files ids of
+# runs.edit_attachments of DONE, not refused edit runs. case.json marks them `"package": true` (+ `package_pdf_path` for
+# an image, converted at fetch); finish warns when one is missing from enclosures.json or enclosed twice.
+CHAT_IMAGE_EXT = (".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp", ".gif", ".webp")   # tools/prep_pages.py IMAGE_EXT
 # C28 "कोणते मसुदे हवेत?" (INSTRUCTIONS §4.28, 03.11.2026): the drafts the user ticked for a run (runs.outputs), fixed order
 # 04.11.2026: do_letter … lq appended (docs/FORMS_RESEARCH_DO_UO.md, FORMS_RESEARCH_ORDERS.md, FORMS_RESEARCH_AFFIDAVIT_LQ.md)
 DRAFT_KEYS = ("letter", "reminder", "gr", "corrigendum", "circular", "memo", "notification", "parawise",
@@ -363,7 +369,38 @@ def newest_proposal(files):
 
 def inputs_of(files):
     p = newest_proposal(files)
-    return ([p] if p else []) + newest(files, ("extra_doc", "reply", "approval", "court_notice"))
+    return ([p] if p else []) + newest(files, ("extra_doc", "reply", "approval", "court_notice", "gr"))
+
+
+def input_layout(files, work):
+    """[(case_files row, local path)] of a full run's fetch, in fetch order: the inputs, then the other proposal uploads
+    as extra documents (A1 H13). The ONE layout rule (cmd_fetch, finish's package check, tools/edit_drafts.py)."""
+    taken, out = set(), []
+    for f in inputs_of(files) + [dict(o, kind="extra_doc", from_kind="proposal") for o in older_proposals(files)]:
+        out.append((f, unique_dst(work, f["kind"], f["original_name"], taken)))
+    return out
+
+
+def chat_attachment_ids(runs):
+    """case_files ids attached in the draft-edit chat by DONE, not refused edit runs (runs.edit_attachments)."""
+    ids = set()
+    for r in runs or []:
+        er = r.get("edit_result") if isinstance(r.get("edit_result"), dict) else {}
+        if r.get("kind") != "edit" or r.get("state") != "done" or er.get("refused"):
+            continue
+        for x in r.get("edit_attachments") or []:
+            if str(x).isdigit():
+                ids.add(int(x))
+    return ids
+
+
+def is_package_input(f, chat_ids):
+    return not f.get("from_kind") and (f["kind"] == "gr" or (f["kind"] != "proposal" and f.get("id") in chat_ids))
+
+
+def converted_pdf(dst):
+    """local PDF next to a chat-attached image (<image>.pdf)."""
+    return dst + ".pdf"
 
 
 def norm_outputs(v):
@@ -486,27 +523,39 @@ def cmd_fetch(work):
     if not any(f["kind"] == "proposal" for f in inputs):
         return cmd_fail("प्रस्ताव PDF अपलोड केलेला नाही — प्रस्ताव अपलोड करा, नंतर पुन्हा तयार करा.")
     older = older_proposals(files)
-    got, taken, warns = [], set(), []
-    for f in inputs + [dict(o, kind="extra_doc", from_kind="proposal") for o in older]:
+    try:
+        runs = rest("GET", f"runs?case_id=eq.{CASE}&select=*&order=id.asc") or []
+    except Exception:
+        runs = []
+    chat = chat_attachment_ids(runs)
+    got, warns = [], []
+    for f, dst in input_layout(files, work):
         bucket, _, path = f["storage_path"].partition("/")
         data = http("GET", f"{BASE}/storage/v1/object/{bucket}/{enc(path)}", raw=True)
         if f["kind"] == "proposal" and not f.get("from_kind"):
             why = proposal_problem(data)
             if why:
                 return cmd_fail(why)
-        dst = unique_dst(work, f["kind"], f["original_name"], taken)
         os.makedirs(os.path.dirname(dst), exist_ok=True)
         open(dst, "wb").write(data)
-        got.append({**f, "local_path": os.path.relpath(dst, work).replace("\\", "/")})
+        rec = {**f, "local_path": os.path.relpath(dst, work).replace("\\", "/")}
+        if is_package_input(f, chat):
+            rec["package"] = True   # Pending 18: attached in the draft-edit chat -> enclosed in this run's package
+            if os.path.splitext(f["original_name"])[1].lower() in CHAT_IMAGE_EXT:
+                try:
+                    import pymupdf
+                    with pymupdf.open(dst) as img:
+                        pdf = img.convert_to_pdf()
+                    open(converted_pdf(dst), "wb").write(pdf)
+                    rec["package_pdf_path"] = os.path.relpath(converted_pdf(dst), work).replace("\\", "/")
+                except Exception as e:
+                    warns.append(f"सुधारणा-चॅटमध्ये जोडलेली प्रतिमा '{f['original_name']}' PDF मध्ये बदलता आली नाही ({str(e)[:80]})"[:300])
+        got.append(rec)
     prop = [f for f in got if f["kind"] == "proposal"]
     if older:
         warns.append(f"प्रस्तावाच्या {len(older) + 1} फाइल अपलोड आहेत — नवीनतम '{prop[0]['original_name']}' प्रस्ताव म्हणून घेतली; "
                      f"इतर ({', '.join(o['original_name'] for o in older)}) अतिरिक्त कागदपत्र म्हणून वाचल्या"[:300])
     outputs = norm_outputs(run.get("outputs"))   # absent column (migration 0008 not applied) -> None
-    try:
-        runs = rest("GET", f"runs?case_id=eq.{CASE}&select=*&order=id.asc") or []
-    except Exception:
-        runs = []
     info = {"case": case, "run": {"id": run["id"], "instructions": run.get("instructions") or "", "outputs": outputs},
             "instructions": run.get("instructions") or "",
             "outputs": outputs,
@@ -769,6 +818,47 @@ def upload_spec():
     return [{"kind": u["kind"], "name": u["name"], "version": u["version"]} for u in done], []
 
 
+def enclosure_paths(raw):
+    """every path of a pkg3 enclosures.json (dict {proposal_parts, enclosures} or a plain list)."""
+    items = (list(raw.get("proposal_parts") or []) + list(raw.get("enclosures") or [])) if isinstance(raw, dict) else \
+        (list(raw) if isinstance(raw, list) else [])
+    out = []
+    for it in items:
+        p = it if isinstance(it, str) else (it.get("path") if isinstance(it, dict) else None)
+        if p:
+            out.append(str(p).replace("\\", "/"))
+    return out
+
+
+def package_input_warnings():
+    """Pending 18: each input attached in the draft-edit chat (`"package": true` at fetch) must be in this run's
+    enclosures.json exactly once -> [warning] (missing / twice). Rows and layout re-read from Supabase (not from the
+    engine-writable case.json); no enclosures.json -> [] (upload_spec logs it)."""
+    ep = os.path.join(work_dir(), "enclosures.json")
+    if not os.path.isfile(ep):
+        return []
+    try:
+        paths = enclosure_paths(json.load(open(ep, encoding="utf-8-sig")))
+        files = rest("GET", f"case_files?case_id=eq.{CASE}&select=*&order=created_at.asc") or []
+        runs = rest("GET", f"runs?case_id=eq.{CASE}&select=*&order=id.asc") or []
+    except Exception as e:
+        print("engine_supabase: package check of chat attachments skipped:", e, file=sys.stderr)
+        return []
+    chat = chat_attachment_ids(runs)
+    root = "/x"
+    warns = []
+    for f, dst in input_layout(files, root):
+        if not is_package_input(f, chat):
+            continue
+        rels = {os.path.relpath(dst, root).replace("\\", "/"), os.path.relpath(converted_pdf(dst), root).replace("\\", "/")}
+        n = sum(1 for p in paths if p in rels or any(p.endswith("/" + r) for r in rels))
+        if n == 0:
+            warns.append(f"पडताळणी अपूर्ण — सुधारणा-चॅटमध्ये जोडलेले '{f['original_name']}' GR सह PDF मध्ये नाही — तपासा"[:300])
+        elif n > 1:
+            warns.append(f"पडताळणी अपूर्ण — सुधारणा-चॅटमध्ये जोडलेले '{f['original_name']}' GR सह PDF मध्ये {n} वेळा आहे — तपासा"[:300])
+    return warns
+
+
 def cmd_finish(out):
     try:
         st = json.load(open(os.path.join(out, "status.json"), encoding="utf-8"))
@@ -804,6 +894,9 @@ def cmd_finish(out):
     st_w0 = st.get("warnings") if isinstance(st.get("warnings"), list) else []
     if pend and not any(str(x).strip() == pend for x in st_w0):
         st["warnings"] = list(st_w0) + [pend]
+    pkg_w = package_input_warnings()   # Pending 18: chat attachments kept in the package (once)
+    if pkg_w:
+        st["warnings"] = list(st.get("warnings") if isinstance(st.get("warnings"), list) else []) + pkg_w
     study_note = []
     try:
         cur_w = (rest("GET", f"runs?id=eq.{RUN}&select=warnings") or [{}])[0].get("warnings")

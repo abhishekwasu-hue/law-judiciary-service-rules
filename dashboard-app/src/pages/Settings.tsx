@@ -37,7 +37,7 @@ const PLAIN: { k: string; label: string; hint?: string; num?: boolean; max?: num
   { k: 'model_review', label: 'अंतिम पडताळणी मॉडेल', hint: 'टिप्पणी, पत्र व ब्रीफिंगची अंतिम तपासणी व मंजुरी. सर्वात सक्षम मॉडेल ठेवावे; रिकामे = डीफॉल्ट', sec: 'ai', ph: 'उदा. claude-opus-…' },
   { k: 'model_light', label: 'स्वस्त मॉडेल', hint: 'अभ्यास-फाइल भाग 1–7, संबंधित माहिती व यांत्रिक काम; रिकामे = डीफॉल्ट', sec: 'ai', ph: 'उदा. claude-haiku-…' },
   { k: 'model_strong', label: 'उच्च-स्तर मॉडेल', hint: 'ऐच्छिक. मुख्य मॉडेलच्या वर एकदिशा उन्नयन (escalation); रिकामे / none = बंद', sec: 'ai', ph: 'रिकामे = बंद' },
-  { k: 'model_edit', label: 'सुधारणा-चॅट मॉडेल', hint: 'प्रकरणावरील सुधारणा-चॅटसाठी. रिकामे = claude-sonnet-5-5', sec: 'ai', ph: 'claude-sonnet-5-5' },
+  { k: 'model_edit', label: 'सुधारणा-चॅटचे मॉडेल', hint: 'प्रकरणावरील सुधारणा-चॅटसाठी (फक्त claude-… मॉडेल). रिकामे = claude-sonnet-5-5', sec: 'ai', ph: 'claude-sonnet-5-5' },
   { k: 'effort', label: 'विचार-पातळी', hint: 'रिकामे = medium', sec: 'ai', choices: [['', 'रिकामे (medium)'], ['low', 'low'], ['medium', 'medium'], ['high', 'high'], ['xhigh', 'xhigh'], ['max', 'max']] },
   // other AI providers (Abhi 02.11.2026: keys for various models incl. free ones — docs/AI_PROVIDERS_RESEARCH.md)
   { k: 'engine_provider', label: 'मुख्य प्रक्रिया कोणाकडून', hint: 'रिकामे = Claude (वरील मॉडेल). दुसरा AI निवडल्यास संपूर्ण प्रक्रिया त्या AI कडून होते; सर्व तपासण्या लागू; प्रकरणावर सूचना येते.', sec: 'alt', choices: PROVIDER_CHOICES('Claude (डीफॉल्ट)') },
@@ -67,6 +67,8 @@ const SECRET: { k: string; label: string; hint: string; alt?: boolean }[] = [
 const LOCAL_LABEL: Record<string, string> = Object.fromEntries([...PLAIN, ...SECRET].map(f => [f.k, f.label]));
 // Same rules as the Worker's Settings PUT (cloudflare/worker.js) — checked here first, field named in Marathi
 const MODEL_NAME = /^[A-Za-z0-9][A-Za-z0-9._:@/-]{1,99}$/;
+// model_edit: the edit job calls the Anthropic API directly → Claude model ids only (Worker CLAUDE_MODEL)
+const CLAUDE_MODEL = /^claude-[A-Za-z0-9][A-Za-z0-9._:@-]{0,92}$/;
 const MODEL_KEYS = ['gemini_model', 'part1_model', 'fallback_model', 'fallback_model_light', 'engine_model', 'engine_model_light', 'model_edit'];
 const REQUIRED = ['supabase_url', 'supabase_anon_key', 'owner_email'];
 const CLEAR = '__clear__'; // Worker: deletes the key
@@ -81,6 +83,7 @@ export function checkSettings(v: Record<string, string>): string | null {
   if (t('cloudflare_account_id') && !/^[0-9a-f]{32}$/.test(t('cloudflare_account_id'))) return `${L('cloudflare_account_id')}: कृपया नेमकी 32 अक्षरे (0-9, a-f) नमूद करावीत.`;
   if (t('ollama_base_url') && !/^https?:\/\/[A-Za-z0-9.-]+(:\d+)?(\/[A-Za-z0-9._~/-]*)?$/.test(t('ollama_base_url'))) return `${L('ollama_base_url')}: कृपया http:// किंवा https:// ने सुरू होणारा पत्ता नमूद करावा (उदा. https://host:11434).`;
   for (const k of MODEL_KEYS) if (t(k) && !MODEL_NAME.test(t(k))) return `${L(k)}: कृपया योग्य मॉडेल-नाव नमूद करावे (अक्षरे, अंक, . _ : @ / - ; जागा नाही).`;
+  if (t('model_edit') && !CLAUDE_MODEL.test(t('model_edit'))) return `${L('model_edit')}: कृपया claude- ने सुरू होणारे मॉडेल-नाव नमूद करावे (उदा. claude-sonnet-5-5).`;
   const ms = t('model_strong');
   if (ms && ms.toLowerCase() !== 'none' && !MODEL_NAME.test(ms)) return `${L('model_strong')}: कृपया योग्य मॉडेल-नाव (अक्षरे, अंक, . _ : @ / - ; जागा नाही) किंवा none नमूद करावे.`;
   return null;
@@ -297,7 +300,7 @@ export default function Settings() {
             <div className={grid}>{PLAIN.filter(p => p.sec === 'tech').map(plainField)}</div>
             <div className={grid}>{SECRET.filter(s => !s.alt).map(secretField)}</div>
             <h3 className="pt-2 font-bold">AI मॉडेल</h3>
-            <p className="text-sm text-slate-600 dark:text-slate-300">स्वस्त मॉडेल: अभ्यास-फाइल भाग 1–7, संबंधित माहिती व यांत्रिक काम. मुख्य मॉडेल: टिप्पणी व मसुदे. पडताळणी मॉडेल: अंतिम तपासणी व मंजुरी. सुधारणा-चॅट मॉडेल: प्रकरणावरील सुधारणा.</p>
+            <p className="text-sm text-slate-600 dark:text-slate-300">स्वस्त मॉडेल: अभ्यास-फाइल भाग 1–7, संबंधित माहिती व यांत्रिक काम. मुख्य मॉडेल: टिप्पणी व मसुदे. पडताळणी मॉडेल: अंतिम तपासणी व मंजुरी. सुधारणा-चॅटचे मॉडेल: प्रकरणावरील सुधारणा (फक्त claude-… मॉडेल).</p>
             <div className={grid}>{PLAIN.filter(p => p.sec === 'ai').map(plainField)}</div>
           </Fold>
 

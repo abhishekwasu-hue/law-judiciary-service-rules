@@ -1054,7 +1054,7 @@ def run_edit(work, api_key=None, model=None):
         if not key:
             raise EditFail("सेटिंग्ज अपूर्ण आहेत. कृपया Settings मधील Anthropic key तपासावी, ही विनंती.")
         mdl = model or os.environ.get("MODEL_EDIT") or DEFAULT_MODEL
-        if not E.MODEL_RE.fullmatch(mdl):
+        if not E.MODEL_RE.fullmatch(mdl) or not mdl.startswith("claude-"):   # Anthropic API direct: Claude ids only
             mdl = DEFAULT_MODEL
         ctx_m = context_of(case, target, pages, package)
         messages = [{"role": "user", "content": user_content(ctx_m, part, message)}]

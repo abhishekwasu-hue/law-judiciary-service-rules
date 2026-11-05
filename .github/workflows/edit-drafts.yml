@@ -91,7 +91,7 @@ jobs:
               if [ -n "$S" ]; then echo "SUPABASE_SERVICE_KEY=$S"; fi
               if [ -n "$DT" ]; then echo "ENGINE_DB_TOKEN=$DT"; fi; } > "$ENGINE_SECRETS" )
           # the edit model (KV setting model_edit, default claude-sonnet-5-5); an invalid name -> the default
-          if [[ "$M" =~ ^[A-Za-z0-9][A-Za-z0-9._:@/-]{1,99}$ ]]; then echo "MODEL_EDIT=$M" >> "$GITHUB_ENV"; fi
+          if [[ "$M" =~ ^claude-[A-Za-z0-9][A-Za-z0-9._:@-]{0,92}$ ]]; then echo "MODEL_EDIT=$M" >> "$GITHUB_ENV"; fi
       - name: Record log URL
         timeout-minutes: 2
         run: python3 tools/engine_supabase.py log_url "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" || true

@@ -57,7 +57,7 @@ export const DISPATCH_REASON = RUN_START_FAIL_TEXT;
 export const SETTING_LABEL: Record<string, string> = {
   owner_email: 'मालकाचा ई-मेल', supabase_url: 'डेटाबेस (Supabase) पत्ता', supabase_anon_key: 'डेटाबेस सार्वजनिक की (anon)', supabase_service_key: 'डेटाबेस सेवा-की (service_role)',
   github_repo: 'प्रक्रिया-भांडार (GitHub repo)', github_branch: 'प्रक्रिया-शाखा (GitHub branch)', github_token: 'प्रक्रिया-परवानगी की (GitHub token)', anthropic_api_key: 'Anthropic AI की',
-  model: 'मुख्य मॉडेल', model_light: 'स्वस्त मॉडेल', model_review: 'अंतिम पडताळणी मॉडेल', model_strong: 'उच्च-स्तर मॉडेल', model_edit: 'सुधारणा-चॅट मॉडेल', effort: 'विचार-पातळी',
+  model: 'मुख्य मॉडेल', model_light: 'स्वस्त मॉडेल', model_review: 'अंतिम पडताळणी मॉडेल', model_strong: 'उच्च-स्तर मॉडेल', model_edit: 'सुधारणा-चॅटचे मॉडेल', effort: 'विचार-पातळी',
   budget_usd: 'प्रति प्रक्रिया कमाल खर्च ($)', monthly_budget_usd: 'मासिक कमाल खर्च ($)', max_parallel_runs: 'एकाच वेळी चालणारे run (1–3)',
   engine_provider: 'मुख्य प्रक्रिया कोणाकडून', engine_model: 'मुख्य — मॉडेल', engine_model_light: 'मुख्य — स्वस्त मॉडेल',
   fallback_provider: 'राखीव AI', fallback_model: 'राखीव — मॉडेल', fallback_model_light: 'राखीव — स्वस्त मॉडेल',
@@ -74,6 +74,7 @@ export const SETTING_RULE: [RegExp, string][] = [
   [/^32 hex characters$/, 'कृपया नेमकी 32 अक्षरे (0-9, a-f) लिहावीत, ही विनंती.'],
   [/^http\(s\)/, 'कृपया http:// किंवा https:// ने सुरू होणारा पत्ता लिहावा (उदा. https://host:11434), ही विनंती.'],
   [/^model name or none$/, 'कृपया योग्य मॉडेल-नाव (अक्षरे, अंक, . _ : @ / - ; जागा नाही) किंवा none लिहावे, ही विनंती.'],
+  [/^claude model name$/, 'कृपया claude- ने सुरू होणारे मॉडेल-नाव लिहावे (उदा. claude-sonnet-5-5), ही विनंती.'],
   [/^model name$/, 'कृपया योग्य मॉडेल-नाव लिहावे (अक्षरे, अंक, . _ : @ / - ; जागा नाही), ही विनंती.'],
   [/^whole number 1 to 3$/, 'कृपया 1, 2 किंवा 3 निवडावे (रिकामे = 2), ही विनंती.'],
   [/^cannot clear$/, 'ही की काढता येत नाही.'],

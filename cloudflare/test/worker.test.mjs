@@ -1510,12 +1510,22 @@ test('draft edit: /api/edit dispatches edit_drafts at once (dispatched_at), queu
     assert.equal(ec.model_edit, 'claude-sonnet-5-5');
     assert.ok(ec.supabase_url && ec.supabase_service_key && ec.anthropic_api_key, 'edit job gets Supabase + Anthropic');
     assert.equal((await call('/api/settings', { method: 'PUT', headers: owner33, body: JSON.stringify({ model_edit: 'bad name!' }) })).status, 400);
+    // Claude model ids only (the edit job calls the Anthropic API directly): another provider's model → 400, Marathi-mapped rule text
+    const ge = await call('/api/settings', { method: 'PUT', headers: owner33, body: JSON.stringify({ model_edit: 'gpt-5.4-mini' }) });
+    assert.equal(ge.status, 400); assert.equal((await ge.json()).error, 'model_edit: claude model name');
+    assert.equal((await call('/api/settings', { method: 'PUT', headers: owner33, body: JSON.stringify({ model_edit: 'gemini/claude-x' }) })).status, 400);
     assert.equal((await call('/api/settings', { method: 'PUT', headers: owner33, body: JSON.stringify({ model_edit: 'claude-haiku-4-5' }) })).status, 200);
     assert.equal((await body(await call('/api/settings', { headers: owner33 }))).model_edit, 'claude-haiku-4-5');
     Q.rows.find(x => x.id === e2.id).state = 'done';
     const e3 = await body(await editCall({ case_id: 703, target: 'order', message: 'y' }));
     ec = await body(await call(`/api/engine/config?run_id=${e3.id}`, { headers: { authorization: `Bearer ${tokenOf(e3.id)}` } }));
     assert.equal(ec.model_edit, 'claude-haiku-4-5');
+    // a non-Claude value already in KV (set before this rule) → the engine config serves the default
+    Q.rows.find(x => x.id === e3.id).state = 'done';
+    env.SETTINGS.m.set('model_edit', 'gpt-5.4-mini');
+    const e4 = await body(await editCall({ case_id: 703, target: 'note', message: 'z' }));
+    ec = await body(await call(`/api/engine/config?run_id=${e4.id}`, { headers: { authorization: `Bearer ${tokenOf(e4.id)}` } }));
+    assert.equal(ec.model_edit, 'claude-sonnet-5-5');
     env.SETTINGS.m.delete('model_edit');
   } finally { setParallel(null); Q = null; }
 });
@@ -1683,6 +1693,20 @@ test('L-F4: estimates — full runs only (cost > 0) for a full run, median of ed
     Q.rows.push({ id: 1301, case_id: 131, state: 'running', kind: 'edit', dispatched_at: now, created_at: now });
     let sp = await body(await call('/api/spend', { headers: owner33 }));
     assert.deepEqual([sp.active_runs, sp.reserved_usd], [1, 0.04], 'an active edit is reserved at the edit estimate, not $3');
+    // the /api/edit gate uses the same reservation: spent 3.04 + reserved 0.04 < limit 3.5 → a new edit is accepted
+    // (at the full-run estimate it would be 3.04 + 3 ≥ 3.5 → 402)
+    env.SETTINGS.m.set('monthly_budget_usd', '3.5');
+    specCases.add(1311); specCases.add(1312);
+    const ok = await editCall({ case_id: 1311, target: 'note', message: 'x' });
+    assert.equal(ok.status, 200, await ok.clone().text());
+    sp = await body(await call('/api/spend', { headers: owner33 }));
+    assert.deepEqual([sp.active_runs, sp.reserved_usd], [2, 0.08], 'the new edit is reserved at the edit estimate too');
+    // an active FULL run is reserved at the full estimate → the next edit is refused (402, as /api/run)
+    Q.rows.push({ id: 1303, case_id: 133, state: 'running', kind: 'full', dispatched_at: now, created_at: now });
+    const no = await editCall({ case_id: 1312, target: 'note', message: 'x' });
+    assert.equal(no.status, 402); assert.equal((await no.json()).error, 'monthly_budget_reached');
+    env.SETTINGS.m.delete('monthly_budget_usd');
+    Q.rows = Q.rows.filter(r => r.id === 1301);
     Q.rows.push({ id: 1302, case_id: 132, state: 'running', kind: 'full', dispatched_at: now, created_at: now });
     sp = await body(await call('/api/spend', { headers: owner33 }));
     assert.deepEqual([sp.active_runs, sp.reserved_usd], [2, 3.04]);
