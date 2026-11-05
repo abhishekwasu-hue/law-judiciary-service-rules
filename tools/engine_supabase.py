@@ -533,6 +533,13 @@ def cmd_case_meta(args):
     wt = case_work_type_of(CASE)   # C33: the workflow adds tools/work_type.py's prompt block for it (absent = service)
     if wt != DEFAULT_WORK_TYPE:
         meta["work_type"] = wt
+    try:   # audit Q-F14: verify compares every letter number line with the case row's file no. / C R no.
+        crow = (rest("GET", f"cases?id=eq.{CASE}&select=*") or [{}])[0]
+    except Exception:
+        crow = {}
+    for k in ("file_no", "cr_no", "cr_year"):
+        if crow.get(k) not in (None, ""):
+            meta[k] = crow[k]
     desk = case_desk_of(CASE)
     if desk != DEFAULT_DESK:   # C30: only another desk is written (law-desk6 = verify's default)
         meta["desk"] = desk
@@ -1814,6 +1821,8 @@ def cmd_verify(args):
     cmd = [sys.executable, script, out, prefix, pkg, str(pages)] + (["--original-name", orig] if orig else [])
     if isinstance(desk, str) and DESK_ID_RE.match(desk) and desk != DEFAULT_DESK:   # default: verify's own default
         cmd += ["--desk", desk]
+    if case_meta and os.path.exists(case_meta):   # audit Q-F14: letter number vs the case row (file_no / cr_no)
+        cmd += ["--case-meta", case_meta]
     r = subprocess.run(cmd, capture_output=True, text=True,
                        encoding="utf-8", errors="replace")
     lines = (r.stdout or "").splitlines()

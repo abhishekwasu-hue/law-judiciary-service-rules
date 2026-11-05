@@ -346,7 +346,7 @@ cmf = os.path.join(tmp, "case_meta.json")
 json.dump({"proposal_original_name": "11ae057d-" + MN, "proposal_pages": 7}, open(cmf, "w", encoding="utf-8"))
 r = run("verify", out_m, work_m, "--case-meta", cmf, VERIFY_SCRIPT=fake)
 a = json.load(open(argf, encoding="utf-8"))
-check(r.returncode == 0 and a[3] == "7" and a[4:] == ["--original-name", MN], f"verify --case-meta: pages + name from the meta file ({a})")
+check(r.returncode == 0 and a[3] == "7" and a[4:] == ["--original-name", MN, "--case-meta", cmf], f"verify --case-meta: pages + name from the meta file ({a})")
 try:
     import pymupdf
     d = pymupdf.open()
@@ -358,7 +358,8 @@ try:
     cm2 = os.path.join(tmp, "cm2", "meta.json")
     r = run("case_meta", cm2, work)
     m2 = json.load(open(cm2, encoding="utf-8"))
-    check(r.returncode == 0 and m2 == {"proposal_original_name": PROP, "package_file": PROP, "proposal_pages": 3, "outputs": None}, f"case_meta: name + pages ({m2} {r.stderr[:200]})")
+    check(r.returncode == 0 and m2 == {"proposal_original_name": PROP, "package_file": PROP, "proposal_pages": 3, "outputs": None,
+                                    "file_no": "संकीर्ण-2026/979/प्र.क्र.130/का.6", "cr_no": "130", "cr_year": 2026}, f"case_meta: name + pages ({m2} {r.stderr[:200]})")
 except ImportError:
     print("skip  verify page count (pymupdf not installed)")
 run_row.update(state="running", step="तपासणी चालू", warnings=[])
@@ -1068,7 +1069,7 @@ for args, label in (((ol, wl), "case.json"), ((ol, "--case-meta", cml), "--case-
     run_row.update(state="running", step="तपासणी चालू", warnings=[])
     r = run("verify", *args, VERIFY_SCRIPT=fake)
     a = json.load(open(argf, encoding="utf-8"))
-    check(r.returncode == 0 and os.path.basename(a[2]) == SHORT and a[4:] == ["--original-name", LSUB] and not run_row["warnings"],
+    check(r.returncode == 0 and os.path.basename(a[2]) == SHORT and a[4:6] == ["--original-name", LSUB] and a[6:] == ([] if label == "case.json" else ["--case-meta", cml]) and not run_row["warnings"],
           f"NAME_MAX verify ({label}): short package accepted, full stripped name passed ({a[4:]} {run_row['warnings']})")
 run_row.update(state="running", warnings=[]); LOG.clear(); nrows = len(DB["case_files"])
 r = run("finish", ol)
