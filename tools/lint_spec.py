@@ -55,8 +55,10 @@ Rules (spec.json)
     अभिप्रायास्तव / सहमतीस्तव …", "… विभागास विनंती", "सार्वजनिक आरोग्य विभागाच्या …")
   - §4.19 (text outside quotes; note body, letter, related heading/source — not the verbatim related text): no '.:-'
     (use ':-'), 'करून' not 'करुन', 'प्रारूप' not 'प्रारुप', 'अनुसरून' not 'अनुसरुन', one space after 'दि.' / 'क्र.' / 'प्र. क्र.' in running text
-    (file/letter nos. and other tokens with '/' or '-' left exactly); missing-info para starts
-    "प्रस्तावासोबत खालील माहिती उपलब्ध नाही:-"
+    (file/letter nos. and other tokens with '/' or '-' left exactly); missing-info para (05.11.2026) "सदर प्रकरणी <प्राधिकारी>
+    यांच्या दि. <DD.MM.YYYY> रोजीच्या प्रस्तावाचे अवलोकन केले असता, त्यामध्ये खालील माहिती आढळून येत नाही:- (1) …; (2) …."
+    (":-" right after "नाही"; the old opener "प्रस्तावासोबत खालील माहिती उपलब्ध नाही:-" is still read as that para + WARN
+    "जुने रूप"; the 40-word WARN counts that para only up to ":-")
   - "letter" (one object) and / or "letters" (list, INSTRUCTIONS §4.28, 03.11.2026: e.g. a letter and a स्मरणपत्र in one
     run; paths letters[i].…): every rule below applies to each letter; "letter" + "letters" together is an error
   - letter (when present): ref_no संकिर्ण-<year>/<file no>/प्र.क्र.<n>/का.6 ("संकीर्ण-" also accepted; "____" blanks);
@@ -83,8 +85,8 @@ Rules (spec.json)
   - §4.24 "शुद्धिपत्रक" (not शुध्दिपत्रक / शुद्धीपत्रक / शुद्धपत्रक) — also in the related heading/source (outside quotes)
   - "ध्द" -> "द्ध" (error; मराठी भाषा विभाग GR दि. 10.11.2022) — not in a person's name (after श्री. / श्रीमती / कै. /
     डॉ., §4.18 name as in the proposal) and not inside quotes
-  - §4.31 (03.11.2026): missing information / documents only in ONE para opening "प्रस्तावासोबत खालील माहिती उपलब्ध
-    नाही(त)" (with its table / sub-points); elsewhere in the note body (first, paras, tables, sub, closing; outside “…”
+  - §4.31 (03.11.2026): missing information / documents only in ONE para — the missing-info para above (MISSING_HEAD_RE;
+    old or new opener; with its table / sub-points); elsewhere in the note body (first, paras, tables, sub, closing; outside “…”
     quotes) no "नमूद नाही", "जोडलेले / जोडलेल्या नाहीत", "उपलब्ध नाही", "प्रस्तावासोबत नाही(त)", "प्रत नाही", "सादर
     केलेली नाही" remark (MISSING_REMARK_RE; a missing table value is "____"); two such paras is an error; WARN when that
     para is not just before the last para (missing_scatter)
@@ -194,13 +196,27 @@ FIN_ROUTE_RE = re.compile(rf"वित्त\s+विभागा{_ROUTE_TAIL}|�
 PHD_ROUTE_RE = re.compile(rf"सार्वजनिक\s+आरोग्य\s+विभागा{_ROUTE_TAIL}")
 INTRO_START = "उपरोक्त विषयाबाबत संदर्भाधीन"
 INTRO_HAS = "आपणांस कळविण्यात येते की,"
-MISSING_HEAD = "प्रस्तावासोबत खालील माहिती उपलब्ध नाही"  # missing-information para (PROPOSAL_SOP Step 4)
-MISSING_FORM = MISSING_HEAD + ":- (1)…; (2)…"
+# Missing-information para (Abhi 05.11.2026, replaces the fixed opener "प्रस्तावासोबत खालील माहिती उपलब्ध नाही:-"):
+# "सदर प्रकरणी <प्राधिकारी> यांच्या दि. <DD.MM.YYYY> रोजीच्या प्रस्तावाचे अवलोकन केले असता, त्यामध्ये खालील माहिती आढळून
+# येत नाही:- (1) …; (2) …." — recognised by MISSING_NEW_RE; the old opener is still recognised (same §4.31 rules) + WARN.
+MISSING_HEAD = "त्यामध्ये खालील माहिती आढळून येत नाही"   # fixed core of the new opener; ":-" follows it
+MISSING_OLD_HEAD = "प्रस्तावासोबत खालील माहिती उपलब्ध नाही"   # old opener (no longer used — WARN)
+MISSING_FORM = ("सदर प्रकरणी <प्राधिकारी> यांच्या दि. <DD.MM.YYYY> रोजीच्या प्रस्तावाचे अवलोकन केले असता, "
+                "त्यामध्ये खालील माहिती आढळून येत नाही:- (1)…; (2)….")
+MISSING_NEW_RE = re.compile(r"अवलोकन\s+केले\s+असता,?\s+त्यामध्ये\s+खालील\s+(?:माहिती|कागदपत्रे)"
+                            r"(?:\s+(?:व|आणि)\s+(?:माहिती|कागदपत्रे))?\s+आढळून\s+येत\s+नाहीत?(?![ऀ-ॿ])")
+MISSING_NEW_COLON_RE = re.compile(MISSING_NEW_RE.pattern + r"\s*:-")
+MISSING_OLD_MSG = ("जुने रूप — §4.31 (05.11.2026): 'सदर प्रकरणी <प्राधिकारी> यांच्या दि. __ रोजीच्या प्रस्तावाचे अवलोकन केले "
+                   "असता, त्यामध्ये खालील माहिती आढळून येत नाही:- (1) …; (2) ….'")
 # §4.31 (Abhi 03.11.2026: "… te vishisht ekach paragraph mdhe discuss kravi"): missing information / documents only in ONE
 # para opening "प्रस्तावासोबत खालील माहिती (/ कागदपत्रे) उपलब्ध नाही(त)", just before the last para; elsewhere in the note
 # body no remark of the kinds below (outside “…” quotes); a missing table value is "____"
-MISSING_HEAD_RE = re.compile(r"^(?:[0-9०-९]+\.\s*)?प्रस्तावासोबत\s+खालील\s+(?:माहिती|कागदपत्रे)(?:\s+(?:व|आणि)\s+(?:माहिती|कागदपत्रे))?"
-                             r"\s+उपलब्ध\s+नाहीत?(?![ऀ-ॿ])")
+MISSING_OLD_RE = re.compile(r"^(?:[0-9०-९]+\.\s*)?प्रस्तावासोबत\s+खालील\s+(?:माहिती|कागदपत्रे)(?:\s+(?:व|आणि)\s+(?:माहिती|कागदपत्रे))?"
+                            r"\s+उपलब्ध\s+नाहीत?(?![ऀ-ॿ])")
+# a para is the missing-info para when it opens with the old form, or carries the new core within its first 400
+# characters before the first ":-" (the authority and date come before it)
+MISSING_HEAD_RE = re.compile(r"^(?:[0-9०-९]+\.\s*)?(?:" + MISSING_OLD_RE.pattern.split(")?", 1)[1]
+                             + r"|(?:(?!:-).){0,400}?" + MISSING_NEW_RE.pattern + r")")
 _NAHI = r"नाहीत?(?![ऀ-ॿ])"
 _LELA = r"लेल(?:े|ी|ा|्या)"
 MISSING_REMARK_RE = re.compile(rf"नमूद\s+(?:के{_LELA}\s+)?{_NAHI}|जोड{_LELA}\s+{_NAHI}|जोडण्यात\s+आ{_LELA}\s+{_NAHI}"
@@ -209,7 +225,7 @@ MISSING_REMARK_RE = re.compile(rf"नमूद\s+(?:के{_LELA}\s+)?{_NAHI}|�
 # audit 05.11.2026 Q-F6 (WARN level — the approved HTE sample uses "… उल्लेख नाही" in two facts): the same remark in
 # other words
 MISSING_REMARK_WARN_RE = re.compile(rf"उल्लेख\s+(?:के{_LELA}\s+)?{_NAHI}|आढळून\s+(?:येत|आल[ेाी]|आ{_LELA})\s+{_NAHI}")
-MISSING_ONE_MSG = ("उपलब्ध नसलेली माहिती / कागदपत्रे फक्त एकाच 'प्रस्तावासोबत खालील माहिती उपलब्ध नाही:-' परिच्छेदात "
+MISSING_ONE_MSG = ("उपलब्ध नसलेली माहिती / कागदपत्रे फक्त एकाच '… अवलोकन केले असता, त्यामध्ये खालील माहिती आढळून येत नाही:-' परिच्छेदात "
                    "(शेवटच्या परिच्छेदाच्या आधी); इतरत्र असा शेरा नको, तक्त्यात '____' (§4.31)")
 # INSTRUCTIONS §4.20 (02.11.2026): letter table only for data to fill in; documents after the table as a numbered list
 DOC_RE = re.compile(r"प्रत(?![्िृ])|प्रमाणपत्र|अहवाल")   # प्रत / प्रती(सह) — not प्रत्यक्ष, प्रतिनियुक्ती
@@ -724,7 +740,10 @@ def lint_spec(spec, pages=None):
     for path, t in rel_own:   # §4.24 "शुद्धिपत्रक" also in the related heading/source (own text outside quotes)
         P += [f"{path}: {msg}" for rx, msg in STYLE_RULES if "4.24" in msg and rx.search(unquoted(t))]
     for path, t in body:
-        if ns(unquoted(t)).startswith(MISSING_HEAD) and not ns(t).startswith(MISSING_HEAD + ":-"):
+        u = ns(unquoted(t))
+        if u.startswith(MISSING_OLD_HEAD) and not ns(t).startswith(MISSING_OLD_HEAD + ":-"):
+            P.append(f"{path}: missing-info para — form '{MISSING_FORM}' (§4.19)")
+        elif MISSING_HEAD_RE.match(u) and MISSING_NEW_RE.search(u) and not MISSING_NEW_COLON_RE.search(ns(t)):
             P.append(f"{path}: missing-info para — form '{MISSING_FORM}' (§4.19)")
     P += missing_scatter(note_seq(n))[0]   # §4.31 (03.11.2026)
     for path, t in body + letter:
@@ -1166,7 +1185,7 @@ def note_letter_no_problems(n):
 
 
 # C2 (Abhi 05.11.2026, option आ — INSTRUCTIONS §4.18, §4.31(अ), §4.36): the missing-info para lists its items inline
-# "प्रस्तावासोबत खालील माहिती उपलब्ध नाही:- (1) …; (2) …." — not a table (ERROR: no inline "(1)" after ":-"; WARN: a
+# "… त्यामध्ये खालील माहिती आढळून येत नाही:- (1) …; (2) …." — not a table (ERROR: no inline "(1)" after ":-"; WARN: a
 # table right after the para). The letter's information-request table (§4.20) is unchanged.
 MISSING_INLINE_RE = re.compile(r":-\s*\(\s*[1१]\s*\)")
 MISSING_INLINE_MSG = ("missing-info para — items inline '(1) …; (2) ….', not a table "
@@ -1265,6 +1284,8 @@ def long_sentence_warnings(items):
     """items = [(label, text)] -> WARN strings (label, sentence no., word count only — no text, audit S-F3)."""
     W = []
     for lab, t in items:
+        if MISSING_HEAD_RE.match(ns(unquoted(t))) and ":-" in t:   # 05.11.2026: its inline list is one sentence by design
+            t = t[:t.index(":-") + 2]
         for k, s in enumerate(sentences(t), 1):
             nw = len([w for w in s.split() if re.search(r"[0-9A-Za-zऀ-ॿ_]", w)])
             if nw > LONG_SENTENCE:
@@ -1384,6 +1405,9 @@ def lint_warnings(spec):
     W = [f"{path}: {m}" for path, t in body + letter for m in warn_hits(t)]
     W += missing_scatter(note_seq(n))[1]   # §4.31 placement
     W += missing_inline_problems(n)[1]   # C2 (05.11.2026): a table after the missing-info para
+    for path, t in body:   # 05.11.2026: the old opener is no longer used
+        if MISSING_OLD_RE.match(ns(unquoted(t))):
+            W.append(f"{path}: missing-info para — {MISSING_OLD_MSG}")
     for path, t in body:   # Abhi 05.11.2026: a U.O. ref no. only when the record has one — never a "____" placeholder
         if UO_BLANK_RE.search(unquoted(t)):
             W.append(f"{path}: blank U.O. reference no. — {UO_BLANK_MSG}")

@@ -45,7 +45,9 @@ Checks
   "क्रमांक" + a number near a पत्र-word, outside quotes; GR / case / own file numbers excepted); the missing-info para lists
   its items inline "(1) …; (2) …." (FAIL when not; WARN for a table right after it)
  Note body (§4.31, 03.11.2026; lint_spec.missing_scatter, outside quotes): missing information / documents only in ONE para
-  "प्रस्तावासोबत खालील माहिती उपलब्ध नाही:-" (+ its table / unnumbered sub-points); no "नमूद नाही / जोडलेले नाही /
+  "सदर प्रकरणी <प्राधिकारी> यांच्या दि. __ रोजीच्या प्रस्तावाचे अवलोकन केले असता, त्यामध्ये खालील माहिती आढळून येत नाही:-"
+  (05.11.2026; the old opener "प्रस्तावासोबत खालील माहिती उपलब्ध नाही:-" still read as that para + WARN "जुने रूप")
+  (+ its table / unnumbered sub-points); no "नमूद नाही / जोडलेले नाही /
   उपलब्ध नाही / प्रस्तावासोबत नाही / प्रत नाही / सादर केलेली नाही" remark elsewhere; not two such paras (SOFT);
   WARN when that para is not just before the last (numbered or "सबब,") para
  Note body (C32 §4.34, 03.11.2026; lint_spec.flow_warnings, WARN only — never FAIL, ALL OK unaffected): a table
@@ -126,7 +128,8 @@ from lint_spec import (AMS, BANNED, BARE_CLOSING_RE, FIN, ID_RE, LH_EMAIL, RELAT
                        style_hits, unquoted, warn_hits, PKG_WORD, draft_word_hits, related_source_problems,
                        missing_scatter, flow_warnings, DO_FIRST_PERSON_RE, SUMMARY_HEAD_RE, summary_problems,
                        NUMLIST, LAST_FORMS, out, redact, details_arg, set_details, details_active,
-                       MISSING_HEAD_RE, MISSING_INLINE_RE, MISSING_INLINE_MSG, note_letter_no_hits)
+                       MISSING_HEAD_RE, MISSING_INLINE_RE, MISSING_INLINE_MSG, note_letter_no_hits,
+                       MISSING_OLD_HEAD, MISSING_OLD_MSG, MISSING_NEW_COLON_RE)
 from mkdocs import DO_WISH, DO_SUBSCRIPTION  # noqa: E402 — अर्धशासकीय पत्र ending (GAD specimen)
 INTRO_HEAD = "उपरोक्त विषयाबाबत"  # letter intro paragraph (lint_spec.INTRO_START begins with it)
 UO_LINE_RE = re.compile(r"^\S.*विभागाकडे\s+अनौपचारिक\s+संदर्भ\s+कार्यासन(?:\s|$)")   # note "uo" block (mkdocs.uo_lines)
@@ -571,9 +574,16 @@ def main(argv):
 
         # §4.19 (मराठी भाषा विभाग GR दि. 10.11.2022): same helpers as the pre-build lint, text outside quotes
         lg = [f"{where}: {x}" for where, t in (("note", note_txt), ("letter", letter_txt)) for x in lang_hits(t)]
-        lg += [f"note: missing-info para — form '{MISSING_FORM}'" for b in bl[:note_end] if b["kind"] == "p"
-               and re.sub(r"^[0-9०-९]+\.\s*", "", ns(unquoted(b["text"]))).startswith(MISSING_HEAD)
-               and not re.sub(r"^[0-9०-९]+\.\s*", "", ns(b["text"])).startswith(MISSING_HEAD + ":-")]
+        for b in bl[:note_end]:   # missing-info para form (old opener: ":-" after it + WARN; new opener: ":-" after "नाही")
+            if b["kind"] != "p":
+                continue
+            u = re.sub(r"^[0-9०-९]+\.\s*", "", ns(unquoted(b["text"]))); full = re.sub(r"^[0-9०-९]+\.\s*", "", ns(b["text"]))
+            if u.startswith(MISSING_OLD_HEAD):
+                warn(f"note: missing-info para — {MISSING_OLD_MSG}")
+                if not full.startswith(MISSING_OLD_HEAD + ":-"):
+                    lg.append(f"note: missing-info para — form '{MISSING_FORM}'")
+            elif MISSING_HEAD_RE.match(u) and not MISSING_NEW_COLON_RE.search(full):
+                lg.append(f"note: missing-info para — form '{MISSING_FORM}'")
         check("official Marathi §4.19 (note body, letter)", lg)
         # §4.31 (Abhi 03.11.2026): missing information / documents only in ONE missing-info para (its table / unnumbered
         # sub-points belong to it); a numbered or "सबब," paragraph starts a new para (SOFT, like every non-HARD check)
