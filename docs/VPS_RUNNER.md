@@ -12,13 +12,13 @@ folder किंवा Docker socket container मध्ये नाही).
 3. TOKEN **1 तासात** कालबाह्य होतो — लगेच (ब) करा.
 
 ## (ब) VPS वर एकच आदेश-संच (root shell मध्ये एकदाच paste करा)
-खालील संपूर्ण block कॉपी करा; **पहिल्या ओळीत** `येथे_TOKEN_चिकटवा` ऐवजी TOKEN टाका; संपूर्ण block एकदाच paste करा.
+**आधी** VPS वर एकच छोटी ओळ टाइप करा (XXXX ऐवजी (अ) मधील TOKEN): `export TOKEN='XXXX'` व Enter. **नंतर** खालील संपूर्ण block जसाच्या तसा कॉपी करून एकदाच paste करा (block मध्ये काहीही बदलायचे नाही).
 Script `/root/vps-setup.sh` लिहिले जाते व background मध्ये चालते (image तयार होण्यास पहिल्या वेळी 5–10 मिनिटे);
 स्क्रीनवर प्रगती दिसते, संपल्यावर आपोआप थांबते (मध्येच Ctrl+C केले तरी काम चालूच राहते; log: `/root/vps-setup.log`).
 शेवटी "यशस्वी: runner vps-prastav GitHub शी जोडला" अशी ओळ आली पाहिजे.
 
 ```bash
-TOKEN='येथे_TOKEN_चिकटवा'
+[ -n "${TOKEN:-}" ] || echo "TOKEN दिलेला नाही — आधी export TOKEN='<GitHub वरील token>' टाइप करून हा block पुन्हा paste करा"
 cat > /root/vps-setup.sh <<'PRASTAV_SETUP_EOF'
 #!/bin/bash
 # प्रस्ताव कक्ष — self-hosted GitHub Actions runner on the VPS (docs/VPS_RUNNER.md). Run as root:
