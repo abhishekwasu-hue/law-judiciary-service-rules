@@ -27,8 +27,9 @@ Rules (spec.json)
   - C1 (Abhi 05.11.2026, option आ; §4.29(1)/(5), §4.30(7), §4.36): no incoming letter number anywhere else in the note
     body either (paras incl. table cells, sub, closing; outside quotes and पृ.N/प.वि.): "क्र." / "क्रमांक" + a token with a
     digit or "/" within 4 words after or 6 words before a पत्र-word (पत्र, पत्रास, पत्रान्वये, स्मरणपत्र …); GR / case /
-    order words right before "क्र." (शासन निर्णय, परिपत्रक, याचिका, अर्ज, प्र. क्र., अ.क्र. …) and the Section's own file
-    no. ("संकिर्ण-…") excepted (note_letter_no_hits)
+    order / point words right before "क्र." (शासन निर्णय, परिपत्रक, याचिका, अर्ज, प्र. क्र., अ.क्र., मुद्दा …), a U.O.
+    reference of any department / another desk's reference no. ("अनौपचारिक संदर्भ क्र. …", "कार्यासन … संदर्भ क्र. …";
+    Abhi 05.11.2026 — kept) and the Section's own file no. ("संकिर्ण-…") excepted (note_letter_no_hits)
   - C2 (Abhi 05.11.2026, option आ; §4.18, §4.31(अ)): the missing-info para lists its items inline after ":-" — "(1) …;
     (2) …." (error when no inline "(1)"; WARN for a table right after the para; missing_inline_problems)
   - last note para (note.closing if not blank, else the last text item of note.paras) is one of the SOP forms:
@@ -1086,6 +1087,8 @@ def first_letter_no_problems(first):
     for m in FIRST_LETTER_NO_RE.finditer(t):
         if CASE_NO_BEFORE_RE.search(t[max(0, m.start() - 30):m.start()].rstrip()):
             continue
+        if any(UO_REF_WORD_RE.match(_word(w)) for w in t[:m.start()].split()[-4:]):   # U.O. / other desk ref (05.11.2026)
+            continue
         out.append(f"{FIRST_LETTER_NO_MSG}: letter no. at character {m.start()}")
     return out
 
@@ -1096,14 +1099,20 @@ def first_letter_no_problems(first):
 # (पत्र, पत्रा, पत्रास, पत्रान्वये, स्मरणपत्र, अ.शा.पत्र …; not परिपत्रक / शुद्धिपत्रक / पत्रक) or within 6 words before
 # one ("क्र. 12/2026 दि. … रोजीच्या पत्रान्वये"). Not a letter number: the word right before "क्र." is a GR / case /
 # order word (शासन निर्णय, परिपत्रक, अधिसूचना, आदेश, याचिका, अर्ज, अपील, प्रकरण, दावा, प्र. क्र., अ.क्र., नस्ती, उमेदवार,
-# नियम, सांकेतांक …), or the number is the Section's own file no. ("संकिर्ण-…" / "संकीर्ण-…"). Text inside “…”
+# नियम, सांकेतांक …) or a point / para / page word ("पत्रातील मुद्दा क्र. 2", परिच्छेद, पृष्ठ, प्रश्न …); a U.O. reference
+# of any department or another desk's reference number — one of the 4 words before "क्र." is "संदर्भ" / "अनौपचारिक" /
+# "कार्यासन…" / "U.O." / "यु.ओ." (Abhi 05.11.2026: "अनौपचारिक संदर्भाचा क्रमांक ठेवायचा असतो … इतर कार्यासनाचा जरी संदर्भ
+# क्रमांक असेल तरी तो सुद्धा नमूद करावा लागत असतो" — kept in the note); or the number is the Section's own file no.
+# ("संकिर्ण-…" / "संकीर्ण-…"). Text inside “…”
 # quotes, पृ.N/प.वि. references, "संबंधित माहिती" and the letter (ref_no, refs "आपले पत्र क्र. …") are not checked.
 LETTER_WORD_RE = re.compile(r"(?<![ऀ-ॿ])(?:स्मरण)?पत्र(?!क)[ऀ-ॿ]*")
 NOTE_NO_RE = re.compile(r"(?<![ऀ-ॿ])(?:क्र\.|क्रमांक)\s*:?\s*-?\s*(\S*[/0-9०-९]\S*)")
 NOT_LETTER_WORD_RE = re.compile(r"^(?:प्र\.?|अ\.?|जी\.?आर\.?|याचिक|अर्ज|अपील|प्रकरण|दाव|निर्णय|परिपत्रक|शुद्धिपत्रक|पूरकपत्र"
-                                r"|अधिसूचन|आदेश|सांकेतांक|नस्ती|उमेदवार|नियम|ज्ञापन|कलम|खाते|petition|application|g\.?r\.?)",
+                                r"|अधिसूचन|आदेश|सांकेतांक|नस्ती|उमेदवार|नियम|ज्ञापन|कलम|खाते|मुद्द|परिच्छेद|परि\.|खंड|पृष्ठ|पान|तक्त|अनुक्र|प्रश्न"
+                                r"|petition|application|g\.?r\.?)",
                                 re.I)
 OWN_FILE_NO_RE = re.compile(r"^संकि?ी?र्ण-")
+UO_REF_WORD_RE = re.compile(r"^(?:संदर्भ|अनौपचारिक|कार्यासन\S*|का\.\s?[0-9०-९]+|U\.?\s?O\.?|यु\.\s?ओ\.?|अ\.\s?सं\.?)$", re.I)
 NOTE_LETTER_NO_MSG = ("टिप्पणीत पत्राचा क्रमांक नको — प्राधिकारी, दिनांक व पृ.N/प.वि. पुरेसे "
                       "(§4.29(1)/(5), §4.30(7), 05.11.2026 C1 पर्याय आ)")
 
@@ -1127,6 +1136,8 @@ def note_letter_no_hits(text):
         else:
             prev = before[-1] if before else ""
         if prev and NOT_LETTER_WORD_RE.match(prev):
+            continue
+        if any(UO_REF_WORD_RE.match(w) for w in before[-4:]):   # U.O. / another desk's reference no. — kept
             continue
         hit = any(LETTER_WORD_RE.search(w) for w in before[-4:])
         if not hit:
@@ -1169,7 +1180,8 @@ def missing_inline_problems(n):
             P.append(f"note.paras[{i}]: {MISSING_INLINE_MSG}")
         nxt = paras[i + 1] if i + 1 < len(paras) else None
         if isinstance(nxt, dict) and "table" in nxt:
-            W.append(f"note.paras[{i + 1}]: table after the missing-info para — {MISSING_INLINE_MSG}")
+            W.append(f"note.paras[{i + 1}]: table after the missing-info para — items inline '(1) …; (2) ….' "
+                     f"(§4.31(अ), 05.11.2026 C2 पर्याय आ)")
     return P, W
 
 

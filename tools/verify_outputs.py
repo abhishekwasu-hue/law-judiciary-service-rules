@@ -592,7 +592,7 @@ def main(argv):
                 if not MISSING_INLINE_RE.search(t):
                     mi.append(f"note: {MISSING_INLINE_MSG}")
                 if i + 1 < len(nb) and nb[i + 1]["kind"] == "tbl":
-                    warn(f"note: table after the missing-info para — {MISSING_INLINE_MSG}")
+                    warn("note: table after the missing-info para — items inline '(1) …; (2) ….' (§4.31(अ), 05.11.2026 C2)")
         check("missing-info items inline §4.31(अ) C2 (note body)", mi)
         # C1 (Abhi 05.11.2026, option आ): no incoming letter number anywhere in the note body (lint_spec.note_letter_no_hits;
         # outside quotes and पृ.N/प.वि.; GR / case / own file numbers excepted)
