@@ -6,17 +6,33 @@ permissions:
 jobs:
   extra:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+      # audit 05.11.2026 R-F13: each PDF is downloaded to a temp file and moved into pdf/ ONLY when it arrived complete and
+      # starts with %PDF. A failed download never touches (and never deletes) a file that is already in the repo; it is
+      # only listed in pdf/FAILED-extra.txt.
       - name: Download PDFs listed in pdf-list-extra.tsv
+        timeout-minutes: 25
         run: |
+          set -u
           UA="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+          TMP=$(mktemp -d)
           : > pdf/FAILED-extra.txt
-          while IFS=$'\t' read -r folder url name; do
+          while IFS=$'\t' read -r folder url name || [ -n "${folder:-}" ]; do
+            [ -n "${url:-}" ] || continue
             mkdir -p "pdf/$folder"
-            if curl -sSL --max-time 120 --fail -A "$UA" -o "pdf/$folder/$name" "$url" && head -c 5 "pdf/$folder/$name" | grep -q '%PDF'; then echo "OK $url"; else echo "$url" >> pdf/FAILED-extra.txt; rm -f "pdf/$folder/$name"; fi
+            t="$TMP/dl.pdf"; rm -f "$t"
+            if curl -sSL --max-time 120 --fail -A "$UA" -o "$t" "$url" && [ -s "$t" ] && head -c 5 "$t" | grep -q '%PDF'; then
+              mv -f "$t" "pdf/$folder/$name"; echo "OK $url"
+            else
+              rm -f "$t"; echo "$url" >> pdf/FAILED-extra.txt
+              if [ -e "pdf/$folder/$name" ]; then echo "FAILED (existing file kept) $url"; else echo "FAILED $url"; fi
+            fi
           done < pdf-list-extra.tsv
+          rm -rf "$TMP"
       - name: Commit
+        timeout-minutes: 5
         run: |
           git config user.name "github-actions"; git config user.email "actions@github.com"
           git add pdf

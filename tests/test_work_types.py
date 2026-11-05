@@ -82,3 +82,14 @@ def test_new_type_by_files_only(tmp_path, monkeypatch):
     assert "rti" in W.type_ids() and W.load("rti")["label"] == "माहिती अधिकार" and W.check() == []
     (d / "bad.json").write_text(json.dumps(dict(new, id="other")), encoding="utf-8")
     assert any("file name" in p for p in W.check())
+
+
+def test_draft_keys_from_one_source():
+    """audit 05.11 R-F9: DRAFT_KEYS come from tools/draft_keys.json (16 keys); every type allows them all, so the 8 new
+    keys (04.11.2026) are allowed and legislature allows lq."""
+    src = json.load(open(os.path.join(ROOT, "tools", "draft_keys.json"), encoding="utf-8"))["keys"]
+    assert list(W.DRAFT_KEYS) == src and len(src) == 16
+    for t in W.type_ids():
+        assert W.load(t)["allowed_drafts"] == src
+    assert "lq" in W.load("legislature")["allowed_drafts"]
+    assert W.problems(dict(W.load("service"), allowed_drafts=src + ["nope"]))   # unknown key still refused

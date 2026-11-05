@@ -3,7 +3,7 @@
  "label": "खरेदी विषयक बाबी",
  "status": "rules_pending",
  "default_drafts": ["letter"],
- "allowed_drafts": ["letter", "reminder", "gr", "corrigendum", "circular", "memo", "notification", "parawise"],
+ "allowed_drafts": ["letter", "reminder", "gr", "corrigendum", "circular", "memo", "notification", "parawise", "do_letter", "uo_note", "endorsement", "office_order", "press_note", "addendum", "affidavit", "lq"],
  "rules_file": "tools/work_rules/procurement.md",
  "samples_dir": "samples/work/procurement/",
  "required_samples": ["खरेदी-प्रस्ताव टिप्पणी", "वित्तीय अधिकार / GeM संदर्भ", "पुरवठा आदेश"],

@@ -6,19 +6,33 @@ permissions:
 jobs:
   download:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+      # audit 05.11.2026 R-F13: download to a temp file, move into pdf/ only on success (%PDF header); a failure never
+      # deletes a file that is already in the repo.
       - name: Download PDFs listed in pdf-list.tsv
+        timeout-minutes: 50
         run: |
+          set -u
           mkdir -p pdf
           ok=0; fail=0
+          TMP=$(mktemp -d)
           : > pdf/FAILED.txt
-          while IFS=$'\t' read -r folder url name; do
+          while IFS=$'\t' read -r folder url name || [ -n "${folder:-}" ]; do
+            [ -n "${url:-}" ] || continue
             mkdir -p "pdf/$folder"
-            if curl -sSL --max-time 90 --fail -A "Mozilla/5.0" -o "pdf/$folder/$name" "$url"; then ok=$((ok+1)); else fail=$((fail+1)); echo "$url" >> pdf/FAILED.txt; rm -f "pdf/$folder/$name"; fi
+            t="$TMP/dl.pdf"; rm -f "$t"
+            if curl -sSL --max-time 90 --fail -A "Mozilla/5.0" -o "$t" "$url" && [ -s "$t" ] && head -c 5 "$t" | grep -q '%PDF'; then
+              mv -f "$t" "pdf/$folder/$name"; ok=$((ok+1))
+            else
+              rm -f "$t"; fail=$((fail+1)); echo "$url" >> pdf/FAILED.txt
+            fi
           done < pdf-list.tsv
+          rm -rf "$TMP"
           echo "downloaded=$ok failed=$fail"
       - name: Commit PDFs
+        timeout-minutes: 10
         run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"

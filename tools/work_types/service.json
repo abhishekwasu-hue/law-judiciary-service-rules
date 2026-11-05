@@ -3,7 +3,7 @@
  "label": "सेवाविषयक प्रकरणे",
  "status": "ready",
  "default_drafts": ["letter"],
- "allowed_drafts": ["letter", "reminder", "gr", "corrigendum", "circular", "memo", "notification", "parawise"],
+ "allowed_drafts": ["letter", "reminder", "gr", "corrigendum", "circular", "memo", "notification", "parawise", "do_letter", "uo_note", "endorsement", "office_order", "press_note", "addendum", "affidavit", "lq"],
  "rules_file": "tools/work_rules/service.md",
  "samples_dir": "samples/work/service/",
  "required_samples": [],

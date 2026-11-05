@@ -111,7 +111,7 @@ jobs:
           ( umask 077; mkdir -p "$(dirname "$ENGINE_SECRETS")"; chmod 700 "$(dirname "$ENGINE_SECRETS")"
             { echo "ANTHROPIC_API_KEY=$A"; echo "SUPABASE_URL=$U"; echo "SUPABASE_SERVICE_KEY=$S"
               printf '%s' "$PSEC"; } > "$ENGINE_SECRETS" )
-          grep -E '^(MODEL|MODEL_LIGHT|MODEL_REVIEW|MODEL_STRONG|EFFORT|BUDGET_USD|ENGINE_PROVIDER|ENGINE_MODEL|ENGINE_MODEL_LIGHT|PART1_PROVIDER|PART1_MODEL|GEMINI_MODEL|FALLBACK_PROVIDER|FALLBACK_MODEL|FALLBACK_MODEL_LIGHT|CLOUDFLARE_ACCOUNT_ID|OLLAMA_BASE_URL)=[][A-Za-z0-9._:@/-]*$' "$RP/engine_conf.env" >> "$GITHUB_ENV" || true
+          grep -E '^(MODEL|MODEL_LIGHT|MODEL_REVIEW|MODEL_STRONG|MODEL_FIXER|EFFORT|BUDGET_USD|ENGINE_PROVIDER|ENGINE_MODEL|ENGINE_MODEL_LIGHT|PART1_PROVIDER|PART1_MODEL|GEMINI_MODEL|FALLBACK_PROVIDER|FALLBACK_MODEL|FALLBACK_MODEL_LIGHT|CLOUDFLARE_ACCOUNT_ID|OLLAMA_BASE_URL)=[][A-Za-z0-9._:@/-]*$' "$RP/engine_conf.env" >> "$GITHUB_ENV" || true
           rm -f "$RP/engine_conf.env"
       - name: Record log URL
         timeout-minutes: 2
@@ -134,10 +134,16 @@ jobs:
           set -euo pipefail
           S0=$(date +%s); trap '{ printf "%s\t%s\t%s\n" "Install tools" "$S0" "$(date +%s)" >> "$RP/stages.tsv"; } 2>/dev/null || true' EXIT
           trap 'echo "साधने install झाली नाहीत (apt/pip/npm) — पुन्हा तयार करा." > "$RP/fail_reason.txt"' ERR
-          sudo apt-get update -y
-          sudo apt-get install -y poppler-utils tesseract-ocr tesseract-ocr-mar libreoffice-writer fonts-freefont-ttf
-          pip install -r "$T/requirements-engine.txt"
-          npm install -g "@anthropic-ai/claude-code@$CLAUDE_CODE_VERSION"
+          # audit 05.11 T-H: apt (system packages), pip (setup-python's site-packages) and npm (setup-node's global
+          # prefix) write to separate places, so they run in parallel; each log is printed, a failure fails the step
+          ( pip install -r "$T/requirements-engine.txt" ) > "$RP/pip.log" 2>&1 & PIP_PID=$!
+          ( npm install -g "@anthropic-ai/claude-code@$CLAUDE_CODE_VERSION" ) > "$RP/npm.log" 2>&1 & NPM_PID=$!
+          APT_RC=0
+          { sudo apt-get update -y && sudo apt-get install -y poppler-utils tesseract-ocr tesseract-ocr-mar libreoffice-writer fonts-freefont-ttf; } || APT_RC=$?
+          PIP_RC=0; wait "$PIP_PID" || PIP_RC=$?
+          NPM_RC=0; wait "$NPM_PID" || NPM_RC=$?
+          echo "--- pip (exit $PIP_RC)"; tail -n 15 "$RP/pip.log"; echo "--- npm (exit $NPM_RC)"; tail -n 15 "$RP/npm.log"
+          [ "$APT_RC" = 0 ] && [ "$PIP_RC" = 0 ] && [ "$NPM_RC" = 0 ] || { echo "install failed: apt $APT_RC pip $PIP_RC npm $NPM_RC"; false; }
       # an encrypted / non-PDF proposal fails here with a Marathi reason (exit 1) -> no paid model call follows
       # case meta (original name from Supabase, page count of the fetched proposal) is taken here, before `engine` exists;
       # verify uses it (--case-meta) instead of the engine-writable /tmp/case/case.json (audit A2 MED)
@@ -150,31 +156,31 @@ jobs:
           python3 "$T/engine_supabase.py" case_meta "$RP/runner-case.json" /tmp/case || { rm -f "$RP/runner-case.json"; echo "case_meta failed"; }
       # Page PNGs (110 dpi) + text layer + tesseract OCR before Claude (QUALITY_AUDIT §5 item 1). Non-fatal: without them
       # Claude renders the pages itself. The model still looks at every image; text/OCR are only a cross-check.
-      - name: Prepare page images (prep_pages.py)
+      # SOP Step 0.4 + INSTRUCTIONS §7.1 for the engine: old-case text corpus and the precedent library (non-fatal).
+      # audit 05.11 T-H: the three jobs write to separate dirs (/tmp/case/pages*, /tmp/old, /tmp/precedent) and run in
+      # parallel, all before the `engine` user exists. T-C: the runner keeps its OWN copy of the proposal OCR
+      # ($RP/prop_ocr, runner-private) so its post-run OCR of the package re-uses it instead of OCR-ing the proposal again.
+      - name: Prepare page images + precedent sources (parallel)
         timeout-minutes: 25
         run: |
           set -uo pipefail
-          S0=$(date +%s); trap '{ printf "%s\t%s\t%s\n" "prep_pages" "$S0" "$(date +%s)" >> "$RP/stages.tsv"; } 2>/dev/null || true' EXIT
-          P=$(python3 -c 'import json; c = json.load(open("/tmp/case/case.json", encoding="utf-8")); print(next(f["local_path"] for f in c["inputs"] if f["kind"] == "proposal"))') || P=""
-          if [ -z "$P" ] || ! timeout 20m python3 "$T/prep_pages.py" "/tmp/case/$P" /tmp/case/pages; then
-            rm -rf /tmp/case/pages
-            python3 "$T/engine_supabase.py" warn "प्रस्तावाची पान-प्रतिमा आधी तयार झाली नाही (prep_pages) — इंजिन स्वतः तयार करेल" || true
-          fi
-          n=0
-          for f in /tmp/case/in/reply/*.pdf; do
-            [ -f "$f" ] || continue
-            n=$((n + 1))
-            timeout 5m python3 "$T/prep_pages.py" "$f" "/tmp/case/pages_reply_$n" || rm -rf "/tmp/case/pages_reply_$n"
-          done
-          exit 0
-      # SOP Step 0.4 + INSTRUCTIONS §7.1 for the engine: old-case text corpus and the precedent library (non-fatal).
-      - name: Prepare precedent sources
-        timeout-minutes: 10
-        run: |
-          set -uo pipefail
-          S0=$(date +%s); trap '{ printf "%s\t%s\t%s\n" "Precedent sources" "$S0" "$(date +%s)" >> "$RP/stages.tsv"; } 2>/dev/null || true' EXIT
-          python3 "$T/oldcases_text.py" /tmp/old || python3 "$T/engine_supabase.py" warn "जुन्या प्रकरणांचा मजकूर-संग्रह (/tmp/old) तयार झाला नाही" || true
-          python3 - <<'PY' || python3 "$T/engine_supabase.py" warn "पूर्वोदाहरण-ग्रंथालय (/tmp/precedent) उघडले नाही" || true
+          S0=$(date +%s); trap '{ printf "%s\t%s\t%s\n" "prep_pages + precedent" "$S0" "$(date +%s)" >> "$RP/stages.tsv"; } 2>/dev/null || true' EXIT
+          (
+            P=$(python3 -c 'import json; c = json.load(open("/tmp/case/case.json", encoding="utf-8")); print(next(f["local_path"] for f in c["inputs"] if f["kind"] == "proposal"))') || P=""
+            if [ -z "$P" ] || ! timeout 20m python3 "$T/prep_pages.py" "/tmp/case/$P" /tmp/case/pages; then
+              rm -rf /tmp/case/pages; touch "$RP/prep.failed"
+            fi
+            n=0
+            for f in /tmp/case/in/reply/*.pdf; do
+              [ -f "$f" ] || continue
+              n=$((n + 1))
+              timeout 5m python3 "$T/prep_pages.py" "$f" "/tmp/case/pages_reply_$n" || rm -rf "/tmp/case/pages_reply_$n"
+            done
+          ) > "$RP/prep.log" 2>&1 &
+          PREP=$!
+          ( python3 "$T/oldcases_text.py" /tmp/old || touch "$RP/oldcases.failed" ) > "$RP/oldcases.log" 2>&1 &
+          OLD=$!
+          ( python3 - <<'PY' || touch "$RP/precedent.failed"
           import os, zipfile
           dst = "/tmp/precedent"; n = 0
           with zipfile.ZipFile("precedent-library/Precedent-Library.zip") as z:
@@ -188,6 +194,20 @@ jobs:
                   open(p, "wb").write(z.read(i)); n += 1
           print(n, "files ->", dst)
           PY
+          ) > "$RP/precedent.log" 2>&1 &
+          PREC=$!
+          wait "$PREP" "$OLD" "$PREC" || true
+          tail -n 5 "$RP/prep.log" "$RP/oldcases.log" "$RP/precedent.log" 2>/dev/null || true
+          [ -e "$RP/prep.failed" ] && { python3 "$T/engine_supabase.py" warn "प्रस्तावाची पान-प्रतिमा आधी तयार झाली नाही (prep_pages) — इंजिन स्वतः तयार करेल" || true; }
+          [ -e "$RP/oldcases.failed" ] && { python3 "$T/engine_supabase.py" warn "जुन्या प्रकरणांचा मजकूर-संग्रह (/tmp/old) तयार झाला नाही" || true; }
+          [ -e "$RP/precedent.failed" ] && { python3 "$T/engine_supabase.py" warn "पूर्वोदाहरण-ग्रंथालय (/tmp/precedent) उघडले नाही" || true; }
+          # T-C: runner-private copy of the proposal's text layer + OCR (no images), made before `engine` exists
+          rm -rf "$RP/prop_ocr"
+          if [ -s /tmp/case/pages/pages.json ]; then
+            mkdir -m 700 "$RP/prop_ocr" && cp /tmp/case/pages/pages.json /tmp/case/pages/*.txt "$RP/prop_ocr/" 2>/dev/null \
+              || rm -rf "$RP/prop_ocr"
+          fi
+          exit 0
       # CLAUDE.md is moved aside for this step only: it would auto-load OWNER_RULES (trading/apps/diet) and HANDOVER
       # (session to-dos, SOP Step 0b/8 commit work) into every turn. ENGINE_PROMPT names exactly what to read instead;
       # running from the repo root keeps every tool's relative path (tools/, pdf/, सन*.zip) working. Restored before commit.
@@ -242,10 +262,27 @@ jobs:
           DEADLINE=$(( JOB_T0 + JOB_MINUTES * 60 - POST_RESERVE_MIN * 60 ))   # the Claude step must end by then
           left() { echo $(( DEADLINE - $(date +%s) )); }
           : "${MODEL:=claude-opus-5-5}" "${MODEL_LIGHT:=claude-haiku-5-5}" "${MODEL_REVIEW:=claude-opus-5-5}" "${MODEL_STRONG:=}" "${EFFORT:=medium}"
+          : "${MODEL_FIXER:=claude-sonnet-5-5}"   # audit 05.11 C-B: `fixer` subagent (mechanical repairs; engine_supabase.py agents)
           : "${PART1_PROVIDER:=claude}" "${PART1_MODEL:=}" "${FALLBACK_PROVIDER:=}" "${FALLBACK_MODEL:=}" "${FALLBACK_MODEL_LIGHT:=}"
           : "${ENGINE_PROVIDER:=}" "${ENGINE_MODEL:=}" "${ENGINE_MODEL_LIGHT:=}" "${CLOUDFLARE_ACCOUNT_ID:=}" "${OLLAMA_BASE_URL:=}"
-          export MODEL MODEL_LIGHT MODEL_REVIEW MODEL_STRONG
+          export MODEL MODEL_LIGHT MODEL_REVIEW MODEL_STRONG MODEL_FIXER
           ES agents /tmp/work/agents.json
+          # audit 05.11 C-D: the brief goes INTO every subagent's definition (its system prompt: cached across the calls of
+          # that agent) instead of each subagent Reading the file in its first turn. The text is the root-owned snapshot
+          # of tools/ENGINE_BRIEF.md, unchanged — no rule is added, cut or reworded. Any error -> agents.json unchanged
+          # (the subagents then Read the file, as before).
+          python3 -I - "$T/ENGINE_BRIEF.md" /tmp/work/agents.json <<'PY' || echo "brief not added to the agent definitions (subagents Read it)"
+          import json, os, sys
+          brief = open(sys.argv[1], encoding="utf-8").read().strip()
+          a = json.load(open(sys.argv[2], encoding="utf-8"))
+          head = ("\n\n# tools/ENGINE_BRIEF.md (the binding brief, full text, identical to the file; it is already here: "
+                  "do not Read the file again)\n\n")
+          for v in a.values():
+              if isinstance(v, dict) and isinstance(v.get("prompt"), str) and "# ENGINE_BRIEF" not in v["prompt"]:
+                  v["prompt"] += head + brief + "\n"
+          json.dump(a, open(sys.argv[2] + ".tmp", "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+          os.replace(sys.argv[2] + ".tmp", sys.argv[2])
+          PY
           # tool docstrings for the prompt: only the tools the ticked drafts need (owner 04.11.2026); all of them in
           # TOOL_DOCS_ALL.md. No case meta / outputs null -> every tool (tools/tool_docs.py).
           python3 -I "$T/tool_docs.py" /tmp/work "$RP/runner-case.json" || echo "tool_docs failed (prompt without tool docstrings)"
@@ -264,7 +301,7 @@ jobs:
           # explicit env for `engine` (an array, so `timeout` can run it); extra VAR=VALUE words follow, then INDIR + command
           ERUN=(sudo -u engine -H env -i HOME=/home/engine PATH="$PATH" LANG=C.UTF-8 LC_ALL=C.UTF-8 TMPDIR=/tmp CI=true
                 FORCE_PROMPT_CACHING_5M=1 CASE_ID="$CASE_ID" RUN_ID="$RUN_ID" RUN_TOKEN="$RUN_TOKEN" WORKER="$WORKER"
-                MODEL="$MODEL" MODEL_LIGHT="$MODEL_LIGHT" MODEL_REVIEW="$MODEL_REVIEW" MODEL_STRONG="$MODEL_STRONG"
+                MODEL="$MODEL" MODEL_LIGHT="$MODEL_LIGHT" MODEL_REVIEW="$MODEL_REVIEW" MODEL_STRONG="$MODEL_STRONG" MODEL_FIXER="$MODEL_FIXER"
                 BUDGET_USD="${BUDGET_USD:-0.75}" ENGINE_SECRETS=/nonexistent)
           INDIR=(bash -c 'cd /srv/engine && exec "$@"' _)
           MARGS=(--model "$MODEL_LIGHT" --effort "$EFFORT")
@@ -388,6 +425,7 @@ jobs:
           MODEL_LIGHT=$MODEL_LIGHT
           MODEL_REVIEW=$MODEL_REVIEW
           MODEL_STRONG=$MODEL_STRONG
+          MODEL_FIXER=$MODEL_FIXER
           BUDGET_USD=${BUDGET_USD:-0.75}"
           # the prompt goes in on stdin, never as one argv string: Linux refuses a single argument over 128 KiB
           # (MAX_ARG_STRLEN) and prompt + brief + tool docstrings reached ~164 KB on 04.11.2026 (run #12 "Argument list
@@ -528,7 +566,13 @@ jobs:
           PY
           ) || PKG=""
           rm -rf "$RP/pkgpages"
-          if [ -n "$PKG" ] && timeout 10m python3 "$T/prep_pages.py" "$PKG" "$RP/pkgpages" --small-dpi 0; then
+          # T-C (audit 05.11): the proposal pages (1..n of the package, untouched by pkg3 apart from the page stamp) re-use
+          # the runner's OWN prep OCR ($RP/prop_ocr, copied before `engine` existed); only the other pages are OCR'd here.
+          # The engine's /tmp/work/pkgpages is never re-used, even when its pdf_sha256 matches the package: the hash says
+          # which PDF the text belongs to, not who wrote it (engine-written OCR could "confirm" a forged extract).
+          NP=$(python3 -I -c 'import json,sys; print(int(json.load(open(sys.argv[1], encoding="utf-8")).get("proposal_pages") or 0))' "$RP/runner-case.json" 2>/dev/null) || NP=0
+          RU=(); [ "$NP" -gt 0 ] && [ -s "$RP/prop_ocr/pages.json" ] && RU=(--proposal-pages "$NP" --reuse "$RP/prop_ocr")
+          if [ -n "$PKG" ] && timeout 10m python3 -I "$T/pkg_ocr.py" "$PKG" "$RP/pkgpages" "${RU[@]}"; then
             echo "runner OCR: $(ls "$RP/pkgpages" | wc -l) files"
           else
             rm -rf "$RP/pkgpages"; echo "runner OCR not made (package: ${PKG:-none})"

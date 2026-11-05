@@ -3,7 +3,7 @@
  "label": "न्यायालयीन प्रकरणे",
  "status": "ready",
  "default_drafts": ["parawise", "letter"],
- "allowed_drafts": ["letter", "reminder", "gr", "corrigendum", "circular", "memo", "notification", "parawise"],
+ "allowed_drafts": ["letter", "reminder", "gr", "corrigendum", "circular", "memo", "notification", "parawise", "do_letter", "uo_note", "endorsement", "office_order", "press_note", "addendum", "affidavit", "lq"],
  "rules_file": "tools/work_rules/court.md",
  "samples_dir": "samples/work/court/",
  "required_samples": [],

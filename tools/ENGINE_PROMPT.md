@@ -1,7 +1,7 @@
 # Engine run (app B) — one case -> three files. Used by .github/workflows/process-proposal.yml (replaces HEADLESS_PROMPT.md)
 
 Given at run time (end of this prompt): WORKDIR (inputs), OUTDIR (outputs), OLDCASES, PRECEDENT, MODEL, MODEL_LIGHT,
-MODEL_REVIEW, MODEL_STRONG (empty = no escalation tier), BUDGET_USD (soft). Working directory =
+MODEL_REVIEW, MODEL_STRONG (empty = no escalation tier), MODEL_FIXER (the `fixer`), BUDGET_USD (soft). Working directory =
 repo root. CLAUDE.md is NOT loaded in this run (the workflow moves it aside). Prompt layout (stable first, for prompt
 caching): this file, then tools/ENGINE_BRIEF.md, then the tool docstrings, then the run variables (last).
 
@@ -46,8 +46,12 @@ caching): this file, then tools/ENGINE_BRIEF.md, then the tool docstrings, then 
 You are the ORCHESTRATOR and run on the cheap tier (MODEL_LIGHT). Subagents (Agent tool, `subagent_type` = name):
 `drafter` (MODEL_REVIEW, Opus-class — Abhi 03.11.2026, C30: "note khupch short jhali detail asayla pahije", the note is
 drafted by Opus; MODEL only when MODEL_REVIEW is empty), `study_writer` and `related_writer` (MODEL_LIGHT), `reviewer`
-(MODEL_REVIEW, Opus-class: final check and approval), `drafter_strong` (MODEL_STRONG) only when configured and
-different from the drafter's model. MODEL (Settings "model") no longer drives a subagent by default.
+(MODEL_REVIEW, Opus-class: final check and approval), `fixer` (MODEL_FIXER, Sonnet-class; audit
+05.11 C-B) for MECHANICAL repairs only — an extract that does not match its page, Study part-1 pages to redo from the
+images — and `drafter_strong` (MODEL_STRONG) only when configured and different from the drafter's model. The drafter
+and the reviewer stay Opus-class; the note, letter, part 0 and every content fix stay with the drafter. No `fixer` in
+/tmp/work/agents.json (`jq -r 'keys[]' /tmp/work/agents.json`) -> its tasks go to `drafter`, as before.
+MODEL (Settings "model") no longer drives a subagent by default.
 The budget is SOFT: going over it only adds a warning; never skip a check, an escalation or the review for cost.
 
 | Task | Agent (tier) | Quality guard |
@@ -55,23 +59,15 @@ The budget is SOFT: going over it only adds a warning; never skip a check, an es
 | Text layer / OCR read, GR citations list, GR search + fetch (gr_request.py), precedent grep, candidate GR page text | you (MODEL_LIGHT) | finding/fetching only; nothing quoted or decided by you |
 | Facts list from the page IMAGES (numbers, dates, names, stamps, handwriting) | drafter (MODEL_REVIEW) | every page image at 110 dpi; reviewer re-reads |
 | Research of the applicable GR paras / rules / cited SC-HC judgments from the original pages; letter or not; GR choice for the note body + enclosures.json marks; DETAILED note body (brief [I4.29], 12 elements) + concise letter (spec without `related`); Study part 0 | drafter (MODEL_REVIEW) | lint; reviewer checks each [I4.29] element and approves |
-| Note `related` ("संबंधित माहिती (संदर्भासाठी)") — verbatim GR/rule/precedent extracts + source + "(पृ.N/प.वि.)" (none when not in the package; §4.27) | related_writer (MODEL_LIGHT) | `extract_check.py`: each extract must occur on its cited package page; mismatches -> drafter |
-| Study parts 2, 3, 4, 7; parts 5–6 = exact copies of the spec's note / letter text (never redrafted) | study_writer (MODEL_LIGHT) | part 3 by `extract_check.py` (mismatches -> drafter); lint; parts 5–6 copied by you from spec |
-| Study part 1 page rendering | helper run (MODEL_LIGHT), then `part1check` vs the drafter's facts | kept only when every number/date/name matches; failing pages -> drafter |
+| Note `related` ("संबंधित माहिती (संदर्भासाठी)") — verbatim GR/rule/precedent extracts + source + "(पृ.N/प.वि.)" (none when not in the package; §4.27) | related_writer (MODEL_LIGHT) | `extract_check.py`: each extract must occur on its cited package page; mismatches -> fixer, then drafter |
+| Study parts 2, 3, 4, 7; parts 5–6 = exact copies of the spec's note / letter text (never redrafted) | study_writer (MODEL_LIGHT) | part 3 by `extract_check.py` (mismatches -> fixer, then drafter); lint; parts 5–6 copied by you from spec |
+| Study part 1 page rendering | helper run (MODEL_LIGHT), then `part1check` vs the drafter's facts | kept only when every number/date/name matches; failing pages -> fixer, then drafter |
 | Final review: every number/date/name of note, letter, part 0 vs the images; INSTRUCTIONS §4 incl. §4.18 and §4.29 (each element present where it applies; no fact/condition of the proposal left out); §4.30 checks (coverage table + contradiction scan -> Study part 7; relief line; original-language provisions; respectful language; others' opinions as recorded); letter-or-not; language; minimal direct corrections | reviewer (MODEL_REVIEW) | 1 review + 1 re-review max; not approved -> delivered with warning (Order step 7) |
 | pkg3 / highlight / build_note_letter / build_study / lint / verify / extract_check runs; page numbers from map.json | you (MODEL_LIGHT) | scripts; LINT OK, ALL OK, EXTRACTS OK |
-| Fixing lint/verify/extract lines | you 2 attempts -> drafter 2 -> drafter_strong 1 (if set) | then "पडताळणी अपूर्ण" warning and go on (rule 9) |
+| Fixing lint/verify lines | you 2 attempts -> drafter 2 -> drafter_strong 1 (if set) | then "पडताळणी अपूर्ण" warning and go on (rule 9) |
+| Mechanical repairs: MISMATCH extract units, part-1 pages | fixer 1 round -> drafter 1 round (the drafter's 2 attempts of the cap) -> drafter_strong 1 (if set) | same end state (rule 9) |
 
-Expected cost per typical proposal (15 pages, 3 GRs; estimate, not yet measured live; prices of docs/QUALITY_AUDIT.md
-§6, $/MTok: Opus 5.5 4/20, Sonnet 5.5 2/10, Haiku 5.5 0.10/0.50; cache read 0.20 / 0.20 / 0.01):
-| Part | $ |
-|---|---|
-| drafter (MODEL_REVIEW = Opus 5.5 since C30, 03.11.2026; was 0.35–0.60 on Sonnet 5.5): ~14 turns × ~45k context, ~70k cache writes, ~20–30k output for the detailed note (no Study 2–4/7, no `related`) | 0.70–1.40 |
-| reviewer (Opus 5.5): ~8 turns, 15 page images + spec + part 0 + brief (~60k writes), ~4–8k output | 0.35–0.60 |
-| study_writer + related_writer (Haiku 5.5): ~30 turns, ~30k output | 0.05–0.15 |
-| orchestrator + part-1 helper (Haiku 5.5) | 0.07–0.35 |
-| escalations (extract mismatches, part-1 pages, content fixes) when needed | 0–0.30 |
-| **Total** | **≈ 1.2–2.8, typical ≈ 1.8** (estimate after C30 Opus drafter; Sonnet drafter 0.8–2.0; all-Opus 2.3–3.3; live run #8 $2.80) |
+Cost: measured $3.0–3.9 per full run, Opus 90–96 % of it (docs/AUDIT_2026-11-05.md Part 2); information only.
 
 ### Order
 1. Read the TEXT of all pages in ONE Bash call (`.txt` where `has_text_layer`, else `.ocr.txt`), case.json, inputs.
@@ -82,7 +78,7 @@ Expected cost per typical proposal (15 pages, 3 GRs; estimate, not yet measured 
    service-rules/). Write `/tmp/work/candidates.md`: per candidate GR — code, date, title, repo path, and
    the text of the pages that may hold the needed para (pymupdf text, page numbers); precedent hits (file, lines).
    Never decide which GR applies or quote anything yourself.
-2. D1 -> `drafter` (ONE Agent call; give paths, not content): "Read the brief and TOOL_DOCS. LOOK at every proposal
+2. D1 -> `drafter` (ONE Agent call; give paths, not content): "Read TOOL_DOCS (the brief is in your agent definition). LOOK at every proposal
    page image WORKDIR/pages/p-NN.png (full 110 dpi; several Reads per message); reply PDFs likewise. Write
    /tmp/work/facts.json (format below) — every number/date/name/amount from the IMAGE, `clear:false` where not sure.
    RESEARCH FIRST (brief [I4.29]): from candidates.md, the GR PDFs, rules and judgments find every applicable para and
@@ -104,31 +100,47 @@ Expected cost per typical proposal (15 pages, 3 GRs; estimate, not yet measured 
    "value": "<as on the image>", "clear": true}]}], "unclear": ["<page: what>"]}`. `file` = "proposal" (page = proposal
    page; the only entries part1check compares), "reply_<n>" / "extra_<n>" (page = page inside that file).
 3. pkg3 -> compare `<pdf>.map.json` with the drafter's पृ.N (fix only page numbers, mechanically). If any enclosed
-   page has no usable text layer (scan / legacy font / garbled Unicode — most gr.maharashtra.gov.in PDFs), run
-   `python3 tools/prep_pages.py "OUTDIR/<package>" /tmp/work/pkgpages --small-dpi 0` once (OCR for extract_check).
-4. In ONE message, two Agent calls (they run in parallel):
-   - `related_writer`: "Read the brief, /tmp/work/related_plan.md, /tmp/work/spec.json and OUTDIR/<package> +
+   page has no usable text layer (scan / legacy font / garbled Unicode — most gr.maharashtra.gov.in PDFs), run RIGHT
+   AFTER pkg3, in the foreground, and wait for it directly (one Bash call, Bash timeout 600000 ms; no background, no
+   polling): `python3 tools/pkg_ocr.py "OUTDIR/<package>" /tmp/work/pkgpages --proposal-pages <proposal pages>
+   --reuse WORKDIR/pages` (OCR for extract_check; audit 05.11 T-C: the proposal pages re-use the workflow's OCR of
+   WORKDIR/pages, only the other pages are OCR'd). Never OCR the package a second time in the run; after a package
+   REBUILD run the same command again (the old OCR belongs to the old PDF and extract_check ignores it).
+4. In ONE message, two Agent calls — normal (foreground) calls, never `run_in_background`; they run in parallel and
+   the message returns when both have finished. Never wait for, sleep on or poll their files (audit 05.11 T-A):
+   - `related_writer`: "Read /tmp/work/related_plan.md, /tmp/work/spec.json and OUTDIR/<package> +
      its .map.json. Write /tmp/work/related.json = the spec `related` list (verbatim extracts in “…”, source, each
      ending " (पृ.N/प.वि.)" from the map, or with no page marker when the page is not in the package; never
      "पॅकेज PDF", warnings, remarks, "स्रोत" or "जसाच्या तसा" — INSTRUCTIONS §4.27)."
-   - `study_writer`: "Read the brief, facts.json, spec.json, study_part0.json, candidates.md and the package. Write
+   - `study_writer`: "Read facts.json, spec.json, study_part0.json, the candidates.md section of each GR you quote
+     (grep, not the whole file) and only the package pages you cite (pymupdf text of one page at a time). Write
      /tmp/work/study_rest.json = parts 2, 3, 4, 7 (build_study parts; part 3 extracts verbatim in “…” with
      "(पॅकेज PDF पृ. N)" or "(पॅकेज PDF मध्ये नाही)"; unavailable GRs, discrepancies, cautions in parts 4/7)."
-5. Merge `related.json` into spec.json `related`. Assemble study.json = part 0 + part 1 + parts 2–4 + part 5 (note
+5. Merge `related.json` into spec.json `related`. Assemble study.json = part 0 + part 1 (section "Study part 1": its one
+   wait, then part1check) + parts 2–4 + part 5 (note
    text copied from spec) + part 6 (letter text copied from spec) + part 7. Run
    `python3 tools/extract_check.py "OUTDIR/<package>" --spec /tmp/work/spec.json --study /tmp/work/study.json
    [--ocr-dir /tmp/work/pkgpages] --extra OLDCASES/t --extra PRECEDENT --extra register --extra service-rules
-   [--extra <each GR/rule PDF quoted but not enclosed>] --log-out /tmp/work/xlog.json --from MODEL_LIGHT --to <drafter model: MODEL_REVIEW, else MODEL>`.
-   EXTRACTS FAIL -> delegate the MISMATCH units (printed lines) to `drafter` (correct those extracts from the
-   page/image; one-way, never back to the cheap tier), merge, re-run; append xlog.json entries to `model_log`. Cap:
-   2 drafter rounds (+1 `drafter_strong` if set). Still MISMATCH -> keep the unit unchanged (its source ending stays
-   as written), warning "पडताळणी अपूर्ण — उतारा मूळ पानाशी जुळला नाही: <where, पृ.>", go on.
+   [--extra <each GR/rule PDF quoted but not enclosed>] --log-out /tmp/work/xlog.json --from MODEL_LIGHT --to <model of the agent that fixes them: MODEL_FIXER for the fixer, else the drafter's = MODEL_REVIEW, else MODEL>`.
+   EXTRACTS FAIL -> MISMATCH units of the spec (`related`) are fixed NOW, before the review (the reviewer hashes the
+   spec): delegate them (printed lines) to `fixer` (correct those extracts from the page/image; one-way, never back
+   to the cheap tier), merge, re-run; still MISMATCH -> one `drafter` round (+1 `drafter_strong` if set). MISMATCH units
+   of Study part 3 wait for step 7 (they run in parallel with the reviewer). Append xlog.json entries to `model_log`.
+   Still MISMATCH after the cap -> keep the unit unchanged (its
+   source ending stays as written), warning "पडताळणी अपूर्ण — उतारा मूळ पानाशी जुळला नाही: <where, पृ.>", go on.
    UNVERIFIABLE lines are not failures. The workflow repeats this check on the delivered files and reports what is
    left as warnings.
 6. lint -> build_note_letter [-> build_parawise / build_order when spec has `parawise` / `order` / `orders`] -> build_study ->
    write a draft OUTDIR/status.json (rule 9, without `review`) -> verify (rule 6). Fix ladder: Escalation (b); its end
    state: rule 9. A PREFIX change (C R found later) -> delete the old-PREFIX files in OUTDIR before rebuilding.
-7. D-final -> `reviewer` (ONE Agent call): "Read the brief, /tmp/work/facts.json, /tmp/work/spec.json,
+7. D-final (audit 05.11 T-D: the reviewer does not wait for the Study repairs; the part-1 wait + part1check were
+   done in step 5). Then ONE message with, in parallel (foreground Agent calls): the `reviewer` call below
+   AND, only when there is Study work left, ONE `fixer` call for it (Study part-3 MISMATCH units of step 5 and part-1
+   pages that failed part1check: "correct those units / redo those pages from the page images; write
+   /tmp/work/study_fix.json"). The reviewer reads only spec / part 0 / facts / images, never the Study, so the two do
+   not touch the same file. After the message: merge the fixer's units into study.json, re-run part1check /
+   extract_check for them (still failing -> one `drafter` round, then the warning of the cap), then the review steps
+   below. `reviewer`: "Read /tmp/work/facts.json, /tmp/work/spec.json,
    /tmp/work/study_part0.json; LOOK at the page images WORKDIR/pages/p-NN.png. Check and correct per your
    definition (incl. brief [I4.29]: each element present where it applies, no fact/condition of the proposal left out;
    brief [I4.30]: checks (1)–(7), and write review.json `coverage` + `contradictions`; brief [I4.31]: missing information /
@@ -158,18 +170,23 @@ Expected cost per typical proposal (15 pages, 3 GRs; estimate, not yet measured 
 Progress steps (rule 4) as before.
 
 ### Study part 1
-- Wait for `/tmp/work/study_part1.done` / `.failed` with ONE Bash loop (Bash timeout 600000 ms, at most 4 calls).
+- The ONLY wait of the run (the part-1 helper is a separate process started by the workflow; audit 05.11 T-A: never
+  write any other wait, sleep or polling loop — not for agents, not for OCR, not for files). Run exactly this command,
+  at most 4 Bash calls (Bash timeout 600000 ms each): `timeout 580 bash -c 'until [ -e /tmp/work/study_part1.done ] ||
+  [ -e /tmp/work/study_part1.failed ]; do sleep 10; done'; ls /tmp/work/study_part1.*`. Still no marker -> treat as
+  `.failed`.
 - `.done` + valid -> `python3 tools/engine_supabase.py part1check /tmp/work/facts.json /tmp/work/study_part1.json`.
-  PART1 OK -> insert UNCHANGED as parts[1]. MISMATCH lines -> delegate to `drafter`: redo exactly those pages of
-  part 1 from the images (or all of part 1 if more than a third of the pages fail) and log the escalation.
+  PART1 OK -> insert UNCHANGED as parts[1]. MISMATCH lines -> keep the page text for now; those pages go to `fixer` in
+  the step-7 message: redo exactly those pages of part 1 from the images (or all of part 1 if more than a third of the
+  pages fail); log the escalation.
 - `.failed` / invalid / missing -> keep the valid pages of a partial study_part1.json (a page whose only para is
-  "[भाग 1 वेळेअभावी अपूर्ण — मूळ पान पाहावे]" is not done); delegate the rest (or all) of
-  part 1 to `drafter` (rule (c) below).
-- After ANY part-1 write (drafter redo, drafter_strong, merge) run part1check again (A1 H11). Cap: 2 drafter rounds
-  (+1 drafter_strong); still MISMATCH -> keep the text, warning "पडताळणी अपूर्ण — भाग 1 पान <N>: part1check जुळले नाही".
+  "[भाग 1 वेळेअभावी अपूर्ण — मूळ पान पाहावे]" is not done); the rest (or all) of part 1 goes to `fixer` in the step-7
+  message (rule (c) below).
+- After ANY part-1 write (fixer / drafter redo, drafter_strong, merge) run part1check again (A1 H11). Cap: fixer 1 +
+  drafter 1 rounds (+1 drafter_strong); still MISMATCH -> keep the text, warning "पडताळणी अपूर्ण — भाग 1 पान <N>: part1check जुळले नाही".
 - Time budget (A1 H10; long / English proposals): your first Bash call writes `date +%s > /tmp/work/t0`. When part 1
   is still not complete for all pages after 90 minutes of the run, or the drafter's part-1 work has used about 40
-  turns, stop part-1 work: deliver the pages done; each page not done keeps its subheading "PDF पान N — <document>" and
+  turns (fixer + drafter together), stop part-1 work: deliver the pages done; each page not done keeps its subheading "PDF पान N — <document>" and
   one para "[भाग 1 वेळेअभावी अपूर्ण — मूळ पान पाहावे]"; warning "पडताळणी अपूर्ण — भाग 1: पाने <N–M> चे रूपांतर वेळेअभावी
   झाले नाही". Pages used by the note/letter (निर्देशपत्र, forwarding letters) are done first. Never fail for part 1;
   otherwise part 1 stays complete and verbatim (INSTRUCTIONS §4.8 "जसेच्या तसे"; no summary of a page).
@@ -184,8 +201,11 @@ Progress steps (rule 4) as before.
 (b) lint / verify still failing after 2 fix attempts by you -> `drafter` (give the printed lines + file paths); still
     failing after 2 drafter attempts -> `drafter_strong` if it exists.
 (c) A cheap-tier output fails its check (study_part1.json invalid, part1check MISMATCH, extract_check MISMATCH in
-    `related` or Study part 3, related.json / study_rest.json missing or invalid) -> `drafter` (only the failing units).
-(d) End of every ladder (02.11.2026): per problem at most you 2 + drafter 2 + drafter_strong 1 (if set) attempts; then
+    `related` or Study part 3) -> `fixer` (only the failing units; mechanical repair from the page/image), still failing
+    -> `drafter` (one round). related.json / study_rest.json missing or invalid -> `drafter` (writing them is drafting,
+    not a repair).
+(d) End of every ladder (02.11.2026): per problem at most you 2 + drafter 2 (mechanical repairs: fixer 1 + drafter 1)
+    + drafter_strong 1 (if set) attempts; then
     stop editing that item, add "पडताळणी अपूर्ण — <what, where>" (the printed line) to status.json `warnings` and go
     on with the next step. Never loop, never fail for it (rule 9).
 Never move a task down. Budget is SOFT: never skip an escalation for cost; the workflow adds an information line
@@ -193,23 +213,33 @@ Never move a task down. Budget is SOFT: never skip an escalation for cost; the w
 Log in status.json `model_log` (list): `{"task": "<Marathi, e.g. भाग 1 पान 3>", "from": "<model id>", "to": "<model id>",
 "reason": "<Marathi, e.g. हस्तलेख अस्पष्ट / lint 2 वेळा अयशस्वी / part1check जुळले नाही / उतारा मूळ PDF शी जुळला नाही>"}`
 — also the fixed routing: `{"task": "तथ्ये, नोंद, पत्र, भाग 0", "from": "", "to": <the drafter's model = MODEL_REVIEW, else MODEL>, "reason": "मसुदा"}`,
-`{"task": "भाग 1-7 (0 वगळून), संबंधित माहिती, साधने", "from": "", "to": MODEL_LIGHT, "reason": "स्वस्त स्तर; उतारे यंत्र-तपासणी"}`
+`{"task": "भाग 1-7 (0 वगळून), संबंधित माहिती, साधने", "from": "", "to": MODEL_LIGHT, "reason": "स्वस्त स्तर; उतारे यंत्र-तपासणी"}`,
+`{"task": "उतारे / भाग 1 पाने — यांत्रिक दुरुस्ती", "from": MODEL_LIGHT, "to": MODEL_FIXER, "reason": "<as above>"}` (only when the fixer ran)
 and `{"task": "अंतिम पडताळणी व मान्यता", "from": "", "to": MODEL_REVIEW, "reason": "अंतिम मान्यता"}`. Model ids are in
 the run variables. The reviewer's corrections go to status.json `review.corrections` (the workflow prints them as
 "मॉडेल: Opus पडताळणी — …").
 
 ### Cost rules (they never override a quality rule)
 - Few turns: independent tool calls in ONE message; shell steps combined in one Bash call; each JSON in one Write.
+- No waiting of your own (audit 05.11 T-A): subagents are normal Agent calls (never `run_in_background`), OCR and
+  every tool run in the foreground; never write a `sleep` / `until` / `while` loop or re-check a file to see whether
+  something has finished. The single exception is the part-1 wait command of section "Study part 1".
+- Context size on the cheap tier (audit 05.11 C-F): keep every MODEL_LIGHT request (you, study_writer, related_writer)
+  under 100K tokens — larger prompts cost several times more. Read files in parts (`grep`, `sed -n`, one PDF page's
+  text per command), never a whole package / candidates.md / old-case text, and give subagents paths, never content.
+  Nothing of the rules is dropped for it: the brief and the tool docstrings stay complete.
 - Limit output (`| head -60`, `grep -m`, `cut -c1-300`); never cat a whole large file, PDF dump or zip listing.
 - The brief (tools/ENGINE_BRIEF.md) and the tool docstrings (/tmp/work/TOOL_DOCS.md) are below / in /tmp/work: do not
-  Read the tool .py files or the full rule files, except a grep of one exact item on a real doubt.
+  Read the tool .py files or the full rule files, except a grep of one exact item on a real doubt. Subagents get the
+  full brief in their agent definition (the workflow appends it to /tmp/work/agents.json): never tell them to Read it.
 - Never Read the same file twice. Give subagents file paths, never paste file contents into the delegation.
 
 ## Drafts ticked by the user — `outputs` (C28, INSTRUCTIONS §4.28, 03.11.2026)
 Abhi, 03.11.2026: "letter, shasan nirnay ase option sudhha asayla pahije, jenekarun user multiple option choose karel
 tyachya demand nusar"; "default letter asel". case.json `outputs` = list of keys in this order: letter (पत्र), reminder
 (स्मरणपत्र), gr (शासन निर्णय), corrigendum (शुद्धिपत्रक), circular (परिपत्रक), memo (ज्ञापन), notification (अधिसूचना),
-parawise (परिच्छेदनिहाय उत्तर). The Study, the note and the package PDF are ALWAYS made.
+parawise (परिच्छेदनिहाय उत्तर), then the eight keys of 04.11.2026 below (the one list: tools/draft_keys.json). The Study,
+the note and the package PDF are ALWAYS made.
 - `outputs` null (old app / column missing) -> today's behaviour: the drafter decides letter / order / parawise by the
   rules below and Step 3.
 - `outputs` a list (also `[]` = note only) -> make EXACTLY those drafts besides the note; tell the drafter the list in D1:
@@ -252,9 +282,23 @@ tools/lint_order.py / tools/lint_parawise.py); build them in step 6 after build_
 **Court mode** (the proposal is a court matter: a notice/letter of a Government Pleader / AGP / सरकारी वकील, the High
 Court or MAT about a writ petition (रिट याचिका), O.A. (मूळ अर्ज), contempt (अवमान याचिका), SLP — look for these words
 on the page images):
-- Note (B9, Section's contempt file): para 1 "<सहायक सरकारी वकील, मा. उच्च न्यायालय, …> यांच्या पृ.N/प.वि. वरील दि. __
-  रोजीच्या पत्रास अनुसरून सादर."; then "पार्श्वभूमी थोडक्यात खालीलप्रमाणे आहे:-" and numbered facts with पृ.N/प.वि.
-  (court order, GRs, earlier opinions, earlier letters); the hearing date as stated in the notice.
+- Note (INSTRUCTIONS §4.32, brief [I4.32]; model samples/specs/WP35697_2026_old-pension_finance-opinion.json): para 1 as
+  PROPOSAL_SOP Step 4b (B9: "<सहायक सरकारी वकील, मा. उच्च न्यायालय, …> यांच्या पृ.N/प.वि. वरील दि. __ रोजीच्या पत्रास
+  अनुसरून सादर."); the FIRST numbered para = the petition (petitioners, court, petition type + no., पृ.N/प.वि., "कृपया
+  पहावी.") and ALL respondents in the petition's order in flowing sentences ("सदर याचिकेत <R1> यांना प्रतिवादी क्र. 1, …
+  आणि <Rn> यांना प्रतिवादी क्र. N करण्यात आले आहे (पृ.N/प.वि.).", Marathi designations, e.g. Registrar General =
+  महाप्रबंधक, मा. उच्च न्यायालय) + the verification date — no choppy "प्रतिवादी क्र. 1 …;" list, no separate respondents
+  para; the SECOND = "सदर याचिकेद्वारे याचिकाकर्त्यांनी पुढीलप्रमाणे प्रमुख मागण्या केल्या आहेत (पृ.N/प.वि.):-" + table
+  अ.क्र. | प्रार्थना | मागणी (each prayer in Marathi, petition order; minor prayers in one row); the English prayers
+  verbatim FIRST in `related`. Then the §4.32 (ई) story order with linking words (service + applicable rule, relied GR +
+  concurrence, comparison judgments/GRs, correspondence in date order, contentions, pending related proposal,
+  "उपरोक्त वस्तुस्थिती पुढीलप्रमाणे आहे:-", सबब); respectful plural; sentences under 40 words; the hearing date as
+  stated in the notice.
+- Joint affidavit (INSTRUCTIONS §4.35, brief [I4.35]; model samples/specs/WP35697_2026_parawise_GP-letter.json): several
+  State respondents -> `parawise.on_behalf_of` (and `affidavit.on_behalf_of`) = ALL State respondents ("Respondent Nos. 1
+  to 3 i.e. the State of Maharashtra, …"); the GP letter asks ONE joint affidavit draft "शासनाच्या वतीने"; copy to the
+  other State respondent department for information. The High Court administration (महाप्रबंधक / प्रबंधक), if a
+  respondent, is NOT part of it: no remarks, no request, no copy on its behalf.
 - Facts suffice -> spec `parawise` (English; B8; Rules for the Conduct of the Legal Affairs of Government 1984,
   Rule 58(3): a parawise report on ALL points of the petition; Rule 58(4) Note (ii): never cryptic "denied" /
   "not admitted" — elaborate factual position with rule/GR/order references, copies of those documents listed as
@@ -269,11 +313,11 @@ on the page images):
 - Parawise FORMAT (Abhi 03.11.2026: "format parawise cha asach asto"): always the Section's office format = the default
   of build_parawise.py — `case`, `petitioner`, `respondent`, `on_behalf_of`, `paras` [{para, remarks}] (one row per para /
   sub-para, `{"section": "Grounds"}`, each ground, delay / formal paras, "Prayer Clauses (a) to (…)"; `averment` optional,
-  not printed); model samples/specs/COURT_wp_parawise_example.json. Only the format is fixed; content from the record.
+  not printed); format model samples/specs/COURT_wp_parawise_example.json, content model (§4.35) WP35697_2026_parawise_GP-letter.json. Only the format is fixed; content from the record.
   `relief_sought` / `background` / `enclosures` / `recommendation` below exist only with `"layout": "rule58"`.
-- Parawise quality (INSTRUCTIONS §4.30, Abhi 03.11.2026; brief [I4.30]): `relief_sought` = the prayer in brief
-  (printed "Relief sought:"); a chronology / service / amounts table as a `background` item {"title", "table"} where it
-  is clearer; every para AND the prayer answered; State GR/rule text quoted in its original language (Marathi in “…”,
+- Parawise quality (INSTRUCTIONS §4.30, Abhi 03.11.2026; brief [I4.30]): only with `"layout": "rule58"` —
+  `relief_sought` = the prayer in brief (printed "Relief sought:") and a chronology / service / amounts table as a
+  `background` item {"title", "table"} where it is clearer (the office format prints neither); always: every para AND the prayer answered; State GR/rule text quoted in its original language (Marathi in “…”,
   never translated); respectful wording to the Court (lint_parawise WARN "contempt-prone wording" -> rephrase); GP/AGP
   or other-department opinions stated as recorded, not as binding.
 - Essential facts missing (§4.15) -> NO `parawise`; the information-letter first (to the HC / District Court as usual).

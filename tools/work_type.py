@@ -5,7 +5,7 @@ Same pattern as tools/desk.py: one file per category, tools/work_types/<id>.json
 change (see docs/WORK_TYPES.md). A case names one with cases.work_type -> case.json "work_type" (absent / null / "" = service).
 
 Fields: id, label (Marathi), status ("ready" | "rules_pending"), default_drafts [..], allowed_drafts [..] (draft keys of
-INSTRUCTIONS §4.28 = DRAFT_KEYS), rules_file (tools/work_rules/<id>.md), samples_dir (samples/work/<id>/),
+INSTRUCTIONS §4.28 / §4.33 = DRAFT_KEYS, read from tools/draft_keys.json), rules_file (tools/work_rules/<id>.md), samples_dir (samples/work/<id>/),
 required_samples [Marathi list of the samples the owner should give], pending_warning (Study / status warning used while
 status is rules_pending; "" allowed for ready types).
 
@@ -25,7 +25,19 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 TYPE_DIR = os.path.join(HERE, "work_types")
 DEFAULT_WORK_TYPE = "service"
-DRAFT_KEYS = ("letter", "reminder", "gr", "corrigendum", "circular", "memo", "notification", "parawise")  # engine_supabase.py
+DRAFT_KEYS_FILE = os.path.join(HERE, "draft_keys.json")
+
+
+def _draft_keys():
+    """the draft keys of INSTRUCTIONS §4.28 / §4.33 from tools/draft_keys.json (the one source; audit 05.11 R-F9)."""
+    with open(DRAFT_KEYS_FILE, encoding="utf-8") as f:
+        keys = json.load(f)["keys"]
+    if not (isinstance(keys, list) and keys and all(isinstance(k, str) for k in keys) and len(set(keys)) == len(keys)):
+        raise ValueError("tools/draft_keys.json: 'keys' must be a list of distinct texts")
+    return tuple(keys)
+
+
+DRAFT_KEYS = _draft_keys()   # = engine_supabase.DRAFT_KEYS = worker.js / constants.ts DRAFT_KEYS (tests/test_rule_ids.py)
 STATUSES = ("ready", "rules_pending")
 ID_RE = re.compile(r"^[a-z][a-z0-9_-]{0,40}$")
 

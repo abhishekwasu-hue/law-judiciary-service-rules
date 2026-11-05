@@ -3,7 +3,7 @@
  "label": "विधिमंडळ कामकाज",
  "status": "rules_pending",
  "default_drafts": ["letter"],
- "allowed_drafts": ["letter", "reminder", "gr", "corrigendum", "circular", "memo", "notification", "parawise"],
+ "allowed_drafts": ["letter", "reminder", "gr", "corrigendum", "circular", "memo", "notification", "parawise", "do_letter", "uo_note", "endorsement", "office_order", "press_note", "addendum", "affidavit", "lq"],
  "rules_file": "tools/work_rules/legislature.md",
  "samples_dir": "samples/work/legislature/",
  "required_samples": ["तारांकित प्रश्न + उत्तर-प्रारूप + टिप्पणी", "अतारांकित प्रश्न + उत्तर", "लक्षवेधी सूचना + निवेदन", "आश्वासन-पूर्ती"],

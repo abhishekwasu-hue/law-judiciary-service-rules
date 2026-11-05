@@ -1,0 +1,10 @@
+{
+ "_comment": "ONE source of the draft keys of INSTRUCTIONS §4.28 / §4.33 (fixed order: the 8 keys of 03.11.2026, then the 8 of 04.11.2026). Read by tools/work_type.py; tests/test_rule_ids.py checks that tools/engine_supabase.py DRAFT_KEYS / DRAFT_LABEL, cloudflare/worker.js DRAFT_KEYS and dashboard-app/src/lib/constants.ts DRAFT_KEYS / DRAFT_LABEL equal it.",
+ "keys": ["letter", "reminder", "gr", "corrigendum", "circular", "memo", "notification", "parawise",
+          "do_letter", "uo_note", "endorsement", "office_order", "press_note", "addendum", "affidavit", "lq"],
+ "labels": {"letter": "पत्र", "reminder": "स्मरणपत्र", "gr": "शासन निर्णय", "corrigendum": "शुद्धिपत्रक",
+            "circular": "परिपत्रक", "memo": "ज्ञापन", "notification": "अधिसूचना", "parawise": "परिच्छेदनिहाय उत्तर",
+            "do_letter": "अर्धशासकीय पत्र", "uo_note": "अनौपचारिक संदर्भ टिप्पणी", "endorsement": "पृष्ठांकन",
+            "office_order": "कार्यालयीन आदेश", "press_note": "प्रसिद्धीपत्रक", "addendum": "पूरकपत्र",
+            "affidavit": "शपथपत्र", "lq": "विधानमंडळ प्रश्नाचे उत्तर"}
+}

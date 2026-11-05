@@ -179,3 +179,68 @@ class PromptViaStdin(unittest.TestCase):
     def test_part1_prompt_small(self):
         n = len(open(os.path.join(ROOT, "tools/ENGINE_PART1_PROMPT.md"), encoding="utf-8").read().encode())
         self.assertLess(n, 100_000)
+
+
+class Audit0511TimeCost(unittest.TestCase):
+    """audit 05.11.2026 Part 1/2/9 fixes: parallel set-up (T-H), OCR once (T-C), brief in the agent definitions (C-D),
+    `fixer` model plumbing (C-B), no wait loops / foreground writers / reviewer parallel to Study repairs (T-A, T-D),
+    download workflows never delete an existing PDF (R-F13)."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.y = open(os.path.join(WF, "process-proposal.yml"), encoding="utf-8").read()
+        cls.p = open(os.path.join(ROOT, "tools", "ENGINE_PROMPT.md"), encoding="utf-8").read()
+
+    @unittest.skipIf(yaml is None, "pyyaml not installed")
+    def test_parallel_setup(self):
+        d = load("process-proposal.yml")
+        inst = step(d, "Install tools")["run"]
+        self.assertIn('& PIP_PID=$!', inst)
+        self.assertIn('& NPM_PID=$!', inst)
+        self.assertIn('wait "$PIP_PID" || PIP_RC=$?', inst)
+        self.assertIn('[ "$APT_RC" = 0 ] && [ "$PIP_RC" = 0 ] && [ "$NPM_RC" = 0 ] ||', inst)
+        prep = step(d, "Prepare page images + precedent sources")["run"]
+        self.assertIn('wait "$PREP" "$OLD" "$PREC"', prep)
+        self.assertIn('"$RP/prop_ocr"', prep)
+        self.assertIn('mkdir -m 700 "$RP/prop_ocr"', prep)
+        names = [s.get("name", "") for s in steps(d)]
+        self.assertLess(names.index("Prepare page images + precedent sources (parallel)"),
+                        next(i for i, n in enumerate(names) if n.startswith("Process the proposal")))
+
+    @unittest.skipIf(yaml is None, "pyyaml not installed")
+    def test_runner_ocr_reuses_only_its_own_files(self):
+        r = step(load("process-proposal.yml"), "Runner OCR")["run"]
+        self.assertIn('"$T/pkg_ocr.py" "$PKG" "$RP/pkgpages"', r)
+        self.assertIn('--reuse "$RP/prop_ocr"', r)
+        self.assertNotIn("--reuse /tmp", r)
+        self.assertNotRegex(r, r"cp[^\n]*/tmp/work/pkgpages")
+        self.assertNotIn("prep_pages.py", r)
+
+    def test_brief_into_agent_definitions_and_fixer_model(self):
+        self.assertIn('python3 -I - "$T/ENGINE_BRIEF.md" /tmp/work/agents.json', self.y)
+        self.assertLess(self.y.index("ES agents /tmp/work/agents.json"), self.y.index('"$T/ENGINE_BRIEF.md" /tmp/work/agents.json'))
+        self.assertIn("|MODEL_FIXER|", self.y)
+        self.assertIn('MODEL_FIXER="$MODEL_FIXER"', self.y)
+        self.assertIn("MODEL_FIXER=$MODEL_FIXER", self.y)
+        self.assertIn("export MODEL MODEL_LIGHT MODEL_REVIEW MODEL_STRONG MODEL_FIXER", self.y)
+
+    def test_engine_prompt_no_waits_and_parallel_review(self):
+        p = self.p
+        self.assertIn("never `run_in_background`", p)
+        self.assertIn("The single exception is the part-1 wait command", p)
+        self.assertEqual(p.count("until [ -e /tmp/work/study_part1.done ]"), 1)
+        self.assertNotIn("ONE Bash loop", p)
+        self.assertIn("tools/pkg_ocr.py", p)
+        self.assertNotIn('prep_pages.py "OUTDIR/<package>"', p)
+        self.assertIn("the `reviewer` call below\n   AND, only when there is Study work left, ONE `fixer` call", p)
+        self.assertNotIn("Read the brief", p)
+        self.assertIn("under 100K tokens", p)
+        self.assertIn("No `fixer` in\n/tmp/work/agents.json", p)
+
+    def test_download_workflows_keep_existing_files(self):
+        for n in ("download-extra.yml", "download-pdfs.yml"):
+            t = open(os.path.join(WF, n), encoding="utf-8").read()
+            self.assertIn('-o "$t"', t, n)
+            self.assertIn('mv -f "$t" "pdf/$folder/$name"', t, n)
+            self.assertNotIn('rm -f "pdf/$folder/$name"', t, n)
+            self.assertNotRegex(t, r'-o "pdf/\$folder/\$name"', n)
