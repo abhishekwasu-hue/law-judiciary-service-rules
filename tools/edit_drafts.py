@@ -630,12 +630,12 @@ def attachment_pdf(row, work):
 def case_input_map(files, exclude_ids, work):
     """local path "in/<kind>/<name>" of the full run's fetch (engine_supabase cmd_fetch layout) -> case_files row."""
     fs = [f for f in files if f.get("id") not in exclude_ids]
-    inputs = E.inputs_of(fs)
-    older = [dict(o, kind="extra_doc") for o in E.older_proposals(fs)]
-    taken, out = set(), {}
-    for f in inputs + older:
-        dst = E.unique_dst(work, f["kind"], f["original_name"], taken)
-        out[os.path.relpath(dst, work).replace("\\", "/")] = f
+    out = {}
+    for f, dst in E.input_layout(fs, work):
+        rel = os.path.relpath(dst, work).replace("\\", "/")
+        out[rel] = f
+        if os.path.splitext(f["original_name"])[1].lower() in IMAGE_EXT:   # Pending 18: image converted at fetch
+            out[os.path.relpath(E.converted_pdf(dst), work).replace("\\", "/")] = f
     return out
 
 
@@ -673,6 +673,10 @@ class Resolver:
                 return full
         if rel_case and rel_case in self.inputs:
             row = self.inputs[rel_case]
+            if os.path.splitext(str(row.get("original_name") or ""))[1].lower() in IMAGE_EXT:
+                p, _ = attachment_pdf(row, self.work)   # a chat image the full run enclosed as <image>.pdf
+                if p:
+                    return p
             return download(row, os.path.join(self.work, "case", rel_case))
         raise Refused(f"GR सह PDF मधील '{str(label)[:80]}' ची मूळ फाइल सापडली नाही. GR सह PDF पुन्हा तयार "
                       "करण्यासाठी कृपया 'पुन्हा तयार करा' हा पर्याय वापरावा, ही विनंती.")
@@ -742,11 +746,15 @@ def build_package(ctx, files, case_rows, work):
             notes.append(why); continue
         title = os.path.splitext(E.strip_upload_prefix(E.safe_name(r.get("original_name") or "कागदपत्र")))[0]
         new_items.append((p, title, {"path": r.get("original_name"), "case_file_id": r["id"]}))
+    have_gr = {str(f.get("original_name")) for f in files if f.get("kind") == "gr"}
+    gr_files = []   # Pending 18: a GR fetched by सांकेतांक is kept as a case_files row (kind gr) -> input of later full runs
     for c in codes:
         p = fetch_gr(c, work)
         if not p:
             notes.append(f"GR {c} शासन संकेतस्थळावर / archive.org वर मिळाला नाही. कृपया त्याची PDF जोडावी, ही विनंती."); continue
         new_items.append((p, gr_title(c), {"path": f"pdf/gr/{c}.pdf", "gr_code": c}))
+        if f"{c}.pdf" not in have_gr:
+            gr_files.append((p, f"{c}.pdf")); have_gr.add(f"{c}.pdf")
     if not new_items:
         raise Refused("; ".join(notes)[:500] or "जोडण्यायोग्य फाइल प्राप्त झालेली नाही.")
     step("सुधारणा: GR सह PDF नव्याने तयार करण्यात येत आहे")
@@ -806,7 +814,7 @@ def build_package(ctx, files, case_rows, work):
         joined = joined[:ATTACH_TEXT_CAP] + " … (पुढील मजकूर कापला)"
     saved = ({**raw, "enclosures": encs + saved_new} if isinstance(raw, dict) else encs + saved_new)
     return {"pdf": out, "name": name, "pages": total, "old_pages": n_old, "attached": attached, "notes": notes,
-            "enclosures": saved, "text": joined}
+            "enclosures": saved, "text": joined, "gr_files": gr_files}
 
 
 # ---------------------------------------------------------------- rebuild + checks
@@ -941,6 +949,8 @@ def upload_all(built, package, spec_path, enc_path):
     try:
         if package:
             put.append(E.put_object("package_pdf", package["pdf"], package["name"]))
+            for p, n in package.get("gr_files") or []:   # Pending 18: GR by सांकेतांक -> case_files kind gr
+                put.append(E.put_object("gr", p, n))
         for kind, (p, name) in built.items():
             put.append(E.put_object(kind, p, name))
         ver = E.next_version("spec")   # spec.json + enclosures.json: one version (engine_supabase upload_spec)
@@ -1120,7 +1130,7 @@ def run_edit(work, api_key=None, model=None):
     elif rows["enclosures"]:   # keep the pair spec.json / enclosures.json in one version
         ep = download(rows["enclosures"], os.path.join(work, "new", "enclosures.json"))
     uploaded = upload_all(built, package, sp if (changes or package) else None, ep if (changes or package) else None)
-    files_kinds = [u["kind"] for u in uploaded if u["kind"] != "spec"]
+    files_kinds = [u["kind"] for u in uploaded if u["kind"] not in ("spec", "gr")]
     if package and not summary:
         summary = "GR सह PDF मध्ये खालील कागदपत्रे जोडण्यात आली आहेत: " + "; ".join(f"{a['title']} ({a['pages']})" for a in package["attached"])
     notes = (list(package["notes"]) if package else []) + extra_notes + ([QUOTE_NOTE] if qbad else [])
