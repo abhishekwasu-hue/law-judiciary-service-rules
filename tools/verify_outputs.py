@@ -71,7 +71,8 @@ Checks
  Optional outputs (02.11.2026; only when the file exists — absent = no line, ALL OK unaffected):
   <PREFIX>_Order_Draft.docx (शासन आदेश-मसुदा), <PREFIX>_Parawise.docx (परिच्छेदनिहाय अभिप्राय, English) and (audit
   05.11.2026 Q-F13) <PREFIX>_Affidavit.docx (शपथपत्र) / <PREFIX>_LQ_Answer.docx (विधानमंडळ प्रश्नाचे उत्तर):
-  fonts (four rFonts = DVOT-SurekhMR incl. headers/footers), no internal ids, no repo paths, पृ. references within
+  fonts (four rFonts = DVOT-SurekhMR incl. headers/footers; the _Affidavit file instead: ascii / hAnsi = Times New Roman,
+  cs / eastAsia = DVOT-SurekhMR — Abhi 05.11.2026, C7 option अ, INSTRUCTIONS §4.2 / §4.36), no internal ids, no repo paths, पृ. references within
   1..package pages (text inside “ ” skipped); C27: no "पॅकेज" / warning / AI word (outside quotes), metadata blank
  Package PDF:
   - file name is the original proposal name (not *_Proposal_with_GRs.pdf); with --original-name NAME: the file name must
@@ -126,6 +127,7 @@ from mkdocs import DO_WISH, DO_SUBSCRIPTION  # noqa: E402 — अर्धशा
 INTRO_HEAD = "उपरोक्त विषयाबाबत"  # letter intro paragraph (lint_spec.INTRO_START begins with it)
 UO_LINE_RE = re.compile(r"^\S.*विभागाकडे\s+अनौपचारिक\s+संदर्भ\s+कार्यासन(?:\s|$)")   # note "uo" block (mkdocs.uo_lines)
 DO_LINE_RE = re.compile(r"^\s*अ\.\s*शा\.\s*पत्र\s+क्र\.")   # अर्धशासकीय पत्र number line (mkdocs.DO_REF_LABEL)
+from build_affidavit import FONTS as AFFIDAVIT_FONTS  # noqa: E402 — C7 (05.11.2026): Times New Roman + DVOT-SurekhMR (cs/eastAsia)
 from clean_meta import docx_meta_problems, pdf_meta_problems  # noqa: E402 — C27 §4 (no tool / AI trace in metadata)
 import desk as _desk  # noqa: E402 — C30 (03.11.2026): desk profiles tools/desks/<id>.json
 from engine_supabase import strip_upload_prefix, name_forms  # noqa: E402 — the ONE upload-prefix rule (§4.16) + NAME_MAX short form
@@ -177,7 +179,9 @@ def blocks_of(d):
     return out
 
 
-def font_problems(d, label):
+def font_problems(d, label, fonts=None):
+    """fonts: {rFonts attribute: font} expected on every text run (default: the four attributes = DVOT-SurekhMR)."""
+    fonts = fonts or {a: FONT for a in FONT_ATTRS}
     roots = [d.element.body]
     for part in d.part.package.iter_parts():
         if re.search(r"/word/(header|footer)\d*\.xml$", str(part.partname)):
@@ -189,9 +193,14 @@ def font_problems(d, label):
             if not t.strip():
                 continue
             rp = r.find(qn("w:rPr")); fo = rp.find(qn("w:rFonts")) if rp is not None else None
-            if fo is None or any(fo.get(qn("w:" + a)) != FONT for a in FONT_ATTRS) or any(fo.get(qn("w:" + a)) is not None for a in THEME_ATTRS):
+            if fo is None or any(fo.get(qn("w:" + a)) != v for a, v in fonts.items()) or any(fo.get(qn("w:" + a)) is not None for a in THEME_ATTRS):
                 bad += 1
-    return [f"{label}: {bad} text runs without {FONT} on all four rFonts attributes"] if bad else []
+    if not bad:
+        return []
+    if len(set(fonts.values())) == 1:
+        return [f"{label}: {bad} text runs without {FONT} on all four rFonts attributes"]
+    want = ", ".join(f"{a}={v}" for a, v in fonts.items())
+    return [f"{label}: {bad} text runs without rFonts {want}"]
 
 
 
@@ -712,7 +721,7 @@ def main(argv):
         except Exception as e:
             check(f"{label} opens", [f"{fx}: {e}"]); continue
         xt = doc_text(X)
-        check(f"{label} fonts", font_problems(X, label))
+        check(f"{label} fonts", font_problems(X, label, AFFIDAVIT_FONTS if label == "Affidavit" else None))
         check(f"{label} internal ids", [f"internal id {x}" for x in id_hits(xt)])
         check(f"{label} repo paths", [f"repo path/word '{x}'" for x in repo_hits(xt)])
         check(f"{label} पृ. references", ref_problems(xt, N, label, skip_quotes=True))

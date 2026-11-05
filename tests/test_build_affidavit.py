@@ -101,8 +101,18 @@ def test_layout_fonts_and_paper_book(tmp_path):
     ln = s._sectPr.find(qn("w:lnNumType"))
     assert ln is not None and ln.get(qn("w:countBy")) == "10"
     sys.path.insert(0, TOOLS)
-    from build_parawise import bad_font_runs
+    from build_affidavit import bad_font_runs
     assert bad_font_runs(d) == 0
+    # C7 (Abhi 05.11.2026, option अ): Times New Roman for Latin, DVOT-SurekhMR for Devanagari (cs / eastAsia)
+    want = {"ascii": "Times New Roman", "hAnsi": "Times New Roman", "cs": FONT, "eastAsia": FONT}
+    runs = [r for r in d.element.body.iter(qn("w:r")) if "".join(t.text or "" for t in r.iter(qn("w:t"))).strip()]
+    assert runs
+    for r in runs:
+        f = r.find(qn("w:rPr")).find(qn("w:rFonts"))
+        assert {a: f.get(qn("w:" + a)) for a in want} == want
+        assert r.find(qn("w:rPr")).find(qn("w:szCs")) is not None
+    from build_parawise import bad_font_runs as all_surekh
+    assert all_surekh(d) == len(runs)   # no run is DVOT-SurekhMR on all four attributes any more
     sizes = {r.font.size.pt for p in d.paragraphs for r in p.runs if r.text.strip() and r.font.size}
     assert sizes == {14.0}
     assert d.core_properties.author in ("", None)
@@ -183,3 +193,21 @@ def test_lint_spec_names_affidavit_in_last_para():
     s2 = load(); s2["affidavit"]["case"] = ""
     probs, _ = lint_spec.lint_extras(s2)
     assert any("affidavit.case" in p for p in probs)
+
+
+def test_marathi_quote_in_reply_keeps_devanagari_font(tmp_path):
+    """§4.30(4): a Marathi GR extract may stand in a reply; its run carries DVOT-SurekhMR in w:cs / w:eastAsia."""
+    s = load()
+    s["affidavit"]["reply"][0]["reply"] = "The Government Resolution states “सदर आदेश तात्काळ अंमलात येतील.” (page 2)."
+    r, out = build(tmp_path, s)
+    assert r.returncode == 0, r.stdout + r.stderr
+    d = docx.Document(str(out))
+    hit = [x for x in d.element.body.iter(qn("w:r")) if "सदर आदेश" in "".join(t.text or "" for t in x.iter(qn("w:t")))]
+    assert hit
+    f = hit[0].find(qn("w:rPr")).find(qn("w:rFonts"))
+    assert f.get(qn("w:cs")) == FONT and f.get(qn("w:ascii")) == "Times New Roman"
+
+
+def test_verify_expects_times_new_roman_for_affidavit():
+    import verify_outputs as V
+    assert V.AFFIDAVIT_FONTS == {"ascii": "Times New Roman", "hAnsi": "Times New Roman", "cs": FONT, "eastAsia": FONT}

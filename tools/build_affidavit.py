@@ -21,8 +21,10 @@ Every element and its source (docs/FORMS_RESEARCH_AFFIDAVIT_LQ.md, part A, has t
   [ASR XVII-11/12] the answer to rule nisi is an affidavit; "affidavit in reply" (Chapter XVII, Rules 10(i), 11, 12);
   [ASR XVII-10(ii)] paper-book layout: A4, double space, font size 14, inner margin 5 cm, outer margin 3 cm, pages
                numbered, "every tenth line shall be numbered in the margin" ("paper_book": false switches the line
-               numbers off). Font: DVOT-SurekhMR on every run (INSTRUCTIONS §4.2; the rule names Times New Roman /
-               Georgia — open point O1 of the research file);
+               numbers off). Font (Abhi 05.11.2026, C7 option अ; INSTRUCTIONS §4.2 exception, §4.36): Times New Roman
+               as the rule names it — every run gets w:ascii / w:hAnsi = Times New Roman and w:cs / w:eastAsia =
+               DVOT-SurekhMR (FONTS below), because a reply may quote a Marathi GR in Marathi (§4.30(4)) and Word /
+               LibreOffice draw Devanagari with the complex-script font; w:szCs = w:sz;
   [CPC 16-A]   opening "I, …, … state on solemn affirmation as follows:-" (Code of Civil Procedure, 1908, First
                Schedule, Appendix E, Form No. 16-A, L&J reprint p. 511) — written "… do hereby state on solemn
                affirmation as under:-";
@@ -78,8 +80,66 @@ from docx.shared import Cm, Pt
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-from build_parawise import FONT, bad_font_runs, fix_styles, para_label, setfont  # noqa: E402
+from build_parawise import FONT, para_label  # noqa: E402 — FONT = DVOT-SurekhMR (Devanagari / complex script)
 from clean_meta import clean_docx  # noqa: E402 — C27 §4: blank core/app properties
+
+# [ASR XVII-10(ii)] + C7 (Abhi 05.11.2026, option अ): Latin text in Times New Roman; Devanagari (quoted Marathi GR
+# extracts, §4.30(4)) in DVOT-SurekhMR through the complex-script / East-Asian slots. tools/verify_outputs.py imports FONTS.
+LATIN = "Times New Roman"
+FONTS = {"ascii": LATIN, "hAnsi": LATIN, "cs": FONT, "eastAsia": FONT}
+THEME = ("asciiTheme", "hAnsiTheme", "cstheme", "eastAsiaTheme")
+
+
+def _rfonts(rf):
+    for a, v in FONTS.items():
+        rf.set(qn("w:" + a), v)
+    for a in THEME:
+        if rf.get(qn("w:" + a)) is not None:
+            del rf.attrib[qn("w:" + a)]
+
+
+def setfont(run, size=None, bold=None):
+    rpr = run._element.get_or_add_rPr()
+    _rfonts(rpr.get_or_add_rFonts())
+    if size:
+        run.font.size = Pt(size)
+        szcs = rpr.find(qn("w:szCs"))
+        if szcs is None:
+            szcs = OxmlElement("w:szCs"); rpr.find(qn("w:sz")).addnext(szcs)
+        szcs.set(qn("w:val"), str(int(size * 2)))
+    if bold is not None:
+        run.bold = bold
+        if bold:   # complex-script text bold as well
+            b = rpr.find(qn("w:bCs"))
+            if b is None:
+                b = OxmlElement("w:bCs"); rpr.find(qn("w:b")).addnext(b)
+    return run
+
+
+def fix_styles(d):
+    for st in d.styles:
+        try:
+            if st.type in (1, 2) and st.font is not None:
+                st.font.name = LATIN
+                _rfonts(st.element.get_or_add_rPr().get_or_add_rFonts())
+        except Exception:
+            pass
+
+
+def bad_font_runs(d):
+    """text runs (body, headers, footers) whose four rFonts attributes are not FONTS (or carry a theme font)."""
+    roots = [d.element.body] + [part._element for s in d.sections for part in (s.header, s.footer)]
+    bad = 0
+    for root in roots:
+        for el in root.iter(qn("w:r")):
+            if not "".join(x.text or "" for x in el.iter(qn("w:t"))).strip():
+                continue
+            rp = el.find(qn("w:rPr")); f = rp.find(qn("w:rFonts")) if rp is not None else None
+            if (f is None or any(f.get(qn("w:" + a)) != v for a, v in FONTS.items())
+                    or any(f.get(qn("w:" + a)) is not None for a in THEME)):
+                bad += 1
+    return bad
+
 
 # [ASR III-1] entitling per bench (verbatim, without the quotation marks of the rule)
 COURTS = {
@@ -173,9 +233,10 @@ def _pp(d, text="", bold=False, align=WA.JUSTIFY, left=None, first=None, after=0
         setfont(p.add_run(text), size, bold)
     else:   # empty paragraph: its mark carries the font/size too
         rpr = p._p.get_or_add_pPr().makeelement(qn("w:rPr"), {})
-        rf = rpr.makeelement(qn("w:rFonts"), {qn("w:" + a): FONT for a in ("ascii", "hAnsi", "cs", "eastAsia")})
+        rf = rpr.makeelement(qn("w:rFonts"), {qn("w:" + a): v for a, v in FONTS.items()})
         sz = rpr.makeelement(qn("w:sz"), {qn("w:val"): str(size * 2)})
-        rpr.append(rf); rpr.append(sz); p._p.get_or_add_pPr().append(rpr)
+        szcs = rpr.makeelement(qn("w:szCs"), {qn("w:val"): str(size * 2)})
+        rpr.append(rf); rpr.append(sz); rpr.append(szcs); p._p.get_or_add_pPr().append(rpr)
     return p
 
 
