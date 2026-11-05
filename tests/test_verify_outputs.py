@@ -643,15 +643,36 @@ class VerifyOutputs(unittest.TestCase):
         self.must_fail(d, "Order_Draft पृ. references")
 
 
-def make_extra(path, paras, font=True, header=None, header_font=True):
-    """A small Word file like build_order / build_parawise output: every run with DVOT-SurekhMR on all four rFonts."""
+    # ---- C7 (Abhi 05.11.2026, option अ): the affidavit is Times New Roman (ascii/hAnsi) + DVOT-SurekhMR (cs/eastAsia) ----
+    def test_affidavit_times_new_roman_ok(self):
+        d = self.case("x_aff_ok")
+        make_extra(os.path.join(d, f"{PRE}_Affidavit.docx"), ["AFFIDAVIT IN REPLY", "“सदर आदेश लागू राहतील.”"], affidavit=True)
+        rc, out = self.run_verify(d)
+        self.assertEqual(rc, 0, out)
+        self.assertIn("OK: Affidavit fonts", out)
+
+    def test_affidavit_all_surekh_fails(self):
+        d = self.case("x_aff_surekh")
+        make_extra(os.path.join(d, f"{PRE}_Affidavit.docx"), ["AFFIDAVIT IN REPLY"])   # old four-DVOT form
+        self.must_fail(d, "Affidavit fonts")
+
+    def test_parawise_times_new_roman_fails(self):
+        d = self.case("x_pw_tnr")
+        make_extra(os.path.join(d, f"{PRE}_Parawise.docx"), ["Para 1"], affidavit=True)   # only the affidavit is TNR
+        self.must_fail(d, "Parawise fonts")
+
+
+def make_extra(path, paras, font=True, header=None, header_font=True, affidavit=False):
+    """A small Word file like build_order / build_parawise output: every run with DVOT-SurekhMR on all four rFonts
+    (affidavit=True: as build_affidavit — ascii/hAnsi Times New Roman, cs/eastAsia DVOT-SurekhMR)."""
     def setf(run, ok):
         rpr = run._element.get_or_add_rPr()
         fo = rpr.find(qn("w:rFonts"))
         if fo is None:
             fo = rpr.makeelement(qn("w:rFonts"), {}); rpr.append(fo)
         for a in ("ascii", "hAnsi", "cs", "eastAsia"):
-            fo.set(qn("w:" + a), "DVOT-SurekhMR" if ok else "Calibri")
+            v = ("Times New Roman" if affidavit and a in ("ascii", "hAnsi") else "DVOT-SurekhMR") if ok else "Calibri"
+            fo.set(qn("w:" + a), v)
     d = docx.Document()
     for t in paras:
         setf(d.add_paragraph().add_run(t), font)
