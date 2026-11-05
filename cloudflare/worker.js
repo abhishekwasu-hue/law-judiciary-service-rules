@@ -65,6 +65,33 @@ const SIGN_BUCKETS = ['proposals', 'outputs', 'gr-library'];
 const RUN_TOKEN_TTL = 4 * 3600;                 // > job timeout (180 min) + queue time
 const STALE_MS = 3.5 * 3600 * 1000;             // queued/running longer than this = stuck (job timeout 180 min)
 const STALE_REASON = "वेळ संपली. कृपया 'पुन्हा तयार करा' वापरावे, ही विनंती.";
+// L-F2 (audit 05.11.2026): a run handed to GitHub that never started (job dropped / cancelled / no runner) stays
+// 'queued' and blocked the whole queue for 3.5 h. Failed after QUEUE_START_MS since dispatched_at. 45 min, not 30: a
+// real GitHub queue wait of 38.3 min was measured (run #6). A late job of such a run is refused at /api/engine/config.
+const QUEUE_START_MS = 45 * 60 * 1000;
+const QUEUE_START_REASON = "प्रक्रिया वेळेत सुरू होऊ शकली नाही. कृपया 'पुन्हा तयार करा' वापरावे, ही विनंती.";
+// a 'running' run whose progress text has not changed for STEP_STALE_MS (runs.step_at, migration 0014; before the first
+// step: started_at) = runner lost; the 3.5 h limit stays as the outer cap. Full runs take 18–44 min.
+const STEP_STALE_MS = 2 * 3600 * 1000;
+const STEP_STALE_REASON = "प्रक्रिया बराच वेळ पुढे सरकली नाही. कृपया 'पुन्हा तयार करा' वापरावे, ही विनंती.";
+// L-F5: GitHub refuses every dispatch (token / repo / GitHub down): the failing run is failed, the rest keep waiting
+const GITHUB_WAIT = 'प्रक्रिया सुरू करण्यात तांत्रिक अडचण आहे. अडचण दूर झाल्यावर प्रक्रिया आपोआप सुरू होईल.';
+// L-F18: engine settings incomplete → waiting runs say why they wait
+const NOT_READY_WAIT = 'प्रक्रियेची सेटिंग्ज अपूर्ण आहेत. मालकांनी सेटिंग्ज पूर्ण केल्यावर प्रक्रिया आपोआप सुरू होईल.';
+// L-F11: a closed case (stage 'बंद') gets no run / edit
+const CLOSED_STAGE = 'बंद';
+const CASE_CLOSED = 'हे प्रकरण बंद आहे. प्रक्रिया सुरू करण्यापूर्वी कृपया प्रकरणाचा टप्पा बदलावा, ही विनंती.';
+// S-F11: a 500 shows only this; the technical text goes to the Worker log with the same reference
+const SERVER_ERROR = 'तांत्रिक अडचण आली. कृपया थोड्या वेळाने पुन्हा प्रयत्न करावा; अडचण राहिल्यास मालकांना कळवावे, ही विनंती.';
+// S-F12: an invite never changes the owner's role
+const OWNER_INVITE = 'मालकांची भूमिका आमंत्रणाने बदलता येत नाही. कृपया दुसरा ई-मेल नमूद करावा, ही विनंती.';
+// S-F9: Storage content-type from the file extension (the browser's header is not trusted); other extensions refused
+const UPLOAD_TYPES = { '.pdf': 'application/pdf', '.doc': 'application/msword',
+  '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.tif': 'image/tiff', '.tiff': 'image/tiff' };
+const BAD_FILE_TYPE = 'हा फाइल-प्रकार स्वीकारता येत नाही. कृपया PDF, Word (DOC / DOCX) किंवा प्रतिमा (JPG / PNG / TIF) फाइल जोडावी, ही विनंती.';
+// L-F4: estimate of one edit run when no edit has a cost yet (measured ~$0.03 per edit)
+const DEFAULT_EDIT_USD = 0.05;
 // dispatch to GitHub failed (A3 audit): the run row and the user see only this; the raw GitHub text stays in activity.
 // Staff-safe text; the app shows the owner the GitHub/token hint for it (dashboard-app lib/format.ts cleanReason).
 const DISPATCH_REASON = "प्रक्रिया सुरू होऊ शकली नाही (तांत्रिक कारण). कृपया 'पुन्हा तयार करा' वापरावे; अडचण राहिल्यास मालकांना कळवावे.";
@@ -206,7 +233,31 @@ async function dispatchRun(env, cfg, run, origin) {
     // draft edit (migration 0013): an edit run starts tools/edit_drafts.py (edit-drafts.yml), same payload/token scheme
     body: JSON.stringify({ event_type: run.kind === 'edit' ? 'edit_drafts' : 'process_proposal', client_payload: { case_id: run.case_id, run_id: run.id, token, worker: origin } }),
   });
-  if (!r.ok) throw new Error(`dispatch ${r.status}: ${(await r.text()).slice(0, 200)}`);
+  if (!r.ok) {
+    const err = new Error(`dispatch ${r.status}: ${(await r.text()).slice(0, 200)}`);
+    err.status = r.status;
+    throw err;
+  }
+}
+// L-F5: a dispatch error that every run would hit (token refused, repo not found, rate limit, GitHub down, network)
+const githubWide = e => !e || !e.status || [401, 403, 404, 429].includes(e.status) || e.status >= 500;
+// L-F6: KV write only when the origin changed, never inside a dispatch (a KV error must not fail a run)
+async function rememberOrigin(env, origin) {
+  if (!origin) return;
+  try {
+    if ((await env.SETTINGS.get('worker_origin')) !== origin) await env.SETTINGS.put('worker_origin', origin);
+  } catch (e) {
+    console.log('worker_origin not saved', String(e.message || e));
+  }
+}
+// waiting runs (queued, never dispatched) get a step text saying why they wait; only rows whose step differs change
+async function markWaiting(db, text) {
+  try {
+    await db.rest(`runs?state=eq.queued&dispatched_at=is.null&or=${encodeURIComponent(`(step.is.null,step.neq."${text}")`)}`, {
+      method: 'PATCH', body: JSON.stringify({ step: text }), headers: { Prefer: 'return=minimal' } });
+  } catch (e) {
+    if (!missingColumn(e, 'dispatched_at')) throw e;
+  }
 }
 
 // Token record: JSON {run_id, used, exp}; a plain run id (tokens issued before this change) counts as unused.
@@ -280,17 +331,38 @@ async function sweepStale(cfg, actor) {
   } catch (e) {
     if (!namesColumn(e, 'kind')) throw e;   // migration 0013 not applied: no edit runs
   }
-  return rows.concat(edits);
+  // L-F2: dispatched but never started (still 'queued' QUEUE_START_MS after dispatch). Column missing (0011) → skip.
+  let notStarted = [];
+  try {
+    notStarted = await failRuns(cfg, `state=eq.queued&dispatched_at=lt.${encodeURIComponent(new Date(Date.now() - QUEUE_START_MS).toISOString())}`, QUEUE_START_REASON, actor);
+  } catch (e) {
+    if (!missingColumn(e, 'dispatched_at')) throw e;
+  }
+  // L-F2: 'running' with no step change for STEP_STALE_MS (runs.step_at, migration 0014; no step yet → started_at)
+  let silent = [];
+  const quiet = pgTime(Date.now() - STEP_STALE_MS);
+  try {
+    silent = await failRuns(cfg, `state=eq.running&or=${encodeURIComponent(`(step_at.lt.${quiet},and(step_at.is.null,started_at.lt.${quiet}))`)}`, STEP_STALE_REASON, actor);
+  } catch (e) {
+    if (!namesColumn(e, 'step_at')) throw e;   // migration 0014 not applied: the 3.5 h limit alone
+  }
+  return rows.concat(notStarted, silent, edits);
 }
 // Dispatch the oldest waiting run when no run is active. Race-safe: (1) claim with a conditional PATCH (only one
 // request gets the row back); (2) after the claim, if any OTHER run is active the claim is given back (two claimers
 // that see each other both give back; the cron / next call dispatches later — never two at once). A failed GitHub
-// dispatch marks that run failed (DISPATCH_REASON) and the next one is tried.
+// dispatch marks that run failed (DISPATCH_REASON) and the next one is tried — unless GitHub refuses every dispatch
+// (401/403/404/429/5xx/network, L-F5): then the loop stops and the waiting runs get GITHUB_WAIT as their step.
 // → { legacy } (column missing) | { active } | { blocked } (monthly limit: the run stays queued) | { dispatched, failed: [ids] }
 async function dispatchNext(env, cfg, origin, actor = null, ownRunId = null) {
   const db = sb(cfg);
   const failed = [];
-  if (!cfg.github_repo || !cfg.github_token || !engineReady(cfg) || !origin) return { dispatched: null, failed, not_ready: true };
+  if (!cfg.github_repo || !cfg.github_token || !engineReady(cfg) || !origin) {
+    // L-F18: the waiting runs say why nothing starts (Supabase reachable; otherwise nothing can be written)
+    if (cfg.supabase_url && cfg.supabase_service_key) await markWaiting(db, NOT_READY_WAIT);
+    return { dispatched: null, failed, not_ready: true };
+  }
+  await rememberOrigin(env, origin);
   for (let i = 0; i < 20; i++) {
     const act = await activeRuns(db);
     if (act === null) return { legacy: true, dispatched: null, failed };
@@ -304,8 +376,9 @@ async function dispatchNext(env, cfg, origin, actor = null, ownRunId = null) {
       if (next.step !== BUDGET_WAIT) await db.rest(`runs?id=eq.${Number(next.id)}&state=eq.queued&dispatched_at=is.null`, { method: 'PATCH', body: JSON.stringify({ step: BUDGET_WAIT }) });
       return { blocked: 'monthly_budget_reached', run: next.id, dispatched: null, failed };
     }
+    // the claim clears a wait text (BUDGET_WAIT / GITHUB_WAIT / NOT_READY_WAIT) left on the row
     const claimed = (await db.rest(`runs?id=eq.${Number(next.id)}&state=eq.queued&dispatched_at=is.null`, {
-      method: 'PATCH', body: JSON.stringify({ dispatched_at: new Date().toISOString() }) })) || [];
+      method: 'PATCH', body: JSON.stringify({ dispatched_at: new Date().toISOString(), ...(next.step ? { step: null } : {}) }) })) || [];
     if (!claimed.length) return { lost: next.id, dispatched: null, failed };
     const run = claimed[0];
     const again = (await activeRuns(db)) || [];
@@ -314,12 +387,16 @@ async function dispatchNext(env, cfg, origin, actor = null, ownRunId = null) {
       return { yielded: run.id, dispatched: null, failed };
     }
     try {
-      await env.SETTINGS.put('worker_origin', origin);
       await dispatchRun(env, cfg, run, origin);
     } catch (e) {
       await db.rest(`runs?id=eq.${Number(run.id)}`, { method: 'PATCH', body: JSON.stringify({ state: 'failed', step: DISPATCH_REASON, finished_at: new Date().toISOString() }) });
       await log(cfg, run.case_id, actor, 'run_failed', { run_id: run.id, reason: DISPATCH_REASON, error: String(e.message || e).slice(0, 300) });
       failed.push(run.id);
+      // L-F5: GitHub refuses every dispatch → stop here; the other runs keep waiting (cron retries every 5 min)
+      if (githubWide(e)) {
+        await markWaiting(db, GITHUB_WAIT);
+        return { dispatched: null, failed, github_error: e.status || 0 };
+      }
       continue;
     }
     await db.rest(`cases?id=eq.${Number(run.case_id)}`, { method: 'PATCH', body: JSON.stringify({ stage: 'अभ्यास चालू' }) });
@@ -344,7 +421,8 @@ async function cronTick(env) {
 // null = column not there yet (migration 0005 not applied) → the caller relies on the KV flag alone.
 async function takeConfig(cfg, runId) {
   try {
-    const rows = await sb(cfg).rest(`runs?id=eq.${Number(runId)}&config_taken_at=is.null`, {
+    // only a run still queued/running (L-F2: a run swept as "never started" whose job starts late gets no config)
+    const rows = await sb(cfg).rest(`runs?id=eq.${Number(runId)}&state=in.(queued,running)&config_taken_at=is.null`, {
       method: 'PATCH', body: JSON.stringify({ config_taken_at: new Date().toISOString() }), headers: { Prefer: 'return=representation' },
     });
     return !!(rows && rows.length);
@@ -360,6 +438,28 @@ function caseActivePath(caseId, legacy) {
   return legacy
     ? `runs?case_id=eq.${Number(caseId)}&state=in.(queued,running)&created_at=gt.${encodeURIComponent(sinceIso)}&select=id&order=created_at.desc&limit=1`
     : `runs?case_id=eq.${Number(caseId)}&state=in.(queued,running)&or=${encodeURIComponent(`(dispatched_at.is.null,dispatched_at.gt."${sinceIso}",created_at.gt."${sinceIso}")`)}&select=id&order=created_at.desc&limit=1`;
+}
+const isUnique = e => e instanceof DbError && (e.code === '23505' || e.status === 409);
+// L-F3 (migration 0014: unique index runs_one_active_per_case on runs(case_id) where state in (queued,running)):
+// insert() is the caller's own insert. A unique violation = another request of this case won the race, or an old stuck
+// row (older than STALE_MS, not yet swept) still counts as active in the index → sweep once and retry; still a
+// violation → { active: run id } (→ 409 run_active).
+async function insertRun(cfg, db, actor, caseId, insert) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return { run: await insert() };
+    } catch (e) {
+      if (!isUnique(e)) throw e;
+      if (attempt === 0) { await sweepStale(cfg, actor); continue; }
+      const act = (await db.rest(`runs?case_id=eq.${Number(caseId)}&state=in.(queued,running)&select=id&order=id.desc&limit=1`)) || [];
+      return { active: act.length ? act[0].id : null };
+    }
+  }
+}
+// L-F11: the case's stage; true = closed ('बंद'). A missing row is left to the caller's own checks.
+async function caseClosed(db, caseId) {
+  const rows = (await db.rest(`cases?id=eq.${Number(caseId)}&select=id,stage`)) || [];
+  return !!(rows.length && rows[0].stage === CLOSED_STAGE);
 }
 async function caseActiveRun(db, caseId) {
   try {
@@ -455,22 +555,41 @@ function monthlyLimit(cfg) {
   const n = Number(v);
   return v && Number.isFinite(n) && n > 0 ? n : DEFAULT_MONTHLY_USD;
 }
-// Estimated cost of one run: median cost_usd of this month's finished runs, else the per-run budget, else $0.75.
-function runEstimate(cfg, finished) {
-  const c = finished.map(r => r.cost_usd).filter(v => v !== null && v !== undefined && v !== '').map(Number).filter(Number.isFinite).sort((a, b) => a - b);
-  if (c.length) return c.length % 2 ? c[(c.length - 1) / 2] : (c[c.length / 2 - 1] + c[c.length / 2]) / 2;
+// median of the positive cost_usd values of these rows; null when none
+function medianCost(rows) {
+  const c = rows.map(r => r.cost_usd).filter(v => v !== null && v !== undefined && v !== '').map(Number).filter(v => Number.isFinite(v) && v > 0).sort((a, b) => a - b);
+  if (!c.length) return null;
+  return c.length % 2 ? c[(c.length - 1) / 2] : (c[c.length / 2 - 1] + c[c.length / 2]) / 2;
+}
+const isEditRun = r => r.kind === 'edit';   // kind missing (migration 0013 not applied) = full run
+// L-F4: estimated cost of one FULL run = median cost of this month's finished full runs with a cost > 0 (edit runs
+// ~$0.03 and $0 refusals left out), else the per-run budget, else $0.75. Exported for the tests.
+export function runEstimate(cfg, finished) {
+  const m = medianCost(finished.filter(r => !isEditRun(r)));
+  if (m !== null) return m;
   const b = Number(String(cfg.budget_usd || '').trim());
   return String(cfg.budget_usd || '').trim() && Number.isFinite(b) && b > 0 ? b : DEFAULT_RUN_USD;
+}
+// L-F4: estimated cost of one EDIT run = median of this month's finished edit runs with a cost > 0, else $0.05
+export function editEstimate(finished) {
+  const m = medianCost(finished.filter(isEditRun));
+  return m !== null ? m : DEFAULT_EDIT_USD;
 }
 async function monthSpend(cfg) {
   const { month, start, end } = istMonth();
   const q = `runs?created_at=gte.${encodeURIComponent(start)}&created_at=lt.${encodeURIComponent(end)}&select=cost_usd,created_at,state`;
-  let rows;
-  try {
-    rows = (await sb(cfg).rest(`${q},dispatched_at`)) || [];
-  } catch (e) {
-    if (!missingColumn(e, 'dispatched_at')) throw e;
-    rows = (await sb(cfg).rest(q)) || [];   // migration 0011 not applied: every queued run was dispatched at once
+  // optional columns: dispatched_at (0011; missing → every queued run was dispatched at once), kind (0013; missing →
+  // all full runs). The column named in the error is dropped; an unnamed "missing column" error drops both.
+  let cols = ['dispatched_at', 'kind'], rows;
+  for (;;) {
+    try {
+      rows = (await sb(cfg).rest(`${q}${cols.map(c => `,${c}`).join('')}`)) || [];
+      break;
+    } catch (e) {
+      if (!cols.length || !cols.some(c => missingColumn(e, c))) throw e;
+      const named = cols.filter(c => namesColumn(e, c));
+      cols = named.length ? cols.filter(c => !named.includes(c)) : [];
+    }
   }
   const inMonth = rows.filter(r => r.created_at && istMonth(new Date(r.created_at).getTime()).month === month);
   const spent = inMonth.reduce((t, r) => t + (Number(r.cost_usd) || 0), 0);
@@ -482,8 +601,11 @@ async function monthSpend(cfg) {
   const waiting = r => r.state === 'queued' && 'dispatched_at' in r && r.dispatched_at === null;
   const isActive = r => (r.state === 'queued' || r.state === 'running') && !waiting(r) && new Date(r.dispatched_at || r.created_at).getTime() > since;   // queue: age from dispatch
   const active = inMonth.filter(isActive);
-  const est = active.length ? runEstimate(cfg, inMonth.filter(r => r.state === 'done' || r.state === 'failed')) : 0;
-  const reserved = active.reduce((t, r) => t + Math.max(0, est - (Number(r.cost_usd) || 0)), 0);
+  const finished = inMonth.filter(r => r.state === 'done' || r.state === 'failed');
+  // L-F4: an active edit run is reserved at the edit estimate, a full run at the full-run estimate
+  const est = active.some(r => !isEditRun(r)) ? runEstimate(cfg, finished) : 0;
+  const estEdit = active.some(isEditRun) ? editEstimate(finished) : 0;
+  const reserved = active.reduce((t, r) => t + Math.max(0, (isEditRun(r) ? estEdit : est) - (Number(r.cost_usd) || 0)), 0);
   return { month, spent_usd: Math.round(spent * 10000) / 10000, limit_usd: monthlyLimit(cfg), runs: inMonth.length,
     reserved_usd: Math.round(reserved * 10000) / 10000, active_runs: active.length };
 }
@@ -496,32 +618,59 @@ async function monthSpend(cfg) {
 // has no 'self' (only data: blob:): the page makes no fetch/XHR (only its own navigation GET and a blob: PDF.js worker),
 // so even injected HTML could not call /api with the session.
 const sha256b64 = async text => btoa(String.fromCharCode(...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)))));
+const isNastiPage = pathname => pathname.startsWith('/nasti/');   // "/nasti" itself = the app (U1)
 export async function cspFor(html, pathname, supabaseUrl) {
   const common = ["base-uri 'self'", "object-src 'none'", "frame-ancestors 'self'", "form-action 'self'"];
-  if (pathname.startsWith('/nasti/') || pathname === '/nasti')
+  if (isNastiPage(pathname))
     return ["default-src 'self' data: blob:", "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:", "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob:", "font-src 'self' data:", "worker-src 'self' blob:", "connect-src data: blob:", ...common].join('; ');
   const hashes = [];
   for (const m of html.matchAll(/<script(\s[^>]*)?>([\s\S]*?)<\/script>/gi)) {
-    if (/\ssrc\s*=/i.test(m[1] || '') || !m[2]) continue;
+    // a JSON data block (type="application/json", e.g. #pk-config) is never executed: no hash needed
+    if (/\ssrc\s*=/i.test(m[1] || '') || !m[2] || /\stype\s*=\s*["']?application\/(?:[\w.+-]*\+)?json/i.test(m[1] || '')) continue;
     hashes.push(`'sha256-${await sha256b64(m[2])}'`);
   }
   let sbOrigin = '';
   try { if (supabaseUrl) sbOrigin = new URL(supabaseUrl).origin; } catch { /* bad URL in settings */ }
-  // *.supabase.co too: a page loaded before Setup / a Supabase URL change still reaches the new project
-  const sbConn = `${sbOrigin ? ` ${sbOrigin} ${sbOrigin.replace(/^http/, 'ws')}` : ''} https://*.supabase.co wss://*.supabase.co`;
+  // S-F5: only the configured project (no *.supabase.co wildcard); after Setup / a URL change the page is reloaded
+  const sbConn = sbOrigin ? ` ${sbOrigin} ${sbOrigin.replace(/^http/, 'ws')}` : '';
   return ["default-src 'self'", `script-src 'self' ${hashes.join(' ')}`.trim(), "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-    "font-src 'self' data: blob: https://fonts.gstatic.com", `img-src 'self' data: blob:${sbOrigin ? ' ' + sbOrigin : ''} https://*.supabase.co`,
+    "font-src 'self' data: blob: https://fonts.gstatic.com", `img-src 'self' data: blob:${sbOrigin ? ' ' + sbOrigin : ''}`,
     `connect-src 'self'${sbConn}`, "worker-src 'self' blob:", "frame-src 'self'", "manifest-src 'self'", ...common].join('; ');
+}
+// P1: Vite's hashed build files (/assets/<name>-<hash>.<ext>) never change under the same name → cached for a year
+const IMMUTABLE = 'public, max-age=31536000, immutable';
+// P2: what GET /api/public-config returns, inlined into the app's index.html as
+// <script type="application/json" id="pk-config">…</script> (the app can skip that round trip; the endpoint stays).
+// "<" is escaped so the JSON can never close the script element.
+export function configScript(pub) {
+  return `<script type="application/json" id="pk-config">${JSON.stringify(pub).replace(/</g, '\\u003c')}</script>`;
+}
+async function publicConfig(env) {
+  const v = {};
+  await Promise.all(['owner_email', 'supabase_url', 'supabase_anon_key', 'supabase_service_key'].map(async k => { v[k] = (await env.SETTINGS.get(k)) || ''; }));
+  return { configured: !!(v.owner_email && v.supabase_url && v.supabase_anon_key && v.supabase_service_key), supabase_url: v.supabase_url, supabase_anon_key: v.supabase_anon_key };
 }
 async function withSecurityHeaders(res, url, env) {
   const type = res.headers.get('content-type') || '';
-  if (!/text\/html/i.test(type)) return res;
-  const html = await res.text();
-  let supabaseUrl = '';
-  try { supabaseUrl = (await env.SETTINGS.get('supabase_url')) || ''; } catch { /* KV unavailable: CSP without Supabase */ }
+  if (!/text\/html/i.test(type)) {
+    if (url.pathname.startsWith('/assets/') && res.status === 200) {
+      const h = new Headers(res.headers);
+      h.set('cache-control', IMMUTABLE);
+      return new Response(res.body, { status: res.status, statusText: res.statusText, headers: h });
+    }
+    return res;
+  }
+  if ([101, 204, 205, 304].includes(res.status)) return res;   // no body to rewrite
+  let html = await res.text();
+  let pub = null;
+  try { pub = await publicConfig(env); } catch { /* KV unavailable: CSP without Supabase, no inlined config */ }
+  if (pub && !isNastiPage(url.pathname) && /<\/head>/i.test(html)) html = html.replace(/<\/head>/i, `${configScript(pub)}</head>`);
   const h = new Headers(res.headers);
-  h.set('content-security-policy', await cspFor(html, url.pathname, supabaseUrl));
+  h.set('content-security-policy', await cspFor(html, url.pathname, pub ? pub.supabase_url : ''));
+  // HTML is always re-checked (it names the current hashed files and carries the current config)
+  h.set('cache-control', 'no-cache');
+  h.delete('etag');
   h.set('x-frame-options', 'SAMEORIGIN');
   h.set('x-content-type-options', 'nosniff');
   h.set('referrer-policy', 'same-origin');
@@ -533,11 +682,19 @@ async function withSecurityHeaders(res, url, env) {
 export default {
   async fetch(req, env) {
     const url = new URL(req.url);
-    if (!url.pathname.startsWith('/api/')) return withSecurityHeaders(await env.ASSETS.fetch(req), url, env);
+    if (!url.pathname.startsWith('/api/')) {
+      // U1: exactly "/nasti" (hard load / refresh / shared link of the app's नस्ती tab) = the app (SPA index), not the
+      // assets' 307 to the raw page /nasti/; "/nasti/" and the files under it stay the owner's page
+      const areq = url.pathname === '/nasti' ? new Request(new URL('/', url).toString(), req) : req;
+      return withSecurityHeaders(await env.ASSETS.fetch(areq), url, env);
+    }
     try {
       return await route(req, env, url);
     } catch (e) {
-      return bad(String(e.message || e), 500);
+      // S-F11: the browser gets a Marathi text + a reference; the technical text only in the Worker log
+      const ref = randomToken().slice(0, 8);
+      console.log('error', ref, req.method, url.pathname, String((e && e.stack) || e), e instanceof DbError ? `${e.code} ${e.detail}` : '');
+      return json({ error: 'server_error', reason: SERVER_ERROR, ref }, 500);
     }
   },
   // cron every 5 min (wrangler.toml [triggers]): stuck-run sweep + dispatch of the next queued run (C33 safety net)
@@ -732,6 +889,8 @@ async function route(req, env, url) {
     if (user.role !== 'owner') return bad('owner only', 403);
     const { email, role } = await req.json();
     if (!email || !['staff', 'senior'].includes(role)) return bad('email + role (staff|senior) required');
+    // S-F12: the owner's e-mail / an owner row is never turned into staff / senior by an invite
+    if (cfg.owner_email && String(email).trim().toLowerCase() === cfg.owner_email.trim().toLowerCase()) return bad(OWNER_INVITE, 409);
     const base = cfg.supabase_url.replace(/\/$/, '');
     const ah = { apikey: cfg.supabase_service_key, Authorization: `Bearer ${cfg.supabase_service_key}`, 'content-type': 'application/json' };
     const r = await fetch(`${base}/auth/v1/invite`, { method: 'POST', headers: ah, body: JSON.stringify({ email }) });
@@ -744,6 +903,8 @@ async function route(req, env, url) {
       existing = !!userId;
     }
     if (!userId) return json({ error: 'invite_failed', status: r.status }, 502);
+    const [cur] = (await db.rest(`members?user_id=eq.${encodeURIComponent(userId)}&select=role`)) || [];
+    if (cur && cur.role === 'owner') return bad(OWNER_INVITE, 409);
     await db.rest('members', { method: 'POST', body: JSON.stringify({ user_id: userId, email, role }), headers: { Prefer: 'resolution=merge-duplicates' } });
     return json({ ok: true, existing });
   }
@@ -824,23 +985,38 @@ async function route(req, env, url) {
     if (!caseId || !FILE_KINDS.includes(kind) || !name || /[\\/]/.test(name)) return bad('case_id, kind, x-file-name required');
     const len = Number(req.headers.get('content-length') || 0);
     if (len > MAX_UPLOAD) return bad('file over 50 MB', 413);
-    const exists = await db.rest(`cases?id=eq.${caseId}&select=id`);
+    // S-F9: the stored content-type comes from the extension (allow-list), never from the browser's header
+    const ext = (name.match(/\.[A-Za-z0-9]{1,8}$/) || [''])[0].toLowerCase();
+    const ctype = UPLOAD_TYPES[ext];
+    if (!ctype) return bad(BAD_FILE_TYPE);
+    const exists = await db.rest(`cases?id=eq.${caseId}&select=id,stage`);
     if (!exists.length) return bad('case not found', 404); // no orphan object in Storage
-    const prev = await db.rest(`case_files?case_id=eq.${caseId}&kind=eq.${kind}&original_name=eq.${encodeURIComponent(name)}&select=version&order=version.desc&limit=1`);
-    const version = prev.length ? prev[0].version + 1 : 1;
+    const nextVersion = async () => {
+      const prev = await db.rest(`case_files?case_id=eq.${caseId}&kind=eq.${kind}&original_name=eq.${encodeURIComponent(name)}&select=version&order=version.desc&limit=1`);
+      return prev.length ? prev[0].version + 1 : 1;
+    };
+    let version = await nextVersion();
     // Supabase Storage keys must be ASCII (live 400 InvalidKey on a Devanagari name): store as file<ext>;
     // the real name stays only in case_files.original_name (downloads use it — §4.16).
-    const ext = (name.match(/\.[A-Za-z0-9]{1,8}$/) || [''])[0].toLowerCase();
     const path = `${caseId}/${kind}/v${version}-${crypto.randomUUID().slice(0, 8)}/file${ext}`; // unique per upload
     try {
-      await db.upload('proposals', path, req.body, req.headers.get('content-type'));
+      await db.upload('proposals', path, req.body, ctype);
     } catch (e) {
       if (String(e.message) === 'file over 50 MB') return bad('file over 50 MB', 413);
       throw e;
     }
     let f;
     try {
-      [f] = await db.rest('case_files', { method: 'POST', body: JSON.stringify({ case_id: caseId, kind, storage_path: `proposals/${path}`, original_name: name, version, uploaded_by: user.id }) });
+      // L-F13 (migration 0014: unique case_id, kind, original_name, version): a parallel upload of the same name took
+      // this version → the next free version (the Storage path is unique anyway)
+      const insert = v => db.rest('case_files', { method: 'POST', body: JSON.stringify({ case_id: caseId, kind, storage_path: `proposals/${path}`, original_name: name, version: v, uploaded_by: user.id }) });
+      try {
+        [f] = await insert(version);
+      } catch (e) {
+        if (!isUnique(e)) throw e;
+        version = await nextVersion();
+        [f] = await insert(version);
+      }
     } catch (e) {
       // approval / court_notice before migration 0008: enum value missing (22P02 invalid input value for enum file_kind)
       if (e instanceof DbError && ['approval', 'court_notice'].includes(kind) && (e.code === '22P02' || /enum/i.test(e.detail))) {
@@ -852,7 +1028,9 @@ async function route(req, env, url) {
     await log(cfg, caseId, user.id, 'file_uploaded', { kind, name, version });
     let letter_updated = null, pending_letters = 0;
     if (kind === 'reply') {
-      await db.rest(`cases?id=eq.${caseId}`, { method: 'PATCH', body: JSON.stringify({ stage: 'माहिती प्राप्त' }) });
+      // L-F11: a reply to a closed case does not reopen it silently — the stage stays, the upload is logged
+      if (exists[0].stage === CLOSED_STAGE) await log(cfg, caseId, user.id, 'reply_on_closed_case', { name, version });
+      else await db.rest(`cases?id=eq.${caseId}`, { method: 'PATCH', body: JSON.stringify({ stage: 'माहिती प्राप्त' }) });
       // The reply answers the pending letter: exactly one sent letter without a reply -> mark it answered.
       // Several pending -> leave them (the UI asks which one).
       const pend = (await db.rest(`letters?case_id=eq.${caseId}&sent_date=not.is.null&reply_received_date=is.null&select=id`)) || [];
@@ -877,6 +1055,7 @@ async function route(req, env, url) {
     if (!isId(case_id)) return bad('case_id required');
     const outs = normOutputs(outputsRaw);
     if (outs.error) return bad(outs.error);
+    if (await caseClosed(db, case_id)) return json({ error: 'case_closed', reason: CASE_CLOSED }, 409);
     const has = await db.rest(`case_files?case_id=eq.${case_id}&kind=eq.proposal&select=id&limit=1`);
     if (!has.length) return bad('upload the proposal PDF first');
     // monthly limit: once this month's spend reached it, no new run is dispatched (runs already going finish)
@@ -891,16 +1070,20 @@ async function route(req, env, url) {
     const active = await db.rest(caseActivePath(case_id, act === null));
     if (active && active.length) return json({ error: 'run_active', run_id: active[0].id }, 409);
     const runRow = { case_id, instructions: instructions || null, created_by: user.id };
-    let run;
-    try {
-      [run] = await db.rest('runs', { method: 'POST', body: JSON.stringify(outs.value === null ? runRow : { ...runRow, outputs: outs.value }) });
-    } catch (e) {
-      // migration 0008 not applied: the run is never refused for that — insert without the column (legacy behaviour)
-      if (outs.value === null || !missingColumn(e, 'outputs')) throw e;
-      console.log(`runs.outputs column missing (apply migration 0008); run for case ${case_id} inserted without outputs`);
-      [run] = await db.rest('runs', { method: 'POST', body: JSON.stringify(runRow) });
-      run = { ...run, outputs_dropped: true };
-    }
+    const ins = await insertRun(cfg, db, user.id, case_id, async () => {
+      try {
+        const [r] = await db.rest('runs', { method: 'POST', body: JSON.stringify(outs.value === null ? runRow : { ...runRow, outputs: outs.value }) });
+        return r;
+      } catch (e) {
+        // migration 0008 not applied: the run is never refused for that — insert without the column (legacy behaviour)
+        if (outs.value === null || !missingColumn(e, 'outputs')) throw e;
+        console.log(`runs.outputs column missing (apply migration 0008); run for case ${case_id} inserted without outputs`);
+        const [r] = await db.rest('runs', { method: 'POST', body: JSON.stringify(runRow) });
+        return { ...r, outputs_dropped: true };
+      }
+    });
+    if (!ins.run) return json({ error: 'run_active', run_id: ins.active }, 409);
+    let run = ins.run;
     const started = { run_id: run.id, instructions: instructions || '', outputs: outs.value, ...(run.outputs_dropped ? { outputs_dropped: true } : {}) };
     const dispatchFailed = async e => {
       // A3 audit: the run row (red box, History) gets only the Marathi reason; the raw GitHub text goes to activity
@@ -918,7 +1101,6 @@ async function route(req, env, url) {
       }
     } else {
       // C33 queue: the new run waits (dispatched_at null); dispatchNext takes the oldest waiting run if none is active
-      await env.SETTINGS.put('worker_origin', url.origin);
       const nx = await dispatchNext(env, cfg, url.origin, user.id, run.id);
       if (nx.failed.map(Number).includes(Number(run.id))) return dispatchFailed(null);   // marked failed + logged there
       if (!nx.dispatched || Number(nx.dispatched.id) !== Number(run.id)) {
@@ -950,6 +1132,7 @@ async function route(req, env, url) {
     if (!isId(b.case_id)) return bad('case_id required');
     const caseId = Number(b.case_id);
     if (!EDIT_TARGETS.includes(b.target)) return bad(BAD_EDIT_TARGET);
+    if (await caseClosed(db, caseId)) return json({ error: 'case_closed', reason: CASE_CLOSED }, 409);
     if (typeof b.message !== 'string' || !b.message.trim()) return bad(EDIT_MSG_EMPTY);
     const message = b.message.trim();
     if (message.length > EDIT_MSG_MAX) return bad(EDIT_MSG_LONG);
@@ -980,20 +1163,24 @@ async function route(req, env, url) {
     if (active.length) return json({ error: 'run_active', run_id: active[0].id }, 409);
     let cur = { case_id: caseId, kind: 'edit', edit_target: b.target, edit_message: message, edit_attachments: attachments,
       created_by: user.id, dispatched_at: new Date().toISOString() };
-    let run;
-    for (;;) {
-      try {
-        [run] = await db.rest('runs', { method: 'POST', body: JSON.stringify(cur) });
-        break;
-      } catch (e) {
-        if (['kind', 'edit_target', 'edit_message', 'edit_attachments'].some(c => namesColumn(e, c))) return json({ error: 'migration_missing', reason: EDIT_MIGRATION, detail: EDIT_MIGRATION_DETAIL }, 409);
-        // runs.dispatched_at missing (migration 0011): the row without it (the edit run is dispatched at once anyway)
-        if (!('dispatched_at' in cur) || !missingColumn(e, 'dispatched_at')) throw e;
-        const { dispatched_at, ...rest } = cur;
-        cur = rest;
+    let migrationMissing = false;
+    const ins = await insertRun(cfg, db, user.id, caseId, async () => {
+      for (;;) {
+        try {
+          const [r] = await db.rest('runs', { method: 'POST', body: JSON.stringify(cur) });
+          return r;
+        } catch (e) {
+          if (['kind', 'edit_target', 'edit_message', 'edit_attachments'].some(c => namesColumn(e, c))) { migrationMissing = true; return null; }
+          // runs.dispatched_at missing (migration 0011): the row without it (the edit run is dispatched at once anyway)
+          if (!('dispatched_at' in cur) || !missingColumn(e, 'dispatched_at')) throw e;
+          const { dispatched_at, ...rest } = cur;
+          cur = rest;
+        }
       }
-    }
-    run = { ...run, kind: 'edit' };
+    });
+    if (migrationMissing) return json({ error: 'migration_missing', reason: EDIT_MIGRATION, detail: EDIT_MIGRATION_DETAIL }, 409);
+    if (!ins.run) return json({ error: 'run_active', run_id: ins.active }, 409);
+    const run = { ...ins.run, kind: 'edit' };
     try {
       await dispatchRun(env, cfg, run, url.origin);
     } catch (e) {

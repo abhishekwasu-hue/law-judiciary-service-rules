@@ -54,10 +54,19 @@ async function queueDb(u, opt, res) {
   const isActive = r => ['queued', 'running'].includes(r.state) &&
     (r.dispatched_at ? new Date(r.dispatched_at).getTime() > since : r.state === 'running' && new Date(r.created_at).getTime() > since);
   const byId = id => rows.find(r => r.id === Number(id));
+  let m0;
   if (Q.hook) await Q.hook(d, M);
   const noEdit = d.includes('&kind=neq.edit');   // draft edit: the queue ignores kind 'edit'
   const queueRow = r => !noEdit || r.kind !== 'edit';
   if (/\/rest\/v1\/case_files\?case_id=eq\.\d+&kind=eq\.proposal/.test(d)) return res([{ id: 1 }]);
+  if (d === `${SB}/rest/v1/runs` && M === 'POST' && Q.unique) {
+    // migration 0014 runs_one_active_per_case: one queued/running row per case
+    const cid = JSON.parse(opt.body).case_id;
+    if (rows.some(r => r.case_id === Number(cid) && ['queued', 'running'].includes(r.state)))
+      return res({ code: '23505', message: 'duplicate key value violates unique constraint "runs_one_active_per_case"' }, 409);
+  }
+  if (M === 'GET' && (m0 = d.match(/\/runs\?case_id=eq\.(\d+)&state=in\.\(queued,running\)&select=id&order=id\.desc&limit=1$/)))
+    return res(rows.filter(r => r.case_id === Number(m0[1]) && ['queued', 'running'].includes(r.state)).sort((a, b) => b.id - a.id).slice(0, 1).map(r => ({ id: r.id })));
   if (d === `${SB}/rest/v1/runs` && M === 'POST') {
     const row = { id: Q.nextId++, state: 'queued', dispatched_at: null, created_at: new Date(Date.now() + Q.nextId).toISOString(), ...JSON.parse(opt.body) };
     rows.push(row); return res([{ ...row }], 201);
@@ -69,8 +78,31 @@ async function queueDb(u, opt, res) {
     const cid = Number(d.match(/case_id=eq\.(\d+)/)[1]);
     return res(rows.filter(r => r.case_id === cid && ['queued', 'running'].includes(r.state) && (!r.dispatched_at || isActive(r))).map(r => ({ id: r.id })));
   }
-  if (M === 'GET' && d.startsWith(`${SB}/rest/v1/runs?created_at=gte.`)) return res(rows.map(r => ({ cost_usd: r.cost_usd ?? null, created_at: r.created_at, state: r.state, dispatched_at: r.dispatched_at ?? null })).concat(monthRuns.map(r => ({ dispatched_at: r.created_at, ...r }))));
+  if (M === 'GET' && d.startsWith(`${SB}/rest/v1/runs?created_at=gte.`)) return res(rows.map(r => ({ cost_usd: r.cost_usd ?? null, created_at: r.created_at, state: r.state, dispatched_at: r.dispatched_at ?? null, kind: r.kind || 'full' })).concat(monthRuns.map(r => ({ dispatched_at: r.created_at, ...r }))));
   let m;
+  // L-F5 / L-F18: wait text on every waiting run whose step differs
+  if (M === 'PATCH' && d.startsWith(`${SB}/rest/v1/runs?state=eq.queued&dispatched_at=is.null&or=(step.is.null,step.neq.`)) {
+    const b = JSON.parse(opt.body);
+    const out = rows.filter(r => r.state === 'queued' && !r.dispatched_at && r.step !== b.step);
+    out.forEach(r => Object.assign(r, b)); Q.waitMarks = (Q.waitMarks || 0) + out.length;
+    return new Response(null, { status: 204 });
+  }
+  // L-F2: dispatched but never started (still queued QUEUE_START after dispatched_at)
+  if (M === 'PATCH' && (m = d.match(/\/runs\?state=eq\.queued&dispatched_at=lt\.([^&]+)&state=in\.\(queued,running\)$/))) {
+    const lim = new Date(m[1]).getTime();
+    const out = rows.filter(r => r.state === 'queued' && r.dispatched_at && new Date(r.dispatched_at).getTime() < lim);
+    out.forEach(r => Object.assign(r, JSON.parse(opt.body)));
+    return res(out.map(r => ({ id: r.id, case_id: r.case_id, kind: r.kind })));
+  }
+  // L-F2: running without a step change (step_at, else started_at) since the limit
+  if (M === 'PATCH' && (m = d.match(/\/runs\?state=eq\.running&or=\(step_at\.lt\."([^"]+)",and\(step_at\.is\.null,started_at\.lt\."[^"]+"\)\)&state=in\.\(queued,running\)$/))) {
+    if (Q.noStepAt) return res({ code: '42703', message: 'column runs.step_at does not exist' }, 400);
+    const lim = new Date(m[1]).getTime();
+    const t = r => (r.step_at || r.started_at) ? new Date(r.step_at || r.started_at).getTime() : Infinity;
+    const out = rows.filter(r => r.state === 'running' && t(r) < lim);
+    out.forEach(r => Object.assign(r, JSON.parse(opt.body)));
+    return res(out.map(r => ({ id: r.id, case_id: r.case_id, kind: r.kind })));
+  }
   if (M === 'PATCH' && (m = d.match(/\/runs\?id=eq\.(\d+)&state=eq\.queued&dispatched_at=is\.null$/))) {
     const r = byId(m[1]);
     if (!r || r.state !== 'queued' || r.dispatched_at) return res([]);
@@ -521,7 +553,7 @@ test('engine config: atomic single use in Postgres, KV fallback without migratio
   env.SETTINGS.m.set('run_token:tb', JSON.stringify({ run_id: '100', used: false, exp }));
   const [a, b] = await Promise.all([get('ta', 100), get('tb', 100)]);
   assert.deepEqual([a.status, b.status].sort(), [200, 403], 'exactly one config read per run');
-  const pq = calls.filter(c => c.u.includes('runs?id=eq.100&config_taken_at=is.null'));
+  const pq = calls.filter(c => c.u.includes('runs?id=eq.100&state=in.(queued,running)&config_taken_at=is.null'));
   assert.equal(pq.length, 2); assert.equal(pq[0].opt.method, 'PATCH'); assert.ok(JSON.parse(pq[0].opt.body).config_taken_at);
   assert.match(pq[0].opt.headers.Prefer, /return=representation/);
   env.SETTINGS.m.set('run_token:tc', JSON.stringify({ run_id: '999', used: false, exp }));
@@ -605,7 +637,10 @@ test('cases: duplicate C R ignoring leading zeros, insert race → duplicate_cr;
   assert.equal(r.status, 500);
   const t = await r.text();
   assert.ok(!t.includes('secret detail') && !t.includes('bigint'), t);
-  assert.deepEqual(JSON.parse(t), { error: 'db 400' });
+  // S-F11: a generic Marathi reason + a log reference; no technical text
+  const j = JSON.parse(t);
+  assert.equal(j.error, 'server_error'); assert.match(j.reason, /तांत्रिक अडचण आली/); assert.match(j.ref, /^[0-9a-f]{8}$/);
+  assert.ok(!t.includes('db 400'), t);
 });
 
 test('ids validated; upload name decoding; letters PATCH 404/whitelist/log/stage', async () => {
@@ -778,7 +813,10 @@ test('upload: Storage size limit → 413 "file over 50 MB"', async () => {
 
 test('HTML responses carry CSP with frame-ancestors self; नस्ती page keeps its inline/eval scripts; non-HTML untouched', async () => {
   const r = await call('/cases/7');
-  assert.equal(await r.text(), HTML, 'body unchanged');
+  // P2: the public config is inlined before </head> as a JSON data block (no hash in the CSP for it)
+  const PK = '<script type="application/json" id="pk-config">{"configured":true,"supabase_url":"https://sb.example","supabase_anon_key":"anon"}</script>';
+  assert.equal(await r.text(), HTML.replace('</head>', `${PK}</head>`), 'only the config block added');
+  assert.equal(r.headers.get('cache-control'), 'no-cache', 'HTML always re-checked');
   const csp = r.headers.get('content-security-policy');
   assert.match(csp, /frame-ancestors 'self'/); assert.equal(r.headers.get('x-frame-options'), 'SAMEORIGIN');
   const { createHash } = await import('node:crypto');
@@ -1035,14 +1073,14 @@ test('C33: GitHub dispatch failure → that run failed (Marathi), the next one i
     assert.equal((await r.json()).reason, "प्रक्रिया सुरू होऊ शकली नाही (तांत्रिक कारण). कृपया 'पुन्हा तयार करा' वापरावे; अडचण राहिल्यास मालकांना कळवावे.");
     assert.equal(Q.rows[0].state, 'failed');
     assert.ok(acts.some(x => x.action === 'run_failed' && x.detail.run_id === 400 && /Bad credentials/.test(x.detail.error)));
-    // two waiting runs, GitHub down: both failed, nothing left hanging
+    // a run-specific refusal (422): that run failed, the next one is tried
     const t0 = Date.now() - 1000;
     Q.rows.push({ id: 402, case_id: 42, state: 'queued', dispatched_at: null, created_at: new Date(t0).toISOString() },
                 { id: 403, case_id: 43, state: 'queued', dispatched_at: null, created_at: new Date(t0 + 1).toISOString() });
     let calls402 = 0;
     const realFetch = globalThis.fetch;
     globalThis.fetch = async (u, opt = {}) => {
-      if (String(u).endsWith('/dispatches') && calls402++ === 0) return new Response('{"message":"Bad credentials"}', { status: 401 });
+      if (String(u).endsWith('/dispatches') && calls402++ === 0) return new Response('{"message":"Unprocessable"}', { status: 422 });
       return realFetch(u, opt);
     };
     dispatchFail = false;
@@ -1052,6 +1090,33 @@ test('C33: GitHub dispatch failure → that run failed (Marathi), the next one i
       assert.equal(out.dispatched, 403);
     } finally { globalThis.fetch = realFetch; }
     assert.equal(Q.rows.find(x => x.id === 402).step, "प्रक्रिया सुरू होऊ शकली नाही (तांत्रिक कारण). कृपया 'पुन्हा तयार करा' वापरावे; अडचण राहिल्यास मालकांना कळवावे.");
+    // L-F5: GitHub refuses every dispatch (401 / 403 / 5xx): only the first run fails, the others keep waiting with a text
+    for (const status of [401, 403, 503]) {
+      Q.rows.length = 0;
+      Q.rows.push({ id: 404, case_id: 44, state: 'queued', dispatched_at: null, created_at: new Date(t0).toISOString() },
+                  { id: 405, case_id: 45, state: 'queued', dispatched_at: null, created_at: new Date(t0 + 1).toISOString() },
+                  { id: 406, case_id: 46, state: 'queued', dispatched_at: null, created_at: new Date(t0 + 2).toISOString() });
+      let n = 0;
+      globalThis.fetch = async (u, opt = {}) => {
+        if (String(u).endsWith('/dispatches')) { n++; return new Response('{"message":"x"}', { status }); }
+        return realFetch(u, opt);
+      };
+      try {
+        const out = await cronTick(env);
+        assert.deepEqual(out.failed, [404], `status ${status}`);
+        assert.equal(out.dispatched, null);
+        assert.equal(n, 1, 'one dispatch attempt only');
+      } finally { globalThis.fetch = realFetch; }
+      assert.equal(Q.rows[0].state, 'failed');
+      for (const r of Q.rows.slice(1)) {
+        assert.equal(r.state, 'queued'); assert.equal(r.dispatched_at, null);
+        assert.match(r.step, /प्रक्रिया सुरू करण्यात तांत्रिक अडचण आहे/);
+      }
+    }
+    // GitHub works again: the next waiting run is dispatched and its wait text cleared
+    const out2 = await cronTick(env);
+    assert.equal(out2.dispatched, 405);
+    assert.equal(Q.rows[1].step, null, 'wait text cleared at the claim');
   } finally { Q = null; dispatchFail = false; }
 });
 
@@ -1376,4 +1441,221 @@ test('draft edit: upload accepts kind gr (chat attachment)', async () => {
   const r = await call('/api/upload?case_id=7&kind=gr', { method: 'POST', headers: { ...owner33, 'x-file-name': encodeURIComponent('202605051234567812.pdf'), 'content-type': 'application/pdf' }, body: '%PDF-1' });
   assert.equal(r.status, 200, await r.clone().text());
   assert.equal((await r.json()).kind, 'gr');
+});
+
+// ---------- audit 05.11.2026 fix round (docs/AUDIT_2026-11-05.md Parts 4+8, 5+6, 7) ----------
+const MIN = 60 * 1000;
+const ago = ms => new Date(Date.now() - ms).toISOString();
+
+test('L-F2: dispatched but never started (45 min) and running without a step change (2 h) are failed; 3.5 h kept', async () => {
+  Q = { rows: [], nextId: 1100 }; monthRuns = []; acts.length = 0;
+  try {
+    Q.rows.push(
+      { id: 1101, case_id: 111, state: 'queued', dispatched_at: ago(50 * MIN), created_at: ago(50 * MIN) },   // never started
+      { id: 1102, case_id: 112, state: 'queued', dispatched_at: ago(20 * MIN), created_at: ago(20 * MIN) },   // GitHub queue wait: kept
+      { id: 1103, case_id: 113, state: 'running', dispatched_at: ago(150 * MIN), started_at: ago(148 * MIN), step_at: ago(130 * MIN), created_at: ago(150 * MIN) },
+      { id: 1104, case_id: 114, state: 'running', dispatched_at: ago(150 * MIN), started_at: ago(148 * MIN), step_at: ago(10 * MIN), created_at: ago(150 * MIN) },
+      { id: 1105, case_id: 115, state: 'running', dispatched_at: ago(140 * MIN), started_at: ago(130 * MIN), created_at: ago(140 * MIN) },   // no step yet
+      { id: 1106, case_id: 116, state: 'queued', dispatched_at: null, created_at: ago(300 * MIN) });   // waiting in the queue: never swept
+    const out = await cronTick(env);
+    assert.deepEqual(out.swept.sort(), [1101, 1103, 1105]);
+    const st = id => Q.rows.find(r => r.id === id);
+    assert.equal(st(1101).state, 'failed'); assert.match(st(1101).step, /प्रक्रिया वेळेत सुरू होऊ शकली नाही/); assert.ok(st(1101).finished_at);
+    assert.equal(st(1102).state, 'queued');
+    assert.equal(st(1103).state, 'failed'); assert.match(st(1103).step, /बराच वेळ पुढे सरकली नाही/);
+    assert.equal(st(1104).state, 'running', 'step changed 10 min ago');
+    assert.equal(st(1105).state, 'failed', 'no step_at → started_at');
+    assert.ok(acts.some(a => Array.isArray(a) && a.some(x => x.detail.run_id === 1101 && x.action === 'run_failed')));
+    assert.equal(out.dispatched, null, '1102 / 1104 are still active');
+    st(1104).state = 'done'; st(1102).state = 'done';
+    assert.equal((await cronTick(env)).dispatched, 1106, 'the queue moves on');
+    // migration 0014 not applied (runs.step_at missing): no error, the 3.5 h limit alone
+    Q.rows.length = 0; Q.noStepAt = true;
+    Q.rows.push({ id: 1107, case_id: 117, state: 'running', dispatched_at: ago(150 * MIN), started_at: ago(150 * MIN), created_at: ago(150 * MIN) });
+    const out2 = await cronTick(env);
+    assert.deepEqual(out2.swept, []);
+    assert.equal(Q.rows[0].state, 'running');
+  } finally { Q = null; }
+});
+
+test('L-F3: unique active run per case — 23505 → sweep + retry once, else 409 run_active (/api/run and /api/edit)', async () => {
+  Q = { rows: [], nextId: 1200, unique: true }; monthRuns = []; dispatchFail = false;
+  [1201, 1202].forEach(c => specCases.add(c));
+  try {
+    // an old stuck row (dispatched 5 h ago, not swept yet) still holds the index → swept, the retry succeeds
+    Q.rows.push({ id: 1190, case_id: 1201, state: 'running', dispatched_at: ago(300 * MIN), created_at: ago(300 * MIN) });
+    let r = await runCase(1201);
+    assert.equal(r.status, 200, await r.clone().text());
+    assert.equal(Q.rows.find(x => x.id === 1190).state, 'failed');
+    // a parallel request inserted between the check and the insert → 409 run_active with that run's id
+    Q.rows.find(x => x.case_id === 1201 && x.state !== 'failed').state = 'done';
+    let injected = false;
+    Q.hook = async (d, M) => {
+      if (!injected && M === 'POST' && d === `${SB}/rest/v1/runs`) { injected = true; Q.rows.push({ id: 1299, case_id: 1202, state: 'queued', dispatched_at: null, created_at: isoNow() }); }
+    };
+    r = await runCase(1202);
+    assert.equal(r.status, 409); assert.deepEqual(await r.json(), { error: 'run_active', run_id: 1299 });
+    Q.rows.find(x => x.id === 1299).state = 'done';
+    injected = false;
+    r = await editCall({ case_id: 1202, target: 'note', message: 'x' });
+    assert.equal(r.status, 409); assert.deepEqual(await r.json(), { error: 'run_active', run_id: 1299 });
+  } finally { Q = null; }
+});
+
+test('L-F4: estimates — full runs only (cost > 0) for a full run, median of edits for an edit; edits reserved at the edit estimate', async () => {
+  const { runEstimate, editEstimate } = await import('../worker.js');
+  const fin = [{ cost_usd: 3, kind: 'full' }, { cost_usd: 4, kind: 'full' }, { cost_usd: 0.03, kind: 'edit' }, { cost_usd: 0.05, kind: 'edit' },
+    { cost_usd: 0.01, kind: 'edit' }, { cost_usd: 0, kind: 'full' }, { cost_usd: null, kind: 'full' }, { cost_usd: 5 }];
+  assert.equal(runEstimate({}, fin), 4, 'median of 3, 4, 5 (kind missing = full); edits and $0 left out');
+  assert.equal(editEstimate(fin), 0.03);
+  assert.equal(editEstimate([{ cost_usd: 3, kind: 'full' }]), 0.05, 'no edit cost yet → $0.05');
+  assert.equal(runEstimate({ budget_usd: '2' }, [{ cost_usd: 0.03, kind: 'edit' }]), 2, 'no full run cost → budget_usd');
+  Q = { rows: [], nextId: 1300 };
+  try {
+    const now = isoNow();
+    monthRuns = [{ cost_usd: 3, created_at: now, state: 'done', kind: 'full' }, { cost_usd: 0.04, created_at: now, state: 'done', kind: 'edit' }];
+    Q.rows.push({ id: 1301, case_id: 131, state: 'running', kind: 'edit', dispatched_at: now, created_at: now });
+    let sp = await body(await call('/api/spend', { headers: owner33 }));
+    assert.deepEqual([sp.active_runs, sp.reserved_usd], [1, 0.04], 'an active edit is reserved at the edit estimate, not $3');
+    Q.rows.push({ id: 1302, case_id: 132, state: 'running', kind: 'full', dispatched_at: now, created_at: now });
+    sp = await body(await call('/api/spend', { headers: owner33 }));
+    assert.deepEqual([sp.active_runs, sp.reserved_usd], [2, 3.04]);
+  } finally { Q = null; monthRuns = []; }
+});
+
+test('L-F6: worker_origin written only when it changed; a KV error never fails a run', async () => {
+  Q = { rows: [], nextId: 1400 }; monthRuns = []; dispatchFail = false;
+  const realPut = env.SETTINGS.put;
+  const puts = [];
+  env.SETTINGS.put = async (k, v, o) => { puts.push(k); return realPut(k, v, o); };
+  try {
+    env.SETTINGS.m.set('worker_origin', 'https://desk.example');
+    let r = await runCase(1401);
+    assert.equal(r.status, 200);
+    assert.ok(!puts.includes('worker_origin'), 'same origin: no write');
+    Q.rows[0].state = 'done';
+    env.SETTINGS.m.set('worker_origin', 'https://old.example');
+    r = await runCase(1402);
+    assert.equal(env.SETTINGS.m.get('worker_origin'), 'https://desk.example');
+    Q.rows[1].state = 'done';
+    env.SETTINGS.m.set('worker_origin', 'https://old.example');
+    env.SETTINGS.put = async (k, v, o) => { if (k === 'worker_origin') throw new Error('KV 429'); return realPut(k, v, o); };
+    r = await runCase(1403);
+    assert.equal(r.status, 200, 'KV 429 on worker_origin: the run still dispatched');
+    assert.equal((await r.json()).queued, false);
+    assert.equal(Q.rows[2].state, 'queued'); assert.ok(Q.rows[2].dispatched_at);
+  } finally { env.SETTINGS.put = realPut; env.SETTINGS.m.set('worker_origin', 'https://desk.example'); Q = null; }
+});
+
+test('L-F18: engine settings incomplete → waiting runs get a Marathi wait text', async () => {
+  Q = { rows: [], nextId: 1500 }; monthRuns = [];
+  const tok = env.SETTINGS.m.get('github_token');
+  try {
+    Q.rows.push({ id: 1501, case_id: 151, state: 'queued', dispatched_at: null, created_at: isoNow() });
+    env.SETTINGS.m.delete('github_token');
+    const out = await cronTick(env);
+    assert.equal(out.dispatched, null);
+    assert.match(Q.rows[0].step, /सेटिंग्ज अपूर्ण आहेत/);
+    assert.equal(Q.rows[0].state, 'queued');
+  } finally { env.SETTINGS.m.set('github_token', tok); Q = null; }
+});
+
+test('L-F11: closed case — /api/run and /api/edit refused (409 Marathi); a reply upload keeps the stage and is logged', async () => {
+  const realFetch = globalThis.fetch;
+  const casePatches = [];
+  globalThis.fetch = async (u, opt = {}) => {
+    u = String(u);
+    if (u.startsWith(`${SB}/rest/v1/cases?id=eq.7&select=id`)) return new Response(JSON.stringify([{ id: 7, stage: 'बंद' }]), { status: 200 });
+    if (u.startsWith(`${SB}/rest/v1/cases?id=eq.7`) && opt.method === 'PATCH') casePatches.push(JSON.parse(opt.body));
+    return realFetch(u, opt);
+  };
+  specCases.add(7); acts.length = 0; activeRuns = []; monthRuns = []; pendingLetters = [];
+  const n0 = calls.filter(c => c.u.endsWith('/dispatches')).length;
+  try {
+    let r = await call('/api/run', { method: 'POST', headers: owner33, body: JSON.stringify({ case_id: 7 }) });
+    assert.equal(r.status, 409);
+    let j = await r.json();
+    assert.equal(j.error, 'case_closed'); assert.match(j.reason, /हे प्रकरण बंद आहे/);
+    r = await editCall({ case_id: 7, target: 'note', message: 'x' });
+    assert.equal(r.status, 409); assert.equal((await r.json()).error, 'case_closed');
+    assert.equal(calls.filter(c => c.u.endsWith('/dispatches')).length, n0, 'nothing dispatched');
+    r = await call('/api/upload?case_id=7&kind=reply', { method: 'POST', headers: { ...owner33, 'x-file-name': encodeURIComponent('उत्तर.pdf') }, body: 'x' });
+    assert.equal(r.status, 200, await r.clone().text());
+    assert.ok(!casePatches.some(b => 'stage' in b), 'stage of the closed case unchanged');
+    assert.ok(acts.some(a => a.action === 'reply_on_closed_case'));
+  } finally { globalThis.fetch = realFetch; }
+});
+
+test('S-F9 + L-F13: upload content-type from the extension (browser header ignored); other types refused; version race retried', async () => {
+  const realFetch = globalThis.fetch;
+  const types = [];
+  let conflict = 1;
+  globalThis.fetch = async (u, opt = {}) => {
+    u = String(u);
+    if (u.startsWith(`${SB}/storage/v1/object/proposals/`)) types.push(opt.headers['content-type']);
+    if (u === `${SB}/rest/v1/case_files` && opt.method === 'POST' && conflict > 0) { conflict--; return new Response(JSON.stringify({ code: '23505', message: 'duplicate key value violates unique constraint "case_files_version_key"' }), { status: 409 }); }
+    return realFetch(u, opt);
+  };
+  const up = (name, ctype = 'text/html') => call('/api/upload?case_id=7&kind=extra_doc', { method: 'POST', headers: { ...owner33, 'x-file-name': encodeURIComponent(name), 'content-type': ctype }, body: 'x' });
+  try {
+    let r = await up('आदेश.PDF');
+    assert.equal(r.status, 200, await r.clone().text());
+    assert.equal((await r.json()).version, 1, 'version re-read after the conflict');
+    for (const [n, t] of [['a.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'], ['b.jpg', 'image/jpeg'], ['c.png', 'image/png'], ['d.doc', 'application/msword']]) {
+      assert.equal((await up(n)).status, 200); assert.equal(types.at(-1), t);
+    }
+    assert.equal(types[0], 'application/pdf');
+    const n = types.length;
+    for (const bad of ['x.html', 'x.svg', 'x.exe', 'noext']) {
+      r = await up(bad);
+      assert.equal(r.status, 400, bad); assert.match((await r.json()).error, /हा फाइल-प्रकार स्वीकारता येत नाही/);
+    }
+    assert.equal(types.length, n, 'nothing stored for a refused type');
+  } finally { globalThis.fetch = realFetch; }
+});
+
+test('S-F12: an invite never downgrades the owner', async () => {
+  const owner = { authorization: 'Bearer owner-jwt' };
+  const inv = b => call('/api/members', { method: 'POST', headers: owner, body: JSON.stringify(b) });
+  let r = await inv({ email: 'ABHI@example.com', role: 'staff' });
+  assert.equal(r.status, 409); assert.match((await r.json()).error, /मालकांची भूमिका/);
+  assert.equal(members.find(x => x.user_id === 'u1').role, 'owner');
+  // an owner row under another e-mail (owner_email changed later): refused too
+  authUsers.push({ id: 'u1', email: 'old-owner@example.com' });
+  r = await inv({ email: 'old-owner@example.com', role: 'senior' });
+  assert.equal(r.status, 409);
+  assert.equal(members.find(x => x.user_id === 'u1').role, 'owner');
+  authUsers.pop();
+});
+
+test('U1 + P1 + S-F5 + P2: /nasti = the app; hashed assets immutable; CSP without wildcard; config inlined (escaped)', async () => {
+  const seen = [];
+  const realAssets = env.ASSETS.fetch;
+  env.ASSETS.fetch = async req => { seen.push(new URL(req.url).pathname); return realAssets(req); };
+  try {
+    const r = await call('/nasti');
+    assert.deepEqual(seen, ['/'], 'the SPA index is served for exactly /nasti');
+    const t = await r.text();
+    assert.ok(t.includes('id="pk-config"') && t.includes('/assets/a.js'), 'app HTML');
+    const csp = r.headers.get('content-security-policy');
+    assert.ok(!/unsafe-eval/.test(csp), 'app CSP, not the नस्ती page policy');
+    seen.length = 0;
+    const n = await call('/nasti/');
+    assert.deepEqual(seen, ['/nasti/']);
+    assert.match(n.headers.get('content-security-policy'), /'unsafe-eval'/);
+    assert.ok(!(await n.text()).includes('pk-config'), 'no config on the owner page');
+  } finally { env.ASSETS.fetch = realAssets; }
+  const a = await call('/assets/a.js');
+  assert.equal(a.headers.get('cache-control'), 'public, max-age=31536000, immutable');
+  assert.equal(await a.text(), 'js');
+  const csp = (await call('/cases/7')).headers.get('content-security-policy');
+  assert.ok(!csp.includes('*.supabase.co'), csp);
+  assert.ok(csp.includes(`connect-src 'self' ${SB} wss://sb.example;`), csp);
+  assert.ok(csp.includes(`img-src 'self' data: blob: ${SB};`), csp);
+  const { configScript } = await import('../worker.js');
+  const s = configScript({ configured: true, supabase_url: 'https://x</script><script>alert(1)//', supabase_anon_key: 'k' });
+  assert.ok(!s.slice(0, -9).includes('</script'), s);
+  assert.equal(JSON.parse(s.match(/>(.*)<\/script>$/)[1]).supabase_url, 'https://x</script><script>alert(1)//');
+  // /api/public-config unchanged
+  assert.deepEqual(await body(await call('/api/public-config')), { configured: true, supabase_url: SB, supabase_anon_key: 'anon' });
 });

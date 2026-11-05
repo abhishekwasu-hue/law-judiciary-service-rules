@@ -1,5 +1,6 @@
 name: Tests
-# Engine tools (pytest: tests/*, incl. the script tests via tests/test_scripts.py) and the Worker (node --test).
+# Engine tools (pytest: tests/*, incl. the script tests via tests/test_scripts.py), the Worker (node --test) and the
+# app's TypeScript check (dashboard-app, tsc --noEmit; audit 05.11.2026 L-F20).
 on:
   push:
   pull_request:
@@ -20,6 +21,8 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020   # v4.4.0
         with:
           node-version: '20'
+          cache: npm
+          cache-dependency-path: dashboard-app/package-lock.json
       - name: Install
         run: |
           set -euo pipefail
@@ -30,3 +33,9 @@ jobs:
         run: python -m pytest -q tests
       - name: Worker tests
         run: node --test cloudflare/test/worker.test.mjs
+      - name: App typecheck
+        working-directory: dashboard-app
+        run: |
+          set -euo pipefail
+          npm ci
+          npx tsc --noEmit -p .

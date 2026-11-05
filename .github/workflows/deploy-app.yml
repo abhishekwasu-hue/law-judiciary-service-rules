@@ -13,6 +13,8 @@ concurrency:
   cancel-in-progress: false
 jobs:
   deploy:
+    # S-F13 (audit 05.11.2026): only main is deployed (Run workflow on another branch → the job is skipped)
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
