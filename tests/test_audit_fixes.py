@@ -386,3 +386,65 @@ class VerifyAuditFixes(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class OwnerDecisions05Nov(unittest.TestCase):
+    """C1 / C2 (Abhi 05.11.2026, options आ; INSTRUCTIONS §4.29(1)/(5), §4.30(7), §4.31(अ), §4.36) + the U.O. exception."""
+
+    def test_c1_letter_no_in_body_is_error(self):
+        for t in ("प्रमुख जिल्हा व सत्र न्यायाधीश यांच्या पत्र क्र. 1234/2026 दि. 01.01.2026 नुसार माहिती प्राप्त झाली आहे.",
+                  "महालेखापाल यांच्या क्र. लेखा/123/2026, दि. 12.03.2026 रोजीच्या पत्रान्वये कळविले आहे.",
+                  "जिल्हा न्यायालयाच्या स्मरणपत्र क्र. 5/2026 द्वारे प्रस्ताव पुन्हा सादर झाला आहे."):
+            with self.subTest(t=t[:30]):
+                self.assertTrue(L.note_letter_no_hits(t), t)
+                n = {"paras": ["x", {"table": [["अ", "ब"], ["1", t]]}], "sub": {}, "closing": "सबब, … मान्यतेस्तव सादर."}
+                self.assertTrue([p for p in L.note_letter_no_problems(n) if "C1" in p and "note.paras[1]" in p])
+
+    def test_c1_not_letter_numbers(self):
+        for t in ("शासन निर्णय क्र. वेतन-1311/प्र.क्र.17/सेवा-3, दि. 01.01.2011 नुसार पत्र पाठविले.",
+                  "रिट याचिका क्र. 35697/2026 मधील पत्र पाहावे.",
+                  "प्र. क्र. 21/2024 बाबतचे पत्र.",
+                  "या कार्यासनाचे पत्र क्र. संकिर्ण-2024/प्र.क्र.259/का.6 नुसार.",
+                  "परिपत्रक क्र. 12/2020 नुसार.",
+                  "दि. 01.01.2026 च्या पत्रातील मुद्दा क्र. 02 नुसार.",
+                  "यांच्या “पत्र क्र. 1/2026” या पत्रान्वये.",
+                  "यांच्या पृ.3/प.वि. वरील दि. 01.01.2026 रोजीच्या पत्रान्वये."):
+            with self.subTest(t=t[:30]):
+                self.assertEqual(L.note_letter_no_hits(t), [])
+
+    def test_uo_and_other_desk_ref_kept(self):
+        """Abhi 05.11.2026: a department's U.O. reference no. and another desk's reference no. stay in the note."""
+        for t in ("वित्त विभागाच्या अनौपचारिक संदर्भ क्र. 123/2026/व्यय-5, दि. 01.01.2026 नुसार पत्र प्राप्त झाले.",
+                  "सामान्य प्रशासन विभागाने अनौपचारिक संदर्भ क्रमांक 45/सेवा-4 अन्वये पत्राद्वारे कळविले.",
+                  "सार्वजनिक आरोग्य विभागाच्या यु.ओ. क्र. 7/2026 नुसार पत्र.",
+                  "कार्यासन-4 च्या संदर्भ क्र. 12/2026 नुसार पत्र प्राप्त झाले."):
+            with self.subTest(t=t[:30]):
+                self.assertEqual(L.note_letter_no_hits(t), [])
+        first = "वित्त विभागाच्या अनौपचारिक संदर्भ क्र. 123/2026/व्यय-5, दि. 01.01.2026 अन्वये प्राप्त नस्तीस अनुसरून सादर."
+        self.assertEqual(L.first_letter_no_problems(first), [])
+
+    def test_c2_missing_info_inline(self):
+        head = L.MISSING_HEAD + ":-"
+        n = {"paras": ["तथ्य.", head, {"table": [["अ.क्र.", "माहिती"], ["1", "सेवानिवृत्तीचा दिनांक"]]},
+                       "सबब, … मान्यतेस्तव सादर."]}
+        P, W = L.missing_inline_problems(n)
+        self.assertEqual(len(P), 1); self.assertIn("C2", P[0])
+        self.assertEqual(len(W), 1); self.assertIn("table after the missing-info para", W[0])
+        n["paras"] = ["तथ्य.", head + " (1) सेवानिवृत्तीचा दिनांक; (2) विकल्प अर्जाचा दिनांक.", "सबब, … मान्यतेस्तव सादर."]
+        self.assertEqual(L.missing_inline_problems(n), ([], []))
+
+    def test_c2_c1_in_lint_spec(self):
+        s = sample("CR131_2026_special-pay_info-letter.json")
+        i = next(i for i, x in enumerate(s["note"]["paras"]) if isinstance(x, str) and x.startswith(L.MISSING_HEAD))
+        s["note"]["paras"][i] = L.MISSING_HEAD + ":- (1) विशेष वेतनाचा दिनांक; (2) आदेशाचा दिनांक."
+        if isinstance(s["note"]["paras"][i + 1], dict):
+            del s["note"]["paras"][i + 1]
+        self.assertFalse([p for p in L.lint_spec(s) if "C2" in p])
+        self.assertFalse([w for w in L.lint_warnings(s) if "table after the missing-info para" in w])
+        s["note"]["paras"][0] += " प्रबंधक यांच्या पत्र क्र. 99/2026 नुसार."
+        self.assertTrue([p for p in L.lint_spec(s) if p.startswith("note.paras[0]") and "C1" in p])
+
+    def test_verify_has_c1_c2_checks(self):
+        src = open(os.path.join(TOOLS, "verify_outputs.py"), encoding="utf-8").read()
+        self.assertIn('"missing-info items inline §4.31(अ) C2 (note body)"', src)
+        self.assertIn('"no incoming letter no. in the note §4.29 C1 (note body)"', src)
