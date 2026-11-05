@@ -201,7 +201,7 @@ class Workflow(unittest.TestCase):
         self.assertIn('> >(STAMP "$RP/part1.stream.tsv" "$RP/part1_result.json")', wf)
         self.assertIn('STAMP() { python3 -I "$T/run_timeline.py" stamp "$@"; }', wf)
         self.assertIn('"$T/run_timeline.py" report "$RP/timeline.json"', wf)
-        self.assertIn('ES note "$(head -n 1 "$RP/timeline.line")" || true', wf)
+        self.assertIn('while IFS= read -r L; do [ -n "$L" ] && { ES note "$L" || true; }; done < "$RP/timeline.line"', wf)
         self.assertIn("name: Stage times (वेळ-तक्ता)", wf)
         # 8 timed steps since prep_pages and the precedent sources share one step (audit 05.11.2026); trap never changes rc
         self.assertEqual(wf.count('>> "$RP/stages.tsv"; } 2>/dev/null || true\' EXIT'), 8)

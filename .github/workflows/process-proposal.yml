@@ -537,7 +537,7 @@ jobs:
           if [ "${#TL[@]}" -gt 0 ]; then
             timeout 120 python3 -I "$T/run_timeline.py" report "$RP/timeline.json" "${TL[@]}" --agents /tmp/work/agents.json \
               --line "$RP/timeline.line" || true
-            [ -s "$RP/timeline.line" ] && { ES note "$(head -n 1 "$RP/timeline.line")" || true; }
+            [ -s "$RP/timeline.line" ] && { while IFS= read -r L; do [ -n "$L" ] && { ES note "$L" || true; }; done < "$RP/timeline.line"; }
           fi
           if [ -z "$DOWN_OK" ]; then
             ES fail "इंजिन थांबवून रेपो तपासता आला नाही (umount/कार्यप्रणाली) — निकाल रोखला; पुन्हा तयार करा." || true
