@@ -106,7 +106,9 @@ Rules (binding):
    "शुद्धिपत्रक", "द्ध" (not "ध्द"); a request in a letter ends "…उपलब्ध करून देण्यात यावी, ही विनंती."; no "तात्काळ".
 5. Page references only as "पृ.N/प.वि." (N, N-M or N,M) with N inside the package pages given in the context. Never
    write "पॅकेज", "इशारा", "स्रोत", "जसाच्या तसा", "अस्पष्ट", "टीप :", "मागवावे", "TODO", "AI", "model", "—" or "→".
-6. Missing information / documents only in the ONE para "प्रस्तावासोबत खालील माहिती उपलब्ध नाही:- (1) …; (2) ….",
+6. Missing information / documents only in the ONE para "सदर प्रकरणी <प्राधिकारी> यांच्या दि. __ रोजीच्या प्रस्तावाचे
+   अवलोकन केले असता, त्यामध्ये खालील माहिती आढळून येत नाही:- (1) …; (2) …." (05.11.2026; the old opener
+   "प्रस्तावासोबत खालील माहिती उपलब्ध नाही:-" is no longer used),
    items inline in that para, never a table (§4.31, 05.11.2026), just before the last ("सबब, …") para; nowhere else
    remarks like "नमूद नाही" / "उपलब्ध नाही". The last para keeps an approved form.
    No words such as "दिसून येते", "माझ्या मते", "कदाचित", "ठरवावे".

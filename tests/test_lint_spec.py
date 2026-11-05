@@ -227,13 +227,13 @@ class LintSpec(unittest.TestCase):
 
     def test_missing_info_para_form(self):
         def f(s):
-            i = next(i for i, x in enumerate(s["note"]["paras"]) if isinstance(x, str) and x.startswith(L.MISSING_HEAD))
+            i = next(i for i, x in enumerate(s["note"]["paras"]) if isinstance(x, str) and L.MISSING_HEAD_RE.match(x))
             s["note"]["paras"][i] = s["note"]["paras"][i].replace(L.MISSING_HEAD + ":-", L.MISSING_HEAD + " -")
         self.bad(self.s122, f, "missing-info para")
 
     # ---- §4.31 missing information in ONE para (Abhi 03.11.2026) ----
     def miss_idx(self, s):
-        return next(i for i, x in enumerate(s["note"]["paras"]) if isinstance(x, str) and x.startswith(L.MISSING_HEAD))
+        return next(i for i, x in enumerate(s["note"]["paras"]) if isinstance(x, str) and L.MISSING_HEAD_RE.match(x))
 
     def test_431_remark_phrases(self):
         for t in ("प्रती प्रस्तावासोबत जोडलेल्या नाहीत.", "प्रस्तावात नमूद नाही", "प्रस्तावात अशी वस्तुस्थिती नमूद नाही.",
@@ -270,7 +270,7 @@ class LintSpec(unittest.TestCase):
 
     def test_431_two_missing_paras(self):
         def f(s):
-            s["note"]["paras"].insert(1, "प्रस्तावासोबत खालील कागदपत्रे उपलब्ध नाहीत:- (1) आदेशाची प्रत.")
+            s["note"]["paras"].insert(1, "सदर प्रकरणी प्रबंधक यांच्या दि. 01.01.2026 रोजीच्या प्रस्तावाचे अवलोकन केले असता, त्यामध्ये खालील कागदपत्रे आढळून येत नाहीत:- (1) आदेशाची प्रत.")
         self.bad(self.s122, f, "more than one")
 
     def test_431_inside_the_para_and_its_table_ok(self):
@@ -485,7 +485,7 @@ class LintSpec(unittest.TestCase):
         self.assertEqual(L.draft_word_hits("www.maharashtra.gov.in या संकेतस्थळावर"), [])   # official GR website line
 
     def test_draft_words_no_false_hits(self):
-        for t in ("AIR 1990 SC 123", "प्रस्तावासोबत खालील माहिती उपलब्ध नाही:-", "MAIN", "remodelled", "टीपणी", "____"):
+        for t in ("AIR 1990 SC 123", "प्रस्तावासोबत खालील माहिती उपलब्ध नाही:-", "सदर प्रकरणी प्रमुख जिल्हा व सत्र न्यायाधीश, भंडारा यांच्या दि. 25.03.2026 रोजीच्या प्रस्तावाचे अवलोकन केले असता, त्यामध्ये खालील माहिती आढळून येत नाही:-", "MAIN", "remodelled", "टीपणी", "____"):
             with self.subTest(t=t):
                 self.assertEqual(L.draft_word_hits(t), [])
 

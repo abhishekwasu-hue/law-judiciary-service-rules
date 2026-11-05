@@ -303,8 +303,21 @@ class VerifyOutputs(unittest.TestCase):
 
     def test_431_two_missing_paras(self):
         d = self.case("two431")
-        build_note(self.spec_with(lambda s: s["note"]["paras"].insert(1, "प्रस्तावासोबत खालील माहिती उपलब्ध नाही:- (1) दिनांक.")), d)
+        build_note(self.spec_with(lambda s: s["note"]["paras"].insert(1, "सदर प्रकरणी प्रबंधक यांच्या दि. 01.01.2026 रोजीच्या प्रस्तावाचे अवलोकन केले असता, त्यामध्ये खालील माहिती आढळून येत नाही:- (1) दिनांक.")), d)
         self.must_fail(d, "more than one")
+
+    def test_missing_old_opener_warns(self):
+        """05.11.2026: the old opener "प्रस्तावासोबत खालील माहिती उपलब्ध नाही:-" is still read as the missing-info para
+        (no FAIL) but WARNs "जुने रूप"."""
+        import lint_spec as L
+        def f(s):
+            i = next(i for i, x in enumerate(s["note"]["paras"]) if isinstance(x, str) and L.MISSING_HEAD_RE.match(x))
+            s["note"]["paras"][i] = "प्रस्तावासोबत खालील माहिती उपलब्ध नाही:- (1) सेवानिवृत्तीचा दिनांक."
+        d = self.case("old431")
+        build_note(self.spec_with(f), d)
+        rc, out = self.run_verify(d)
+        self.assertIn("जुने रूप", out)
+        self.assertNotIn("FAIL: missing information in ONE para", out)
 
     def test_c27_checks_are_soft(self):
         import engine_supabase as E

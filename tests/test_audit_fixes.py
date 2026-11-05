@@ -323,7 +323,8 @@ class VerifyAuditFixes(unittest.TestCase):
 
     def test_q_f13_affidavit_lq(self):
         d = self.case("f13")
-        TV.make_extra(os.path.join(d, f"{TV.PRE}_Affidavit.docx"), ["AFFIDAVIT IN REPLY (पृ.17/प.वि.)"])
+        TV.make_extra(os.path.join(d, f"{TV.PRE}_Affidavit.docx"), ["AFFIDAVIT IN REPLY (पृ.17/प.वि.)"],
+                      affidavit=True)   # C7 (05.11.2026): Times New Roman + DVOT-SurekhMR (cs/eastAsia)
         TV.make_extra(os.path.join(d, f"{TV.PRE}_LQ_Answer.docx"), ["उत्तराचा दिनांक"])
         rc, out = self.verify(d)
         for ln in ("OK: Affidavit fonts", "OK: Affidavit पृ. references", "OK: LQ_Answer fonts", "OK: LQ_Answer metadata"):
@@ -424,7 +425,7 @@ class OwnerDecisions05Nov(unittest.TestCase):
         self.assertEqual(L.first_letter_no_problems(first), [])
 
     def test_c2_missing_info_inline(self):
-        head = L.MISSING_HEAD + ":-"
+        head = "सदर प्रकरणी प्रमुख जिल्हा व सत्र न्यायाधीश, भंडारा यांच्या दि. 25.03.2026 रोजीच्या प्रस्तावाचे अवलोकन केले असता, त्यामध्ये खालील माहिती आढळून येत नाही:-"
         n = {"paras": ["तथ्य.", head, {"table": [["अ.क्र.", "माहिती"], ["1", "सेवानिवृत्तीचा दिनांक"]]},
                        "सबब, … मान्यतेस्तव सादर."]}
         P, W = L.missing_inline_problems(n)
@@ -435,8 +436,8 @@ class OwnerDecisions05Nov(unittest.TestCase):
 
     def test_c2_c1_in_lint_spec(self):
         s = sample("CR131_2026_special-pay_info-letter.json")
-        i = next(i for i, x in enumerate(s["note"]["paras"]) if isinstance(x, str) and x.startswith(L.MISSING_HEAD))
-        s["note"]["paras"][i] = L.MISSING_HEAD + ":- (1) विशेष वेतनाचा दिनांक; (2) आदेशाचा दिनांक."
+        i = next(i for i, x in enumerate(s["note"]["paras"]) if isinstance(x, str) and L.MISSING_HEAD_RE.match(x))
+        s["note"]["paras"][i] = "सदर प्रकरणी प्रमुख जिल्हा व सत्र न्यायाधीश, भंडारा यांच्या दि. 25.03.2026 रोजीच्या प्रस्तावाचे अवलोकन केले असता, त्यामध्ये खालील माहिती आढळून येत नाही:- (1) विशेष वेतनाचा दिनांक; (2) आदेशाचा दिनांक."
         if isinstance(s["note"]["paras"][i + 1], dict):
             del s["note"]["paras"][i + 1]
         self.assertFalse([p for p in L.lint_spec(s) if "C2" in p])
@@ -473,3 +474,24 @@ class OwnerDecisions05Nov(unittest.TestCase):
                   "वेतननिश्चिती आदेश क्र. 7/2025, दि. 01.01.2025 च्या पत्रासह सादर."):
             with self.subTest(t=t[:30]):
                 self.assertEqual(L.note_letter_no_hits(t), [])
+
+
+    def test_new_missing_opener(self):
+        """Abhi 05.11.2026: "सदर प्रकरणी <प्राधिकारी> यांच्या दि. … रोजीच्या प्रस्तावाचे अवलोकन केले असता, त्यामध्ये खालील माहिती
+        आढळून येत नाही:- (1) …" is the missing-info para; the old opener WARNs; its "आढळून येत नाही" is no Q-F6 remark;
+        no banned word; the 40-word WARN counts it only up to ":-"."""
+        s = sample("CR131_2026_special-pay_info-letter.json")
+        i = next(i for i, x in enumerate(s["note"]["paras"]) if isinstance(x, str) and L.MISSING_HEAD_RE.match(x))
+        self.assertTrue(s["note"]["paras"][i].startswith("सदर प्रकरणी "))
+        self.assertEqual(L.lint_spec(s), [])
+        ws = L.lint_warnings(s)
+        self.assertFalse([w for w in ws if w.startswith(f"note.paras[{i}]")], ws)
+        self.assertEqual(L.banned_hits(s["note"]["paras"][i]), [])
+        long_list = s["note"]["paras"][i].split(":-")[0] + ":- " + "; ".join(f"({k}) दिनांक व आदेश क्रमांक व वेतनश्रेणी" for k in range(1, 12)) + "."
+        s2 = copy.deepcopy(s); s2["note"]["paras"][i] = long_list
+        self.assertFalse([w for w in L.lint_warnings(s2) if w.startswith(f"note.paras[{i}]") and "words" in w])
+        s3 = copy.deepcopy(s); s3["note"]["paras"][i] = "प्रस्तावासोबत खालील माहिती उपलब्ध नाही:- (1) दिनांक."
+        self.assertEqual(L.lint_spec(s3), [])
+        self.assertTrue([w for w in L.lint_warnings(s3) if "जुने रूप" in w])
+        s4 = copy.deepcopy(s); s4["note"]["paras"][i] = s["note"]["paras"][i].replace("नाही:-", "नाही -")
+        self.assertTrue([p for p in L.lint_spec(s4) if "missing-info para — form" in p])

@@ -87,7 +87,8 @@ Cost: measured $3.0–3.9 per full run, Opus 90–96 % of it (docs/AUDIT_2026-11
    letter, `related` = []; पृ.N computed from the package order: proposal pages 1..n, then the enclosure pages in
    order; the note body DETAILED per brief [I4.29] — the 12 elements where they apply, nothing of the proposal left
    out, short sentences, the brief's [I4.30] quality checks; missing information / documents ONLY in the one
-   missing-info para just before the last para, items inline "(1) …; (2) …." (no table), essential items only, "____"
+   missing-info para "सदर प्रकरणी <प्राधिकारी> यांच्या दि. __ रोजीच्या प्रस्तावाचे अवलोकन केले असता, त्यामध्ये खालील माहिती
+   आढळून येत नाही:- …" (05.11.2026) just before the last para, items inline "(1) …; (2) …." (no table), essential items only, "____"
    in tables [I4.31]; no incoming letter no. anywhere in the note [I4.36]; only references needed
    to decide the demand, each fact once, office order with linking openers, one quote per sentence, पृ.N/प.वि. once
    per document and no पृ. table column, 3-6 decisive facts in "उपरोक्त वस्तुस्थिती", no quote cut with "…" [I4.34];
