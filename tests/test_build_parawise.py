@@ -386,7 +386,7 @@ class TestBuildParawise(unittest.TestCase):
         P = [p for p in d.paragraphs if p.text.strip()]
         self.assertEqual(P[0].text, "Para wise Explanation in WRIT PETITION NO. ____ OF 2026.")
         self.assertEqual(P[1].text, "Shri. A. B. Chachani Vs. The State of Maharashtra and Ors.")
-        self.assertTrue(P[2].text.startswith("Parawise submissions on behalf of Respondent No. 2 i.e. the State of"))
+        self.assertTrue(P[2].text.startswith("Parawise submissions on behalf of Respondent Nos. 1 and 2 i.e. the State of"))
         self.assertTrue(P[2].text.endswith("in respect of contentions raised by the present petitioner, in this petition."))
         self.assertTrue(P[-1].text.strip().startswith("*****"))
         self.assertEqual(P[0].alignment, 1)   # centre
