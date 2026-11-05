@@ -69,6 +69,14 @@
   no rule dropped). Gap: tools/verify_outputs.py does not check the _Affidavit / _LQ_Answer files yet.
 
 ## Pending
+23. **05.11.2026 owner decisions done:** (a) note signer chain §4.6 changed on Abhi's own note page ("asa bdal kra"):
+    "(अ.मा. वसू)" (not bold) + "क. अ. (अ.का.)" on the right, then अ.स. (श्री. वडनेरकर) / उ.वि.स. नि. उ.स. (श्री. बोंद्रे) /
+    सचिव व व. वि. स. (श्री. बिले) left; अ.मु.स. (वित्त) rule unchanged — desk profile signers_right/signers_plain, mkdocs,
+    lint, brief, SOP, WORKFLOW, PROPOSAL_PROMPT, all 24 samples. (b) two runs at once: KV max_parallel_runs (1–3, default 2),
+    Settings dropdown; risks: monthly spend can overshoot by ~1 run, double GitHub minutes / API load. (c) /nasti dark-mode
+    selected tab colour (injected CSS, owner file untouched). (d) migration 0014 applied ("Success. No rows returned").
+    **Open:** data region — Abhi said "ho" to moving it; needs a new Supabase project (Mumbai) + data copy by Abhi; plan to
+    be given step by step before any move.
 22. **Audit 05.11 fix round (docs/AUDIT_2026-11-05.md; Abhi: "kam purn kra") — merged + deployed 05.11.2026** (live bundle
     index-Cf3VpA1S.js, inline #pk-config; engine UA "prastav-kaksha-engine/1" passes Cloudflare, Python default UA still 1010).
     Tests: pytest 589 passed, worker 46/46, all samples LINT OK, app tsc/build OK. **Owner action: apply migration 0014**

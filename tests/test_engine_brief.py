@@ -63,7 +63,7 @@ class EngineBriefTest(unittest.TestCase):
         with open(os.path.join(ROOT, "tools", "desks", "law-desk6.json"), encoding="utf-8") as f:
             desk = json.load(f)
         signers, ams = desk["signers"], desk["finance_signer"]
-        self.assertEqual(len(signers), 4)
+        self.assertEqual(len(signers), 5)   # §4.6, 05.11.2026: name + post on the right, then three on the left
         for s in signers + [ams]:
             self.assertIn(s, self.text)
         pos = [self.text.index(s) for s in signers]

@@ -122,7 +122,7 @@ import desk as _desk  # noqa: E402 — C30 (03.11.2026): desk profiles tools/des
 _D0 = _desk.load_desk(None)
 # the default desk's chain as literals (tests/test_engine_brief.py parses them); = tools/desks/law-desk6.json signers /
 # finance_signer (tests/test_desks.py checks); per spec: desk_signers(desk)
-SIGNERS = ["का. अ. (श्रीम. कऱ्हाडे)", "अ.स. (श्री. वडनेरकर)", "उ.वि.स. नि. उ.स. (श्री. बोंद्रे)", "प्र.स. व वि.प. (श्री. खटी)"]
+SIGNERS = ["(अ.मा. वसू)", "क. अ. (अ.का.)", "अ.स. (श्री. वडनेरकर)", "उ.वि.स. नि. उ.स. (श्री. बोंद्रे)", "सचिव व व. वि. स. (श्री. बिले)"]
 AMS = "अ.मु.स. (वित्त)"
 FIN = "वित्त विभागाच्या मान्यतेस्तव"
 # closed list (PROPOSAL_SOP.md Step 4 "Banned words") — keep both lists identical

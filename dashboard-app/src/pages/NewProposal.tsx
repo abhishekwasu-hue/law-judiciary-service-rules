@@ -340,7 +340,7 @@ export default function NewProposal() {
               {/* N14: one amber line while the run waits for its turn */}
               {run && waiting ? (
                 <div className="rounded-lg bg-amber-100 px-3 py-2 font-bold text-amber-900 dark:bg-amber-900/40 dark:text-amber-100" role="status">
-                  ⏳ प्रतीक्षेत{queuedPos ? ` — क्रमांक ${queuedPos}` : ''}. आधीची प्रक्रिया संपल्यावर ही प्रक्रिया आपोआप सुरू होईल.
+                  ⏳ प्रतीक्षेत{queuedPos ? ` — क्रमांक ${queuedPos}` : ''}. आधीच्या प्रक्रियांपैकी एक पूर्ण झाल्यावर ही प्रक्रिया क्रमाने आपोआप सुरू होईल.
                 </div>
               ) : run ? (
                 <RunProgress run={run} retryHint={failed && canRetry ? 'कृपया खालील “↻ पुन्हा तयार करा” बटण दाबावे.' : undefined} />

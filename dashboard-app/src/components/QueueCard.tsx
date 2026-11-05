@@ -1,8 +1,10 @@
-// "प्रतीक्षा-यादी" card (C33): runs are processed one by one by the Worker's sequential queue. Shows तयार (today) / चालू / रांगेत
+// "प्रतीक्षा-यादी" card (C33): the Worker's queue runs up to `max_parallel` full runs at the same time (GET /api/spend
+// max_parallel = KV max_parallel_runs, default 2; 1 = one by one). Shows तयार (today) / चालू / रांगेत
 // with each waiting case's position and an estimated time, from the latest run of every case (useData, live via Realtime)
 // and the typical run time of recent runs (useTypicalRunSeconds — same basis as the run page's ETA).
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { getSpend } from '../lib/api';
 import { useData, useLatestRuns } from '../lib/data';
 import { isStale, isWaiting, type Tone } from '../lib/constants';
 import { crLabel } from '../lib/format';
@@ -31,17 +33,31 @@ function Num({ label, value, tone }: { label: string; value: number; tone: Tone 
 
 export interface QueueRow { run: Run; kind: 'running' | 'waiting'; position: number; leftSec: number | null }
 
+/** Same default as the Worker's maxParallel (cloudflare/worker.js) when /api/spend gives no value. */
+export const DEFAULT_PARALLEL = 2;
+const slotsOf = (n: number | null | undefined) => (Number.isInteger(n) && (n as number) >= 1 && (n as number) <= 3 ? (n as number) : DEFAULT_PARALLEL);
 /** Pure: order and estimate. running first (by start), then waiting FIFO by created_at; leftSec = estimated time until that
- *  run is ready (running: typical − elapsed, at least 1 min; waiting k: rest of the running ones + k × typical). */
-export function queueRows(runs: Run[], typicalSec: number | null, now: number): QueueRow[] {
+ *  run is ready (running: typical − elapsed, at least 1 min; waiting: up to `parallel` runs at once — each waiting run takes
+ *  the slot that frees first, in FIFO order, and is ready one typical run time later). */
+export function queueRows(runs: Run[], typicalSec: number | null, now: number, parallel: number = DEFAULT_PARALLEL): QueueRow[] {
   const active = runs.filter(r => (r.state === 'queued' || r.state === 'running') && !isStale(r));
   const running = active.filter(r => !isWaiting(r)).sort((a, b) => (a.created_at < b.created_at ? -1 : 1));
   const waiting = active.filter(r => isWaiting(r)).sort((a, b) => (a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : a.id - b.id));
   const runLeft = (r: Run) => (typicalSec == null ? null : Math.max(60, typicalSec - (now - Date.parse(r.dispatched_at || r.created_at)) / 1000));
   const rows: QueueRow[] = running.map(r => ({ run: r, kind: 'running', position: 0, leftSec: runLeft(r) }));
-  // the queue moves when the (last) running run ends
-  const base = rows.reduce((m, x) => Math.max(m, x.leftSec ?? 0), 0);
-  waiting.forEach((r, i) => rows.push({ run: r, kind: 'waiting', position: i + 1, leftSec: typicalSec == null ? null : base + (i + 1) * typicalSec }));
+  // slots: when each of the `parallel` engine slots frees (a free slot = 0; more running than slots — e.g. the setting
+  // was lowered — the extra ones end first, their time is kept)
+  const slots = rows.map(x => x.leftSec ?? 0).sort((a, b) => a - b);
+  const n = slotsOf(parallel);
+  while (slots.length < n) slots.unshift(0);
+  while (slots.length > n) slots.shift();
+  waiting.forEach((r, i) => {
+    if (typicalSec == null) { rows.push({ run: r, kind: 'waiting', position: i + 1, leftSec: null }); return; }
+    slots.sort((a, b) => a - b);
+    const ready = slots[0] + typicalSec;
+    slots[0] = ready;
+    rows.push({ run: r, kind: 'waiting', position: i + 1, leftSec: ready });
+  });
   return rows;
 }
 
@@ -50,12 +66,19 @@ export default function QueueCard({ className = '' }: { className?: string }) {
   const latestRuns = useLatestRuns();
   const typical = useTypicalRunSeconds();
   const [now, setNow] = useState(() => Date.now());
+  const [parallel, setParallel] = useState<number>(DEFAULT_PARALLEL);
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 30000);
     return () => clearInterval(t);
   }, []);
+  // the owner's setting (KV max_parallel_runs) via /api/spend; unreachable → the Worker's default
+  useEffect(() => {
+    let live = true;
+    void getSpend().then(s => { if (live) setParallel(slotsOf(s.max_parallel)); }, () => undefined);
+    return () => { live = false; };
+  }, []);
   const runs = useMemo(() => [...latestRuns.values()], [latestRuns]);
-  const rows = useMemo(() => queueRows(runs, typical?.sec ?? null, now), [runs, typical, now]);
+  const rows = useMemo(() => queueRows(runs, typical?.sec ?? null, now, parallel), [runs, typical, now, parallel]);
   const today = new Date(now);
   const ready = runs.filter(r => r.state === 'done' && sameDay(r.finished_at, today)).length;
   const nRun = rows.filter(r => r.kind === 'running').length;
@@ -100,7 +123,7 @@ export default function QueueCard({ className = '' }: { className?: string }) {
       )}
       {rows.length > 0 && (
         <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
-          एका वेळी एक प्रस्ताव • प्रत्येक प्रस्ताव तयार होताच प्रकरणात उपलब्ध • वेळ {typical?.n ? `मागील ${typical.n} प्रक्रियांवरून` : 'प्राथमिक'} अंदाज
+          {parallel === 1 ? 'एका वेळी एक प्रस्ताव' : `एका वेळी जास्तीत जास्त ${parallel} प्रस्ताव`} • प्रत्येक प्रस्ताव तयार होताच प्रकरणात उपलब्ध • वेळ {typical?.n ? `मागील ${typical.n} प्रक्रियांवरून` : 'प्राथमिक'} अंदाज
         </p>
       )}
     </section>

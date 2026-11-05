@@ -28,7 +28,10 @@ const NASTI_COMPACT_CSS = `@media (max-width: 767px) {
   .top small{display:inline!important;margin:0 8px 0 0!important}
   .top .acts{flex-wrap:nowrap!important;overflow-x:auto;scrollbar-width:none;gap:6px!important}
   .top .acts .btn{flex:none;padding:6px 10px!important;white-space:nowrap}
-}`;
+}
+/* dark mode: the selected bottom tab ("🏠 सारांश" etc.) was 3.3:1 on the dark bar — lighter blue (owner 05.11.2026) */
+@media (prefers-color-scheme: dark) { :root:not([data-theme=light]) .tabs button.on{color:#9cc2ff!important;border-top-color:#9cc2ff!important} }
+:root[data-theme=dark] .tabs button.on{color:#9cc2ff!important;border-top-color:#9cc2ff!important}`;
 function injectCompact(e: SyntheticEvent<HTMLIFrameElement>) {
   try {
     const d = e.currentTarget.contentDocument;

@@ -15,7 +15,9 @@ const PLAIN_KEYS = ['supabase_url', 'supabase_anon_key', 'github_repo', 'github_
   // engine tiers read by tools/engine_supabase.py engine_config (QUALITY_AUDIT §7): escalation model, reasoning effort
   'model_strong', 'effort',
   // draft edit (docs/DRAFT_EDIT_DESIGN.md): model of tools/edit_drafts.py (one Messages API call); empty = DEFAULT_MODEL_EDIT
-  'model_edit'];
+  'model_edit',
+  // queue (Abhi 05.11.2026: two full runs at the same time): full runs active at once, 1..3; empty / invalid = 2
+  'max_parallel_runs'];
 const PROVIDERS = { part1_provider: ['', 'claude', ...AI_PROVIDERS], fallback_provider: ['', ...AI_PROVIDERS], engine_provider: ['', 'claude', ...AI_PROVIDERS] };
 const MODEL_KEYS = ['gemini_model', 'part1_model', 'fallback_model', 'fallback_model_light', 'engine_model', 'engine_model_light', 'model_edit'];
 // providers this configuration uses (engine / fallback / part 1); 'claude' and '' are Anthropic
@@ -284,11 +286,18 @@ async function failRuns(cfg, filter, reason, actor = null) {
   return rows || [];
 }
 
-// ---------- sequential queue (C33, migration 0011: runs.dispatched_at) ----------
-// One engine run at a time across ALL cases (Abhi 04.11.2026: "काम मात्र सिक्वेन्सनेस … वन बाय वन"). A run waits with
-// state 'queued' and dispatched_at null; dispatchNext hands the oldest one (FIFO: created_at, id) to GitHub when no run
-// is active. Active = running/queued and dispatched less than STALE_MS ago (a legacy running row without dispatched_at:
+// ---------- engine queue (C33, migration 0011: runs.dispatched_at) ----------
+// At most maxParallel(cfg) full engine runs at a time across ALL cases (C33, Abhi 04.11.2026: one by one; Abhi
+// 05.11.2026: two at the same time — KV max_parallel_runs, 1..3, default 2; 1 = the old one-by-one queue). A run waits
+// with state 'queued' and dispatched_at null; dispatchNext hands the oldest ones (FIFO: created_at, id) to GitHub while
+// fewer than that many runs are active. Still one run per case (H3; runs_one_active_per_case, migration 0014).
+// Active = running/queued and dispatched less than STALE_MS ago (a legacy running row without dispatched_at:
 // created less than STALE_MS ago). Column missing (migration not applied) → null: every run is dispatched at once.
+const DEFAULT_PARALLEL_RUNS = 2;
+export function maxParallel(cfg) {
+  const v = String((cfg && cfg.max_parallel_runs) ?? '').trim();
+  return /^[1-3]$/.test(v) ? Number(v) : DEFAULT_PARALLEL_RUNS;
+}
 const ENGINE_END_REASON = "प्रक्रिया पूर्ण होऊ शकली नाही (तांत्रिक कारण). कृपया 'पुन्हा तयार करा' वापरावे; अडचण राहिल्यास मालकांना कळवावे.";
 const pgTime = ms => `"${new Date(ms).toISOString()}"`;
 // draft edit (migration 0013): edit runs (runs.kind 'edit') are dispatched at once and never take part in the queue —
@@ -348,43 +357,52 @@ async function sweepStale(cfg, actor) {
   }
   return rows.concat(notStarted, silent, edits);
 }
-// Dispatch the oldest waiting run when no run is active. Race-safe: (1) claim with a conditional PATCH (only one
-// request gets the row back); (2) after the claim, if any OTHER run is active the claim is given back (two claimers
-// that see each other both give back; the cron / next call dispatches later — never two at once). A failed GitHub
-// dispatch marks that run failed (DISPATCH_REASON) and the next one is tried — unless GitHub refuses every dispatch
-// (401/403/404/429/5xx/network, L-F5): then the loop stops and the waiting runs get GITHUB_WAIT as their step.
-// → { legacy } (column missing) | { active } | { blocked } (monthly limit: the run stays queued) | { dispatched, failed: [ids] }
+// Dispatch the oldest waiting runs while fewer than maxParallel(cfg) full runs are active (a waiting run whose case
+// already has an active run is skipped — H3). Race-safe: (1) claim with a conditional PATCH (only one request gets the
+// row back); (2) after the claim, if more than the limit are active (or another active run of the same case) the claim
+// is given back. The last claimer to commit sees every earlier claim, so the limit is never exceeded; two claimers that
+// see each other both give back and the cron / next call fills the slot later. A failed GitHub dispatch marks that run
+// failed (DISPATCH_REASON) and the next one is tried — unless GitHub refuses every dispatch (401/403/404/429/5xx/
+// network, L-F5): then the loop stops and the waiting runs get GITHUB_WAIT as their step.
+// → { legacy } (column missing) | { active } (all slots busy) | { blocked } (monthly limit: the run stays queued) |
+//   { yielded } | … always with dispatched (the caller's own run when it went, else the first one dispatched, else
+//   null), dispatched_all: [runs dispatched by this call], failed: [ids]
 async function dispatchNext(env, cfg, origin, actor = null, ownRunId = null) {
   const db = sb(cfg);
-  const failed = [];
+  const failed = [], started = [];
+  const done = (extra = {}) => ({ ...extra, dispatched: started.find(r => Number(r.id) === Number(ownRunId)) || started[0] || null, dispatched_all: started, failed });
   if (!cfg.github_repo || !cfg.github_token || !engineReady(cfg) || !origin) {
     // L-F18: the waiting runs say why nothing starts (Supabase reachable; otherwise nothing can be written)
     if (cfg.supabase_url && cfg.supabase_service_key) await markWaiting(db, NOT_READY_WAIT);
-    return { dispatched: null, failed, not_ready: true };
+    return done({ not_ready: true });
   }
   await rememberOrigin(env, origin);
+  const limit = maxParallel(cfg);
   for (let i = 0; i < 20; i++) {
     const act = await activeRuns(db);
-    if (act === null) return { legacy: true, dispatched: null, failed };
-    if (act.length) return { active: act[0].id, dispatched: null, failed };
-    const [next] = await waitingRuns(db);
-    if (!next) return { dispatched: null, failed };
-    // the existing monthly-limit check (as /api/run), at the moment of dispatch: reached → the run stays queued with
-    // BUDGET_WAIT as its step and nothing more is dispatched; the cron retries every 5 min
+    if (act === null) return done({ legacy: true });
+    if (act.length >= limit) return done({ active: act[0].id });
+    const busy = new Set(act.map(r => Number(r.case_id)));
+    const next = (await waitingRuns(db)).find(r => !busy.has(Number(r.case_id)));
+    if (!next) return done();
+    // the existing monthly-limit check (as /api/run), at the moment of dispatch (runs dispatched just before are
+    // reserved at their estimate): reached → the run stays queued with BUDGET_WAIT as its step and nothing more is
+    // dispatched; the cron retries every 5 min
     const sp = await monthSpend(cfg);
     if (sp.spent_usd + sp.reserved_usd >= sp.limit_usd) {
       if (next.step !== BUDGET_WAIT) await db.rest(`runs?id=eq.${Number(next.id)}&state=eq.queued&dispatched_at=is.null`, { method: 'PATCH', body: JSON.stringify({ step: BUDGET_WAIT }) });
-      return { blocked: 'monthly_budget_reached', run: next.id, dispatched: null, failed };
+      return done({ blocked: 'monthly_budget_reached', run: next.id });
     }
     // the claim clears a wait text (BUDGET_WAIT / GITHUB_WAIT / NOT_READY_WAIT) left on the row
     const claimed = (await db.rest(`runs?id=eq.${Number(next.id)}&state=eq.queued&dispatched_at=is.null`, {
       method: 'PATCH', body: JSON.stringify({ dispatched_at: new Date().toISOString(), ...(next.step ? { step: null } : {}) }) })) || [];
-    if (!claimed.length) return { lost: next.id, dispatched: null, failed };
+    if (!claimed.length) continue;   // another request took this run; look again
     const run = claimed[0];
     const again = (await activeRuns(db)) || [];
-    if (again.some(r => Number(r.id) !== Number(run.id))) {
+    const others = again.filter(r => Number(r.id) !== Number(run.id));
+    if (others.length >= limit || others.some(r => Number(r.case_id) === Number(run.case_id))) {
       await db.rest(`runs?id=eq.${Number(run.id)}&state=eq.queued`, { method: 'PATCH', body: JSON.stringify({ dispatched_at: null }) });
-      return { yielded: run.id, dispatched: null, failed };
+      return done({ yielded: run.id });
     }
     try {
       await dispatchRun(env, cfg, run, origin);
@@ -395,16 +413,16 @@ async function dispatchNext(env, cfg, origin, actor = null, ownRunId = null) {
       // L-F5: GitHub refuses every dispatch → stop here; the other runs keep waiting (cron retries every 5 min)
       if (githubWide(e)) {
         await markWaiting(db, GITHUB_WAIT);
-        return { dispatched: null, failed, github_error: e.status || 0 };
+        return done({ github_error: e.status || 0 });
       }
       continue;
     }
     await db.rest(`cases?id=eq.${Number(run.case_id)}`, { method: 'PATCH', body: JSON.stringify({ stage: 'अभ्यास चालू' }) });
     // the caller's own run is logged by /api/run (with its instructions); a run taken from the queue is logged here
     if (Number(run.id) !== Number(ownRunId)) await log(cfg, run.case_id, actor, 'run_started', { run_id: run.id, from_queue: true });
-    return { dispatched: run, failed };
+    started.push(run);   // a free slot may remain: look again
   }
-  return { dispatched: null, failed };
+  return done();
 }
 // cron (wrangler.toml [triggers]) safety net: sweep stuck runs, then dispatch the next waiting run
 async function cronTick(env) {
@@ -413,7 +431,7 @@ async function cronTick(env) {
   const swept = await sweepStale(cfg, null);
   const origin = (await env.SETTINGS.get('worker_origin')) || '';
   const r = await dispatchNext(env, cfg, origin, null);
-  return { swept: swept.map(x => x.id), dispatched: r.dispatched ? r.dispatched.id : null, failed: r.failed };
+  return { swept: swept.map(x => x.id), dispatched: r.dispatched ? r.dispatched.id : null, dispatched_all: r.dispatched_all.map(x => x.id), failed: r.failed };
 }
 
 // Single use of the config token, atomic in Postgres (M, QUALITY_AUDIT §7): only the request whose conditional PATCH
@@ -822,10 +840,11 @@ async function route(req, env, url) {
   }
   if (p === '/api/me') return json(user);
 
-  // GET /api/spend (members) → {month, spent_usd, limit_usd (empty setting = 20), runs, reserved_usd (active runs at their estimate), active_runs}: runs.cost_usd this IST calendar month
+  // GET /api/spend (members) → {month, spent_usd, limit_usd (empty setting = 20), runs, reserved_usd (active runs at their estimate), active_runs,
+  // max_parallel (full runs at the same time, for the queue card's estimate)}: runs.cost_usd this IST calendar month
   if (p === '/api/spend' && M === 'GET') {
     const { month, spent_usd, limit_usd, runs, reserved_usd, active_runs } = await monthSpend(cfg);
-    return json({ month, spent_usd, limit_usd, runs, reserved_usd, active_runs });
+    return json({ month, spent_usd, limit_usd, runs, reserved_usd, active_runs, max_parallel: maxParallel(cfg) });
   }
 
   // POST /api/runs/sweep → runs queued/running for more than 3.5 h since dispatch are marked failed (called by the app
@@ -858,6 +877,9 @@ async function route(req, env, url) {
       const n = Number(String(b.monthly_budget_usd).trim());
       if (!Number.isFinite(n) || n <= 0 || n > 1000) return bad('monthly_budget_usd: positive number <= 1000');
     }
+    // max_parallel_runs: empty = 2; otherwise a whole number 1..3 (full engine runs at the same time)
+    if ('max_parallel_runs' in b && b.max_parallel_runs !== null && String(b.max_parallel_runs).trim() !== '' && !/^[1-3]$/.test(String(b.max_parallel_runs).trim()))
+      return bad('max_parallel_runs: whole number 1 to 3');
     for (const [k, ok] of Object.entries(PROVIDERS))
       if (k in b && b[k] !== null && !ok.includes(String(b[k]).trim())) return bad(`${k}: one of ${ok.filter(Boolean).join(', ')} or empty`);
     if ('cloudflare_account_id' in b && b.cloudflare_account_id !== null && String(b.cloudflare_account_id).trim() !== '' && !/^[0-9a-f]{32}$/.test(String(b.cloudflare_account_id).trim()))
@@ -1100,7 +1122,7 @@ async function route(req, env, url) {
         return dispatchFailed(e);
       }
     } else {
-      // C33 queue: the new run waits (dispatched_at null); dispatchNext takes the oldest waiting run if none is active
+      // C33 queue: the new run waits (dispatched_at null); dispatchNext takes the oldest waiting runs while a slot is free
       const nx = await dispatchNext(env, cfg, url.origin, user.id, run.id);
       if (nx.failed.map(Number).includes(Number(run.id))) return dispatchFailed(null);   // marked failed + logged there
       if (!nx.dispatched || Number(nx.dispatched.id) !== Number(run.id)) {

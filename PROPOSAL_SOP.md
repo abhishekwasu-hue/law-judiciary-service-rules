@@ -90,7 +90,7 @@ Copy the structure of the nearest sample in `samples/specs/` and fill your facts
     अभिप्रायार्थ / सहमतीस्तव सादर (करण्यात येत आहे)." (U.O. reference §4.33); medical Format-2 (§8.3) "… सार्वजनिक आरोग्य
     विभागास विनंती करण्यास हरकत नसावी. मान्यतेस्तव सादर."; approval within the department, no draft, "सबब, … मान्यतेस्तव
     सादर."; file closure "सबब, … नस्ती बंद करण्यास मान्यता असावी."
-- **Signers** (`note.signers`, in order): का. अ. (श्रीम. कऱ्हाडे) / अ.स. (श्री. वडनेरकर) / उ.वि.स. नि. उ.स. (श्री. बोंद्रे) / प्र.स. व वि.प. (श्री. खटी). Add "अ.मु.स. (वित्त)" only when the last para sends the file to Finance — "वित्त विभागाच्या मान्यतेस्तव / अभिप्रायास्तव /
+- **Signers** (`note.signers`, in order): (अ.मा. वसू) / क. अ. (अ.का.) [these two on the right, the name not bold — the tool places them from the desk profile] / अ.स. (श्री. वडनेरकर) / उ.वि.स. नि. उ.स. (श्री. बोंद्रे) / सचिव व व. वि. स. (श्री. बिले) (INSTRUCTIONS §4.6, 05.11.2026). Add "अ.मु.स. (वित्त)" only when the last para sends the file to Finance — "वित्त विभागाच्या मान्यतेस्तव / अभिप्रायास्तव /
   सहमतीस्तव …" or "वित्त विभागास विनंती …" — or to the Public Health Department (§8.3); this is the route lint and verify read
   (audit 05.11 R-F11).
 - **`related`** ("संबंधित माहिती (संदर्भासाठी)"): verbatim extracts. Each source ends with " (पृ.N/प.वि.)" (several pages: "(पृ.N-M/प.वि.)" / "(पृ.N,M/प.वि.)") when the page is in the returned PDF; otherwise NO page marker (just GR no./date/page/para). The Study keeps "(पॅकेज PDF पृ. N)" / "(पॅकेज PDF मध्ये नाही)" (INSTRUCTIONS §4.27, 02.11.2026). No repo paths (register/, service-rules/, pdf/ …) and no internal ids in `related`.

@@ -249,7 +249,7 @@ export default function RunProgress({ run, retryHint }: { run: Run; retryHint?: 
         <div className="flex items-center gap-2">
           {active ? (
             <span className="inline-flex items-center gap-2 rounded-full bg-blue-100 px-3 py-1 text-sm font-bold text-blue-900 dark:bg-blue-900/40 dark:text-blue-100">
-              <Spinner className="h-4 w-4" /> {waiting ? 'प्रतीक्षेत — आधीची प्रक्रिया पूर्ण झाल्यावर आपोआप सुरू होईल' : preparing ? 'तयारी चालू — सर्व्हर सुरू होत आहे' : 'प्रक्रिया चालू'}
+              <Spinner className="h-4 w-4" /> {waiting ? 'प्रतीक्षेत — आधीच्या प्रक्रियांपैकी एक पूर्ण झाल्यावर क्रमाने आपोआप सुरू होईल' : preparing ? 'तयारी चालू — सर्व्हर सुरू होत आहे' : 'प्रक्रिया चालू'}
             </span>
           ) : (
             <Chip tone={stale ? 'red' : runTone(run.state)}>{stale ? 'वेळ संपली' : stateText(run.state)}</Chip>

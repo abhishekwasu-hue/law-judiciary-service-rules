@@ -82,7 +82,7 @@ export const STALE_REASON = "वेळ संपली. कृपया 'पु�
 export const isStale = (r: { state: string; created_at: string; dispatched_at?: string | null }) =>
   (r.state === 'queued' || r.state === 'running') && !isWaiting(r)
   && Date.now() - new Date(r.dispatched_at || r.created_at).getTime() > STALE_MS;
-/** C33 sequential queue: queued and not yet sent to the engine (dispatched_at null). Legacy rows (column absent) = dispatched. */
+/** C33 queue: queued and not yet sent to the engine (dispatched_at null). Legacy rows (column absent) = dispatched. */
 export const isWaiting = (r: { state: string; dispatched_at?: string | null }) => r.state === 'queued' && r.dispatched_at === null;
 /** Run in progress (blocks a new run). A stale run does not block. */
 export const runActive = (r: { state: string; created_at: string; dispatched_at?: string | null } | null | undefined) =>

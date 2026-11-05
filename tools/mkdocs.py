@@ -11,7 +11,7 @@ spec.json:
    "sub": {"<para index in paras, 0-based>": ["(१) ...", "(२) ..."]},   # optional lettered/numbered sub-points after that para
    "closing": "सबब, उपरोक्त माहिती तक्त्याच्या स्वरूपात कळविण्याबाबतच्या पत्राचे प्रारूप पृ.      /प.वि. वर मान्यतेस्तव सादर. मान्य झाल्यास पत्र निर्गमित करण्यात येईल.",
               # or (no letter): "सबब, ... प्रस्ताव वित्त विभागाच्या मान्यतेस्तव सादर करण्यात येत आहे."  (PROPOSAL_SOP Step 4)
-   "signers": ["का. अ. (श्रीम. कऱ्हाडे)", "अ.स. (श्री. वडनेरकर)", "उ.वि.स. नि. उ.स. (श्री. बोंद्रे)", "प्र.स. व वि.प. (श्री. खटी)"]
+   "signers": ["(अ.मा. वसू)", "क. अ. (अ.का.)", "अ.स. (श्री. वडनेरकर)", "उ.वि.स. नि. उ.स. (श्री. बोंद्रे)", "सचिव व व. वि. स. (श्री. बिले)"]
               # add "अ.मु.स. (वित्त)" only when the file goes to Finance (INSTRUCTIONS §4.6)
  },
  "desk": "law-desk6",      # optional (C30, 03.11.2026) — desk profile tools/desks/<id>.json (note header, signer chain,
@@ -190,10 +190,25 @@ def build_note(spec, out):
             add(body, sect, numbered, d, f"\t{s}", left=Cm(1.0), first=Cm(-0.0))
     add(body, sect, close, d, "\t " + n.get("closing", "मान्यतेस्तव सादर."))
     add(body, sect, blank, d, " ")
-    for s in n["signers"]:
-        sp = add(body, sect, sign, d, s)
-        sp.paragraph_format.left_indent = Cm(0); sp.paragraph_format.right_indent = Cm(0)
-        sp.alignment = 0  # left
+    # §4.6 (Abhi 05.11.2026, his own note page): the first `signers_right` lines of the desk chain — the preparer's name
+    # "(अ.मा. वसू)" (not bold, `signers_plain`) and post "क. अ. (अ.का.)" — sit together on the right, centred on each other,
+    # with no blank line between them; the rest of the chain stays on the left.
+    dk = desk_of(spec)
+    nright = int(dk.get("signers_right", 0) or 0)
+    plain = set(dk.get("signers_plain", []) or [])
+    for i, s in enumerate(n["signers"]):
+        sp = add(body, sect, sign, d, s, bold=False if i in plain else None)
+        sp.paragraph_format.right_indent = Cm(0)
+        if i < nright:
+            sp.paragraph_format.left_indent = Cm(4); sp.alignment = 1   # right block, lines centred
+            if i < nright - 1:
+                sp.paragraph_format.line_spacing = 1.0   # the two right lines sit together (template: 2.5 lines)
+            if i > 0:
+                sp.paragraph_format.space_before = Cm(0)
+            if i < nright - 1:
+                sp.paragraph_format.space_after = Cm(0)
+        else:
+            sp.paragraph_format.left_indent = Cm(0); sp.alignment = 0   # left
     ul = uo_lines(spec)
     if ul:   # अनौपचारिक संदर्भ (note "uo"): the U.O. block at the foot of the note, left (docs/FORMS_RESEARCH_DO_UO.md)
         add(body, sect, blank, d, " ")

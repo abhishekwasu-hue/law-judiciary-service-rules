@@ -27,6 +27,7 @@ type Sec = 'cost' | 'tech' | 'ai' | 'alt';
 const PLAIN: { k: string; label: string; hint?: string; num?: boolean; max?: number; sec: Sec; ph?: string; choices?: [string, string][] }[] = [
   { k: 'budget_usd', label: 'प्रत्येक प्रस्तावाचा कमाल खर्च ($)', hint: 'ओलांडल्यास फक्त सूचना येते; प्रक्रिया थांबत नाही व दर्जा घटत नाही. रिकामे = 0.75', num: true, max: 20, sec: 'cost', ph: 'उदा. 1.5' },
   { k: 'monthly_budget_usd', label: 'मासिक कमाल खर्च ($)', hint: 'या महिन्याचा (भारतीय वेळ) एकूण कमाल खर्च. ओलांडल्यावर नवीन प्रक्रिया सुरू होत नाही; चालू प्रक्रिया पूर्ण होते. रिकामे = $20', num: true, max: 1000, sec: 'cost', ph: 'रिकामे = $20' },
+  { k: 'max_parallel_runs', label: 'एकाच वेळी चालणारे run (1–3)', hint: 'एकाच वेळी जास्तीत जास्त किती प्रस्तावांची प्रक्रिया चालू राहील (वेगवेगळी प्रकरणे; एका प्रकरणाची एकच). इतर प्रस्ताव प्रतीक्षा-यादीत क्रमाने थांबतात. रिकामे = 2', sec: 'cost', choices: [['', 'रिकामे (2)'], ['1', '1 — एकामागून एक'], ['2', '2'], ['3', '3']] },
   { k: 'owner_email', label: 'मालकाचा ई-मेल', hint: 'या ई-मेलने लॉगिन करणाऱ्यास सेटिंग्ज बदलण्याचा अधिकार असतो.', sec: 'tech' },
   { k: 'supabase_url', label: 'माहिती-साठ्याचा पत्ता (Supabase)', hint: 'Supabase प्रकल्पाच्या सेटिंग्जमध्ये मिळतो.', sec: 'tech' },
   { k: 'supabase_anon_key', label: 'माहिती-साठ्याची सार्वजनिक की (Supabase)', hint: 'त्याच ठिकाणची सार्वजनिक (anon) की.', sec: 'tech' },
@@ -76,6 +77,7 @@ export function checkSettings(v: Record<string, string>): string | null {
   for (const k of REQUIRED) if (k in v && !t(k)) return `${L(k)}: रिकामे ठेवता येत नाही.`;
   if (t('budget_usd') && !(Number(t('budget_usd')) > 0 && Number(t('budget_usd')) <= 20)) return `${L('budget_usd')}: कृपया 0 पेक्षा जास्त व 20 पर्यंतची संख्या नमूद करावी.`;
   if (t('monthly_budget_usd') && !(Number(t('monthly_budget_usd')) > 0 && Number(t('monthly_budget_usd')) <= 1000)) return `${L('monthly_budget_usd')}: कृपया 0 पेक्षा जास्त व 1000 पर्यंतची संख्या नमूद करावी (रिकामे = $20).`;
+  if (t('max_parallel_runs') && !/^[1-3]$/.test(t('max_parallel_runs'))) return `${L('max_parallel_runs')}: कृपया 1, 2 किंवा 3 निवडावे (रिकामे = 2).`;
   if (t('cloudflare_account_id') && !/^[0-9a-f]{32}$/.test(t('cloudflare_account_id'))) return `${L('cloudflare_account_id')}: कृपया नेमकी 32 अक्षरे (0-9, a-f) नमूद करावीत.`;
   if (t('ollama_base_url') && !/^https?:\/\/[A-Za-z0-9.-]+(:\d+)?(\/[A-Za-z0-9._~/-]*)?$/.test(t('ollama_base_url'))) return `${L('ollama_base_url')}: कृपया http:// किंवा https:// ने सुरू होणारा पत्ता नमूद करावा (उदा. https://host:11434).`;
   for (const k of MODEL_KEYS) if (t(k) && !MODEL_NAME.test(t(k))) return `${L(k)}: कृपया योग्य मॉडेल-नाव नमूद करावे (अक्षरे, अंक, . _ : @ / - ; जागा नाही).`;

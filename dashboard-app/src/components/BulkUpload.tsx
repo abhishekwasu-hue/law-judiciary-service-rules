@@ -3,7 +3,7 @@
 // त्या एका प्रस्तावाशी संबंधित"): a box holds its main proposal PDF plus any other files of THAT proposal (PDF / Word /
 // image, each with its type); several PDFs are never split into several proposals automatically. Per box: work category (bulk setter "सर्वांना"), drafts (compact, default पत्र; court → पत्र +
 // परिच्छेदनिहाय उत्तर), optional instruction. "रांगेत टाका (N)": for every row in turn → POST /api/cases (work_type, desk;
-// C R and subject are filled by the engine from the निर्देशपत्र) → upload → POST /api/run. The Worker runs them one by one
+// C R and subject are filled by the engine from the निर्देशपत्र) → upload → POST /api/run. The Worker runs them in FIFO order (up to max_parallel_runs at once)
 // ({queued: true, position}). A failed row keeps what was done (case / upload) and is retried from there.
 import { useRef, useState, type DragEvent } from 'react';
 import { Link } from 'react-router-dom';
@@ -48,7 +48,7 @@ export function userError(x: unknown, isOwner: boolean): string {
 /** Text after /api/run (glossary: प्रक्रिया, प्रतीक्षेत). The migration note is owner-only. */
 export function startText(r: RunStart, isOwner: boolean): string {
   const base = r.queued
-    ? `प्रतीक्षेत — क्रमांक ${Number(r.position) || '?'}. आधीची प्रक्रिया संपल्यावर ही प्रक्रिया आपोआप सुरू होईल.`
+    ? `प्रतीक्षेत — क्रमांक ${Number(r.position) || '?'}. आधीच्या प्रक्रियांपैकी एक पूर्ण झाल्यावर ही प्रक्रिया क्रमाने आपोआप सुरू होईल.`
     : 'प्रक्रिया सुरू झाली.';
   return r.outputs_dropped && isOwner ? `${base} मसुदे-निवड लागू झाली नाही (migration 0008 बाकी).` : base;
 }
@@ -154,7 +154,7 @@ export default function BulkUpload({ overBudget }: { overBudget: boolean }) {
     setBusy(false);
     const failed = rowsRef.current.filter(r => r.st === 'err').length;
     const nSent = rowsRef.current.filter(r => r.st === 'queued' || r.st === 'started').length;
-    toast(failed ? `${failed} प्रस्ताव पाठविता आले नाहीत. कृपया लाल ओळी पाहून बटण पुन्हा दाबावे.` : `${nSent} प्रस्ताव पाठवले — एकामागून एक तयार होतील`, failed ? 'err' : 'ok');
+    toast(failed ? `${failed} प्रस्ताव पाठविता आले नाहीत. कृपया लाल ओळी पाहून बटण पुन्हा दाबावे.` : `${nSent} प्रस्ताव पाठवले — क्रमाने तयार होतील`, failed ? 'err' : 'ok');
   }
 
   const drop = (e: DragEvent) => { e.preventDefault(); setOver(false); if (!busy) addProposal(Array.from(e.dataTransfer.files)); };
@@ -168,7 +168,7 @@ export default function BulkUpload({ overBudget }: { overBudget: boolean }) {
         className={`flex min-h-[110px] flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed p-4 text-center transition ${over ? 'border-saffron-500 bg-saffron-500/10' : 'border-slate-300 dark:border-navy-700'}`}
       >
         <div className="font-semibold">{rows.length ? `प्रस्ताव ${rows.length + 1} जोडा` : 'प्रस्ताव 1 जोडा'}</div>
-        <div className="text-sm text-slate-500 dark:text-slate-400">कृपया एका वेळी एकाच प्रस्तावाच्या फाइल निवडाव्यात: मुख्य PDF (व हवे असल्यास त्याच प्रस्तावाच्या इतर PDF / Word / प्रतिमा) • कमाल {BULK_MAX} प्रस्ताव • प्रक्रिया एकामागून एक होईल</div>
+        <div className="text-sm text-slate-500 dark:text-slate-400">कृपया एका वेळी एकाच प्रस्तावाच्या फाइल निवडाव्यात: मुख्य PDF (व हवे असल्यास त्याच प्रस्तावाच्या इतर PDF / Word / प्रतिमा) • कमाल {BULK_MAX} प्रस्ताव • प्रक्रिया क्रमाने होईल</div>
         <button type="button" className="btn-ghost" disabled={busy || rows.length >= BULK_MAX} onClick={() => inputRef.current?.click()}>＋ नवीन प्रस्ताव ({rows.length}/{BULK_MAX})</button>
         <input ref={inputRef} type="file" hidden multiple accept={EXTRA_ACCEPT} onChange={e => { addProposal(Array.from(e.target.files || [])); e.target.value = ''; }} />
       </div>
@@ -268,7 +268,7 @@ export default function BulkUpload({ overBudget }: { overBudget: boolean }) {
           </button>}
           {sent.length > 0 && !busy && (
             <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-green-50 px-3 py-2 text-sm text-green-900 dark:bg-green-900/30 dark:text-green-100">
-              <span><b>{sent.length}</b> प्रस्ताव पाठवले — एकामागून एक तयार होतील. प्रत्येक प्रस्ताव तयार होताच तो ‘प्रकरणे’ मध्ये त्या प्रकरणात मिळेल. हे पान बंद केले तरी काम चालू राहील.</span>
+              <span><b>{sent.length}</b> प्रस्ताव पाठवले — क्रमाने तयार होतील. प्रत्येक प्रस्ताव तयार होताच तो ‘प्रकरणे’ मध्ये त्या प्रकरणात मिळेल. हे पान बंद केले तरी काम चालू राहील.</span>
               <Link className="inline-flex min-h-tap items-center font-semibold underline" to="/cases">प्रकरणे →</Link>
             </div>
           )}

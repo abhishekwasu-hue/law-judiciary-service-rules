@@ -56,7 +56,7 @@ export const SETTING_LABEL: Record<string, string> = {
   owner_email: 'मालकाचा ई-मेल', supabase_url: 'डेटाबेस (Supabase) पत्ता', supabase_anon_key: 'डेटाबेस सार्वजनिक की (anon)', supabase_service_key: 'डेटाबेस सेवा-की (service_role)',
   github_repo: 'प्रक्रिया-भांडार (GitHub repo)', github_branch: 'प्रक्रिया-शाखा (GitHub branch)', github_token: 'प्रक्रिया-परवानगी की (GitHub token)', anthropic_api_key: 'Anthropic AI की',
   model: 'मुख्य मॉडेल', model_light: 'स्वस्त मॉडेल', model_review: 'अंतिम पडताळणी मॉडेल', model_strong: 'उच्च-स्तर मॉडेल', model_edit: 'सुधारणा-चॅट मॉडेल', effort: 'विचार-पातळी',
-  budget_usd: 'प्रति प्रक्रिया कमाल खर्च ($)', monthly_budget_usd: 'मासिक कमाल खर्च ($)',
+  budget_usd: 'प्रति प्रक्रिया कमाल खर्च ($)', monthly_budget_usd: 'मासिक कमाल खर्च ($)', max_parallel_runs: 'एकाच वेळी चालणारे run (1–3)',
   engine_provider: 'मुख्य प्रक्रिया कोणाकडून', engine_model: 'मुख्य — मॉडेल', engine_model_light: 'मुख्य — स्वस्त मॉडेल',
   fallback_provider: 'राखीव AI', fallback_model: 'राखीव — मॉडेल', fallback_model_light: 'राखीव — स्वस्त मॉडेल',
   part1_provider: 'अभ्यास-फाइल भाग 1 कोणाकडून', part1_model: 'भाग 1 — मॉडेल', gemini_model: 'Gemini मॉडेल',
@@ -73,6 +73,7 @@ export const SETTING_RULE: [RegExp, string][] = [
   [/^http\(s\)/, 'कृपया http:// किंवा https:// ने सुरू होणारा पत्ता लिहावा (उदा. https://host:11434), ही विनंती.'],
   [/^model name or none$/, 'कृपया योग्य मॉडेल-नाव (अक्षरे, अंक, . _ : @ / - ; जागा नाही) किंवा none लिहावे, ही विनंती.'],
   [/^model name$/, 'कृपया योग्य मॉडेल-नाव लिहावे (अक्षरे, अंक, . _ : @ / - ; जागा नाही), ही विनंती.'],
+  [/^whole number 1 to 3$/, 'कृपया 1, 2 किंवा 3 निवडावे (रिकामे = 2), ही विनंती.'],
   [/^cannot clear$/, 'ही की काढता येत नाही.'],
 ];
 function settingError(msg: string): string | null {
@@ -84,13 +85,13 @@ function settingError(msg: string): string | null {
   return `${SETTING_LABEL[m[1]]}: ${rule ? rule[1] : 'मूल्य योग्य नाही.'}`;
 }
 
-// ---------- POST /api/run (C33: may answer {queued: true, position} when another case's run is active) ----------
+// ---------- POST /api/run (C33: may answer {queued: true, position} when every engine slot is busy) ----------
 export interface RunStart { id: number; outputs_dropped?: boolean; queued?: boolean; position?: number }
-/** Short Marathi text of a /api/run answer: started now, or waiting in the sequential queue at position N.
+/** Short Marathi text of a /api/run answer: started now, or waiting in the queue at position N.
  *  `isOwner` (optional, default = current viewer): the migration hint only for the owner. */
 export function runStartText(r: RunStart, startedText = 'प्रक्रिया सुरू झाली', isOwner = viewerOwner()): string {
   const base = r.queued
-    ? `प्रतीक्षा-यादीत क्रमांक ${Number(r.position) || '?'} — आधीची प्रक्रिया पूर्ण झाल्यावर ही प्रक्रिया आपोआप सुरू होईल.`
+    ? `प्रतीक्षा-यादीत क्रमांक ${Number(r.position) || '?'} — आधीच्या प्रक्रियांपैकी एक पूर्ण झाल्यावर ही प्रक्रिया क्रमाने आपोआप सुरू होईल.`
     : startedText;
   if (!r.outputs_dropped) return base;
   return isOwner
@@ -99,7 +100,8 @@ export function runStartText(r: RunStart, startedText = 'प्रक्रि�
 }
 
 // ---------- monthly spend limit (Worker GET /api/spend; POST /api/run → 402 monthly_budget_reached) ----------
-export interface Spend { month: string; spent_usd: number; limit_usd: number; runs: number; reserved_usd?: number; active_runs?: number }
+/** max_parallel: full runs the Worker runs at the same time (KV max_parallel_runs, 1..3; default 2). */
+export interface Spend { month: string; spent_usd: number; limit_usd: number; runs: number; reserved_usd?: number; active_runs?: number; max_parallel?: number }
 /** Same test as the Worker's /api/run (402): this month's spend + active runs at their estimate reach the limit. */
 export const spendBlocked = (s: Spend) => s.spent_usd + (Number(s.reserved_usd) || 0) >= s.limit_usd;
 export const getSpend = () => api<Spend>('/api/spend');

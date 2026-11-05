@@ -425,7 +425,7 @@ test('monthly spend: IST month sum, boundary, 402 block on /api/run', async () =
     spendQueries.length = 0;
     env.SETTINGS.m.set('monthly_budget_usd', '');
     const s = await body(await call('/api/spend', { headers: owner }));
-    assert.deepEqual(s, { month: '2026-11', spent_usd: 1.75, limit_usd: 20, runs: 3, reserved_usd: 0, active_runs: 0 }, 'empty setting = default $20');
+    assert.deepEqual(s, { month: '2026-11', spent_usd: 1.75, limit_usd: 20, runs: 3, reserved_usd: 0, active_runs: 0, max_parallel: 2 }, 'empty setting = default $20');
     const q = decodeURIComponent(spendQueries[0]);
     assert.ok(q.includes('created_at=gte.2026-10-31T18:30:00.000Z'), q);
     assert.ok(q.includes('created_at=lt.2026-11-30T18:30:00.000Z'), q);
@@ -724,7 +724,7 @@ test('monthly limit counts queued/running runs at an estimate', async () => {
     // /api/spend: reserved_usd / active_runs added (A3 audit: the app checks spent + reserved like the Worker)
     monthRuns = [{ cost_usd: '1.0', created_at: now, state: 'done' }, { cost_usd: null, created_at: now, state: 'running' }];
     const sp = await body(await call('/api/spend', { headers: owner }));
-    assert.deepEqual(Object.keys(sp), ['month', 'spent_usd', 'limit_usd', 'runs', 'reserved_usd', 'active_runs']);
+    assert.deepEqual(Object.keys(sp), ['month', 'spent_usd', 'limit_usd', 'runs', 'reserved_usd', 'active_runs', 'max_parallel']);
     assert.equal(sp.reserved_usd, 1); assert.equal(sp.active_runs, 1);
   } finally {
     env.SETTINGS.m.set('monthly_budget_usd', '');
@@ -935,6 +935,8 @@ test('C30: case desk — create/PATCH accept the profile ids only (400 Marathi);
 const owner33 = { authorization: 'Bearer owner-jwt' };
 const dispatchBodies = () => calls.filter(c => c.u.endsWith('/dispatches')).map(c => JSON.parse(c.opt.body).client_payload);
 const runCase = cid => call('/api/run', { method: 'POST', headers: owner33, body: JSON.stringify({ case_id: cid }) });
+// KV max_parallel_runs (null = absent → default 2)
+const setParallel = v => (v === null ? env.SETTINGS.m.delete('max_parallel_runs') : env.SETTINGS.m.set('max_parallel_runs', v));
 const tokenOf = runId => [...env.SETTINGS.m.entries()].filter(([k, v]) => k.startsWith('run_token:') && JSON.parse(v).run_id === String(runId)).map(([k]) => k.slice(10)).pop();
 
 test('C33: case work_type — 4 ids only (400 Marathi); missing column → saved without it', async () => {
@@ -965,6 +967,7 @@ test('C33: case work_type — 4 ids only (400 Marathi); missing column → saved
 
 test('C33: one run at a time across cases — immediate when idle, else queued with FIFO position', async () => {
   Q = { rows: [], nextId: 100 }; monthRuns = []; dispatchFail = false;
+  setParallel('1');   // these steps describe the one-by-one queue (max_parallel_runs 1)
   try {
     const n0 = dispatchBodies().length;
     const a = await body(await runCase(101));
@@ -999,11 +1002,12 @@ test('C33: one run at a time across cases — immediate when idle, else queued w
     assert.equal(d.position, 1);
     const f = await body(await call('/api/engine/fail', { method: 'POST', headers: { authorization: `Bearer ${tokenOf(c.id)}` }, body: JSON.stringify({ run_id: c.id, reason: 'x' }) }));
     assert.deepEqual(f, { ok: true, changed: 1, dispatched: d.id });
-  } finally { Q = null; }
+  } finally { setParallel(null); Q = null; }
 });
 
 test('C33: race-safe — parallel /api/run calls dispatch exactly one; claim race never dispatches two', async () => {
   Q = { rows: [], nextId: 200 }; monthRuns = []; dispatchFail = false;
+  setParallel('1');   // these steps describe the one-by-one queue (max_parallel_runs 1)
   try {
     const n0 = dispatchBodies().length;
     const rs = await Promise.all([201, 202, 203, 204, 205].map(cid => runCase(cid).then(body)));
@@ -1039,11 +1043,12 @@ test('C33: race-safe — parallel /api/run calls dispatch exactly one; claim rac
       assert.equal(dispatchBodies().length, n1 + 1, 'cron dispatches after a give-back');
     }
     assert.equal(dispatchBodies().at(-1).run_id, 202);
-  } finally { Q = null; }
+  } finally { setParallel(null); Q = null; }
 });
 
 test('C33: both claimers see each other → both give back, cron dispatches one', async () => {
   Q = { rows: [], nextId: 300 }; monthRuns = []; dispatchFail = false;
+  setParallel('1');   // these steps describe the one-by-one queue (max_parallel_runs 1)
   try {
     const t0 = Date.now() - 1000;
     Q.rows.push({ id: 301, case_id: 31, state: 'queued', dispatched_at: null, created_at: new Date(t0).toISOString() },
@@ -1061,6 +1066,150 @@ test('C33: both claimers see each other → both give back, cron dispatches one'
     await worker.scheduled({}, env, null);
     assert.equal(dispatchBodies().length, n0 + 1);
     assert.equal(dispatchBodies().at(-1).run_id, 301);
+  } finally { setParallel(null); Q = null; }
+});
+
+const activeFull = () => Q.rows.filter(r => r.kind !== 'edit' && ['queued', 'running'].includes(r.state) && r.dispatched_at);
+test('parallel runs: default 2 (absent / invalid setting) — two cases dispatched at once, not a third; FIFO refill', async () => {
+  for (const v of [null, '', '0', '4', 'abc', '2.5']) {
+    Q = { rows: [], nextId: 1000 }; monthRuns = []; dispatchFail = false;
+    setParallel(v);
+    try {
+      const n0 = dispatchBodies().length;
+      const a = await body(await runCase(1001)), b = await body(await runCase(1002)), c = await body(await runCase(1003)), d = await body(await runCase(1004));
+      assert.deepEqual([a.queued, b.queued, c.queued, c.position, d.queued, d.position], [false, false, true, 1, true, 2], `setting ${v}`);
+      assert.equal(dispatchBodies().length, n0 + 2, 'two dispatched, not a third');
+      assert.deepEqual(activeFull().map(r => r.id).sort(), [a.id, b.id]);
+      // the cron with both slots busy dispatches nothing
+      assert.equal((await cronTick(env)).dispatched, null);
+      assert.equal(dispatchBodies().length, n0 + 2);
+      // one ends → the oldest waiting run takes its slot (FIFO), still two active
+      Q.rows.find(r => r.id === a.id).state = 'done';
+      const nx = await body(await call('/api/engine/next', { method: 'POST', headers: { authorization: `Bearer ${tokenOf(a.id)}` }, body: JSON.stringify({ run_id: a.id }) }));
+      assert.equal(nx.dispatched, c.id);
+      assert.equal(activeFull().length, 2);
+      assert.equal(Q.rows.find(r => r.id === d.id).dispatched_at, null, 'third waiting run still waits');
+      // both slots free at once → one call fills both (two dispatches)
+      Q.rows.find(r => r.id === b.id).state = 'done'; Q.rows.find(r => r.id === c.id).state = 'done';
+      const e = await body(await runCase(1005));
+      assert.equal(e.queued, false, 'the new run goes in the second free slot');
+      assert.deepEqual(activeFull().map(r => r.id).sort(), [d.id, e.id]);
+    } finally { setParallel(null); Q = null; }
+  }
+});
+
+test('parallel runs: setting 1 restores one by one; 3 allows three; settings PUT validates 1..3', async () => {
+  Q = { rows: [], nextId: 1100 }; monthRuns = []; dispatchFail = false;
+  try {
+    setParallel('1');
+    const rs = [];
+    for (const cid of [1101, 1102, 1103, 1104]) rs.push(await body(await runCase(cid)));
+    assert.deepEqual(rs.map(r => r.queued), [false, true, true, true]);
+    assert.equal(activeFull().length, 1);
+    setParallel('3');
+    const out = await cronTick(env);
+    assert.deepEqual(out.dispatched_all, [rs[1].id, rs[2].id], 'two more in FIFO order (three active)');
+    assert.equal(activeFull().length, 3);
+    assert.equal(Q.rows.find(r => r.id === rs[3].id).dispatched_at, null);
+  } finally { setParallel(null); Q = null; }
+  const put = v => call('/api/settings', { method: 'PUT', headers: owner33, body: JSON.stringify({ max_parallel_runs: v }) });
+  for (const v of ['0', '4', 'two', '1.5', 2.5]) {
+    const r = await put(v);
+    assert.equal(r.status, 400, String(v)); assert.deepEqual(await r.json(), { error: 'max_parallel_runs: whole number 1 to 3' });
+  }
+  assert.equal((await put(' 3 ')).status, 200);
+  assert.equal((await body(await call('/api/settings', { headers: owner33 }))).max_parallel_runs, '3');
+  assert.equal((await put('')).status, 200);
+  assert.equal((await body(await call('/api/settings', { headers: owner33 }))).max_parallel_runs, '');
+  setParallel(null);
+});
+
+test('parallel runs: one case never has two active runs; a waiting run of a busy case is skipped, not dispatched', async () => {
+  Q = { rows: [], nextId: 1200, unique: true }; monthRuns = []; dispatchFail = false;
+  try {
+    const a = await body(await runCase(1201));
+    assert.equal(a.queued, false);
+    const dup = await runCase(1201);
+    assert.equal(dup.status, 409); assert.equal((await dup.json()).run_id, a.id);
+    // a row the per-case guards would refuse (e.g. index not applied): waiting run of case 1201, older than 1202's
+    const t0 = Date.now() - 5000;
+    Q.unique = false;
+    Q.rows.push({ id: 1290, case_id: 1201, state: 'queued', dispatched_at: null, created_at: new Date(t0).toISOString() },
+                { id: 1291, case_id: 1202, state: 'queued', dispatched_at: null, created_at: new Date(t0 + 1).toISOString() });
+    const out = await cronTick(env);
+    assert.deepEqual(out.dispatched_all, [1291], 'the busy case is skipped, the next case goes');
+    assert.equal(Q.rows.find(r => r.id === 1290).dispatched_at, null);
+    assert.equal(Q.rows.filter(r => r.case_id === 1201 && r.dispatched_at && ['queued', 'running'].includes(r.state)).length, 1);
+    // claim race on the same case: another worker dispatched a run of case 1203 between our check and our claim
+    Q.rows.find(r => r.id === 1291).state = 'done';
+    Q.rows.push({ id: 1292, case_id: 1203, state: 'queued', dispatched_at: null, created_at: new Date(t0 + 2).toISOString() },
+                { id: 1293, case_id: 1203, state: 'queued', dispatched_at: new Date(t0 + 3).toISOString(), created_at: new Date(t0 + 3).toISOString() });
+    // 1293 is active → 1292 (same case) is skipped; free slot but nothing else waits
+    const out2 = await cronTick(env);
+    assert.deepEqual(out2.dispatched_all, []);
+    assert.equal(Q.rows.find(r => r.id === 1292).dispatched_at, null);
+  } finally { Q = null; }
+});
+
+test('parallel runs: edit runs are never counted — two active edits leave both slots free', async () => {
+  Q = { rows: [], nextId: 1300 }; monthRuns = []; dispatchFail = false;
+  try {
+    const now = isoNow();
+    Q.rows.push({ id: 1390, case_id: 1391, kind: 'edit', state: 'running', dispatched_at: now, created_at: now },
+                { id: 1392, case_id: 1393, kind: 'edit', state: 'queued', dispatched_at: now, created_at: now });
+    const a = await body(await runCase(1301)), b = await body(await runCase(1302)), c = await body(await runCase(1303));
+    assert.deepEqual([a.queued, b.queued, c.queued, c.position], [false, false, true, 1]);
+    assert.equal(activeFull().length, 2);
+  } finally { Q = null; }
+});
+
+test('parallel runs: the monthly limit is checked before every dispatch with the active runs reserved', async () => {
+  Q = { rows: [], nextId: 1500 }; monthRuns = []; dispatchFail = false;
+  setParallel('3'); env.SETTINGS.m.set('monthly_budget_usd', '1'); env.SETTINGS.m.set('budget_usd', '0.6');
+  try {
+    const t0 = Date.now() - 5000;
+    for (let i = 0; i < 3; i++) Q.rows.push({ id: 1501 + i, case_id: 1501 + i, state: 'queued', dispatched_at: null, created_at: new Date(t0 + i).toISOString() });
+    const out = await cronTick(env);
+    // 1st: 0 + 0 < 1 → goes; 2nd: 0 + 0.6 < 1 → goes; 3rd: 0 + 1.2 ≥ 1 → waits with the Marathi limit text
+    assert.deepEqual(out.dispatched_all, [1501, 1502]);
+    const third = Q.rows.find(r => r.id === 1503);
+    assert.equal(third.dispatched_at, null);
+    assert.match(third.step, /मासिक खर्च-मर्यादा/);
+  } finally { setParallel(null); env.SETTINGS.m.delete('monthly_budget_usd'); env.SETTINGS.m.delete('budget_usd'); Q = null; }
+});
+
+test('parallel runs: race — five parallel /api/run calls and concurrent queue callers never exceed 2 active', async () => {
+  Q = { rows: [], nextId: 1400 }; monthRuns = []; dispatchFail = false;
+  try {
+    const n0 = dispatchBodies().length;
+    await Promise.all([1401, 1402, 1403, 1404, 1405].map(cid => runCase(cid).then(body)));
+    assert.ok(activeFull().length <= 2, 'never more than two');
+    await cronTick(env);   // fills a slot given back by two claimers that saw each other
+    assert.equal(activeFull().length, 2);
+    assert.equal(dispatchBodies().length, n0 + 2);
+    // both slots free together; three callers at once (sweep, engine/next, cron) → two more, never three
+    activeFull().forEach(r => { r.state = 'done'; });
+    const first = Q.rows.find(r => r.id === 1400);
+    await Promise.all([
+      call('/api/runs/sweep', { method: 'POST', headers: owner33 }),
+      call('/api/engine/next', { method: 'POST', headers: { authorization: `Bearer ${tokenOf(first.id)}` }, body: JSON.stringify({ run_id: first.id }) }),
+      worker.scheduled({}, env, null),
+    ]);
+    assert.ok(activeFull().length <= 2);
+    await cronTick(env);
+    assert.equal(activeFull().length, 2);
+    assert.equal(dispatchBodies().length, n0 + 4);
+    // forced interleaving: two claimers hold at the waiting-list read with ONE slot free → at most one dispatch
+    activeFull()[0].state = 'done';
+    let gate = 0, release;
+    const both = new Promise(r => { release = r; });
+    Q.hook = async (d, M) => { if (M === 'GET' && d.includes('runs?state=eq.queued&dispatched_at=is.null')) { gate++; if (gate === 2) release(); await both; } };
+    await Promise.all([call('/api/runs/sweep', { method: 'POST', headers: owner33 }), worker.scheduled({}, env, null)]);
+    Q.hook = null;
+    assert.ok(activeFull().length <= 2, 'never three at once');
+    await cronTick(env);
+    assert.equal(activeFull().length, 2);
+    assert.equal(Q.rows.filter(r => r.state === 'queued' && !r.dispatched_at).length, 0, 'all five ran');
   } finally { Q = null; }
 });
 
@@ -1299,6 +1448,7 @@ const NO_SPEC_TXT = "हे प्रकरण या सुविधेपू�
 
 test('draft edit: /api/edit dispatches edit_drafts at once (dispatched_at), queue ignores edit runs, one run per case both ways', async () => {
   Q = { rows: [], nextId: 700 }; monthRuns = []; dispatchFail = false; acts.length = 0;
+  setParallel('1');   // these steps describe the one-by-one queue (max_parallel_runs 1)
   [701, 702, 703].forEach(c => specCases.add(c));
   try {
     const n0 = dispatchEvents().length;
@@ -1352,7 +1502,7 @@ test('draft edit: /api/edit dispatches edit_drafts at once (dispatched_at), queu
     ec = await body(await call(`/api/engine/config?run_id=${e3.id}`, { headers: { authorization: `Bearer ${tokenOf(e3.id)}` } }));
     assert.equal(ec.model_edit, 'claude-haiku-4-5');
     env.SETTINGS.m.delete('model_edit');
-  } finally { Q = null; }
+  } finally { setParallel(null); Q = null; }
 });
 
 test('draft edit: validation — target, message, attachments (this case, kinds, ≤ 5), no_spec, read-only, budget, dispatch failure', async () => {
@@ -1402,6 +1552,7 @@ test('draft edit: validation — target, message, attachments (this case, kinds,
 
 test('draft edit: migration 0013 missing → 409 migration_missing; the queue still works without runs.kind; edit sweep at 30 min', async () => {
   Q = { rows: [], nextId: 800 }; monthRuns = []; dispatchFail = false;
+  setParallel('1');   // these steps describe the one-by-one queue (max_parallel_runs 1)
   specCases.add(801);
   try {
     editColumns = false;
@@ -1434,7 +1585,7 @@ test('draft edit: migration 0013 missing → 409 migration_missing; the queue st
     assert.equal(dispatchEvents().at(-1).event_type, 'edit_drafts');
     assert.ok(!('dispatched_at' in runInserts.at(-1)), 'row without dispatched_at');
     assert.equal(runInserts.at(-1).kind, 'edit');
-  } finally { Q = null; editColumns = true; }
+  } finally { setParallel(null); Q = null; editColumns = true; }
 });
 
 test('draft edit: upload accepts kind gr (chat attachment)', async () => {
