@@ -8,6 +8,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TOOL = os.path.join(ROOT, "tools", "engine_supabase.py")
 KEY = "test-service-key"
+DBTOK = "d" * 48   # S-F2: the runner-only DB token of the Worker proxy (engine_isolation on)
 PROP = "प्रस्ताव CR 130 मूळ.pdf"
 
 DB = {
@@ -57,7 +58,11 @@ class H(BaseHTTPRequestHandler):
         LOG.append({"m": self.command, "path": path, "q": q, "body": body, "h": self.headers})
         if path == "/api/engine/step":  # Worker route (H1): run token, no Supabase key
             WSTEPS.append({"auth": self.headers.get("Authorization"), "body": json.loads(body)}); return self.send(200, {"ok": True})
-        if self.headers.get("apikey") != KEY or self.headers.get("Authorization") != f"Bearer {KEY}":
+        if path.startswith("/api/engine/sb/"):   # S-F2 Worker proxy (isolation on): DB token, never a Supabase key
+            if self.headers.get("apikey") or self.headers.get("Authorization") != f"Bearer {DBTOK}":
+                return self.send(403, {"error": "bad token"})
+            path = path[len("/api/engine/sb"):]
+        elif self.headers.get("apikey") != KEY or self.headers.get("Authorization") != f"Bearer {KEY}":
             return self.send(401, {"error": "auth"})
         if path.startswith("/storage/v1/object/"):
             key = path[len("/storage/v1/object/"):]
@@ -1256,6 +1261,31 @@ check(r.returncode == 1 and run_row["state"] == "failed" and "श्री." not
 check(es0.log_safe_lines(["OK: fonts", "FAIL: note पृ. references — पृ.99/प.वि. श्री. नाव", "WARN: x श्री. नाव", "ALL OK | pages 3 | toc 2"])
       == ["OK: fonts", "FAIL: note पृ. references", "ALL OK | pages 3 | toc 2", "WARN lines: 1 (details: runner-private log)"],
       "log_safe_lines: check names only, WARN counted")
+
+# --- S-F2 (engine_isolation on): no service key in env / secrets file -> every call through the Worker proxy
+sec = os.path.join(tmp, "secrets_iso.env")
+open(sec, "w", encoding="utf-8").write(f"SUPABASE_URL={BASE}\nENGINE_DB_TOKEN={DBTOK}\n")
+penv = {k: v for k, v in os.environ.items() if k not in ("SUPABASE_SERVICE_KEY", "SUPABASE_URL")}
+penv.update(ENGINE_SECRETS=sec, WORKER=BASE, CASE_ID="7", RUN_ID="11", PYTHONIOENCODING="utf-8",
+            ENGINE_WORK_DIR=os.path.join(tmp, "no-such-engine-work"))
+prun = lambda *a: subprocess.run([sys.executable, TOOL, *a], env=penv, capture_output=True, text=True, encoding="utf-8")
+run_row.update(state="queued", warnings=[])
+n0 = len(LOG)
+r = prun("fetch", os.path.join(tmp, "case_proxy"))
+check(r.returncode == 0 and run_row["state"] == "running"
+      and open(os.path.join(tmp, "case_proxy", "in", "proposal", PROP), "rb").read() == b"%PDF new",
+      f"proxy: fetch (REST + Storage) through /api/engine/sb ({r.stderr.strip()[:200]})")
+r = prun("warn", "प्रॉक्सी इशारा"); check(r.returncode == 0 and "प्रॉक्सी इशारा" in run_row["warnings"], "proxy: warn")
+r = prun("step", "प्रॉक्सी पायरी"); check(r.returncode == 0 and run_row["step"] == "प्रॉक्सी पायरी", "proxy: step (direct DB write, not /api/engine/step)")
+new_calls = LOG[n0:]
+check(new_calls and all(l["path"].startswith("/api/engine/sb/") and not l["h"].get("apikey")
+                        and l["h"].get("Authorization") == f"Bearer {DBTOK}" for l in new_calls),
+      f"proxy: every call to /api/engine/sb with the DB token, no apikey ({len(new_calls)} calls)")
+open(sec, "w", encoding="utf-8").write(f"SUPABASE_URL={BASE}\nSUPABASE_SERVICE_KEY={KEY}\nENGINE_DB_TOKEN={DBTOK}\n")
+n0 = len(LOG)
+r = prun("step", "सेवा-की पायरी")
+check(r.returncode == 0 and run_row["step"] == "सेवा-की पायरी" and all(l["path"].startswith("/rest/v1/") and l["h"].get("apikey") == KEY for l in LOG[n0:]),
+      "isolation off (service key present): direct Supabase exactly as before, the DB token is ignored")
 
 srv.shutdown()
 print("ALL TESTS PASSED")

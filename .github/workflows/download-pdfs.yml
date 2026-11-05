@@ -8,7 +8,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262   # v4.4.0
+        with: { fetch-depth: 1, persist-credentials: false }   # S-F14: the commit step authenticates itself
       # audit 05.11.2026 R-F13: download to a temp file, move into pdf/ only on success (%PDF header); a failure never
       # deletes a file that is already in the repo.
       - name: Download PDFs listed in pdf-list.tsv
@@ -33,7 +34,11 @@ jobs:
           echo "downloaded=$ok failed=$fail"
       - name: Commit PDFs
         timeout-minutes: 10
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}   # this step only (checkout keeps no credentials)
         run: |
+          # S-F14: checkout keeps no credentials; the token reaches git only via an env-based credential helper
+          git config credential.helper '!f() { test "$1" = get || exit 0; echo username=x-access-token; echo "password=$GH_TOKEN"; }; f'
           git config user.name "github-actions"
           git config user.email "actions@github.com"
           git pull --rebase origin main || true

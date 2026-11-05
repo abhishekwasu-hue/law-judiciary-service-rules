@@ -64,22 +64,28 @@ jobs:
             esac
             echo "$R" > "$RP/fail_reason.txt"; rm -f "$RP/cfg.json"; echo "config: HTTP $CODE"; exit 1
           fi
-          for k in anthropic_api_key supabase_url supabase_service_key; do
+          for k in anthropic_api_key supabase_url supabase_service_key db_token; do
             V=$(jq -r ".$k // empty" "$RP/cfg.json")
             if [ -n "$V" ]; then echo "::add-mask::$V"; fi
           done
           A=$(jq -r '.anthropic_api_key // empty' "$RP/cfg.json")
           U=$(jq -r '.supabase_url // empty' "$RP/cfg.json")
           S=$(jq -r '.supabase_service_key // empty' "$RP/cfg.json")
+          # S-F2 (KV engine_isolation "on", docs/ENGINE_ISOLATION.md): no service key; a DB token for the Worker proxy
+          # /api/engine/sb (this run's case only) instead. Off: the Worker sends neither field.
+          DT=$(jq -r '.db_token // empty' "$RP/cfg.json")
+          ISO=$(jq -r '.engine_isolation // empty' "$RP/cfg.json")
           M=$(jq -r '.model_edit // empty' "$RP/cfg.json")
           rm -f "$RP/cfg.json"
-          if [ -z "$A" ] || [ -z "$U" ] || [ -z "$S" ]; then
+          if [ -z "$A" ] || [ -z "$U" ] || { [ -z "$S" ] && [ -z "$DT" ]; } || { [ "$ISO" = on ] && [ -z "$DT" ]; }; then
             echo "सेटिंग्ज अपूर्ण आहेत. कृपया Settings मधील Anthropic key व Supabase तपासून सुधारणा पुन्हा पाठवावी, ही विनंती." > "$RP/fail_reason.txt"
             echo "config incomplete (Settings)"; exit 1
           fi
           # secrets only into the runner's 700 file (read by engine_supabase.py / edit_drafts.py), never the job env
           ( umask 077; mkdir -p "$(dirname "$ENGINE_SECRETS")"; chmod 700 "$(dirname "$ENGINE_SECRETS")"
-            { echo "ANTHROPIC_API_KEY=$A"; echo "SUPABASE_URL=$U"; echo "SUPABASE_SERVICE_KEY=$S"; } > "$ENGINE_SECRETS" )
+            { echo "ANTHROPIC_API_KEY=$A"; echo "SUPABASE_URL=$U"
+              if [ -n "$S" ]; then echo "SUPABASE_SERVICE_KEY=$S"; fi
+              if [ -n "$DT" ]; then echo "ENGINE_DB_TOKEN=$DT"; fi; } > "$ENGINE_SECRETS" )
           # the edit model (KV setting model_edit, default claude-sonnet-5-5); an invalid name -> the default
           if [[ "$M" =~ ^[A-Za-z0-9][A-Za-z0-9._:@/-]{1,99}$ ]]; then echo "MODEL_EDIT=$M" >> "$GITHUB_ENV"; fi
       - name: Record log URL

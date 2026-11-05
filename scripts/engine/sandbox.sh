@@ -13,6 +13,9 @@
 #                                       and restored (git checkout HEAD + git clean, allowed paths excluded); exit 3 then.
 #   scrub <dir>...                      delete symlinks, hard-linked files and special files (fifo/socket/device) that
 #                                       `engine` left in its output dirs, before the runner chowns/reads them.
+# SANDBOX_HIDE_RAW=1 (only with KV engine_isolation "on", S-F1 (c), docs/ENGINE_ISOLATION.md): `up` also covers the raw
+# old-case zips (<repo>/*.zip, precedent-library/*.zip) and .git (its pack holds the same zips) inside <mount> with
+# empty read-only placeholders; `engine` reads only the extracted text (/tmp/old) and library (/tmp/precedent).
 # Run this script only from the root-owned snapshot (/opt/engine-scripts), never from the workspace.
 set -euo pipefail
 
@@ -61,6 +64,7 @@ cmd_up() {
   for f in "${ALLOWED_FILES[@]}"; do
     sudo mount --bind "$rw/files/$(basename "$f")" "$mnt/$f"
   done
+  if [ "${SANDBOX_HIDE_RAW:-}" = 1 ]; then hide_raw "$mnt" "$rw"; fi
   # self-test: the repo is read-only for `engine`, the allowed paths are writable
   if sudo -u engine test -w "$mnt/tools" || sudo -u engine test -w "$mnt/.git" || sudo -u engine test -w "$mnt"; then
     die "repo mount is writable for engine"
@@ -68,6 +72,23 @@ cmd_up() {
   sudo -u engine test -w "$mnt/$ALLOWED_DIR" || die "$ALLOWED_DIR is not writable for engine"
   if sudo -u engine touch "$mnt/tools/.sandbox-probe" 2>/dev/null; then die "engine could write into tools/"; fi
   echo "sandbox up: $mnt (ro) + writable $ALLOWED_DIR ${ALLOWED_FILES[*]}"
+}
+
+hide_raw() {  # hide_raw <mount> <rwdir>: empty read-only placeholders over the raw zips and .git (S-F1 (c))
+  local mnt=$1 rw=$2 z n=0
+  sudo mkdir -p "$rw/empty-dir"; sudo touch "$rw/empty-file"; sudo chmod 444 "$rw/empty-file"; sudo chmod 555 "$rw/empty-dir"
+  shopt -s nullglob
+  for z in "$mnt"/*.zip "$mnt"/precedent-library/*.zip; do
+    sudo mount --bind "$rw/empty-file" "$z"; sudo mount -o remount,ro,bind "$z"; n=$((n + 1))
+  done
+  shopt -u nullglob
+  if [ -d "$mnt/.git" ]; then sudo mount --bind "$rw/empty-dir" "$mnt/.git"; sudo mount -o remount,ro,bind "$mnt/.git"; fi
+  for z in "$mnt"/*.zip "$mnt"/precedent-library/*.zip; do
+    [ -e "$z" ] || continue
+    if sudo -u engine test -s "$z"; then die "raw zip still readable for engine: $(basename "$z")"; fi
+  done
+  if [ -d "$mnt/.git" ] && [ -n "$(sudo -u engine ls -A "$mnt/.git" 2>/dev/null)" ]; then die ".git still readable for engine"; fi
+  echo "sandbox: raw zips hidden ($n) + .git hidden"
 }
 
 copy_file() {  # copy_file <src> <dst>: engine-owned regular file -> runner-owned 644 (sudo: engine may chmod 600)

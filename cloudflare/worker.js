@@ -17,7 +17,10 @@ const PLAIN_KEYS = ['supabase_url', 'supabase_anon_key', 'github_repo', 'github_
   // draft edit (docs/DRAFT_EDIT_DESIGN.md): model of tools/edit_drafts.py (one Messages API call); empty = DEFAULT_MODEL_EDIT
   'model_edit',
   // queue (Abhi 05.11.2026: two full runs at the same time): full runs active at once, 1..3; empty / invalid = 2
-  'max_parallel_runs'];
+  'max_parallel_runs',
+  // S-F1 / S-F2 (audit 05.11.2026, docs/ENGINE_ISOLATION.md): 'on' = engine isolation (no Supabase service key to the
+  // runner: a case-scoped DB token + /api/engine/sb proxy; the workflow adds the key gateway + outbound limit); '' / 'off' = as before
+  'engine_isolation'];
 const PROVIDERS = { part1_provider: ['', 'claude', ...AI_PROVIDERS], fallback_provider: ['', ...AI_PROVIDERS], engine_provider: ['', 'claude', ...AI_PROVIDERS] };
 const MODEL_KEYS = ['gemini_model', 'part1_model', 'fallback_model', 'fallback_model_light', 'engine_model', 'engine_model_light', 'model_edit'];
 // providers this configuration uses (engine / fallback / part 1); 'claude' and '' are Anthropic
@@ -128,7 +131,7 @@ async function peekStream(body) {
   return { head: head.subarray(0, MAGIC_PEEK), stream };
 }
 // S-F10: engine progress text = one plain line (control / bidi-override characters removed, spaces folded), ≤ 200 chars
-export const cleanStep = s => String(s || '').replace(/[\u0000-\u001F\u007F-\u009F‎‏‪-‮⁦-⁩]/g, ' ')
+export const cleanStep = s => String(s || '').replace(/[\u0000-\u001F\u007F-\u009F\u200E\u200F\u202A-\u202E\u2066-\u2069]/g, ' ')
   .replace(/\s+/g, ' ').trim().slice(0, 200);
 const BAD_FILE_TYPE = 'हा फाइल-प्रकार स्वीकारता येत नाही. कृपया PDF, Word (DOC / DOCX) किंवा प्रतिमा (JPG / PNG / TIF) फाइल जोडावी, ही विनंती.';
 // L-F4: estimate of one edit run when no edit has a cost yet (measured ~$0.03 per edit)
@@ -218,6 +221,144 @@ function sb(cfg) {
   };
 }
 const encodePath = p => p.split('/').map(encodeURIComponent).join('/');
+
+// ---------- engine isolation (S-F1 / S-F2, audit 05.11.2026; docs/ENGINE_ISOLATION.md) ----------
+// KV engine_isolation 'on': /api/engine/config sends no Supabase service key. It issues a second token, kept by the
+// RUNNER only (its 700 secrets file; the `engine` user gets only the run token for step / fail):
+// KV run_db:<token> = {run_id, case_id, exp}. With it the runner's tools (engine_supabase.py, edit_drafts.py) reach
+// Supabase through /api/engine/sb/<rest/v1/… | storage/v1/object/…>: the Worker checks every request against that
+// run's case (tables, filters, fields, Storage paths) and forwards it with the service key.
+export const isolationOn = cfg => String((cfg && cfg.engine_isolation) || '').trim().toLowerCase() === 'on';
+async function issueDbToken(env, run, exp) {
+  const t = randomToken();
+  await env.SETTINGS.put(`run_db:${t}`, JSON.stringify({ run_id: String(run.id), case_id: String(run.case_id), exp }), { expiration: exp });
+  return t;
+}
+async function dbToken(env, req) {
+  const t = (req.headers.get('authorization') || '').replace(/^Bearer /, '').trim();
+  if (!/^[0-9a-f]{48}$/.test(t)) return null;
+  let rec;
+  try { rec = JSON.parse((await env.SETTINGS.get(`run_db:${t}`)) || 'null'); } catch { rec = null; }
+  if (!rec || !isId(rec.run_id) || !isId(rec.case_id)) return null;
+  if (rec.exp && rec.exp < Math.floor(Date.now() / 1000)) return null;
+  return { run_id: String(rec.run_id), case_id: String(rec.case_id) };
+}
+// what the engine tools write (tools/engine_supabase.py patch_run / fill_case / insert_row / activity; edit_drafts.py).
+// A new runs / cases field written by those tools must be added here, or the proxy refuses it (403).
+const RUN_PATCH_FIELDS = ['state', 'started_at', 'finished_at', 'step', 'summary', 'letter_needed', 'essential_points',
+  'grs_attached', 'grs_missing', 'warnings', 'log_url', 'cost_usd', 'num_turns', 'duration_s', 'edit_result'];
+const RUN_STATES = ['running', 'done', 'failed'];
+const CASE_PATCH_FIELDS = ['stage', 'cr_no', 'cr_year', 'file_no', 'subject', 'category'];
+const OUTPUT_KINDS = ['package_pdf', 'study', 'note_letter', 'order_draft', 'parawise', 'affidavit', 'lq_answer', 'spec'];
+const FILE_ROW_FIELDS = ['case_id', 'kind', 'storage_path', 'original_name', 'version', 'uploaded_by'];
+const SB_FILTER_KEYS = { runs: ['id', 'case_id', 'state'], cases: ['id', 'cr_no', 'cr_year'], case_files: ['case_id', 'kind'], activity: [] };
+const SB_SELECT = /^(\*|[a-z_]+)(,(\*|[a-z_]+))*$/;            // no embedding (no parentheses): one table only
+const SB_ORDER = /^[a-z_]+(\.(asc|desc))?(,[a-z_]+(\.(asc|desc))?)*$/;
+const SB_FILTER = /^(eq|neq|gt|gte|lt|lte|is)\.[A-Za-z0-9_.:-]*$|^in\.\([a-z_,]+\)$/;
+const SB_PREFER = /^return=(minimal|representation)$/;
+const OBJ_PATH = /^\d+\/[a-z_]+\/v\d+\/(r\d+\/)?[A-Za-z0-9._-]{1,80}$/;   // engine_supabase put_object / spec_object keys
+const OBJ_TYPES = ['application/pdf', 'application/json', 'application/octet-stream',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+const onlyKeys = (o, keys) => o && typeof o === 'object' && !Array.isArray(o) && Object.keys(o).every(k => keys.includes(k));
+// → null (allowed) or the reason (403). params = URLSearchParams of the PostgREST request; scope = {run_id, case_id}.
+export function engineRestCheck(method, table, params, body, scope) {
+  const keys = SB_FILTER_KEYS[table];
+  if (!keys) return 'table';
+  const f = {};
+  for (const [k, v] of params) {
+    if (k === 'select') { if (!SB_SELECT.test(v)) return 'select'; continue; }
+    if (k === 'order') { if (!SB_ORDER.test(v)) return 'order'; continue; }
+    if (k === 'limit') { if (!/^\d{1,4}$/.test(v)) return 'limit'; continue; }
+    if (!keys.includes(k) || !SB_FILTER.test(v)) return `filter ${k}`;
+    (f[k] ||= []).push(v);
+  }
+  const has = (k, v) => (f[k] || []).includes(v);
+  const R = `eq.${scope.run_id}`, C = `eq.${scope.case_id}`, cid = Number(scope.case_id);
+  if (table === 'runs') {
+    if (method === 'GET') return has('id', R) || has('case_id', C) ? null : 'scope';
+    if (method !== 'PATCH') return 'method';
+    if (!has('id', R)) return 'scope';
+    if (!onlyKeys(body, RUN_PATCH_FIELDS) || !Object.keys(body).length) return 'fields';
+    if ('state' in body && !RUN_STATES.includes(body.state)) return 'state';
+    return null;
+  }
+  if (table === 'cases') {
+    if (method === 'GET') {
+      if (has('id', C)) return null;
+      // fill_case's duplicate check: ids only, of other cases with that C R / year
+      return params.get('select') === 'id' && has('id', `neq.${scope.case_id}`) && f.cr_no && f.cr_year ? null : 'scope';
+    }
+    if (method !== 'PATCH') return 'method';
+    return has('id', C) && onlyKeys(body, CASE_PATCH_FIELDS) && Object.keys(body).length ? null : 'scope';
+  }
+  if (table === 'case_files') {
+    if (method === 'GET') return has('case_id', C) ? null : 'scope';
+    if (method !== 'POST' || Object.keys(f).length) return 'method';
+    const rows = Array.isArray(body) ? body : [body];
+    const ok = rows.length > 0 && rows.length <= 20 && rows.every(r => onlyKeys(r, FILE_ROW_FIELDS) && r.case_id === cid &&
+      OUTPUT_KINDS.includes(r.kind) && r.uploaded_by == null && typeof r.storage_path === 'string' &&
+      r.storage_path.startsWith(`outputs/${cid}/`) && OBJ_PATH.test(r.storage_path.slice('outputs/'.length)));
+    return ok ? null : 'row';
+  }
+  // activity: insert only, this case, no actor
+  if (method !== 'POST' || Object.keys(f).length) return 'method';
+  return onlyKeys(body, ['case_id', 'actor', 'action', 'detail']) && body.case_id === cid && body.actor == null &&
+    typeof body.action === 'string' && /^[a-z_]{1,40}$/.test(body.action) ? null : 'row';
+}
+// Storage: write / delete only under outputs/<case>/…; read outputs/<case>/… or any object a case_files row of this
+// case points to (the case's own uploads in proposals / gr-library). → 'row' = the caller must look up that row.
+export function engineStorageCheck(method, bucket, path, scope) {
+  if (!SIGN_BUCKETS.includes(bucket) || !path || path.split('/').some(s => !s || s === '.' || s === '..')) return 'path';
+  const own = bucket === 'outputs' && path.startsWith(`${Number(scope.case_id)}/`) && OBJ_PATH.test(path);
+  if (method === 'POST' || method === 'DELETE') return own ? null : 'scope';
+  if (method !== 'GET') return 'method';
+  return own ? null : 'row';
+}
+async function engineSb(req, env, cfg, sub) {
+  const scope = await dbToken(env, req);
+  if (!scope) return bad('bad token', 403);
+  if (!cfg.supabase_url || !cfg.supabase_service_key) return bad('not configured', 503);
+  const M = req.method, base = cfg.supabase_url.replace(/\/$/, '');
+  const h = { apikey: cfg.supabase_service_key, Authorization: `Bearer ${cfg.supabase_service_key}` };
+  const url = new URL(req.url);
+  const pass = async r => new Response(r.body, { status: r.status, headers: { 'content-type': r.headers.get('content-type') || 'application/json' } });
+  let m = sub.match(/^\/rest\/v1\/([a-z_]+)$/);
+  if (m) {
+    const table = m[1];
+    let text = null, body = null;
+    if (M === 'PATCH' || M === 'POST') {
+      text = await req.text();
+      if (text.length > 1024 * 1024) return bad('too large', 413);
+      try { body = JSON.parse(text); } catch { return bad('bad json'); }
+    } else if (M !== 'GET') return bad('method', 405);
+    const why = engineRestCheck(M, table, url.searchParams, body, scope);
+    if (why) return bad(`refused: ${why}`, 403);
+    const prefer = req.headers.get('prefer') || '';
+    const r = await fetch(`${base}/rest/v1/${table}?${url.searchParams.toString()}`, { method: M,
+      headers: { ...h, 'content-type': 'application/json', ...(SB_PREFER.test(prefer) ? { Prefer: prefer } : {}) }, body: text });
+    return pass(r);
+  }
+  m = sub.match(/^\/storage\/v1\/object\/([a-z-]+)\/(.+)$/);
+  if (!m) return bad('not found', 404);
+  let path;
+  try { path = m[2].split('/').map(decodeURIComponent).join('/'); } catch { return bad('bad path'); }
+  const bucket = m[1];
+  const why = engineStorageCheck(M, bucket, path, scope);
+  if (why === 'row') {
+    const rows = await sb(cfg).rest(`case_files?case_id=eq.${Number(scope.case_id)}&storage_path=eq.${encodeURIComponent(`${bucket}/${path}`)}&select=id&limit=1`);
+    if (!rows || !rows.length) return bad('refused: scope', 403);
+  } else if (why) return bad(`refused: ${why}`, 403);
+  const target = `${base}/storage/v1/object/${bucket}/${encodePath(path)}`;
+  if (M === 'GET') return pass(await fetch(target, { headers: h }));
+  if (M === 'DELETE') return pass(await fetch(target, { method: 'DELETE', headers: h }));
+  const len = Number(req.headers.get('content-length') || 0);
+  if (len > MAX_UPLOAD) return bad('file over 50 MB', 413);
+  const data = await req.arrayBuffer();
+  if (data.byteLength > MAX_UPLOAD) return bad('file over 50 MB', 413);
+  const type = (req.headers.get('content-type') || 'application/octet-stream').split(';')[0].trim().toLowerCase();
+  if (!OBJ_TYPES.includes(type)) return bad('content type', 415);
+  return pass(await fetch(target, { method: 'POST', headers: { ...h, 'content-type': type, 'x-upsert': 'true' }, body: data }));
+}
 
 // ---------- auth ----------
 async function currentUser(req, cfg) {
@@ -813,6 +954,14 @@ async function route(req, env, url) {
     // other providers: a key is sent only when its provider is chosen (A: part 1 on Gemini; C: fallback provider)
     // a provider key leaves the Worker only when that provider is chosen (engine / fallback / part 1)
     for (const pv of usedProviders(cfg)) if (cfg[PROVIDER_KEY[pv]]) out[PROVIDER_KEY[pv]] = cfg[PROVIDER_KEY[pv]];
+    // S-F2: isolation on → no service key leaves the Worker; a runner-only DB token for /api/engine/sb (this run's case)
+    if (isolationOn(cfg)) {
+      const [run] = (await sb(cfg).rest(`runs?id=eq.${Number(tok.run_id)}&select=id,case_id`)) || [];
+      if (!run) return bad('bad token', 403);
+      delete out.supabase_service_key;
+      out.engine_isolation = 'on';
+      out.db_token = await issueDbToken(env, run, exp);
+    }
     for (const k of ['part1_provider', 'gemini_model', 'part1_model', 'fallback_provider', 'fallback_model', 'fallback_model_light',
       'engine_provider', 'engine_model', 'engine_model_light', 'cloudflare_account_id', 'ollama_base_url']) out[k] = cfg[k] || '';
     return json(out);
@@ -856,6 +1005,9 @@ async function route(req, env, url) {
     const rows = await sb(cfg).rest(`runs?id=eq.${Number(tok.run_id)}&state=in.(queued,running)`, { method: 'PATCH', body: JSON.stringify({ step }) });
     return json({ ok: true, changed: (rows || []).length });
   }
+
+  // engine (S-F2, isolation on): Supabase REST / Storage for the runner by its DB token, scoped to that run's case
+  if (p.startsWith('/api/engine/sb/')) return engineSb(req, env, cfg, p.slice('/api/engine/sb'.length));
 
   if (!configured) return bad('not configured', 503);
   const user = await currentUser(req, cfg);
@@ -931,6 +1083,8 @@ async function route(req, env, url) {
     // max_parallel_runs: empty = 2; otherwise a whole number 1..3 (full engine runs at the same time)
     if ('max_parallel_runs' in b && b.max_parallel_runs !== null && String(b.max_parallel_runs).trim() !== '' && !/^[1-3]$/.test(String(b.max_parallel_runs).trim()))
       return bad('max_parallel_runs: whole number 1 to 3');
+    if ('engine_isolation' in b && b.engine_isolation !== null && !['', 'off', 'on'].includes(String(b.engine_isolation).trim().toLowerCase()))
+      return bad('engine_isolation: on, off or empty');
     for (const [k, ok] of Object.entries(PROVIDERS))
       if (k in b && b[k] !== null && !ok.includes(String(b[k]).trim())) return bad(`${k}: one of ${ok.filter(Boolean).join(', ')} or empty`);
     if ('cloudflare_account_id' in b && b.cloudflare_account_id !== null && String(b.cloudflare_account_id).trim() !== '' && !/^[0-9a-f]{32}$/.test(String(b.cloudflare_account_id).trim()))

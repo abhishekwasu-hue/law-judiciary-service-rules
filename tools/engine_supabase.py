@@ -165,8 +165,16 @@ def lookup(k):
     return os.environ.get(k, "").strip() or secret_file_values().get(k, "")
 
 
+def proxy_mode():
+    """S-F2 (audit 05.11.2026, docs/ENGINE_ISOLATION.md; KV engine_isolation "on"): the secrets file holds no Supabase
+    service key but a runner-only DB token (ENGINE_DB_TOKEN) -> every REST / Storage call goes to the Worker
+    (WORKER/api/engine/sb/...), which checks it against this run's case and forwards it. A service key always wins."""
+    return (not lookup("SUPABASE_SERVICE_KEY") and bool(lookup("ENGINE_DB_TOKEN"))
+            and bool(re.match(r"https?://[A-Za-z0-9.-]+(:\d+)?$", lookup("WORKER"))))
+
+
 def has_supabase():
-    return bool(lookup("SUPABASE_URL") and lookup("SUPABASE_SERVICE_KEY"))
+    return bool(lookup("SUPABASE_URL") and lookup("SUPABASE_SERVICE_KEY")) or proxy_mode()
 
 
 def env(k):
@@ -176,12 +184,15 @@ def env(k):
     return v
 
 
-BASE = CASE = RUN = KEY = None
+BASE = CASE = RUN = KEY = DB_TOKEN = None
 
 
 def init():
-    global BASE, CASE, RUN, KEY
-    BASE, KEY = env("SUPABASE_URL").rstrip("/"), env("SUPABASE_SERVICE_KEY")
+    global BASE, CASE, RUN, KEY, DB_TOKEN
+    if proxy_mode():   # S-F2: the Worker proxy (same URL paths after BASE; DB token instead of the service key)
+        BASE, KEY, DB_TOKEN = lookup("WORKER").rstrip("/") + "/api/engine/sb", None, lookup("ENGINE_DB_TOKEN")
+    else:
+        BASE, KEY = env("SUPABASE_URL").rstrip("/"), env("SUPABASE_SERVICE_KEY")
     CASE, RUN = env("CASE_ID"), env("RUN_ID")
     if not (CASE.isdigit() and RUN.isdigit()):
         print("engine_supabase: CASE_ID / RUN_ID must be numeric", file=sys.stderr); sys.exit(2)
@@ -199,6 +210,8 @@ USER_AGENT = "prastav-kaksha-engine/1"
 
 def http(method, url, body=None, headers=None, raw=False):
     h = {"apikey": KEY, "Authorization": f"Bearer {KEY}", "User-Agent": USER_AGENT}
+    if DB_TOKEN and not KEY:   # S-F2 proxy: the Worker takes the DB token; no Supabase key exists on this side
+        h = {"Authorization": f"Bearer {DB_TOKEN}", "User-Agent": USER_AGENT}
     h.update(headers or {})
     data = body
     if body is not None and not isinstance(body, (bytes, bytearray)):

@@ -90,27 +90,34 @@ jobs:
             echo "$R" > "$RP/fail_reason.txt"; rm -f "$RP/cfg.json"; echo "config: HTTP $CODE"; exit 1
           fi
           PKEYS="gemini_api_key openai_api_key openrouter_api_key groq_api_key mistral_api_key cerebras_api_key cloudflare_api_token ollama_api_key"
-          for k in anthropic_api_key supabase_url supabase_service_key $PKEYS model; do
+          for k in anthropic_api_key supabase_url supabase_service_key db_token $PKEYS model; do
             V=$(jq -r ".$k // empty" "$RP/cfg.json")
             if [ -n "$V" ]; then echo "::add-mask::$V"; fi
           done
           A=$(jq -r '.anthropic_api_key // empty' "$RP/cfg.json")
           U=$(jq -r '.supabase_url // empty' "$RP/cfg.json")
           S=$(jq -r '.supabase_service_key // empty' "$RP/cfg.json")
+          # S-F2 (KV engine_isolation "on", docs/ENGINE_ISOLATION.md): no service key; a runner-only DB token for the
+          # Worker proxy /api/engine/sb (this run's case only) instead. Off: the Worker sends neither field.
+          DT=$(jq -r '.db_token // empty' "$RP/cfg.json")
+          ISO=$(jq -r '.engine_isolation // empty' "$RP/cfg.json")
           PSEC=""   # other providers' keys (sent by the Worker only for a chosen provider) as KEY=VALUE lines
           for k in $PKEYS; do V=$(jq -r ".$k // empty" "$RP/cfg.json"); [ -n "$V" ] && PSEC+="$(echo "$k" | tr '[:lower:]' '[:upper:]')=$V"$'\n'; done
           # non-secret settings: model tiers + soft budget (engine_supabase.py config; invalid/missing -> defaults)
           python3 "$T/engine_supabase.py" config "$RP/cfg.json" > "$RP/engine_conf.env" || : > "$RP/engine_conf.env"
           rm -f "$RP/cfg.json"
           EP=$(sed -n 's/^ENGINE_PROVIDER=//p' "$RP/engine_conf.env")   # another provider runs the engine -> no Anthropic key needed
-          if { [ -z "$A" ] && [ -z "$EP" ]; } || [ -z "$U" ] || [ -z "$S" ]; then
+          if { [ -z "$A" ] && [ -z "$EP" ]; } || [ -z "$U" ] || { [ -z "$S" ] && [ -z "$DT" ]; } || { [ "$ISO" = on ] && [ -z "$DT" ]; }; then
             echo "सेटिंग्ज अपूर्ण — Settings मधील AI key (Anthropic किंवा निवडलेला AI) व Supabase तपासा, नंतर पुन्हा तयार करा." > "$RP/fail_reason.txt"
             echo "config incomplete (Settings)"; exit 1
           fi
           # secrets: only into the runner's 700 file (read by engine_supabase.py and by the steps that need them)
           ( umask 077; mkdir -p "$(dirname "$ENGINE_SECRETS")"; chmod 700 "$(dirname "$ENGINE_SECRETS")"
-            { echo "ANTHROPIC_API_KEY=$A"; echo "SUPABASE_URL=$U"; echo "SUPABASE_SERVICE_KEY=$S"
+            { echo "ANTHROPIC_API_KEY=$A"; echo "SUPABASE_URL=$U"
+              if [ -n "$S" ]; then echo "SUPABASE_SERVICE_KEY=$S"; fi
+              if [ -n "$DT" ]; then echo "ENGINE_DB_TOKEN=$DT"; fi
               printf '%s' "$PSEC"; } > "$ENGINE_SECRETS" )
+          if [ "$ISO" = on ]; then echo "ENGINE_ISOLATION=on" >> "$GITHUB_ENV"; echo "engine isolation: on"; fi
           grep -E '^(MODEL|MODEL_LIGHT|MODEL_REVIEW|MODEL_STRONG|MODEL_FIXER|EFFORT|BUDGET_USD|ENGINE_PROVIDER|ENGINE_MODEL|ENGINE_MODEL_LIGHT|PART1_PROVIDER|PART1_MODEL|GEMINI_MODEL|FALLBACK_PROVIDER|FALLBACK_MODEL|FALLBACK_MODEL_LIGHT|CLOUDFLARE_ACCOUNT_ID|OLLAMA_BASE_URL)=[][A-Za-z0-9._:@/-]*$' "$RP/engine_conf.env" >> "$GITHUB_ENV" || true
           rm -f "$RP/engine_conf.env"
       - name: Record log URL
@@ -289,7 +296,8 @@ jobs:
 
           # ---- H1: the `engine` user and its READ-ONLY view of the repo (writable: pdf/gr, tools/gr-request*.txt) ----
           ME="$(id -u):$(id -g)"
-          if ! "$SB" up "$GITHUB_WORKSPACE" /srv/engine /srv/engine-rw; then
+          HIDE=""; [ "${ENGINE_ISOLATION:-}" = on ] && HIDE=1   # S-F1 (c): raw old-case zips + .git hidden from `engine`
+          if ! SANDBOX_HIDE_RAW="$HIDE" "$SB" up "$GITHUB_WORKSPACE" /srv/engine /srv/engine-rw; then
             "$SB" down "$GITHUB_WORKSPACE" /srv/engine /srv/engine-rw || true
             mv "$RP/CLAUDE.md.repo" CLAUDE.md
             ES fail "इंजिनचे सुरक्षित वातावरण (read-only repo) तयार झाले नाही — पुन्हा तयार करा."; exit 1
@@ -344,6 +352,61 @@ jobs:
             else
               tail -n 20 "$RP/litellm.log" 2>/dev/null || true
               echo "मुख्य AI ($ENGINE_PROVIDER) सुरू झाले नाही — Settings मधील त्याची key / मॉडेल-नाव तपासा, नंतर पुन्हा तयार करा." > "$RP/fail_reason.txt"
+              SKIP_MAIN=1
+            fi
+          fi
+
+          # ---- S-F1 (KV engine_isolation "on" only; docs/ENGINE_ISOLATION.md). Off: nothing below runs. ----
+          # (a) the Anthropic key stays with the runner: a second local LiteLLM gateway (runner user, 127.0.0.1:4001, its
+          # own random master key, files in $RP) passes /anthropic/* through to api.anthropic.com UNCHANGED (any model
+          # name, prompt caching, streaming, beta headers) and adds the real key itself; `engine` gets only the gateway
+          # URL + master key (an engine-provider / fallback gateway on :4000 already keeps the provider key outside).
+          # (b) outbound: tools/egress_proxy.py (runner user, 127.0.0.1:3128; only the Worker host, gr.maharashtra.gov.in,
+          # archive.org) + iptables owner match (scripts/engine/egress.sh): `engine` reaches only 127.0.0.1:4000/4001/3128.
+          # Fail closed: when any part does not come up, the run stops with a Marathi reason (rollback: KV off).
+          EG=/opt/engine-scripts/egress.sh
+          AGW_PID=""; EGP_PID=""; ISO_ENV=()
+          iso_stop() { for p in $AGW_PID $EGP_PID; do kill "$p" 2>/dev/null; wait "$p" 2>/dev/null; done; AGW_PID=""; EGP_PID=""
+                       bash "$EG" down >/dev/null 2>&1 || true; }
+          if [ "${ENGINE_ISOLATION:-}" = on ] && [ -z "$SKIP_MAIN" ]; then
+            ISO_OK=1
+            if [ -z "$ENG_USED" ]; then
+              AMK="sk-local-$(head -c 24 /dev/urandom | od -An -tx1 | tr -d ' \n')"; echo "::add-mask::$AMK"
+              if gw_install && mkdir -p "$RP/agw" \
+                 && echo '{"general_settings": {"master_key": "os.environ/LITELLM_MASTER_KEY"}}' > "$RP/agw/litellm.yaml"; then
+                ( unset ANTHROPIC_BASE_URL ANTHROPIC_API_BASE; export LITELLM_MASTER_KEY="$AMK" ANTHROPIC_API_KEY="$AK"
+                  exec "$RP/litellm-venv/bin/litellm" --config "$RP/agw/litellm.yaml" --host 127.0.0.1 --port 4001 ) >> "$RP/agw.log" 2>&1 &
+                AGW_PID=$!
+                GUP=""; for i in $(seq 1 60); do curl -sf -o /dev/null http://127.0.0.1:4001/health/liveliness && { GUP=1; break; }; sleep 2; done
+                if [ -n "$GUP" ]; then AUTH=(ANTHROPIC_BASE_URL=http://127.0.0.1:4001/anthropic ANTHROPIC_AUTH_TOKEN="$AMK")
+                else echo "isolation: key gateway did not start"; tail -n 20 "$RP/agw.log" 2>/dev/null || true; ISO_OK=""; fi
+              else echo "isolation: gateway install failed"; ISO_OK=""; fi
+            fi
+            WH=${WORKER#https://}; WH=${WH%%/*}; WH=${WH%%:*}
+            python3 -I "$T/egress_proxy.py" --port 3128 --allow "$WH" --allow gr.maharashtra.gov.in --allow archive.org \
+              --log "$RP/egress.log" > "$RP/egress.out" 2>&1 &
+            EGP_PID=$!
+            PUP=""; for i in $(seq 1 20); do (exec 3<>/dev/tcp/127.0.0.1/3128) 2>/dev/null && { PUP=1; break; }; sleep 1; done
+            [ -n "$PUP" ] || { echo "isolation: egress proxy did not start"; ISO_OK=""; }
+            if [ -n "$ISO_OK" ]; then
+              if bash "$EG" up 4000,4001,3128; then
+                bash "$EG" test 3128 "$WORKER/api/public-config" > "$RP/egress_test.txt" 2>&1; ETR=$?
+                cat "$RP/egress_test.txt"
+                if [ "$ETR" != 0 ]; then ISO_OK=""
+                elif grep -q 'WARN DNS' "$RP/egress_test.txt"; then
+                  ES note "सुरक्षा: इंजिनसाठी DNS बंद झाले नाही (इतर सर्व बाहेरील जोडण्या बंद)" || true
+                fi
+              else ISO_OK=""; fi
+            fi
+            if [ -n "$ISO_OK" ]; then
+              ISO_ENV=(HTTPS_PROXY=http://127.0.0.1:3128 https_proxy=http://127.0.0.1:3128 HTTP_PROXY=http://127.0.0.1:3128
+                       http_proxy=http://127.0.0.1:3128 NO_PROXY=127.0.0.1,localhost no_proxy=127.0.0.1,localhost
+                       CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1)
+              ERUN+=("${ISO_ENV[@]}")
+              echo "isolation: on (key gateway ${AGW_PID:+:4001}${ENG_USED:+provider :4000}, egress proxy :3128, iptables)"
+            else
+              iso_stop
+              echo "इंजिनचे सुरक्षित नेटवर्क-वातावरण (engine isolation) तयार झाले नाही — पुन्हा तयार करा; अडचण राहिल्यास मालकांनी Settings मधील engine_isolation बंद (off) करावे." > "$RP/fail_reason.txt"
               SKIP_MAIN=1
             fi
           fi
@@ -503,6 +566,7 @@ jobs:
           # ---- H1: kill every `engine` process, unmount, copy back checked GR files, check the workspace ----
           DOWN_OK=1
           "$SB" down "$GITHUB_WORKSPACE" /srv/engine /srv/engine-rw || DOWN_OK=""
+          if [ "${ENGINE_ISOLATION:-}" = on ]; then iso_stop; fi   # S-F1: gateway, egress proxy, iptables (after the kill)
           mv "$RP/CLAUDE.md.repo" CLAUDE.md
           CHECK_RC=0; "$SB" check "$GITHUB_WORKSPACE" > "$RP/check.txt" || CHECK_RC=$?
           cat "$RP/check.txt"

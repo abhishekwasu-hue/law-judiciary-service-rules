@@ -523,7 +523,7 @@ def max_tokens_for(part):
 def step(text):
     """Live progress. L-F1 (audit 05.11.2026): the edit job holds the Supabase service key, so the step is written
     DIRECTLY to Supabase (only while the run is queued / running, L-F8); the Worker route (run token) only without it."""
-    if E.KEY:
+    if E.KEY or E.DB_TOKEN:   # S-F2 (isolation on): the same write through the Worker proxy (DB token)
         try:
             E.patch_run({"step": text[:200]})
         except Exception as e:

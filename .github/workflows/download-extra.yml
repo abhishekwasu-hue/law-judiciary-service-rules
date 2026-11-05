@@ -8,7 +8,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262   # v4.4.0
+        with: { fetch-depth: 1, persist-credentials: false }   # S-F14: the commit step authenticates itself
       # audit 05.11.2026 R-F13: each PDF is downloaded to a temp file and moved into pdf/ ONLY when it arrived complete and
       # starts with %PDF. A failed download never touches (and never deletes) a file that is already in the repo; it is
       # only listed in pdf/FAILED-extra.txt.
@@ -33,7 +34,11 @@ jobs:
           rm -rf "$TMP"
       - name: Commit
         timeout-minutes: 5
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}   # this step only (checkout keeps no credentials)
         run: |
+          # S-F14: checkout keeps no credentials; the token reaches git only via an env-based credential helper
+          git config credential.helper '!f() { test "$1" = get || exit 0; echo username=x-access-token; echo "password=$GH_TOKEN"; }; f'
           git config user.name "github-actions"; git config user.email "actions@github.com"
           git add pdf
           git commit -m "Add extra rule PDFs" || echo nothing

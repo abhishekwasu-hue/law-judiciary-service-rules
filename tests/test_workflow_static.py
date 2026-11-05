@@ -47,12 +47,25 @@ class WorkflowStatic(unittest.TestCase):
                 self.assertEqual(r.returncode, 0, f"{n} / {st.get('name')}: {r.stderr}")
 
     def test_checkout_pinned_without_credentials(self):
-        for n in ("process-proposal.yml", "gr-request.yml", "retry-failed.yml", "tests.yml"):
+        # S-F14 (audit 05.11.2026): EVERY workflow — SHA-pinned checkout, no persisted credentials
+        for n in self.names:
             co = [s for s in steps(load(n)) if str(s.get("uses", "")).startswith("actions/checkout")]
             self.assertTrue(co, n)
             for s in co:
                 self.assertRegex(s["uses"], r"@[0-9a-f]{40}$", n)
                 self.assertIs(s.get("with", {}).get("persist-credentials"), False, n)
+
+    def test_push_steps_use_env_credential_helper(self):
+        """S-F14: a workflow that pushes with persist-credentials false gets the token only in its commit step's env,
+        through a credential helper that reads $GH_TOKEN (never the token itself in .git/config or argv)."""
+        for n in ("download-extra.yml", "download-pdfs.yml", "fetch-case-docs.yml"):
+            push = [s for s in steps(load(n)) if "git push" in s.get("run", "")]
+            self.assertEqual(len(push), 1, n)
+            st = push[0]
+            self.assertEqual(st.get("env", {}).get("GH_TOKEN"), "${{ secrets.GITHUB_TOKEN }}", n)
+            self.assertIn("credential.helper '!f()", st["run"], n)
+            self.assertIn('echo "password=$GH_TOKEN"', st["run"], n)
+            self.assertNotIn("extraheader", st["run"], n)
 
     def test_timeouts(self):
         for n in ("process-proposal.yml", "gr-request.yml", "retry-failed.yml", "tests.yml"):

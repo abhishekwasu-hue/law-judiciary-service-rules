@@ -190,6 +190,7 @@ Both are optional keys of the same spec.json; engine detail: tools/ENGINE_PROMPT
 - Study headings भाग 0 … भाग 7;
 - package: original file name (not `*_Proposal_with_GRs.pdf`); exactly "पृ. i / N" in the bottom strip of every page; bookmarks; page count = proposal + enclosure pages of `<pdf>.map.json` (no separator pages); no mark "TEXT NOT FOUND"/0 hits; no annotation on proposal pages; only Highlight annotations; docx core properties and PDF metadata blank, no AI/tool names (§4.27).
 - facts (WARN only, audit Q-F1): `python3 tools/fact_check.py "<package pdf>" --spec spec.json [--ocr-dir DIR] --details FILE` — every date / amount / letter no. / name of the note and letter (outside “…”) must occur on the पृ.N/प.वि. page it cites (no ref in the para: the proposal pages); NOT FOUND / ELSEWHERE lines = check that fact against the page image.
+- consistency (WARN only, audit Q-F15, §4.30(2)): `python3 tools/consistency_check.py spec.json [--study study.json] --details FILE` — every date / amount / C R no. of the letter(s), order drafts, parawise, affidavit, LQ answer and Study part 0 (outside “…”) must also be in the note; one name spelled two ways, a different petition no. or two posts for one name = WARN; English drafts: dates, amounts, case nos. only.
 
 Then a second read of every number and date against the page images.
 
