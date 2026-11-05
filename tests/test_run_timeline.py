@@ -203,8 +203,9 @@ class Workflow(unittest.TestCase):
         self.assertIn('"$T/run_timeline.py" report "$RP/timeline.json"', wf)
         self.assertIn('while IFS= read -r L; do [ -n "$L" ] && { ES note "$L" || true; }; done < "$RP/timeline.line"', wf)
         self.assertIn("name: Stage times (वेळ-तक्ता)", wf)
-        # 8 timed steps since prep_pages and the precedent sources share one step (audit 05.11.2026); trap never changes rc
-        self.assertEqual(wf.count('>> "$RP/stages.tsv"; } 2>/dev/null || true\' EXIT'), 8)
+        # 8 timed steps since prep_pages and the precedent sources share one step (audit 05.11.2026), + "Check
+        # consistency" (Q-F15) = 9; trap never changes rc
+        self.assertEqual(wf.count('>> "$RP/stages.tsv"; } 2>/dev/null || true\' EXIT'), 9)
 
 
 class Cost(unittest.TestCase):

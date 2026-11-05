@@ -214,7 +214,8 @@ class Texts:
             self.p._ocr.pop(n, None) if t is None else None
         else:
             t = self.p._ocr.get(n)
-        self._cheap[n] = t
+        if t is not None:
+            self._cheap[n] = t
         return t
 
     def sources(self, n, kind, value, allow_tess):

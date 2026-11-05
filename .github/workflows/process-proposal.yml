@@ -596,6 +596,14 @@ jobs:
           OCR=(); [ -d "$RP/pkgpages" ] && OCR=("$RP/pkgpages")
           python3 "$T/engine_supabase.py" extracts /tmp/out /tmp/work/spec.json /tmp/work/study.json "${OCR[@]}"
           timeout 5m python3 "$T/engine_supabase.py" facts /tmp/out /tmp/work/spec.json "${OCR[@]}" || echo "fact check not completed (warning only)"
+      # Cross-document consistency (audit 05.11.2026 Q-F15, tools/consistency_check.py): dates / amounts / names / petition
+      # nos. / posts of the note vs the letter(s), order drafts, parawise, affidavit, LQ answer and Study part 0; soft
+      # warnings only, never fails the job (S-F3: the log gets the summary count, details in $RP/consistency.log).
+      - name: Check consistency (consistency_check.py)
+        timeout-minutes: 5
+        run: |
+          S0=$(date +%s); trap '{ printf "%s\t%s\t%s\n" "Check consistency" "$S0" "$(date +%s)" >> "$RP/stages.tsv"; } 2>/dev/null || true' EXIT
+          timeout 3m python3 "$T/engine_supabase.py" consistency /tmp/work/spec.json /tmp/work/study.json || echo "consistency check not completed (warning only)"
       - name: Upload outputs and finish
         timeout-minutes: 10
         run: |

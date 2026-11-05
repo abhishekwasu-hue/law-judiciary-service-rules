@@ -22,6 +22,8 @@ async function token(): Promise<string | null> {
 export const MARATHI: [RegExp, string, string?, boolean?][] = [
   [/login required|JWT expired|invalid JWT|\b401\b/i, 'कृपया पुन्हा लॉगिन करावे, ही विनंती.'],
   [/not a member/i, 'आपण या कक्षाचे सदस्य नाही.'],
+  // S-F6: OTP sign-in with shouldCreateUser:false for an e-mail without an account (GoTrue otp_disabled)
+  [/Signups not allowed|otp_disabled|signup.*disabled/i, 'हा ई-मेल कक्षात आमंत्रित नाही. कृपया आमंत्रित ई-मेल नमूद करावा किंवा मालकांना कळवावे, ही विनंती.'],
   [/owner only/i, 'हे काम फक्त मालक करू शकतात.'],
   [/read-only/i, 'आपल्याला फक्त पाहण्याची परवानगी आहे; बदल करता येणार नाहीत.'],
   [/setup code wrong/i, 'सेटअप कोड चुकीचा आहे. कृपया योग्य कोड नमूद करावा, ही विनंती.'],

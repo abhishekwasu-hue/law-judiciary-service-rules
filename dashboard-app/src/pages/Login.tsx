@@ -17,7 +17,7 @@ export default function Login() {
     e?.preventDefault();
     setBusy(true);
     setErr('');
-    const { error } = await sb().auth.signInWithOtp({ email: email.trim(), options: { emailRedirectTo: window.location.origin } });
+    const { error } = await sb().auth.signInWithOtp({ email: email.trim(), options: { emailRedirectTo: window.location.origin, shouldCreateUser: false } }); // S-F6: no account for an e-mail that was not invited
     setBusy(false);
     if (error) setErr(humanError(error));
     else setSent(true);

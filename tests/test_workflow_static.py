@@ -84,7 +84,8 @@ class WorkflowStatic(unittest.TestCase):
         # every runner-side tool after the Claude step comes from the root-owned snapshot
         after = main[main.index('"$SB" down'):]
         self.assertNotRegex(after, r"python3 tools/")
-        for name in ("Runner OCR", "Verify outputs", "Check extracts", "Upload outputs", "Record failure", "Commit new GRs"):
+        for name in ("Runner OCR", "Verify outputs", "Check extracts", "Check consistency", "Upload outputs", "Record failure",
+                     "Commit new GRs"):
             r = step(d, name)["run"]
             self.assertNotRegex(r.replace("ESP=tools/engine_supabase.py", ""), r"python3 tools/", name)
         snap = step(d, "Snapshot runner tools")["run"]
@@ -127,8 +128,11 @@ class WorkflowStatic(unittest.TestCase):
         self.assertNotIn("/tmp/work/pkgpages", x)
         names = [s.get("name", "") for s in steps(d)]
         order = [next(i for i, x in enumerate(names) if x.startswith(p)) for p in
-                 ("Fetch case files", "Process the proposal", "Runner OCR", "Verify outputs", "Check extracts", "Upload outputs")]
+                 ("Fetch case files", "Process the proposal", "Runner OCR", "Verify outputs", "Check extracts",
+                  "Check consistency", "Upload outputs")]
         self.assertEqual(order, sorted(order))
+        c = step(d, "Check consistency")["run"]   # Q-F15: soft, never fails the job
+        self.assertIn('consistency /tmp/work/spec.json /tmp/work/study.json || echo', c)
 
     def test_litellm_hash_locked(self):
         d = load("process-proposal.yml")

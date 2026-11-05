@@ -91,6 +91,45 @@ const OWNER_INVITE = 'मालकांची भूमिका आमंत�
 const UPLOAD_TYPES = { '.pdf': 'application/pdf', '.doc': 'application/msword',
   '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.tif': 'image/tiff', '.tiff': 'image/tiff' };
+// S-F9 (05.11.2026): the first bytes must match the extension too (a renamed HTML / script file is refused).
+// PDF: "%PDF-" anywhere in the first 1024 bytes (PDF 1.7 §7.5.2 allows leading bytes); .doc: OLE2 or RTF saved as .doc.
+const MAGIC_PEEK = 1024;
+const startsWith = (b, sig) => sig.every((x, i) => b[i] === x);
+const ascii = s => [...s].map(c => c.charCodeAt(0));
+export function magicOk(ext, b) {
+  if (ext === '.pdf') { const pdf = ascii('%PDF-'); for (let i = 0; i + pdf.length <= b.length; i++) if (startsWith(b.subarray(i), pdf)) return true; return false; }
+  if (ext === '.doc') return startsWith(b, [0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1]) || startsWith(b, ascii('{\\rtf'));
+  if (ext === '.docx') return startsWith(b, [0x50, 0x4B, 0x03, 0x04]);
+  if (ext === '.jpg' || ext === '.jpeg') return startsWith(b, [0xFF, 0xD8, 0xFF]);
+  if (ext === '.png') return startsWith(b, [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+  if (ext === '.tif' || ext === '.tiff') return startsWith(b, [0x49, 0x49, 0x2A, 0x00]) || startsWith(b, [0x4D, 0x4D, 0x00, 0x2A]);
+  return false;
+}
+// reads up to MAGIC_PEEK bytes of a body stream; returns those bytes and a stream that still yields the whole body
+async function peekStream(body) {
+  if (!body) return { head: new Uint8Array(0), stream: null };
+  const reader = body.getReader();
+  const chunks = [];
+  let n = 0, done = false;
+  while (n < MAGIC_PEEK) {
+    const r = await reader.read();
+    if (r.done) { done = true; break; }
+    const c = typeof r.value === 'string' ? new TextEncoder().encode(r.value) : new Uint8Array(r.value);
+    chunks.push(c); n += c.length;
+  }
+  const head = new Uint8Array(n);
+  let o = 0;
+  for (const c of chunks) { head.set(c, o); o += c.length; }
+  const stream = new ReadableStream({
+    start(ctl) { if (n) ctl.enqueue(head); if (done) ctl.close(); },
+    async pull(ctl) { if (done) return; const r = await reader.read(); if (r.done) { done = true; ctl.close(); } else ctl.enqueue(new Uint8Array(r.value)); },
+    cancel(reason) { return reader.cancel(reason); },
+  });
+  return { head: head.subarray(0, MAGIC_PEEK), stream };
+}
+// S-F10: engine progress text = one plain line (control / bidi-override characters removed, spaces folded), ≤ 200 chars
+export const cleanStep = s => String(s || '').replace(/[\u0000-\u001F\u007F-\u009F‎‏‪-‮⁦-⁩]/g, ' ')
+  .replace(/\s+/g, ' ').trim().slice(0, 200);
 const BAD_FILE_TYPE = 'हा फाइल-प्रकार स्वीकारता येत नाही. कृपया PDF, Word (DOC / DOCX) किंवा प्रतिमा (JPG / PNG / TIF) फाइल जोडावी, ही विनंती.';
 // L-F4: estimate of one edit run when no edit has a cost yet (measured ~$0.03 per edit)
 const DEFAULT_EDIT_USD = 0.05;
@@ -539,6 +578,17 @@ async function findCrDup(db, crNo, crYear, exceptId = null) {
 
 // Auth user id for an e-mail (admin API, service role). GoTrue's list has a `filter` (e-mail search); the exact,
 // case-insensitive match is taken. Falls back to scanning a few pages when the filter is not supported.
+// S-F6: the app signs in with shouldCreateUser:false (no account for an unknown e-mail). The owner's account is made
+// here by the admin API (service role) at Setup / when owner_email changes; an existing account is left as it is.
+// Best effort: a failure is only logged (the owner can still be added in the Supabase dashboard).
+async function ensureAuthUser(supabaseUrl, serviceKey, email) {
+  try {
+    const base = String(supabaseUrl).replace(/\/$/, '');
+    const r = await fetch(`${base}/auth/v1/admin/users`, { method: 'POST', headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, 'content-type': 'application/json' },
+      body: JSON.stringify({ email: String(email).trim(), email_confirm: true }) });
+    if (!r.ok && r.status !== 422) console.log('owner account not created', r.status);
+  } catch (e) { console.log('owner account not created', String(e.message || e)); }
+}
 async function findAuthUser(base, headers, email) {
   const want = String(email).trim().toLowerCase();
   const pick = j => ((j && (j.users || (Array.isArray(j) ? j : []))) || []).find(u => String(u.email || '').toLowerCase() === want);
@@ -747,6 +797,7 @@ async function route(req, env, url) {
     for (const k of ['owner_email', 'supabase_url', 'supabase_anon_key', 'supabase_service_key']) if (!b[k]) return bad(`${k} required`);
     for (const k of ALL_KEYS) if (b[k]) await env.SETTINGS.put(k, String(b[k]).trim());
     await env.SETTINGS.delete('setup_code');
+    await ensureAuthUser(String(b.supabase_url).trim(), String(b.supabase_service_key).trim(), b.owner_email); // S-F6
     return json({ ok: true });
   }
 
@@ -800,7 +851,7 @@ async function route(req, env, url) {
     if (!tok || tok.run_id !== String(b.run_id || '')) return bad('bad token', 403);
     if (tok.exp && tok.exp < Math.floor(Date.now() / 1000)) return bad('bad token', 403);
     if (!cfg.supabase_url || !cfg.supabase_service_key) return bad('not configured', 503);
-    const step = String(b.step || '').trim().slice(0, 200);
+    const step = cleanStep(b.step);
     if (!step) return bad('step required');
     const rows = await sb(cfg).rest(`runs?id=eq.${Number(tok.run_id)}&state=in.(queued,running)`, { method: 'PATCH', body: JSON.stringify({ step }) });
     return json({ ok: true, changed: (rows || []).length });
@@ -904,6 +955,9 @@ async function route(req, env, url) {
       if (SECRET_KEYS.includes(k) && (v === '' || v.startsWith('••••'))) continue; // unchanged secret
       await env.SETTINGS.put(k, v);
     }
+    // S-F6: a new owner e-mail gets its sign-in account (sign-ups are closed)
+    if (typeof b.owner_email === 'string' && b.owner_email.trim() && b.owner_email.trim().toLowerCase() !== String(cfg.owner_email || '').trim().toLowerCase())
+      await ensureAuthUser(cfg.supabase_url, cfg.supabase_service_key, b.owner_email);
     return json({ ok: true });
   }
 
@@ -1013,6 +1067,15 @@ async function route(req, env, url) {
     if (!ctype) return bad(BAD_FILE_TYPE);
     const exists = await db.rest(`cases?id=eq.${caseId}&select=id,stage`);
     if (!exists.length) return bad('case not found', 404); // no orphan object in Storage
+    // S-F9: the first bytes must match the extension; the rest of the body is streamed to Storage unchanged
+    const { head, stream: fileStream } = await peekStream(req.body);
+    if (!magicOk(ext, head)) return bad(BAD_FILE_TYPE);
+    let uploadBody = fileStream;
+    if (len > 0 && typeof FixedLengthStream === 'function') { // Workers: keep the known length (no chunked upload)
+      const fls = new FixedLengthStream(len);
+      fileStream.pipeTo(fls.writable).catch(() => {});
+      uploadBody = fls.readable;
+    }
     const nextVersion = async () => {
       const prev = await db.rest(`case_files?case_id=eq.${caseId}&kind=eq.${kind}&original_name=eq.${encodeURIComponent(name)}&select=version&order=version.desc&limit=1`);
       return prev.length ? prev[0].version + 1 : 1;
@@ -1022,7 +1085,7 @@ async function route(req, env, url) {
     // the real name stays only in case_files.original_name (downloads use it — §4.16).
     const path = `${caseId}/${kind}/v${version}-${crypto.randomUUID().slice(0, 8)}/file${ext}`; // unique per upload
     try {
-      await db.upload('proposals', path, req.body, ctype);
+      await db.upload('proposals', path, uploadBody, ctype);
     } catch (e) {
       if (String(e.message) === 'file over 50 MB') return bad('file over 50 MB', 413);
       throw e;

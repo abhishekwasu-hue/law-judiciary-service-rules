@@ -8,6 +8,7 @@ function kv() {
   return { m, get: async k => (m.has(k) ? m.get(k) : null), put: async (k, v) => void m.set(k, v), delete: async k => void m.delete(k) };
 }
 const SB = 'https://sb.example';
+const PDF_BODY = '%PDF-1.4\nx'; // S-F9: an upload body starts with the bytes of its type
 const calls = [];
 const members = [];
 const patches = [], acts = [], uploads = [];
@@ -35,6 +36,7 @@ let storageTooBig = false;        // true = Storage refuses the object (bucket f
 const authUsers = [{ id: 'au-old', email: 'Staff.Old@example.com' }]; // accounts that exist before any invite
 const caseRows = { 40: { id: 40, cr_no: '21', cr_year: 2026, subject: 's' }, 43: { id: 43, cr_no: null, cr_year: null, subject: 's' } };
 const searchUrls = [];
+const ownerCreates = [];          // S-F6: POST /auth/v1/admin/users (owner account at Setup / owner_email change)
 const letterRows = { 31: { id: 31, case_id: 7 }, 32: { id: 32, case_id: 7 }, 33: { id: 33, case_id: 7 } };
 // draft edit (migration 0013): editColumns false = runs.kind / edit_* and file_kind 'spec' missing; specCases = case ids
 // with a spec.json row; fileRows = case_files rows for the attachments check; editStale = edit rows the non-queue sweep hits
@@ -184,6 +186,13 @@ globalThis.fetch = async (u, opt = {}) => {
     if (authUsers.some(x => x.email.toLowerCase() === email.toLowerCase())) return res({ code: 422, error_code: 'email_exists', msg: 'A user with this email address has already been registered' }, 422);
     const nu = { id: `au-${authUsers.length + 1}`, email }; authUsers.push(nu); return res(nu);
   }
+  if (u === `${SB}/auth/v1/admin/users` && opt.method === 'POST') { // S-F6: owner account by the admin API
+    assert.equal(opt.headers.Authorization, 'Bearer service-secret-1234', 'admin API with the service role');
+    const { email, email_confirm } = JSON.parse(opt.body);
+    ownerCreates.push({ email, email_confirm });
+    if (authUsers.some(x => x.email.toLowerCase() === email.toLowerCase())) return res({ code: 422, error_code: 'email_exists' }, 422);
+    const nu = { id: `au-${authUsers.length + 1}`, email }; authUsers.push(nu); return res(nu);
+  }
   if (u.startsWith(`${SB}/auth/v1/admin/users?`)) {
     assert.equal(opt.headers.Authorization, 'Bearer service-secret-1234', 'admin API with the service role');
     const f = new URL(u).searchParams.get('filter');
@@ -286,6 +295,7 @@ test('setup → settings masking → auth → run dispatch → engine config', a
   assert.equal((await setup({ ...base, setup_code: 'wrong' })).status, 403);
   assert.equal((await setup({ ...base, setup_code: code })).status, 200);
   assert.equal(env.SETTINGS.m.has('setup_code'), false);
+  assert.deepEqual(ownerCreates, [{ email: 'abhi@example.com', email_confirm: true }], 'S-F6: owner sign-in account made at Setup');
   assert.equal((await setup({ ...base, setup_code: code })).status, 409, 'setup locked after first save');
 
   const pub = await body(await call('/api/public-config'));
@@ -375,7 +385,7 @@ test('sweep, upload case check, signed-URL bucket whitelist', async () => {
   assert.equal(p.body.step, "वेळ संपली. कृपया 'पुन्हा तयार करा' वापरावे, ही विनंती.");
   assert.equal(acts[0].length, 2);
 
-  const up = (cid, kind = 'extra_doc') => call(`/api/upload?case_id=${cid}&kind=${kind}`, { method: 'POST', headers: { ...owner, 'x-file-name': encodeURIComponent('पत्र.pdf'), 'content-type': 'application/pdf' }, body: 'x' });
+  const up = (cid, kind = 'extra_doc') => call(`/api/upload?case_id=${cid}&kind=${kind}`, { method: 'POST', headers: { ...owner, 'x-file-name': encodeURIComponent('पत्र.pdf'), 'content-type': 'application/pdf' }, body: PDF_BODY });
   uploads.length = 0;
   assert.equal((await up(8)).status, 404, 'unknown case refused');
   assert.equal(uploads.length, 0, 'nothing stored for unknown case');
@@ -389,7 +399,7 @@ test('sweep, upload case check, signed-URL bucket whitelist', async () => {
 
 test('reply upload marks the single pending letter answered; several pending left alone', async () => {
   const owner = { authorization: 'Bearer owner-jwt' };
-  const up = () => call('/api/upload?case_id=7&kind=reply', { method: 'POST', headers: { ...owner, 'x-file-name': encodeURIComponent('उत्तर.pdf'), 'content-type': 'application/pdf' }, body: 'x' });
+  const up = () => call('/api/upload?case_id=7&kind=reply', { method: 'POST', headers: { ...owner, 'x-file-name': encodeURIComponent('उत्तर.pdf'), 'content-type': 'application/pdf' }, body: PDF_BODY });
   letterPatches.length = 0;
   pendingLetters = [{ id: 31 }];
   const r1 = await up(); const one = await body(r1); assert.equal(r1.status, 200, JSON.stringify(one));
@@ -405,7 +415,7 @@ test('reply upload marks the single pending letter answered; several pending lef
   assert.equal(letterPatches.length, 1, 'several pending: none patched');
 
   pendingLetters = [];
-  const ex = await body(await call('/api/upload?case_id=7&kind=extra_doc', { method: 'POST', headers: { ...owner, 'x-file-name': encodeURIComponent('a.pdf') }, body: 'x' }));
+  const ex = await body(await call('/api/upload?case_id=7&kind=extra_doc', { method: 'POST', headers: { ...owner, 'x-file-name': encodeURIComponent('a.pdf') }, body: PDF_BODY }));
   assert.equal(ex.letter_updated, null);
 });
 
@@ -492,6 +502,11 @@ test('one run at a time per case (409), engine step via run token, provider sett
   assert.equal(st.status, 200); assert.equal((await st.json()).changed, 1);
   const pp = patches.at(-1);
   assert.ok(pp.u.includes('id=eq.80&state=in.(queued,running)')); assert.deepEqual(pp.body, { step: 'पाने वाचत आहे' });
+  // S-F10: control characters / bidi overrides removed, one line, ≤ 200 chars; only control characters → 400
+  assert.equal((await step('tok80', { run_id: 80, step: 'टिप्पणी\n\u0000तयार\u202E' + 'क'.repeat(400) })).status, 200);
+  const sp = patches.at(-1).body.step;
+  assert.ok(sp.startsWith('टिप्पणी तयार') && sp.length === 200 && !/[\u0000-\u001F\u202E]/.test(sp), sp);
+  assert.equal((await step('tok80', { run_id: 80, step: '\u0000\u0007\n' })).status, 400);
   env.SETTINGS.m.set('run_token:tokold', JSON.stringify({ run_id: '80', used: true, exp: 1000 }));
   assert.equal((await step('tokold', { run_id: 80, step: 'x' })).status, 403, 'expired token refused');
 
@@ -647,11 +662,11 @@ test('ids validated; upload name decoding; letters PATCH 404/whitelist/log/stage
   const owner = { authorization: 'Bearer owner-jwt' };
   const n0 = calls.length;
   for (const id of ['7&x=1', '7.5', '-1', '']) {
-    assert.equal((await call(`/api/upload?case_id=${encodeURIComponent(id)}&kind=extra_doc`, { method: 'POST', headers: { ...owner, 'x-file-name': 'a.pdf' }, body: 'x' })).status, 400, `upload case_id ${id}`);
+    assert.equal((await call(`/api/upload?case_id=${encodeURIComponent(id)}&kind=extra_doc`, { method: 'POST', headers: { ...owner, 'x-file-name': 'a.pdf' }, body: PDF_BODY })).status, 400, `upload case_id ${id}`);
     assert.equal((await call('/api/letters', { method: 'POST', headers: owner, body: JSON.stringify({ case_id: id }) })).status, 400, `letters case_id ${id}`);
   }
   assert.ok(!calls.slice(n0).some(c => c.u.includes('/rest/v1/cases?') || c.u.includes('/rest/v1/letters')), 'no DB call for a bad id');
-  assert.equal((await call('/api/upload?case_id=7&kind=extra_doc', { method: 'POST', headers: { ...owner, 'x-file-name': '%E0%A4' }, body: 'x' })).status, 400, 'bad URI encoding → 400');
+  assert.equal((await call('/api/upload?case_id=7&kind=extra_doc', { method: 'POST', headers: { ...owner, 'x-file-name': '%E0%A4' }, body: PDF_BODY })).status, 400, 'bad URI encoding → 400');
   const lp = await call('/api/letters', { method: 'POST', headers: owner, body: JSON.stringify({ case_id: '7', ref_no: 'r' }) });
   assert.equal(lp.status, 200);
 
@@ -806,7 +821,7 @@ test('upload: Storage size limit → 413 "file over 50 MB"', async () => {
   const owner = { authorization: 'Bearer owner-jwt' };
   storageTooBig = true;
   try {
-    const r = await call('/api/upload?case_id=7&kind=extra_doc', { method: 'POST', headers: { ...owner, 'x-file-name': 'a.pdf' }, body: 'x' });
+    const r = await call('/api/upload?case_id=7&kind=extra_doc', { method: 'POST', headers: { ...owner, 'x-file-name': 'a.pdf' }, body: PDF_BODY });
     assert.equal(r.status, 413); assert.deepEqual(await r.json(), { error: 'file over 50 MB' });
   } finally { storageTooBig = false; }
 });
@@ -874,7 +889,7 @@ test('C28: /api/run outputs — validated, deduped, fixed order; 400 Marathi; mi
 
 test('C28: upload accepts the kinds approval and court_notice; unknown kind refused', async () => {
   const owner = { authorization: 'Bearer owner-jwt' };
-  const up = kind => call(`/api/upload?case_id=7&kind=${kind}`, { method: 'POST', headers: { ...owner, 'x-file-name': encodeURIComponent('मान्यता.pdf'), 'content-type': 'application/pdf' }, body: 'x' });
+  const up = kind => call(`/api/upload?case_id=7&kind=${kind}`, { method: 'POST', headers: { ...owner, 'x-file-name': encodeURIComponent('मान्यता.pdf'), 'content-type': 'application/pdf' }, body: PDF_BODY });
   for (const k of ['approval', 'court_notice']) {
     const r = await up(k); const j = await r.json();
     assert.equal(r.status, 200, JSON.stringify(j)); assert.equal(j.kind, k);
@@ -1730,7 +1745,7 @@ test('L-F11: closed case — /api/run and /api/edit refused (409 Marathi); a rep
     r = await editCall({ case_id: 7, target: 'note', message: 'x' });
     assert.equal(r.status, 409); assert.equal((await r.json()).error, 'case_closed');
     assert.equal(calls.filter(c => c.u.endsWith('/dispatches')).length, n0, 'nothing dispatched');
-    r = await call('/api/upload?case_id=7&kind=reply', { method: 'POST', headers: { ...owner33, 'x-file-name': encodeURIComponent('उत्तर.pdf') }, body: 'x' });
+    r = await call('/api/upload?case_id=7&kind=reply', { method: 'POST', headers: { ...owner33, 'x-file-name': encodeURIComponent('उत्तर.pdf') }, body: PDF_BODY });
     assert.equal(r.status, 200, await r.clone().text());
     assert.ok(!casePatches.some(b => 'stage' in b), 'stage of the closed case unchanged');
     assert.ok(acts.some(a => a.action === 'reply_on_closed_case'));
@@ -1747,7 +1762,10 @@ test('S-F9 + L-F13: upload content-type from the extension (browser header ignor
     if (u === `${SB}/rest/v1/case_files` && opt.method === 'POST' && conflict > 0) { conflict--; return new Response(JSON.stringify({ code: '23505', message: 'duplicate key value violates unique constraint "case_files_version_key"' }), { status: 409 }); }
     return realFetch(u, opt);
   };
-  const up = (name, ctype = 'text/html') => call('/api/upload?case_id=7&kind=extra_doc', { method: 'POST', headers: { ...owner33, 'x-file-name': encodeURIComponent(name), 'content-type': ctype }, body: 'x' });
+  const MAGIC = { pdf: PDF_BODY, docx: new Uint8Array([0x50, 0x4B, 0x03, 0x04, 1]), jpg: new Uint8Array([0xFF, 0xD8, 0xFF, 0xE0, 1]),
+    png: new Uint8Array([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 1]), doc: new Uint8Array([0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1, 1]) };
+  const up = (name, ctype = 'text/html', b) => call('/api/upload?case_id=7&kind=extra_doc', { method: 'POST', headers: { ...owner33, 'x-file-name': encodeURIComponent(name), 'content-type': ctype },
+    body: b ?? MAGIC[(name.match(/\.(\w+)$/) || [])[1]?.toLowerCase()] ?? PDF_BODY });
   try {
     let r = await up('आदेश.PDF');
     assert.equal(r.status, 200, await r.clone().text());
@@ -1762,7 +1780,27 @@ test('S-F9 + L-F13: upload content-type from the extension (browser header ignor
       assert.equal(r.status, 400, bad); assert.match((await r.json()).error, /हा फाइल-प्रकार स्वीकारता येत नाही/);
     }
     assert.equal(types.length, n, 'nothing stored for a refused type');
+    // S-F9 magic: a renamed HTML / script file is refused although its extension is allowed; nothing stored
+    for (const [bad, b] of [['x.pdf', '<html><script>alert(1)</script>'], ['x.docx', '%PDF-1.4'], ['x.png', 'GIF89a'], ['x.jpg', ''], ['x.doc', '<html>']]) {
+      r = await up(bad, 'application/pdf', b);
+      assert.equal(r.status, 400, bad); assert.match((await r.json()).error, /हा फाइल-प्रकार स्वीकारता येत नाही/);
+    }
+    assert.equal(types.length, n, 'nothing stored for a renamed file');
+    // PDF header after leading bytes (allowed by the PDF spec) and RTF saved as .doc are accepted
+    assert.equal((await up('y.pdf', 'x', '\r\n  %PDF-1.7 rest')).status, 200);
+    assert.equal((await up('y.doc', 'x', '{\\rtf1 hello}')).status, 200); assert.equal(types.at(-1), 'application/msword');
   } finally { globalThis.fetch = realFetch; }
+});
+
+test('S-F9: magicOk signatures; S-F10: engine step text is one clean line', async () => {
+  const { magicOk, cleanStep } = await import('../worker.js');
+  const B = a => new Uint8Array(a);
+  assert.ok(magicOk('.tif', B([0x49, 0x49, 0x2A, 0x00])) && magicOk('.tiff', B([0x4D, 0x4D, 0x00, 0x2A])));
+  assert.ok(!magicOk('.tif', B([0x49, 0x49])) && !magicOk('.exe', B([0x4D, 0x5A])));
+  assert.equal(cleanStep('नोंद\u0000 तयार\n\r\t होत\u202E आहे\u001b[31m'), 'नोंद तयार होत आहे [31m');
+  assert.equal(cleanStep('क्ष\u200Dत्र\u200C'), 'क्ष\u200Dत्र\u200C', 'ZWJ / ZWNJ (Devanagari) kept');
+  assert.equal(cleanStep('x'.repeat(500)).length, 200);
+  assert.equal(cleanStep('\u0007\u0008 '), '');
 });
 
 test('S-F12: an invite never downgrades the owner', async () => {
@@ -1777,6 +1815,14 @@ test('S-F12: an invite never downgrades the owner', async () => {
   assert.equal(r.status, 409);
   assert.equal(members.find(x => x.user_id === 'u1').role, 'owner');
   authUsers.pop();
+  // S-F6: a changed owner_email gets its sign-in account; an unchanged one makes no admin call
+  const put = b => call('/api/settings', { method: 'PUT', headers: owner, body: JSON.stringify(b) });
+  const n0 = ownerCreates.length;
+  assert.equal((await put({ owner_email: 'abhi@example.com' })).status, 200);
+  assert.equal(ownerCreates.length, n0, 'same owner e-mail: no admin call');
+  assert.equal((await put({ owner_email: 'new-owner@example.com' })).status, 200);
+  assert.deepEqual(ownerCreates.at(-1), { email: 'new-owner@example.com', email_confirm: true });
+  assert.equal((await put({ owner_email: 'abhi@example.com' })).status, 200);
 });
 
 test('U1 + P1 + S-F5 + P2: /nasti = the app; hashed assets immutable; CSP without wildcard; config inlined (escaped)', async () => {
