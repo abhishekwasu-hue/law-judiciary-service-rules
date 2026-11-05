@@ -618,9 +618,26 @@ class VerifyOutputs(unittest.TestCase):
         self.assertNotIn("FAIL:", out)
         warns = [ln for ln in out.splitlines() if ln.startswith("WARN:") and "(§4.34)" in ln]
         for needle in ("(table): table column 'पृ./प.वि.'", "forwarding detail 'माहितीकरिता देण्यात'", "quote-gluing",
-                       "shortened quote", "'उपरोक्त वस्तुस्थिती' item carries a पृ./प.वि. reference"):
+                       "shortened quote"):
             self.assertTrue(any(needle in w for w in warns), f"{needle}:\n{out}")
-        self.assertEqual(sum("'उपरोक्त वस्तुस्थिती' item" in w for w in warns), 1, out)   # only item (1)
+        # §4.37 D2 (05.11.2026): the separate summary list is the old form — one WARN for the list, none per item
+        w437 = [ln for ln in out.splitlines() if ln.startswith("WARN:") and "जुने रूप §4.37" in ln
+                and "उपरोक्त वस्तुस्थिती" in ln]
+        self.assertEqual(len(w437), 1, out)
+
+    def test_437_tables_warn_not_fail(self):
+        # §4.37 D3 (Abhi 05.11.2026): condition / prayers / descriptive tables are SOFT notes in the built docx too
+        d = self.case("tables437")
+        def f(s):
+            s["note"]["paras"].insert(3, {"table": [["अ.क्र.", "अट", "प्रस्तावातील स्थिती"], ["1", "अट एक", "तथ्य एक"]]})
+            s["note"]["paras"].insert(4, {"table": [["अ.क्र.", "मुद्दा", "अभिप्राय"], ["1", "पदाची कर्तव्ये", "सर्व कामकाज पाहणे"],
+                                                    ["2", "अतिरिक्त कार्यभार", "प्रभारी म्हणून काम पाहणे"]]})
+        build_note(self.spec_with(f), d)
+        rc, out = self.run_verify(d)
+        self.assertEqual(rc, 0, out)
+        self.assertNotIn("FAIL:", out)
+        self.assertTrue([ln for ln in out.splitlines() if ln.startswith("WARN:") and "condition table" in ln], out)
+        self.assertTrue([ln for ln in out.splitlines() if ln.startswith("WARN:") and "descriptive table" in ln], out)
 
     # ---- optional outputs (02.11.2026): <PREFIX>_Order_Draft.docx / <PREFIX>_Parawise.docx ----
     def test_extras_absent_no_lines(self):

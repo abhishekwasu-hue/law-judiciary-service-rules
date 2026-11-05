@@ -974,17 +974,16 @@ class AuditA1Fixes(unittest.TestCase):
         s = copy.deepcopy(self.s122); s["note"]["paras"].insert(1, "सदर पत्रात “अ” असे नमूद आहे. तसेच, अर्जात “ब” असे नमूद आहे.")
         self.assertEqual(self.flow(s), [])
 
-    def test_432_summary_item_page_ref_warn(self):
+    def test_437_old_summary_list_warn(self):
+        # §4.37 D2 (05.11.2026): the separate "उपरोक्त वस्तुस्थिती पुढीलप्रमाणे आहे:-" list is the old form (WARN, never an error);
+        # its page-ref item check (C32) went with it
         s = copy.deepcopy(self.s122)
-        s["note"]["paras"].insert(6, "उपरोक्त वस्तुस्थिती पुढीलप्रमाणे आहे:-")
-        s["note"]["sub"] = {"6": ["(1) पदोन्नती दि. 30.01.2010 रोजी झाली आहे (पृ.7/प.वि.).", "(2) विकल्प अर्ज दि. 24.01.2025 रोजी सादर झाला आहे."]}
-        ws = self.flow(s)
-        self.assertEqual([w.split(":")[0] for w in ws if "उपरोक्त वस्तुस्थिती" in w], ["note.sub.6[0]"], ws)
-        s["note"]["sub"]["6"][0] = "(1) पदोन्नती दि. 30.01.2010 रोजी झाली आहे."
-        self.assertEqual(self.flow(s), [])
-        # a page ref in an ordinary sub-point (not the summary list) is fine
-        s = copy.deepcopy(self.s122); s["note"]["sub"] = {"5": ["(1) अर्ज (पृ.15/प.वि.)."]}
-        self.assertEqual(self.flow(s), [])
+        s["note"]["paras"].insert(1, "उपरोक्त वस्तुस्थिती पुढीलप्रमाणे आहे:-")
+        s["note"]["sub"] = {"1": ["(1) पदोन्नती दि. 30.01.2010 रोजी झाली आहे (पृ.7/प.वि.)."]}
+        self.assertEqual(L.lint_spec(s), [])
+        ws = [w for w in L.lint_warnings(s) if "जुने रूप §4.37" in w and w.startswith("note.paras[1]:")]
+        self.assertEqual(len(ws), 1, ws)
+        self.assertFalse([w for w in self.flow(s) if "उपरोक्त वस्तुस्थिती" in w])
 
     def test_432_shortened_quote_warn(self):
         s = copy.deepcopy(self.s122); s["note"]["paras"].insert(1, "अर्जात “वेतननिश्चिती … करण्यात यावी” असे नमूद आहे.")
@@ -1018,6 +1017,81 @@ class AuditA1Fixes(unittest.TestCase):
         finally:
             shutil.rmtree(d, ignore_errors=True)
 
+
+
+class Flow437(unittest.TestCase):
+    """§4.37 (Abhi 05.11.2026, D1–D4; docs/FLOW_RESEARCH.md): WARN-level flow checks — synthetic inputs only (the samples
+    are re-baselined separately)."""
+    def test_condition_and_prayer_tables(self):
+        ws = L.flow_warnings([], [("t1", ["अ.क्र.", "अट", "प्रस्तावातील स्थिती"]),
+                                  ("t2", ["परिच्छेद 12 मधील परिस्थिती", "प्रस्तुत प्रकरणातील वस्तुस्थिती"]),
+                                  ("t3", ["अ.क्र.", "प्रार्थना", "मागणी"]),
+                                  ("t4", ["अ.क्र.", "तपशील", "माहिती"])])
+        self.assertTrue(any(w.startswith("t1:") and "जुने रूप §4.37" in w for w in ws), ws)
+        self.assertTrue(any(w.startswith("t2:") and "जुने रूप §4.37" in w for w in ws), ws)
+        self.assertTrue(any(w.startswith("t3:") and "§4.37 मुद्देनिहाय" in w for w in ws), ws)
+        self.assertFalse([w for w in ws if w.startswith("t4:")])
+        self.assertFalse(L.is_condition_header(["परिस्थिती"]))   # one cell alone is not the pair
+
+    def test_descriptive_table(self):
+        desc = [["अ.क्र.", "मुद्दा", "अभिप्राय"], ["1", "पदाची कर्तव्ये", "मा. उच्च न्यायालयाच्या पत्रानुसार सर्व कामकाज पाहणे"],
+                ["2", "अतिरिक्त कार्यभार", "प्रभारी अधीक्षक म्हणून काम पाहणे व दि. 06.05.2024 पासून आदेशानुसार कार्यभार"]]
+        self.assertTrue(any("descriptive table" in w for w in L.table_shape_warnings([("t", desc)])))
+        money = [["अ.क्र.", "आस्थापना", "मंजूर पदे", "वार्षिक भार (रु.)"], ["1", "मा. उच्च न्यायालय, मुंबई", "25", "12,00,000"],
+                 ["2", "नागपूर खंडपीठ", "10", "4,80,000"], ["", "एकूण", "35", "16,80,000"]]
+        self.assertEqual(L.table_shape_warnings([("t", money)]), [])
+        service = [["अ.क्र.", "नाव", "पद"], ["1", "श्री. ____", "लिपिक"], ["2", "श्रीमती ____", "शिपाई"]]
+        self.assertEqual(L.table_shape_warnings([("t", service)]), [])   # service-detail header
+        kv = [["अ.क्र.", "तपशील", "माहिती"], ["1", "मृत्यूचा दिनांक", "27.05.2025"], ["2", "सेवा", "22 वर्षे"],
+              ["3", "मंजूर रक्कम", "रु.60,000"]]
+        self.assertEqual(L.table_shape_warnings([("t", kv)]), [])   # labels skipped, values are figures
+        blanks = [["अ.क्र.", "बाब", "प्रस्तावानुसार"], ["1", "संवर्ग", "____"], ["2", "प्रस्तावित भत्ता", "____"]]
+        self.assertEqual(L.table_shape_warnings([("t", blanks)]), [])   # unknown figures
+
+    def test_para_count(self):
+        n = {"first": "… पत्रास अनुसरून सादर.", "paras": ["परिच्छेद"] * 9 + [{"table": [["अ"], ["1"]]}]}
+        self.assertEqual(L.para_count_warnings(n), [])   # 1 + 9 = 10
+        n["paras"].append("परिच्छेद")
+        self.assertTrue(any("11 numbered paras" in w for w in L.para_count_warnings(n)))
+
+    def test_para2_opener(self):
+        sp = {"note": {"first": "प्रबंधक (कार्मिक), उच्च न्यायालय (अपील शाखा), मुंबई यांच्या पृ.1/प.वि. वरील दि. 01.01.2026 "
+                                "रोजीच्या पत्रास अनुसरून सादर.",
+                       "paras": ["प्रबंधक (कार्मिक) यांनी … प्रस्ताव सादर केला आहे."]}}
+        self.assertTrue(any("§4.37 D4" in w for w in L.para2_warnings(sp)))
+        for t in ("सदर पत्रान्वये प्रबंधक (कार्मिक) यांनी … प्रस्ताव सादर केला आहे.",
+                  "उपरोक्त पत्रान्वये मा. उच्च न्यायालयाने … विनंती केली आहे."):
+            sp["note"]["paras"][0] = t
+            self.assertEqual(L.para2_warnings(sp), [], t)
+        sp["note"]["paras"][0] = "याचिकाकर्ते यांनी दाखल केलेली रिट याचिका क्र. 1/2026 कृपया पहावी."
+        self.assertEqual(L.para2_warnings(sp), [])   # court note: §4.32 (अ)
+        sp["note"]["paras"][0] = "प्रबंधक यांनी … सादर केला आहे."; sp["parawise"] = {"paras": []}
+        self.assertEqual(L.para2_warnings(sp), [])
+        sp.pop("parawise"); sp["note"]["first"] = "पूर्वपृष्ठावरील वित्त विभागाच्या अभिप्रायास अनुसरून सादर."
+        self.assertEqual(L.para2_warnings(sp), [])   # para 1 does not answer a letter
+
+    def test_last_para_lead(self):
+        base = "सबब, उपरोक्त माहिती तक्त्याच्या स्वरूपात कळविण्याबाबतच्या पत्राचे प्रारूप पृ.      /प.वि. वर मान्यतेस्तव सादर. " \
+               "मान्य झाल्यास पत्र निर्गमित करण्यात येईल."
+        fin = "प्रस्ताव वित्त विभागाच्या मान्यतेस्तव सादर करण्यात येत आहे."
+        for t in (base,
+                  "उपरोक्त वस्तुस्थिती विचारात घेता, श्रीमती ____ यांनी विशेष वेतनाची मागणी केली आहे. " + base,
+                  "उपरोक्त सर्व वस्तुस्थिती विचारात घेता, सबब, " + fin,
+                  "सबब, उपरोक्त वस्तुस्थिती विचारात घेता, " + fin,
+                  "उपरोक्त वस्तुस्थिती विचारात घेता, " + fin):
+            self.assertTrue(any(r.match(L.ns(t)) for r in L.LAST_FORMS), t)
+        self.assertFalse(any(r.match("उपरोक्त वस्तुस्थिती विचारात घेता, ही मागणी योग्य आहे.") for r in L.LAST_FORMS))
+
+    def test_court_prayers_as_subpoints(self):
+        sp = {"parawise": {"paras": []}, "note": {
+            "first": "सादर.",
+            "paras": ["याचिकाकर्ते यांनी दाखल केलेली रिट याचिका क्र. 1/2026 (पृ.1/प.वि.) कृपया पहावी. सदर याचिकेत महाराष्ट्र शासन यांना "
+                      "प्रतिवादी क्र. 1 करण्यात आले आहे (पृ.2/प.वि.).",
+                      "सदर याचिकेद्वारे याचिकाकर्त्यांनी पुढीलप्रमाणे प्रमुख मागण्या केल्या आहेत (पृ.5/प.वि.):-"],
+            "sub": {"1": ["(अ) जुनी निवृत्तिवेतन योजना लागू करावी;", "(आ) खर्च व इतर अनुतोष."]}}}
+        self.assertEqual(L.court_shape_warnings(sp), [])
+        sp["note"]["sub"] = {}
+        self.assertTrue(any("para 3" in w for w in L.court_shape_warnings(sp)))
 
 if __name__ == "__main__":
     unittest.main()

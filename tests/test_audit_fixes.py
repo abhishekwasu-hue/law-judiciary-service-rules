@@ -90,23 +90,15 @@ class LintAuditRules(unittest.TestCase):
         s["note"]["paras"][0] = self.s131["note"]["paras"][0] + " “… उल्लेख नाही …”"   # quotes exempt
         self.assertFalse([x for x in new_warns(s, self.s131) if "missing-info remark" in x])
 
-    # ---- Q-F8 (WARN) ----
-    def test_summary_items(self):
-        mk = lambda k: [("x", "उपरोक्त वस्तुस्थिती पुढीलप्रमाणे आहे:-", [f"({i}) तथ्य" for i in range(1, k + 1)])]
-        self.assertEqual(L.summary_problems(mk(3)), [])
-        self.assertEqual(L.summary_problems(mk(6)), [])
-        self.assertTrue(any("2 items" in w for w in L.summary_problems(mk(2))))
-        self.assertTrue(any("7 items" in w for w in L.summary_problems(mk(7))))
-        q = [("x", "उपरोक्त वस्तुस्थिती पुढीलप्रमाणे आहे:-", ["(1) a", "(2) “उतारा”", "(3) c"])]
-        self.assertTrue(any("quote" in w for w in L.summary_problems(q)))
-        inline = [("x", "उपरोक्त वस्तुस्थिती पुढीलप्रमाणे आहे:- (1) अ; (2) ब; (3) क; (4) ड; (5) इ; (6) फ; (7) ग.", [])]
-        self.assertTrue(any("7 items" in w for w in L.summary_problems(inline)))
-
-    def test_summary_in_spec_table_rows(self):
+    # ---- Q-F8: dropped 05.11.2026 with the "उपरोक्त वस्तुस्थिती" list (§4.37 D2) ----
+    def test_summary_list_is_old_form(self):
+        self.assertFalse(hasattr(L, "summary_problems"))
         s = self.spec(); i = len(s["note"]["paras"]) - 1
         s["note"]["paras"][i:i] = ["उपरोक्त वस्तुस्थिती पुढीलप्रमाणे आहे:-",
                                    {"table": [["अ.क्र.", "तथ्य"]] + [[str(k), "तथ्य"] for k in range(1, 9)]}]
-        self.assertTrue([w for w in new_warns(s, self.s131) if "8 items" in w])
+        w = new_warns(s, self.s131)
+        self.assertTrue([x for x in w if "जुने रूप §4.37" in x], w)
+        self.assertFalse([x for x in w if "8 items" in x])
 
     # ---- Q-F9 (WARN) ----
     def test_long_sentence(self):
@@ -135,7 +127,8 @@ class LintAuditRules(unittest.TestCase):
         s = copy.deepcopy(self.wp)
         s["note"]["paras"][0] = s["note"]["paras"][0].replace("प्रतिवादी क्र.", "प्रतिवादी")
         self.assertTrue(any("para 2" in w for w in L.court_shape_warnings(s)))
-        s = copy.deepcopy(self.wp); s["note"]["paras"][2]["table"][0][1] = "मुद्दा"
+        s = copy.deepcopy(self.wp); s["note"]["paras"][1] = "सदर याचिकेची पार्श्वभूमी खालीलप्रमाणे आहे."
+        s["note"].get("sub", {}).pop("1", None)
         self.assertTrue(any("para 3" in w for w in L.court_shape_warnings(s)))
         s = copy.deepcopy(self.wp); s.pop("parawise")   # not a court-reply spec: not checked
         self.assertEqual(L.court_shape_warnings(s), [])
@@ -265,12 +258,10 @@ class VerifyUnits(unittest.TestCase):
         self.assertEqual(len(V.ref_meta_problems(ln, {"file_no": "2025/978", "cr_no": "131"})), 3)
         self.assertEqual(V.ref_meta_problems("क्रमांक :- संकिर्ण-2026/____/प्र.क्र.130/का.6", {"file_no": "2026/979"}), [])
 
-    def test_summary_blocks(self):
-        bl = [{"kind": "p", "text": "5. उपरोक्त वस्तुस्थिती पुढीलप्रमाणे आहे:-"},
-              {"kind": "p", "text": "(1) अ"}, {"kind": "tbl", "text": "अ.क्र. | तथ्य\n1 | ब\n2 | क"},
-              {"kind": "p", "text": "6. पुढील"}, {"kind": "p", "text": "(1) इतर"}]
-        e = V.summary_blocks(bl)
-        self.assertEqual(len(e), 1); self.assertEqual(len(e[0][2]), 3)
+    def test_summary_blocks_dropped(self):
+        # 05.11.2026 (§4.37 D2): the Q-F8 list count is gone; the docx mirror of the descriptive-table check is used instead
+        self.assertFalse(hasattr(V, "summary_blocks"))
+        self.assertTrue(hasattr(V, "table_shape_warnings"))
 
 
 @unittest.skipIf(TV.FONTFILE is None, "no Devanagari font for the page stamps")
