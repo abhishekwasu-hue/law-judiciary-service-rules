@@ -2,8 +2,12 @@ name: Tests
 # Engine tools (pytest: tests/*, incl. the script tests via tests/test_scripts.py), the Worker (node --test) and the
 # app's TypeScript check (dashboard-app, tsc --noEmit; audit 05.11.2026 L-F20).
 on:
+  # GitHub Actions minutes (private repo): run on main pushes and pull requests only, not on every work-branch push
+  # (05.11.2026: the account's Actions spending limit was reached; branch WIP pushes doubled the runs)
   push:
+    branches: [main]
   pull_request:
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:

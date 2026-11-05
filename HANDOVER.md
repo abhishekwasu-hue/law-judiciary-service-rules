@@ -69,6 +69,11 @@
   no rule dropped). Gap: tools/verify_outputs.py does not check the _Affidavit / _LQ_Answer files yet.
 
 ## Pending
+26. **GitHub Actions blocked (05.11.2026 from 14:49 UTC):** every job fails at once with "The job was not started because recent
+    account payments have failed or your spending limit needs to be increased" — engine runs, edits, tests and Deploy app cannot
+    run until Abhi fixes GitHub → Settings → Billing and plans (payment / Actions spending limit). Nothing to deploy right now:
+    no app / Worker change since the 14:00 deploy; the engine reads rules from main at run time. Tests workflow now runs on main
+    pushes + PRs only (branch pushes were doubling the minutes).
 25. **05.11.2026 owner rule decisions (INSTRUCTIONS §4.36) — on main + deployed:** C1 (आ) no incoming LETTER number anywhere in
     the note (order nos., GR / petition / C R nos., U.O. and other-desk reference nos. only when on record — kept); C2 (आ) +
     wording (आ): missing-info para "सदर प्रकरणी <प्राधिकारी> यांच्या दि. … रोजीच्या प्रस्तावाचे अवलोकन केले असता, त्यामध्ये खालील
