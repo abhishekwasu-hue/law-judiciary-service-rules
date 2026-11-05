@@ -78,8 +78,23 @@ export function DownloadStrip({ ctx, after }: { ctx: CaseCtx; after?: ReactNode 
       {items.map((x, i) => (
         <DownloadBtn key={x.f.id} f={x.f} label={x.label} className={`${i === 0 ? 'btn-primary' : 'btn-ghost'} min-w-0 px-2 leading-tight sm:px-4`} />
       ))}
+      {items.length > 0 && <WhatsAppShare ctx={ctx} />}
       {after}
     </div>
+  );
+}
+
+/** Owner 05.11.2026 (option इ, "इ करा"): no automatic sending — the button opens WhatsApp on the user's own phone / WhatsApp
+ *  Web with a ready message (case, subject, link to the case). Nothing is sent by the app; no file leaves the app; the user
+ *  chooses the contact and presses send. */
+function WhatsAppShare({ ctx }: { ctx: CaseCtx }) {
+  const subj = (ctx.c.subject || '').trim();
+  const text = `${ctx.title}${subj ? ` — ${subj.length > 90 ? `${subj.slice(0, 90)}…` : subj}` : ''}\nटिप्पणी व मसुदे तयार आहेत. कृपया प्रस्ताव कक्षात पाहावे:\n${window.location.origin}/cases/${ctx.c.id}`;
+  return (
+    <a href={`https://wa.me/?text=${encodeURIComponent(text)}`} target="_blank" rel="noopener noreferrer"
+      className="btn-ghost min-w-0 px-2 leading-tight text-green-800 sm:px-4 dark:text-green-300" aria-label="WhatsApp वर पाठवा (संदेश आपण स्वतः पाठवायचा)">
+      <span aria-hidden="true">🟢</span> WhatsApp वर पाठवा
+    </a>
   );
 }
 
