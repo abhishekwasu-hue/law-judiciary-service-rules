@@ -23,7 +23,7 @@ class FakeSB:
     def __init__(self, case_id=7, run_id=70):
         self.case = {"id": case_id, "cr_no": "131", "cr_year": 2026, "subject": "विशेष वेतन", "desk": None}
         self.run = {"id": run_id, "case_id": case_id, "kind": "edit", "state": "queued", "warnings": []}
-        self.files, self.objects, self.activity, self.patches = [], {}, [], []
+        self.files, self.objects, self.activity, self.patches, self.refused_patches = [], {}, [], [], []
         self.next_id = 100
 
     def add(self, kind, name, data, bucket="outputs", version=1):
@@ -52,7 +52,12 @@ class FakeSB:
             if method == "GET":
                 return [copy.deepcopy(self.run)]
             if method == "PATCH":
-                self.patches.append(body); self.run.update(body); return None
+                st = q.get("state", "")
+                if st.startswith("in.(") and self.run.get("state") not in st[4:-1].split(","):   # L-F8 guard
+                    self.refused_patches.append(body)
+                    return [] if "return=representation" in str((headers or {}).get("Prefer")) else None
+                self.patches.append(body); self.run.update(body)
+                return [copy.deepcopy(self.run)] if "return=representation" in str((headers or {}).get("Prefer")) else None
         if table == "cases":
             if method == "GET":
                 return [dict(self.case)]
@@ -208,10 +213,11 @@ def test_cost_from_usage():
 # ---------------------------------------------------------------- full dry pipeline (CR131 note + letter)
 def seed_cr131(sb, tmp_path, pages=20):
     spec = sample("CR131_2026_special-pay_info-letter.json")
-    sb.add("spec", "spec.json", json.dumps(spec, ensure_ascii=False).encode("utf-8"))
     nl = sb.add("note_letter", "CR131_2026_Note_and_Letter.docx", b"old docx")
     pkg = blank_pdf(str(tmp_path / "pkg.pdf"), pages)
     sb.add("package_pdf", "प्रस्ताव CR131.pdf", open(pkg, "rb").read())
+    # a full run stores the spec AFTER its outputs (tools/engine_supabase.py finish; L-F7 compares the row ids)
+    sb.add("spec", "spec.json", json.dumps(spec, ensure_ascii=False).encode("utf-8"))
     return spec, nl
 
 
@@ -332,7 +338,6 @@ def test_no_spec_fails(sb, tmp_path):
 def seed_package(sb, tmp_path):
     """proposal (3 pages) + one repo GR enclosure (pdf/gr) built with pkg3; a highlight added afterwards (highlight.py)."""
     spec = sample("CR131_2026_special-pay_info-letter.json")
-    sb.add("spec", "spec.json", json.dumps(spec, ensure_ascii=False).encode("utf-8"))
     sb.add("note_letter", "CR131_2026_Note_and_Letter.docx", b"old")
     prop = blank_pdf(str(tmp_path / "prop.pdf"), 3)
     sb.add("proposal", "11ae057d-प्रस्ताव.pdf", open(prop, "rb").read(), bucket="inputs")
@@ -349,6 +354,7 @@ def seed_package(sb, tmp_path):
     h = pg3.add_highlight_annot(pymupdf.Rect(72, 90, 300, 110)); h.update()
     d.saveIncr(); n = len(d); d.close()
     sb.add("package_pdf", "प्रस्ताव.pdf", old.read_bytes())
+    sb.add("spec", "spec.json", json.dumps(spec, ensure_ascii=False).encode("utf-8"))
     sb.add("spec", "enclosures.json", json.dumps(encs, ensure_ascii=False).encode("utf-8"))
     return n
 
@@ -443,3 +449,108 @@ def test_fixed_strings_are_respectful():
     bad = [s for s in lits if IMPERATIVE.search(s.replace("'पुन्हा तयार करा'", ""))]
     assert bad == []
     assert "कृपया" in ED.SYSTEM and "ही विनंती" in ED.SYSTEM and "आपण" in ED.SYSTEM
+
+
+# ---------------------------------------------------------------- audit 05.11.2026 fixes
+def test_stale_spec_refused(sb, tmp_path, monkeypatch):
+    """L-F7: the last full run's spec upload failed (its note_letter is newer than the newest spec) -> refused, no model
+    call, nothing uploaded."""
+    seed_cr131(sb, tmp_path)
+    sb.add("note_letter", "CR131_2026_Note_and_Letter.docx", b"newer docx", version=2)
+    sb.run.update({"edit_target": "letter", "edit_message": "पत्रात बदल करावा"})
+    api = FakeAPI([])
+    monkeypatch.setattr(ED, "post_json", api)
+    n = len(sb.files)
+    with pytest.raises(ED.Refused) as ex:
+        ED.run_edit(str(tmp_path / "w"), api_key="sk", model="claude-sonnet-5-5")
+    assert ex.value.args[0] == ED.STALE_SPEC and "कृपया" in ED.STALE_SPEC and api.calls == [] and len(sb.files) == n
+
+
+def test_spec_records_run_and_order(sb, tmp_path, monkeypatch):
+    """L-F7: the edit's own spec is stored under …/spec/v<n>/r<run>/ and after its outputs (so the next edit is not stale)."""
+    spec, _ = seed_cr131(sb, tmp_path)
+    new = spec["letter"]["intro"].replace("सदर प्रकरणी", "सदर प्रकरणी आवश्यक")
+    sb.run.update({"edit_target": "letter", "edit_message": "पत्रात 'आवश्यक' शब्द जोडावा"})
+    monkeypatch.setattr(ED, "post_json", FakeAPI([model_reply([("replace", "/letter/intro", new)])]))
+    ED.run_edit(str(tmp_path / "w"), api_key="sk", model="claude-sonnet-5-5")
+    sp = max((f for f in sb.files if f["kind"] == "spec" and f["original_name"] == "spec.json"), key=lambda f: f["version"])
+    nl = max((f for f in sb.files if f["kind"] == "note_letter"), key=lambda f: f["version"])
+    assert f"/spec/v{sp['version']}/r{sb.run['id']}/spec.json" in sp["storage_path"] and sp["id"] > nl["id"]
+    assert ED.spec_run_of(sp) == sb.run["id"] and not ED.stale_spec(sp, nl)
+
+
+def test_closed_run_not_resurrected(sb, tmp_path, monkeypatch):
+    """L-F8: a run already failed (sweep / cancel) is never set running / done; nothing is done."""
+    seed_cr131(sb, tmp_path)
+    sb.run.update({"state": "failed", "step": "मूळ कारण", "edit_target": "letter", "edit_message": "बदल"})
+    api = FakeAPI([])
+    monkeypatch.setattr(ED, "post_json", api)
+    assert ED.run_edit(str(tmp_path / "w"), api_key="sk", model="claude-sonnet-5-5") is None
+    assert sb.run["state"] == "failed" and sb.run["step"] == "मूळ कारण" and api.calls == [] and sb.refused_patches
+    ED.finish_refused("कारण")
+    assert sb.run["state"] == "failed"
+    ED.step("सुधारणा: प्रगती")
+    assert sb.run["step"] == "मूळ कारण"
+
+
+def test_step_direct_to_supabase(sb, monkeypatch):
+    """L-F1: with the service key the edit job writes the step itself (the Worker route was blocked by Cloudflare 1010)."""
+    monkeypatch.setenv("RUN_TOKEN", "rt"); monkeypatch.setenv("WORKER", "https://worker.test")
+    called = []
+    monkeypatch.setattr(E, "cmd_step_worker", lambda t: called.append(t))
+    sb.run["state"] = "running"
+    ED.step("सुधारणा: तपासणी करण्यात येत आहे")
+    assert sb.run["step"] == "सुधारणा: तपासणी करण्यात येत आहे" and called == []
+    monkeypatch.setattr(E, "KEY", None)
+    ED.step("x")
+    assert called == ["x"]
+
+
+def test_user_agent_on_http(monkeypatch):
+    """L-F1: Supabase / Worker calls carry User-Agent prastav-kaksha-engine/1 (Python's default UA -> Cloudflare 1010)."""
+    seen = []
+
+    class R:
+        status = 200
+        def read(self): return b"[]"
+        def __enter__(self): return self
+        def __exit__(self, *a): return False
+
+    def fake(req, timeout=0):
+        seen.append(req.get_header("User-agent")); return R()
+    import urllib.request
+    monkeypatch.setattr(urllib.request, "urlopen", fake)
+    monkeypatch.setattr(E, "KEY", "k")
+    E.http("GET", "https://sb.test/rest/v1/runs")
+    monkeypatch.setenv("RUN_TOKEN", "rt"); monkeypatch.setenv("WORKER", "https://worker.test"); monkeypatch.setenv("RUN_ID", "5")
+    E.cmd_step_worker("प्रगती")
+    assert seen == [E.USER_AGENT, E.USER_AGENT] and E.USER_AGENT == "prastav-kaksha-engine/1"
+
+
+def test_note_edit_quote_mismatch_warned(sb, tmp_path, monkeypatch, capsys):
+    """Q-F20: a note edit that brings in a quote not on its cited page -> a soft warning (Study / app) and a note; the
+    Actions log carries no case text (S-F3)."""
+    spec, _ = seed_cr131(sb, tmp_path)
+    d = pymupdf.open()   # a package whose page 2 has a usable text layer (>= 50 characters)
+    for i in range(20):
+        d.new_page().insert_text((72, 100), f"Page {i + 1}: the government resolution text of this page is printed here.", fontsize=10)
+    pk = tmp_path / "pk.pdf"; d.save(str(pk)); d.close()
+    sb.objects[next(f for f in sb.files if f["kind"] == "package_pdf")["storage_path"]] = pk.read_bytes()
+    q = "This sentence of the order is certainly not printed on the cited page"   # Latin: the blank pages' text layer
+    p0 = spec["note"]["paras"][0]
+    new = p0 + " सदर शासन निर्णयात “" + q + "” अशी तरतूद आहे (पृ.2/प.वि.)."
+    sb.run.update({"edit_target": "note", "edit_message": "परि. 2 मध्ये “" + q + "” हा उतारा जोडावा"})
+    monkeypatch.setattr(ED, "post_json", FakeAPI([model_reply([("replace", "/note/paras/0", new)], "उतारा जोडण्यात आला आहे.")]))
+    ED.run_edit(str(tmp_path / "w"), api_key="sk", model="claude-sonnet-5-5")
+    w = [x for x in sb.run["warnings"] if "टिप्पणीतील अवतरणे" in x]
+    assert w and w[0].startswith("पडताळणी अपूर्ण — ") and "टिप्पणी परि." in w[0]
+    assert ED.QUOTE_NOTE in sb.run["edit_result"]["notes"]
+    out = capsys.readouterr()
+    assert "उतारा जोडण्यात" not in out.out and q not in out.out + out.err and "edit done:" in out.out
+
+
+def test_labels_and_system_rule():
+    """R-F20: the fallback label is टिप्पणी; the SYSTEM prompt keeps para 1 free of a letter number (§4.29(1))."""
+    st = {"note": {"paras": []}}
+    assert ED.where_of({"toks": ["note", "other"], "state": st, "op": "replace"}) == "टिप्पणी"
+    assert "§4.29(1)" in ED.SYSTEM and "never\n   carries a letter number" in ED.SYSTEM and "authority, date and पृ.N/प.वि. only" in ED.SYSTEM

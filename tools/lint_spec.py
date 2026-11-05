@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""lint_spec.py <spec.json> [--study study.json] [--pages N] [--allow-missing-part1]
+"""lint_spec.py <spec.json> [--study study.json] [--pages N] [--allow-missing-part1] [--details FILE]
 Pre-build lint: checks spec.json (note/letter, format: tools/mkdocs.py docstring) and study.json (tools/build_study.py
 docstring) against the rules that tools/verify_outputs.py checks on the built files (PROPOSAL_SOP.md Step 4,
 INSTRUCTIONS.md §4), so problems are fixed before building. spec.json may be "-" to lint only --study.
@@ -22,7 +22,8 @@ Rules (spec.json)
     (related_source_problems). The Study keeps "(पॅकेज PDF पृ. N)".
   - पृ. references: same accepted forms as verify_outputs ("पृ.N/प.वि.", "पृ. N / प.वि.", lists, ranges, Devanagari
     digits, blank "पृ.      /प.वि."); "“…”" quotes are skipped in related; page range 1..N only with --pages N
-  - note.first ends with "सादर."
+  - note.first ends with "सादर."; no letter number in it — "क्र." / "क्रमांक" + a token with "/" outside quotes and
+    पृ.N/प.वि. (a petition / application / case no. excepted) (§4.29(1), audit 05.11.2026 Q-F7 / R-F2)
   - last note para (note.closing if not blank, else the last text item of note.paras) is one of the SOP forms:
     "सबब, … पत्राचे प्रारूप पृ.  /प.वि. वर मान्यतेस्तव सादर. मान्य झाल्यास पत्र निर्गमित करण्यात येईल." or
     "सबब, … वित्त विभागाच्या मान्यतेस्तव सादर करण्यात येत आहे." or (several drafts, INSTRUCTIONS §4.28, 03.11.2026)
@@ -91,6 +92,19 @@ WARN level (spec.json; note body and letter, text outside quotes; related and si
     related extracts)
   - §4.28 (03.11.2026): the note's last para names every draft in the spec (letter "पत्राचे", reminder "स्मरणपत्राचे",
     order kinds "शासन निर्णयाचे / शुद्धिपत्रकाचे / …", parawise "परिच्छेदनिहाय"; drafts_unnamed)
+  - audit 05.11.2026 (docs/AUDIT_2026-11-05.md; samples' known findings: tests/test_lint_spec.py AUDIT_KNOWN_WARNS):
+    Q-F6 "उल्लेख (केलेला) नाही" / "आढळून येत / आले नाही" outside the missing-info para (MISSING_REMARK_WARN_RE);
+    Q-F8 "उपरोक्त वस्तुस्थिती" list not 3–6 items (note.sub / table data rows / inline "(1)" markers) or a “…” in it;
+    Q-F9 own-text sentence (outside quotes; note body strings, letter intro / points / closing / body) of more than 40
+    words (an abbreviation dot after a one-akshara word does not end a sentence); Q-F11 court note (spec "parawise" /
+    "affidavit"): para 2 without "प्रतिवादी क्र."; with "parawise" also para 3 not "… मागण्या …:-" + a table with a
+    "प्रार्थना" column (§4.32);
+    Q-F12 a letter to a "वकील" with a copy to the High Court Registry (§4.35; on_behalf_of: lint_parawise /
+    lint_affidavit); Q-F19 no demand word in para 1–2 (court note: 1–3) when para 1 answers an incoming letter / petition
+    (§4.30(3)); Q-F21 "पूर्वोदाहरण-ग्रंथालय" in a related heading / source
+Output (audit S-F3): --details FILE (or env CASE_DETAILS_FILE) — full lines appended to FILE, stdout with every quoted
+  segment replaced by its length (redact / out; the same switch in lint_parawise, lint_affidavit, verify_outputs,
+  extract_check). Without it the output is unchanged.
 Desk (C30, 03.11.2026): spec "desk" names the profile tools/desks/<id>.json (absent = law-desk6, the Desk-6 values above);
   the signer chain, the finance signer (in place of "अ.मु.स. (वित्त)") and the letter ref_no form come from it; an unknown
   desk id is an error ("desk: desk profile — …").
@@ -183,6 +197,9 @@ _LELA = r"लेल(?:े|ी|ा|्या)"
 MISSING_REMARK_RE = re.compile(rf"नमूद\s+(?:के{_LELA}\s+)?{_NAHI}|जोड{_LELA}\s+{_NAHI}|जोडण्यात\s+आ{_LELA}\s+{_NAHI}"
                                rf"|उपलब्ध\s+(?:करून\s+दि{_LELA}\s+)?{_NAHI}|प्रस्तावासोबत\s+{_NAHI}"
                                rf"|(?<![ऀ-ॿ])प्रती?\s+{_NAHI}|सादर\s+(?:के{_LELA}|करण्यात\s+आ{_LELA})\s+{_NAHI}")
+# audit 05.11.2026 Q-F6 (WARN level — the approved HTE sample uses "… उल्लेख नाही" in two facts): the same remark in
+# other words
+MISSING_REMARK_WARN_RE = re.compile(rf"उल्लेख\s+(?:के{_LELA}\s+)?{_NAHI}|आढळून\s+(?:येत|आल[ेाी]|आ{_LELA})\s+{_NAHI}")
 MISSING_ONE_MSG = ("उपलब्ध नसलेली माहिती / कागदपत्रे फक्त एकाच 'प्रस्तावासोबत खालील माहिती उपलब्ध नाही:-' परिच्छेदात "
                    "(शेवटच्या परिच्छेदाच्या आधी); इतरत्र असा शेरा नको, तक्त्यात '____' (§4.31)")
 # INSTRUCTIONS §4.20 (02.11.2026): letter table only for data to fill in; documents after the table as a numbered list
@@ -712,6 +729,8 @@ def lint_spec(spec, pages=None):
         P.append("note.first: structure — first para missing")
     elif not first.strip().endswith("सादर."):
         P.append("note.first: first para — must end with 'सादर.'")
+    if isinstance(first, str):
+        P += [f"note.first: {x}" for x in first_letter_no_problems(first)]   # §4.29(1), audit 05.11.2026 Q-F7 / R-F2
     paras = n.get("paras", [])
     if not isinstance(paras, list):
         P.append("note.paras: structure — must be a list"); paras = []
@@ -913,6 +932,8 @@ def missing_scatter(seq):
         if i not in owned:
             for m in MISSING_REMARK_RE.finditer(unquoted(t)):
                 P.append(f"{lab}: missing-info remark — '{m.group(0)}' — {MISSING_ONE_MSG}")
+            for m in MISSING_REMARK_WARN_RE.finditer(unquoted(t)):   # Q-F6: WARN level
+                W.append(f"{lab}: missing-info remark — '{m.group(0)}' — {MISSING_ONE_MSG}")
     if heads:
         after = [i for i in range(max(owned) + 1, len(seq)) if seq[i][2]]
         if len(after) != 1:
@@ -1039,6 +1060,212 @@ def note_tables(n):
     return out
 
 
+# ---------------- audit 05.11.2026 (docs/AUDIT_2026-11-05.md Part 3 / Part 9) ----------------
+# Q-F7 / R-F2 (ERROR): INSTRUCTIONS §4.29(1) (Abhi 04.11.2026: "नोंदीच्या पहिल्याच पॅराग्राफ मध्ये पत्राचा क्रमांक … आवश्यकता
+# नाही दिनांक जरी नमूद केला तरी होईल"): note.first names each covering letter by authority, date and पृ.N/प.वि. only — no
+# letter number ("क्र." / "क्रमांक" followed by a token with "/"), outside quotes and outside the पृ.N/प.वि. references.
+# A petition / application / case number ("याचिका क्र. 35697/2026") is not a letter number.
+FIRST_LETTER_NO_RE = re.compile(r"(?<![ऀ-ॿ])(?:क्र\.|क्रमांक)\s*:?\s*-?\s*(\S*/\S*)")
+CASE_NO_BEFORE_RE = re.compile(r"(?:याचिका|अर्ज|अपील|प्रकरण|दावा|petition|application)\s*(?:\([^)]{0,20}\)\s*)?$", re.I)
+FIRST_LETTER_NO_MSG = ("first para — पत्राचा क्रमांक नको, दिनांक व पृ.N/प.वि. पुरेसे (§4.29(1), 04.11.2026)")
+
+
+def first_letter_no_problems(first):
+    """§4.29(1): letter numbers in note.first (outside quotes and पृ.N/प.वि.); [] = ok."""
+    t = REF_LOOSE.sub(" ", unquoted(first or ""))
+    out = []
+    for m in FIRST_LETTER_NO_RE.finditer(t):
+        if CASE_NO_BEFORE_RE.search(t[max(0, m.start() - 30):m.start()].rstrip()):
+            continue
+        out.append(f"{FIRST_LETTER_NO_MSG}: letter no. at character {m.start()}")
+    return out
+
+
+# Q-F8 (WARN, §4.29(10) / §4.34(आ)): the "उपरोक्त वस्तुस्थिती पुढीलप्रमाणे आहे:-" list has 3 to 6 decisive facts, one line
+# each, no “…” quote (the quotes are in the body)
+SUMMARY_MIN, SUMMARY_MAX = 3, 6
+INLINE_ITEM_RE = re.compile(r"\(\s*[0-9०-९]+\s*\)")
+
+
+def summary_problems(entries):
+    """entries = [(label, head text, [item texts])] — one per "उपरोक्त वस्तुस्थिती" para; items = its sub-points / table
+    data rows (none: the "(1) … (2) …" markers in the head para after the heading are counted). -> WARN strings."""
+    W = []
+    for lab, head, items in entries:
+        tail = SUMMARY_HEAD_RE.split(head or "", 1)[-1]
+        k = len(items) if items else len(INLINE_ITEM_RE.findall(unquoted(tail)))
+        if k and not SUMMARY_MIN <= k <= SUMMARY_MAX:
+            W.append(f"{lab}: 'उपरोक्त वस्तुस्थिती' list has {k} items — 3 to 6 decisive facts, one line each "
+                     f"(§4.29(10), §4.34(आ))")
+        nq = sum(len(CURLY_QUOTE_RE.findall(x or "")) for x in list(items) + ([tail] if not items else []))
+        if nq:
+            W.append(f"{lab}: 'उपरोक्त वस्तुस्थिती' list carries {nq} quote(s) “…” — facts only, the quotes stay in the body "
+                     f"(§4.34(आ))")
+    return W
+
+
+def summary_entries(n):
+    """summary_problems() entries of a spec note: the string para with the heading, its note.sub items and the table
+    data rows (all rows after the header) of the non-string items right after it."""
+    paras = n.get("paras") if isinstance(n.get("paras"), list) else []
+    sub = n.get("sub") if isinstance(n.get("sub"), dict) else {}
+    out = []
+    for i, x in enumerate(paras):
+        if not (isinstance(x, str) and SUMMARY_HEAD_RE.search(unquoted(x))):
+            continue
+        items = [t for t in sub.get(str(i), []) if isinstance(t, str) and t.strip()]
+        j = i + 1
+        while j < len(paras) and not isinstance(paras[j], str):
+            y = paras[j]
+            if isinstance(y, dict) and isinstance(y.get("table"), list):
+                items += [" ".join(c for c in r if isinstance(c, str)) for r in y["table"][1:] if isinstance(r, list)]
+            items += [t for t in sub.get(str(j), []) if isinstance(t, str) and t.strip()]
+            j += 1
+        out.append((f"note.paras[{i}]", x, items))
+    return out
+
+
+# Q-F9 (WARN, §4.18 / §4.32(इ) "एका वाक्यात एक मुद्दा (40 शब्दांपेक्षा लांब वाक्य नको)"): own-text sentence (outside “…”
+# quotes) of more than 40 words in the note body or a letter. A dot after a one-akshara word ("दि.", "क्र.", "पृ.", "श्री.",
+# "प.वि.", initials) is an abbreviation, not a sentence end.
+LONG_SENTENCE = 40
+_C = "क-हक़-य़"
+ONE_AKSHARA_RE = re.compile(rf"(?:[{_C}]़?(?:्[{_C}]़?)*[ा-ौॢॣ]?|[ऄ-औ])[ऀ-ः]?")
+ABBR_WORDS = {"श्रीम", "No", "Nos", "Rs", "Dr", "Mr", "Mrs", "Ms", "vs", "v", "Sr", "St", "viz", "etc", "i.e", "e.g"}
+SENT_END_RE = re.compile(r"[.।?!](?=\s|$)")
+
+
+def sentences(text):
+    """Own-text sentences of text (quotes removed): split at "." / "।" / "?" / "!" before a space or the end, except an
+    abbreviation dot (one-akshara word or ABBR_WORDS)."""
+    t = unquoted(text or "")
+    t = re.sub(r"^\s*(?:[0-9०-९]+\.|\(\s*[0-9०-९]+\s*\))\s*", "", t)
+    out, start = [], 0
+    for m in SENT_END_RE.finditer(t):
+        if m.group(0) == ".":
+            w = re.search(r"([A-Za-z.]+|[ऀ-ॿ]+)$", t[start:m.start()])
+            if w and (w.group(1) in ABBR_WORDS or ONE_AKSHARA_RE.fullmatch(w.group(1))
+                      or (len(w.group(1)) == 1 and w.group(1).isalpha())):
+                continue
+        out.append(t[start:m.end()]); start = m.end()
+    if t[start:].strip():
+        out.append(t[start:])
+    return [s for s in (x.strip() for x in out) if s]
+
+
+def long_sentence_warnings(items):
+    """items = [(label, text)] -> WARN strings (label, sentence no., word count only — no text, audit S-F3)."""
+    W = []
+    for lab, t in items:
+        for k, s in enumerate(sentences(t), 1):
+            nw = len([w for w in s.split() if re.search(r"[0-9A-Za-zऀ-ॿ_]", w)])
+            if nw > LONG_SENTENCE:
+                W.append(f"{lab}: sentence {k} has {nw} words — one point per sentence, at most {LONG_SENTENCE} words "
+                         f"(§4.18, §4.32(इ))")
+    return W
+
+
+# Q-F11 (WARN, §4.32 (अ)/(आ)): a court note (spec with "parawise" / "affidavit") — para 2 names the respondents in order
+# ("… यांना प्रतिवादी क्र. 1, …") and para 3 lists the prayers ("सदर याचिकेद्वारे याचिकाकर्त्यांनी पुढीलप्रमाणे प्रमुख मागण्या …:-"
+# + a table with a "प्रार्थना" column). Model: samples/specs/WP35697_2026_old-pension_finance-opinion.json.
+RESP_RE = re.compile(r"प्रतिवादी\s+क्र\.")
+PRAYER_HEAD_RE = re.compile(r"मागण्या")
+
+
+def court_shape_warnings(spec):
+    if not isinstance(spec, dict) or not (spec.get("parawise") or spec.get("affidavit")):
+        return []
+    n = spec.get("note") if isinstance(spec.get("note"), dict) else {}
+    paras = n.get("paras") if isinstance(n.get("paras"), list) else []
+    idx = [i for i, x in enumerate(paras) if isinstance(x, str) and x.strip()]
+    W = []
+    if not idx or not RESP_RE.search(unquoted(paras[idx[0]])):
+        W.append(f"note.paras[{idx[0] if idx else 0}]: court note para 2 — the petition and its respondents in order in "
+                 f"flowing sentences ('… यांना प्रतिवादी क्र. 1, … यांना प्रतिवादी क्र. 2 … करण्यात आले आहे (पृ.N/प.वि.).'; "
+                 f"§4.32(अ))")
+    if not spec.get("parawise"):
+        return W   # affidavit stage: the prayers were tabled in the earlier parawise note (para 3 checked with "parawise")
+    ok3 = False
+    if len(idx) > 1 and PRAYER_HEAD_RE.search(unquoted(paras[idx[1]])):
+        nxt = paras[idx[1] + 1] if idx[1] + 1 < len(paras) else None
+        hdr = nxt.get("table")[0] if isinstance(nxt, dict) and isinstance(nxt.get("table"), list) and nxt["table"] \
+            and isinstance(nxt["table"][0], list) else []
+        ok3 = any(isinstance(c, str) and "प्रार्थना" in c for c in hdr)
+    if not ok3:
+        W.append(f"note.paras[{idx[1] if len(idx) > 1 else 1}]: court note para 3 — 'सदर याचिकेद्वारे याचिकाकर्त्यांनी "
+                 f"पुढीलप्रमाणे प्रमुख मागण्या केल्या आहेत (पृ.N/प.वि.):-' + table 'अ.क्र. | प्रार्थना | मागणी' (§4.32(आ))")
+    return W
+
+
+# Q-F12 (WARN, §4.35): the joint affidavit is on behalf of the State respondents only — the High Court Registry
+# (महाप्रबंधक / प्रबंधक / Registrar) is not part of it: no remarks on its behalf, no copy of the GP letter to it
+REGISTRY_RE = re.compile(r"महाप्रबंधक|प्रबंधक|निबंधक|Registrar|High\s+Court|उच्च\s+न्यायालय", re.I)
+REGISTRY_MSG = ("the High Court Registry (महाप्रबंधक / प्रबंधक / Registrar) is not part of the State's joint affidavit — "
+                "nothing on its behalf, no copy to it (§4.35)")
+
+
+def registry_hits(text, copy_line=False):
+    """True when text names the High Court Registry; in a copy line a "… सरकारी वकील, उच्च न्यायालय" address is not it."""
+    t = unquoted(text or "")
+    if copy_line and "वकील" in t and not re.search(r"महाप्रबंधक|प्रबंधक|निबंधक|Registrar", t, re.I):
+        return False
+    return bool(REGISTRY_RE.search(t))
+
+
+def gp_letter_copy_warnings(spec):
+    """§4.35: a letter to the Government Pleader (letter.to names a "वकील") — no copy to the High Court Registry."""
+    W = []
+    for lp, L in letters_of(spec):
+        if not isinstance(L, dict) or "वकील" not in " ".join(x for x in (L.get("to") or []) if isinstance(x, str)):
+            continue
+        for i, c in enumerate(L.get("copies") or []):
+            if isinstance(c, str) and registry_hits(c, copy_line=True):
+                W.append(f"{lp}.copies[{i}]: {REGISTRY_MSG}")
+    return W
+
+
+# Q-F19 (WARN, §4.30(3)): the demand in one short sentence right after para 1 — para 1 or 2 (court note: para 3, the
+# prayers) names it. Low-noise keyword test.
+DEMAND_RE = re.compile(r"मागणी|मागण्या|मागितल|विनंती|अनुतोष|शिफारस|याचिका|प्रश्न"
+                       r"|सादर\s+(?:केला|केली|केले|केलेला|केलेली|करण्यात)"
+                       r"|(?:करण्या|मिळण्या|देण्या|ठेवण्या)(?:बाबत|ची|चा|चे|स)(?![ऀ-ॿ])")
+
+INCOMING_RE = re.compile(r"पत्रां?स|पत्रासोबत|पत्रान्वये|निवेदन|अर्ज|याचिका|नोटी[सश]")
+
+
+def demand_warnings(spec):
+    n = spec.get("note") if isinstance(spec, dict) and isinstance(spec.get("note"), dict) else None
+    if n is None:
+        return []
+    paras = n.get("paras") if isinstance(n.get("paras"), list) else []
+    idx = [i for i, x in enumerate(paras) if isinstance(x, str) and x.strip()]
+    court = bool(spec.get("parawise") or spec.get("affidavit"))
+    if not court and not INCOMING_RE.search(unquoted(n.get("first") or "")):
+        return []   # the department's own initiative (a GR to endorse, an office order): no one asks anything
+    look = [n.get("first") or ""] + [paras[i] for i in idx[:2 if court else 1]]
+    if any(DEMAND_RE.search(unquoted(t)) for t in look if isinstance(t, str)):
+        return []
+    return [f"note.paras[{idx[0] if idx else 0}]: demand — give the demand in one short sentence right after para 1 "
+            f"(who asks what; §4.30(3))"]
+
+
+# Q-F21 (WARN): the precedent library is an internal working collection — a related source names the office record
+# (C R no. / letter no. and date), not "पूर्वोदाहरण-ग्रंथालय" (§4.4 "स्वतःच्या मनाने काम करू नये"; INSTRUCTIONS §7.1)
+LIBRARY_RE = re.compile(r"पूर्वोदाहरण\s*-?\s*ग्रंथालय|precedent[\s-]*library", re.I)
+
+
+def library_ref_warnings(spec):
+    W = []
+    for i, it in enumerate((spec or {}).get("related") or []):
+        if not isinstance(it, dict):
+            continue
+        for k in ("heading", "source"):
+            if isinstance(it.get(k), str) and LIBRARY_RE.search(it[k]):
+                W.append(f"related[{i}].{k}: 'पूर्वोदाहरण-ग्रंथालय' — name the office record (C R / letter no., date), "
+                         f"not the internal library (§4.4)")
+    return W
+
+
 def lint_warnings(spec):
     """WARN-level findings "<JSON path>: <message>" (note body and letter outside quotes); never errors."""
     if not isinstance(spec, dict) or not isinstance(spec.get("note"), dict):
@@ -1052,6 +1279,16 @@ def lint_warnings(spec):
     W += flow_warnings(note_seq(n), note_tables(n), rel_txt)   # C32 §4.34 relevance + flow
     W += [f"{last_para(n)[0]}: last para — does not name the draft {d} (§4.28: name every draft made, e.g. "
           f"'पत्राचे प्रारूप व शासन निर्णयाचे प्रारूप पृ.      /प.वि. वर मान्यतेस्तव सादर.')" for d in drafts_unnamed(spec)]
+    # audit 05.11.2026: Q-F8 summary list, Q-F9 long sentences, Q-F11 court para 2/3, Q-F12 registry copies, Q-F19 demand,
+    # Q-F21 library refs
+    W += summary_problems(summary_entries(n))
+    own = [(p, t) for p, t in body if not re.search(r"\.table\[", p)]
+    own += [(p, t) for p, t in letter if re.match(r"letters?(?:\[\d+\])?\.(?:intro|points\[\d+\]|closing|body\[\d+\])$", p)]
+    W += long_sentence_warnings(own)
+    W += court_shape_warnings(spec)
+    W += gp_letter_copy_warnings(spec)
+    W += demand_warnings(spec)
+    W += library_ref_warnings(spec)
     return W
 
 
@@ -1126,6 +1363,61 @@ def lint_extras(spec):
     return probs, warns
 
 
+# ---------------- audit 05.11.2026 S-F3: no case text in CI logs ----------------
+# With a details file (--details FILE, or env CASE_DETAILS_FILE), the full lines (quote text, subjects, ref nos.) are
+# appended to that file and stdout gets the same lines with every quoted segment ('…', “…”, ‘…’) replaced by its length
+# "'<N ch>'" — check names, JSON paths, block / page numbers and counts stay. Without one, output is unchanged (local use,
+# the engine's own repair loop). Shared by lint_spec, lint_parawise, lint_affidavit, verify_outputs, extract_check.
+DETAILS_ENV = "CASE_DETAILS_FILE"
+_DETAILS = []
+REDACT_RE = re.compile(r"'[^'\n]*'|“[^”\n]*”|‘[^’\n]*’")
+
+
+def redact(line):
+    """line with each quoted segment replaced by its length (S-F3)."""
+    return REDACT_RE.sub(lambda m: f"'<{len(m.group(0)) - 2} ch>'", str(line))
+
+
+def details_arg(argv):
+    """Remove "--details FILE" from argv (a list, changed in place); -> the file (argv, else env CASE_DETAILS_FILE) or None."""
+    path = None
+    while "--details" in argv:
+        i = argv.index("--details")
+        path = argv[i + 1] if i + 1 < len(argv) else None
+        del argv[i:i + 2]
+    return path or _os.environ.get(DETAILS_ENV) or None
+
+
+def set_details(path, tool=""):
+    """Start redacted output: full lines go to `path` (appended; a header line names the tool)."""
+    del _DETAILS[:]
+    if path:
+        _DETAILS.append(path)
+        try:
+            with open(path, "a", encoding="utf-8") as f:
+                f.write(f"== {tool}\n")
+        except OSError as e:
+            print(f"details file not writable ({e.__class__.__name__}) — output redacted only", file=sys.stderr)
+
+
+def details_active():
+    return bool(_DETAILS)
+
+
+def out(line, shown=None):
+    """Print one output line: the full line, or (details file active) `shown` / redact(line) on stdout and the full line
+    into the file."""
+    if not _DETAILS:
+        print(line); return
+    try:
+        with open(_DETAILS[0], "a", encoding="utf-8") as f:
+            f.write(str(line) + "\n")
+    except OSError:
+        pass
+    print(shown if shown is not None else redact(line))
+
+
+
 def load(path):
     with open(path, encoding="utf-8-sig") as f:
         return json.load(f)
@@ -1133,6 +1425,7 @@ def load(path):
 
 def main(argv):
     args = argv[1:]
+    set_details(details_arg(args), "lint_spec " + " ".join(args))   # S-F3
     spec_path = study_path = None; pages = None; allow1 = False
     try:
         while args:
@@ -1167,9 +1460,9 @@ def main(argv):
             probs.append(f"{path}: JSON — {e}"); continue
         probs += fn(obj)
     for p in probs:
-        print(p)
+        out(p)
     for w in warns:
-        print("WARN " + w)
+        out("WARN " + w)
     if not probs:
         print("LINT OK")
     return 1 if probs else 0

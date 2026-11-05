@@ -111,6 +111,9 @@ Rules (binding):
    No words such as "दिसून येते", "माझ्या मते", "कदाचित", "ठरवावे".
 7. Note paras: items of "paras" are strings (numbered automatically 2., 3., …; "first" is para 1 — never type a para
    number) or tables {"table": [[header cells], [row cells], …], "bold_last": false}. Keep the signer chain as it is.
+   Para 1 of the टिप्पणी ("first") names each covering letter by its authority, date and पृ.N/प.वि. only and never
+   carries a letter number (INSTRUCTIONS §4.29(1)); when you touch para 1, drop any "क्र. …" of a covering letter and
+   keep the date.
    A letter table asks only for data; documents go in a numbered list after it.
 
 Reply strictly as JSON: {"ops": [...], "summary": "...", "refuse": ""}.
@@ -312,7 +315,7 @@ def where_of(ch):
             return note_para_label(n.get("paras"), idx(rest[1]), insert=ins and len(rest) == 2)
         if f == "sub" and len(rest) > 1 and idx(rest[1]) is not None:
             return note_para_label(n.get("paras"), idx(rest[1])) + " चे उप-मुद्दे"
-        return {"closing": "टिप्पणी शेवटचा परिच्छेद", "signers": "टिप्पणी सही-साखळी", "uo": "टिप्पणी — अनौपचारिक संदर्भ"}.get(f, "नोंद")
+        return {"closing": "टिप्पणी शेवटचा परिच्छेद", "signers": "टिप्पणी सही-साखळी", "uo": "टिप्पणी — अनौपचारिक संदर्भ"}.get(f, "टिप्पणी")
     if k == "related":
         i = idx(rest[0])
         if i is None:
@@ -518,13 +521,15 @@ def max_tokens_for(part):
 
 # ---------------------------------------------------------------- Supabase helpers (engine_supabase underneath)
 def step(text):
-    if os.environ.get("RUN_TOKEN") and os.environ.get("WORKER"):
-        E.cmd_step_worker(text)
-    else:
+    """Live progress. L-F1 (audit 05.11.2026): the edit job holds the Supabase service key, so the step is written
+    DIRECTLY to Supabase (only while the run is queued / running, L-F8); the Worker route (run token) only without it."""
+    if E.KEY:
         try:
             E.patch_run({"step": text[:200]})
         except Exception as e:
-            print("edit_drafts step:", e, file=sys.stderr)
+            print("edit_drafts step:", str(e)[:120], file=sys.stderr)
+    elif os.environ.get("RUN_TOKEN") and os.environ.get("WORKER"):
+        E.cmd_step_worker(text)
 
 
 def download(row, dst):
@@ -848,7 +853,9 @@ def verify_checks(outdir, built, pkg, desk, package_changed):
         if isinstance(desk, str) and E.DESK_ID_RE.match(desk) and desk != E.DEFAULT_DESK:
             cmd += ["--desk", desk]
         r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace")
-        print(r.stdout, end="")
+        E.private_log("edit_verify.log", r.stdout or "")
+        for l in E.log_safe_lines((r.stdout or "").splitlines()):   # S-F3: check names only in the Actions log
+            print(l)
         h, s = E.classify_verify((r.stdout or "").splitlines())
 
         def keep(c):
@@ -884,6 +891,36 @@ def verify_checks(outdir, built, pkg, desk, package_changed):
     return hard, soft
 
 
+# Q-F20 (audit 05.11.2026): an edit of the note / related is checked like a full run's final extract guard
+# (tools/extract_check.py, related + note-body “…” quotes vs the package pages; text layer only — no OCR in the edit job).
+# Only mismatches the edit brought in are reported (the old ones are already in the full run's Study part 7).
+QUOTE_NOTE = ("सुधारित टिप्पणीतील काही अवतरणे GR सह PDF मधील नमूद पानाशी शब्दशः जुळली नाहीत. कृपया वापरण्यापूर्वी "
+              "ती मूळ पानाशी तपासावीत, ही विनंती.")
+
+
+def quote_check(old_spec, new_spec, pkg):
+    """-> mismatch records of new_spec that old_spec did not have ([] when the check cannot run: never fails the edit)."""
+    try:
+        import extract_check as X
+        bad = lambda sp: [r for r in X.check(pkg, sp, no_ocr=True, note_body=True) if r.get("status") == "mismatch"]
+        old = {(bool(r.get("warn_only")), r.get("extract")) for r in bad(old_spec)}
+        return [r for r in bad(new_spec) if (bool(r.get("warn_only")), r.get("extract")) not in old]
+    except Exception as e:
+        print("edit_drafts: quote check not run:", type(e).__name__, file=sys.stderr)
+        return []
+
+
+def quote_warnings(recs):
+    """mismatch records -> soft warning lines (runs.warnings; same texts as the full run, tools/engine_supabase.py)."""
+    where = lambda xs: "; ".join(sorted({str(x.get("where")) for x in xs}))[:180]
+    note = [r for r in recs if r.get("warn_only")]
+    rel = [r for r in recs if not r.get("warn_only")]
+    out = [E.note_quote_line(len(note), where(note))] if note else []
+    if rel:
+        out.append(E.soft_line("उतारे", f"{len(rel)} उतारे मूळ PDF शी शब्दशः जुळले नाहीत ({where(rel)}) — वापरण्यापूर्वी तपासणी आवश्यक"))
+    return out
+
+
 # ---------------------------------------------------------------- uploads
 def upload_all(built, package, spec_path, enc_path):
     """objects first, rows only after every upload succeeded (engine_supabase finish rule). -> [{kind, name, version}]"""
@@ -897,7 +934,7 @@ def upload_all(built, package, spec_path, enc_path):
         for n, p in (("spec.json", spec_path), ("enclosures.json", enc_path)):
             if not p:
                 continue
-            path = f"{E.CASE}/spec/v{ver}/{n}"
+            path = E.spec_object(ver, n)   # …/spec/v<n>/r<this run>/<name> (L-F7)
             E.http("POST", f"{E.BASE}/storage/v1/object/outputs/{E.enc(path)}", open(p, "rb").read(),
                    {"Content-Type": "application/json", "x-upsert": "true"})
             put.append({"kind": "spec", "name": n, "version": ver, "path": path})
@@ -911,6 +948,26 @@ def upload_all(built, package, spec_path, enc_path):
 
 
 # ---------------------------------------------------------------- the job
+# L-F7 (audit 05.11.2026): the spec rows of a run are inserted AFTER its note_letter / package rows (tools/engine_supabase.py
+# finish and upload_all here; case_files ids are an identity column, so they grow). A newest spec row older than the
+# newest note_letter / package row means the last run's spec upload failed: an edit would change an OLDER draft.
+STALE_SPEC = ("या प्रकरणाची सुधारणा-फाइल शेवटच्या टिप्पणी व पत्रापेक्षा जुनी आहे (शेवटच्या प्रक्रियेत ती जतन होऊ शकली नाही). "
+              "जुन्या मसुद्यावर बदल होऊ नये म्हणून ही सुधारणा करण्यात आलेली नाही. कृपया 'पुन्हा तयार करा' हा पर्याय "
+              "वापरावा, ही विनंती.")
+
+
+def stale_spec(spec_row, *outputs):
+    """True when a newer note_letter / package_pdf row exists than the newest spec row (by id; created_at as a tie)."""
+    key = lambda r: (int(r.get("id") or 0), str(r.get("created_at") or ""))
+    return any(o and key(o) > key(spec_row) for o in outputs)
+
+
+def spec_run_of(row):
+    """The run that wrote a spec row (storage key …/spec/v<n>/r<run>/<name>, L-F7), or None (older key form)."""
+    m = re.search(r"/spec/v\d+/r(\d+)/", str((row or {}).get("storage_path") or ""))
+    return int(m.group(1)) if m else None
+
+
 def load_run():
     run = (E.rest("GET", f"runs?id=eq.{E.RUN}&select=*") or [None])[0]
     case = (E.rest("GET", f"cases?id=eq.{E.CASE}&select=*") or [None])[0]
@@ -935,7 +992,10 @@ def context_of(case, target, pages, package):
 
 def run_edit(work, api_key=None, model=None):
     t0 = time.time()
-    E.patch_run({"state": "running", "started_at": E.now(), "step": "सुधारणा: फाइल्स प्राप्त करण्यात येत आहेत"})
+    if not E.patch_run({"state": "running", "started_at": E.now(), "step": "सुधारणा: फाइल्स प्राप्त करण्यात येत आहेत"}):
+        # L-F8: the run was already failed / closed (sweep, cancel) — never resurrected, nothing is done
+        print("edit_drafts: run is no longer queued/running — not started", file=sys.stderr)
+        return None
     run, case, files = load_run()
     target = str(run.get("edit_target") or "").strip()
     message = str(run.get("edit_message") or "").strip()
@@ -950,6 +1010,8 @@ def run_edit(work, api_key=None, model=None):
     rows = {"enclosures": newest_row(files, "spec", "enclosures.json"), "package_pdf": newest_row(files, "package_pdf")}
     existing = {k: newest_row(files, k) for k in OUTPUTS}
     existing = {k: v for k, v in existing.items() if v}
+    if stale_spec(spec_row, existing.get("note_letter"), rows["package_pdf"]):
+        raise Refused(STALE_SPEC)
     if target != "package" and TARGET_KIND[target] not in existing:
         raise Refused(f"या प्रकरणात {TARGET_LABEL[target]} तयार झालेले नाही. कृपया 'पुन्हा तयार करा' मध्ये तो मसुदा निवडावा, ही विनंती.")
     spec = json.load(open(download(spec_row, os.path.join(work, "old", "spec.json")), encoding="utf-8-sig"))
@@ -1011,7 +1073,8 @@ def run_edit(work, api_key=None, model=None):
                 break
             if attempt == 2:
                 raise EditFail(f"सुधारणा नियमांत बसली नाही ({errs[0]}). कृपया बदल वेगळ्या शब्दांत पाठवावा, ही विनंती."[:500])
-            print("edit_drafts: retry with", len(errs), "error(s):", *errs[:5], sep="\n  ", file=sys.stderr)
+            print("edit_drafts: retry with", len(errs), "error(s) (details: runner-private log)", file=sys.stderr)   # S-F3
+            E.private_log("edit_retry.log", "\n".join(errs))
             messages += [{"role": "assistant", "content": resp.get("content") or [{"type": "text", "text": "{}"}]},
                          {"role": "user", "content": user_content(None, None, None, retry_errors=errs)}]
         if not refused and not changes and not package:
@@ -1029,6 +1092,7 @@ def run_edit(work, api_key=None, model=None):
         built = rebuild(new_spec, kinds, existing, outdir)
     step("सुधारणा: तपासणी करण्यात येत आहे")
     hard, soft = verify_checks(outdir, built, pkg, E.case_desk(case), bool(package))
+    qbad = quote_check(spec, new_spec, pkg) if changes and {c["toks"][0] for c in changes} & {"note", "related"} else []
     if hard:
         d = "; ".join(f"{c}: {x}" if x else c for c, x in hard[:3])
         raise EditFail(f"सुधारणेची पडताळणी पूर्ण झाली नाही ({d}); त्यामुळे कोणतीही फाइल जतन करण्यात आलेली नाही. कृपया सुधारणा पुन्हा पाठवावी, ही विनंती."[:500])
@@ -1046,16 +1110,19 @@ def run_edit(work, api_key=None, model=None):
     files_kinds = [u["kind"] for u in uploaded if u["kind"] != "spec"]
     if package and not summary:
         summary = "GR सह PDF मध्ये खालील कागदपत्रे जोडण्यात आली आहेत: " + "; ".join(f"{a['title']} ({a['pages']})" for a in package["attached"])
-    notes = (list(package["notes"]) if package else []) + extra_notes
+    notes = (list(package["notes"]) if package else []) + extra_notes + ([QUOTE_NOTE] if qbad else [])
     er = {"summary": summary, "changes": readable_changes(changes), "files": files_kinds, "cost_usd": round(cost, 4),
           "attached": package["attached"] if package else []}
     if refused:
         er["refused"] = refused
     if notes:
         er["notes"] = notes
-    E.patch_run({"state": "done", "finished_at": E.now(), "step": "तयार", "summary": summary[:500],
-                 "edit_result": er, "cost_usd": round(cost, 4), "duration_s": round(time.time() - t0, 1)})
-    warns = [E.soft_line(c, x) for c, x in soft[:8]] + [f"सुधारणा: {n}"[:300] for n in notes]
+    if spec_run_of(spec_row):
+        er["based_on_run"] = spec_run_of(spec_row)   # L-F7: the run whose spec was edited
+    if not E.patch_run({"state": "done", "finished_at": E.now(), "step": "तयार", "summary": summary[:500],
+                 "edit_result": er, "cost_usd": round(cost, 4), "duration_s": round(time.time() - t0, 1)}):
+        print("edit_drafts: run is no longer running — new versions stored, state not changed", file=sys.stderr)   # L-F8
+    warns = [E.soft_line(c, x) for c, x in soft[:8]] + [f"सुधारणा: {n}"[:300] for n in notes] + quote_warnings(qbad)
     if warns:
         try:
             E.add_warnings(warns)
@@ -1065,19 +1132,22 @@ def run_edit(work, api_key=None, model=None):
         E.activity("edit_done", {"run_id": int(E.RUN), "files": uploaded, "target": target})
     except Exception as e:
         print("edit_drafts: activity not stored:", e, file=sys.stderr)
-    print("edit done:", summary, "|", ", ".join(f"{u['kind']} v{u['version']}" for u in uploaded), f"| ${cost:.4f}")
+    # S-F3: no case text (summary) in the Actions log
+    print("edit done:", ", ".join(f"{u['kind']} v{u['version']}" for u in uploaded) or "no new file",
+          f"| changes {len(changes)} | quote mismatches {len(qbad)} | ${cost:.4f}")
     return er
 
 
 def finish_refused(reason, cost=0.0):
     er = {"summary": reason, "refused": reason, "changes": [], "files": [], "cost_usd": round(cost, 4), "attached": []}
-    E.patch_run({"state": "done", "finished_at": E.now(), "step": "तयार", "summary": reason[:500], "edit_result": er,
-                 "cost_usd": round(cost, 4)})
+    if not E.patch_run({"state": "done", "finished_at": E.now(), "step": "तयार", "summary": reason[:500], "edit_result": er,
+                        "cost_usd": round(cost, 4)}):
+        print("edit_drafts: run is no longer queued/running — state not changed", file=sys.stderr)   # L-F8
     try:
         E.activity("edit_refused", {"run_id": int(E.RUN), "reason": reason[:300]})
     except Exception:
         pass
-    print("edit refused:", reason)
+    print(f"edit refused (reason stored on the run, {len(reason)} chars)")   # S-F3
     return er
 
 

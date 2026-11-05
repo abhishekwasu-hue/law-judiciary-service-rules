@@ -23,12 +23,17 @@ still read), the Study "(पॅकेज PDF पृ. N)".
   नाही)" (Study) / no page cited: searched in the --extra sources (.pdf text, .txt/.md, .docx text;
   directories recursively) -> ok_extra or mismatch; without --extra -> unverifiable.
 --note-body: also the note body's verbatim “…” quotes (spec note.first + note.paras; pages = the para's "पृ.N/प.वि."
-  refs, which cite the returned package) — WARNING only (new check): printed as "WARN MISMATCH …" / "WARN
+  refs, which cite the returned package; a para with no ref of its own (§4.34(ई): a document's page is given once, at its
+  first mention — audit 05.11.2026 Q-F3): the document is found by a date / GR code in the para's own text and its first
+  earlier mention with a page ref, widened to that enclosure's pages in <package>.map.json; else every enclosure page,
+  else every package page — those wide searches use the text layer only, no OCR) — WARNING only (new check): printed as "WARN MISMATCH …" / "WARN
   UNVERIFIABLE …", records carry "warn_only": true, never counted in EXTRACTS FAIL / --log-out.
 Prints one line per problem ("MISMATCH …", "UNVERIFIABLE …"), then "EXTRACTS OK (checked N, unverifiable K)"
 (exit 0) or "EXTRACTS FAIL (M mismatch)" (exit 1). --json = every record. --log-out = status.json `model_log`
 entries for the mismatched units ({"task": "उतारा: …", "from": --from, "to": --to, "reason": "…"}) — those units go
-back to the drafter (one-way escalation; workflow prints them as "मॉडेल: …" lines)."""
+back to the drafter (one-way escalation; workflow prints them as "मॉडेल: …" lines).
+--details FILE (or env CASE_DETAILS_FILE; audit S-F3): the problem lines with the extract text go to FILE; stdout shows
+only the position ("related[N]" / "भाग 3" / "नोंद परि. N"), the pages and the extract length."""
 import difflib, glob, json, os, re, sys, tempfile, unicodedata, zipfile
 
 DEV_DIGITS = str.maketrans("०१२३४५६७८९", "0123456789")
@@ -129,18 +134,76 @@ def note_pages(text):
     return sorted(set(out))
 
 
-def units_note(spec):
+WIDE_MARK = re.compile(r"\[पाने: (?:enclosures|package)\]")
+DOC_TOKEN = re.compile(r"(?<![0-9])(?:[0-9]{2}\.[0-9]{2}\.(?:19|20)[0-9]{2}|[0-9]{14,20})(?![0-9])")
+
+
+def unquoted_text(t):
+    return QUOTE.sub(" ", str(t or ""))
+
+
+def doc_entries(mp):
+    """[(label, [pages], is_proposal_side)] of a pkg3 map.json (dict) — entries with "pages"."""
+    if not isinstance(mp, dict):
+        return []
+    side = set(mp.get("proposal_parts") or []) | {"प्रस्ताव"}
+    ents = [(k, v) for k, v in mp.items() if isinstance(v, dict) and isinstance(v.get("pages"), list)]
+    return [(k, [int(x) for x in v["pages"] if str(x).isdigit()], k in side or v.get("first_page") == 1) for k, v in ents]
+
+
+def entry_pages(page, entries):
+    """All pages of the enclosure entry holding `page` (a proposal-side page: just [page])."""
+    for _, pages, prop in entries:
+        if page in pages:
+            return [page] if prop else list(pages)
+    return [page]
+
+
+def first_mention_pages(t, earlier, entries):
+    """audit 05.11.2026 Q-F3 (§4.34(ई): a document's पृ.N/प.वि. is given once, at its first mention): pages for a quote
+    whose own para cites none — the document is identified by a date / GR code in the para's own text; its first earlier
+    mention with a page ref gives the page (the ref nearest after the token, else before it), widened to that enclosure's
+    pages. -> (pages, how) or ([], "")."""
+    own = unquoted_text(t)
+    for tok in dict.fromkeys(m.group(0) for m in DOC_TOKEN.finditer(own)):
+        for et in earlier:
+            k = et.find(tok)
+            if k < 0:
+                continue
+            refs = [(m.start(), m) for m in NOTE_CITE.finditer(et)]
+            if not refs:
+                continue
+            after = [m for pos, m in refs if pos >= k]
+            m = after[0] if after else refs[-1][1]
+            pg = note_pages(m.group(0))
+            if pg:
+                return sorted(set(x for p_ in pg for x in entry_pages(p_, entries))), "first_mention"
+    return [], ""
+
+
+def units_note(spec, mp=None, npages=0):
     """Note body (spec note.first + note.paras): the verbatim “…” quotes of each para, pages = its पृ.N/प.वि. refs.
+    A para with quotes but no page ref of its own (§4.34(ई), audit Q-F3): the pages of that document's first mention
+    (first_mention_pages), else every enclosure page of the package map (mp), else every package page (npages).
     WARNING-only units (new check, QUALITY_AUDIT §7): their mismatches never make EXTRACTS FAIL."""
     n = (spec or {}).get("note") or {}
     paras = [n.get("first")] + list(n.get("paras") or [])
-    out = []
+    entries = doc_entries(mp)
+    enc = sorted(set(p_ for _, pages, prop in entries if not prop for p_ in pages))
+    out, earlier = [], []
     for i, p in enumerate(paras):
         t = " ".join(strings(p)) if p is not None else ""
         q = QUOTE.findall(t)
         if q:
             pg = note_pages(t)
-            out.append((f"नोंद परि. {i + 1}" if i else "नोंद परि. 1 (प्रारंभ)", q, pg, pg, False))
+            where = f"नोंद परि. {i + 1}" if i else "नोंद परि. 1 (प्रारंभ)"
+            if not pg:
+                pg, how = first_mention_pages(t, earlier, entries)
+                if not pg:
+                    pg, how = (enc, "enclosures") if enc else (list(range(1, npages + 1)), "package")
+                where += f" [पाने: {how}]"
+            out.append((where, q, pg, pg, False))
+        earlier.append(unquoted_text(t))
     return out
 
 
@@ -260,16 +323,33 @@ def extra_text(paths):
 
 def check(pdf, spec=None, study=None, ocr_dir=None, no_ocr=False, extras=None, note_body=False):
     units = [u + (False,) for u in units_related(spec) + units_part3(study)]
-    units += [u + (True,) for u in units_note(spec)] if note_body else []
     pages = Pages(pdf, ocr_dir, no_ocr)
+    if note_body:
+        try:
+            with open(pdf + ".map.json", encoding="utf-8-sig") as fh:
+                mp = json.load(fh)
+        except Exception:
+            mp = None
+        units += [u + (True,) for u in units_note(spec, mp, pages.n)]
     extra = None
     recs = []
     for where, exs, up, sp, notin, warn_only in units:
         pg = up or ([] if notin else sp)
+        wide = WIDE_MARK.search(where) is not None
         for ex in exs:
             for raw, fr in fragments(ex):
                 rec = {"where": where, "pages": pg, "extract": fr[:120]}
                 if warn_only: rec["warn_only"] = True
+                if wide and pg:   # Q-F3 fallback (all enclosure / package pages): text layer only, no OCR of every page
+                    good = [n for n in pg if 1 <= n <= pages.n and pages.usable(n, fr)]
+                    if any(fr in norm(pages.text(a) + pages.text(a + 1) if a + 1 in good else pages.text(a)) for a in good):
+                        rec.update(status="ok", why="")
+                    elif len(good) < len(pg):
+                        rec.update(status="unverifiable", why="पान-संदर्भ नाही; स्कॅन/legacy पानांचे OCR केले नाही")
+                    else:
+                        rec.update(status="mismatch", why="पान-संदर्भ नाही; कोणत्याही जोडलेल्या पानाशी जुळला नाही")
+                    rec["pages"] = [min(pg), max(pg)]
+                    recs.append(rec); continue
                 if not pg:
                     if extras:
                         extra = extra if extra is not None else extra_text(extras)
@@ -314,8 +394,17 @@ def model_log(recs, frm="", to=""):
     return out
 
 
+def short_where(where):
+    """Position only (audit S-F3): "related[N]" / "भाग 3" / "नोंद परि. N" — no heading text."""
+    m = re.match(r"related\[\d+\]|भाग 3|नोंद परि\. \d+", where or "")
+    return m.group(0) if m else "?"
+
+
 def main(argv):
     a = list(argv)
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import lint_spec   # audit S-F3: --details FILE / env CASE_DETAILS_FILE -> no extract text on stdout
+    lint_spec.set_details(lint_spec.details_arg(a), "extract_check " + " ".join(a))
     def opt(name, multi=False):
         vals = []
         while name in a:
@@ -336,7 +425,9 @@ def main(argv):
     for r in recs:
         if r["status"] in ("mismatch", "unverifiable"):
             pre = "WARN " if r.get("warn_only") else ""
-            print(f"{pre}{r['status'].upper()} {r['where']} पृ.{r['pages']}: {r['extract'][:80]} — {r['why']}")
+            lint_spec.out(f"{pre}{r['status'].upper()} {r['where']} पृ.{r['pages']}: {r['extract'][:80]} — {r['why']}",
+                          f"{pre}{r['status'].upper()} {short_where(r['where'])} पृ.{r['pages']}: "
+                          f"<{len(r['extract'])} ch> — {r['why']}")
     for path, data in ((js, recs), (logp, model_log(recs, frm, to) if logp else None)):
         if path:
             with open(path, "w", encoding="utf-8") as fh: json.dump(data, fh, ensure_ascii=False, indent=1)

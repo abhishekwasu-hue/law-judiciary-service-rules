@@ -54,6 +54,9 @@ Warnings — "layout": "rule58"
     relief_sought summaries of the petition, not “…” quotes) — e.g. "erroneous judgment", "the Court failed to", "illegal order",
     "perverse", "the Court must" — with a respectful form to use instead (CONTEMPT_PRONE; common drafting usage,
     basis: Contempt of Courts Act, 1971, s. 2(c); WARNING only, never an error)
+Audit 05.11.2026: WARN Q-F12 — parawise.on_behalf_of names the High Court Registry (Registrar / High Court / महाप्रबंधक /
+प्रबंधक): the joint affidavit is on behalf of the State respondents only (INSTRUCTIONS §4.35; lint_spec.registry_hits).
+S-F3: --details FILE (or env CASE_DETAILS_FILE) — full lines to FILE, quoted segments redacted on stdout.
 """
 import json
 import os
@@ -299,14 +302,23 @@ def lint_parawise(spec):
     return P
 
 
+def registry_warnings(pw, key="parawise"):
+    """§4.35 (audit 05.11.2026 Q-F12): the parawise remarks / affidavit are on behalf of the State respondents only — the
+    High Court Registry (Registrar General / Registrar, महाप्रबंधक / प्रबंधक) is not part of them."""
+    t = pw.get("on_behalf_of") if isinstance(pw, dict) else None
+    if isinstance(t, str) and lint_spec.registry_hits(t):
+        return [f"{key}.on_behalf_of: {lint_spec.REGISTRY_MSG}"]
+    return []
+
+
 def warnings_parawise(spec):
     """WARN-level findings for spec["parawise"]; never errors."""
     if not isinstance(spec, dict) or not isinstance(spec.get("parawise"), dict):
         return []
     pw = spec["parawise"]
     if layout(pw) == "office":
-        return _warn_office(pw)
-    W = []
+        return _warn_office(pw) + registry_warnings(pw)
+    W = registry_warnings(pw)
     for path, t in _strings(pw):
         if DEV_RE.search(lint_spec.unquoted(t)):
             W.append(f"{path}: Devanagari outside quotes — the parawise remarks are in English (INSTRUCTIONS §3.1); "
@@ -342,6 +354,8 @@ def warnings_parawise(spec):
 
 
 def main(argv):
+    argv = list(argv)
+    lint_spec.set_details(lint_spec.details_arg(argv), "lint_parawise " + " ".join(argv[1:]))   # audit S-F3
     if len(argv) != 2:
         print(__doc__); return 2
     try:
@@ -353,9 +367,9 @@ def main(argv):
         print(f"{argv[1]}: no 'parawise' block"); return 1
     probs = lint_parawise(spec)
     for p in probs:
-        print(p)
+        lint_spec.out(p)
     for w in warnings_parawise(spec):
-        print("WARN " + w)
+        lint_spec.out("WARN " + w)
     if not probs:
         print("LINT OK")
     return 1 if probs else 0

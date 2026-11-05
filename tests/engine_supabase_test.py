@@ -34,6 +34,9 @@ def match(rows, q):
         if k in ("select", "order", "limit"): continue
         v = v[0]
         if v.startswith("eq."): out = [r for r in out if str(r.get(k)) == v[3:]]
+        elif v.startswith("in.(") and v.endswith(")"):   # L-F8: state=in.(queued,running)
+            allowed = set(v[4:-1].split(","))
+            out = [r for r in out if str(r.get(k)) in allowed]
     if "order" in q:
         col, _, d = q["order"][0].partition(".")
         out = sorted(out, key=lambda r: (0, r[col], "") if isinstance(r.get(col), (int, float)) else (1, 0, str(r.get(col) or "")), reverse=(d == "desc"))
@@ -72,15 +75,22 @@ class H(BaseHTTPRequestHandler):
                     return self.send(400, {"code": "22P02", "message": f'invalid input value for enum file_kind: "{data["kind"]}"'})
                 data["id"] = len(rows) + 100; data.setdefault("created_at", "8"); rows.append(data); return self.send(201)
             if self.command == "PATCH":
-                for r in match(rows, q): r.update(data)
+                hit = match(rows, q)
+                for r in hit: r.update(data)
+                if "return=representation" in (self.headers.get("Prefer") or ""):
+                    return self.send(200, hit)
                 return self.send(204)
         self.send(400, {"error": "route"})
 
     do_GET = do_POST = do_PATCH = do_DELETE = handle_any
 
 
-def run(*args, **extra):
+def run(*args, _keep_state=False, **extra):
     # ENGINE_WORK_DIR: no spec.json / enclosures.json unless a test gives a work dir (draft edit, migration 0013)
+    # L-F8: fetch / finish change the state only of an ACTIVE run; the tests below reuse one run row, so a closed row is
+    # re-opened first (as a new queued run would be) unless the test checks the guard itself (_keep_state=True)
+    if args and args[0] in ("fetch", "finish") and not _keep_state and DB["runs"][0].get("state") not in ("queued", "running"):
+        DB["runs"][0]["state"] = "running"
     env = dict(os.environ, SUPABASE_URL=BASE, SUPABASE_SERVICE_KEY=KEY, CASE_ID="7", RUN_ID="11", PYTHONIOENCODING="utf-8",
                **{"ENGINE_WORK_DIR": os.path.join(tempfile.gettempdir(), "no-such-engine-work"), **extra})
     return subprocess.run([sys.executable, TOOL, *args], env=env, capture_output=True, text=True, encoding="utf-8")
@@ -448,6 +458,7 @@ import engine_supabase as es
 
 c = es.engine_config({})
 check(c == {"MODEL": "claude-opus-5-5", "MODEL_LIGHT": "claude-haiku-5-5", "MODEL_REVIEW": "claude-opus-5-5", "MODEL_STRONG": "",
+            "MODEL_FIXER": "claude-sonnet-5-5",
             "EFFORT": "medium", "BUDGET_USD": "0.75", "ENGINE_PROVIDER": "", "ENGINE_MODEL": "", "ENGINE_MODEL_LIGHT": "",
             "PART1_PROVIDER": "claude", "PART1_MODEL": "", "GEMINI_MODEL": "gemini-2.5-flash", "FALLBACK_PROVIDER": "", "FALLBACK_MODEL": "", "FALLBACK_MODEL_LIGHT": "",
             "CLOUDFLARE_ACCOUNT_ID": "", "OLLAMA_BASE_URL": ""},
@@ -475,7 +486,7 @@ json.dump({"anthropic_api_key": "sk-secret", "model": "claude-opus-5-5", "model_
           open(cfgf, "w", encoding="utf-8"))
 r = subprocess.run([sys.executable, TOOL, "config", cfgf], capture_output=True, text=True, encoding="utf-8",
                    env={k: v for k, v in os.environ.items() if not k.startswith("SUPABASE")})
-check(r.returncode == 0 and r.stdout.splitlines() == ["MODEL=claude-opus-5-5", "MODEL_LIGHT=claude-haiku-5-5", "MODEL_REVIEW=claude-opus-5-5", "MODEL_STRONG=",
+check(r.returncode == 0 and r.stdout.splitlines() == ["MODEL=claude-opus-5-5", "MODEL_LIGHT=claude-haiku-5-5", "MODEL_REVIEW=claude-opus-5-5", "MODEL_STRONG=", "MODEL_FIXER=claude-sonnet-5-5",
       "EFFORT=medium", "BUDGET_USD=0.90",
       "ENGINE_PROVIDER=", "ENGINE_MODEL=", "ENGINE_MODEL_LIGHT=", "PART1_PROVIDER=claude", "PART1_MODEL=", "GEMINI_MODEL=gemini-2.5-flash",
       "FALLBACK_PROVIDER=", "FALLBACK_MODEL=", "FALLBACK_MODEL_LIGHT=", "CLOUDFLARE_ACCOUNT_ID=", "OLLAMA_BASE_URL="] and "sk-secret" not in r.stdout, f"config CLI: KEY=VALUE lines, no secret, no Supabase env ({r.stdout!r} {r.stderr[:200]})")
@@ -554,7 +565,7 @@ check(r.returncode == 0 and run_row["cost_usd"] == 0 and any("openrouter:gemma-4
       f"claude_result via gateway: provider cost stored (free = $0), not the Claude estimate ({run_row.get('cost_usd')} {run_row['warnings']})")
 
 ag = es.agents_json({"MODEL": "claude-sonnet-5-5", "MODEL_LIGHT": "claude-haiku-5-5", "MODEL_REVIEW": "claude-opus-5-5", "MODEL_STRONG": ""})
-check(set(ag) == {"drafter", "study_writer", "related_writer", "reviewer"} and ag["drafter"]["model"] == "claude-opus-5-5"
+check(set(ag) == {"drafter", "study_writer", "related_writer", "fixer", "reviewer"} and ag["drafter"]["model"] == "claude-opus-5-5"
       and ag["drafter"]["description"] and "[I4.29]" in ag["drafter"]["prompt"] and "[I4.29]" in ag["reviewer"]["prompt"],
       "agents: drafter on MODEL_REVIEW (C30 03.11.2026: note drafted by Opus), detailed-note rule, no strong tier when not configured")
 check(es.agents_json({"MODEL": "claude-sonnet-5-5"})["drafter"]["model"] == "claude-sonnet-5-5"
@@ -576,6 +587,25 @@ aj = json.load(open(agf, encoding="utf-8"))
 check(r.returncode == 0 and aj["drafter"]["model"] == "claude-opus-5-5" and "drafter_strong" not in aj
       and aj["reviewer"]["model"] == "claude-opus-5-5" and aj["study_writer"]["model"] == "claude-haiku-5-5",
       f"agents CLI: file written from env ({r.stderr[:200]})")
+# C-B (audit 05.11.2026): a Sonnet-class `fixer` for mechanical repairs (extract mismatches, Study part 1 from images);
+# drafter / reviewer models unchanged; Settings model_fixer -> MODEL_FIXER; invalid -> default
+check(aj["fixer"]["model"] == "claude-sonnet-5-5" and "extract_check" in aj["fixer"]["description"]
+      and "part1check" in aj["fixer"]["description"] and "page images" in aj["fixer"]["description"]
+      and "ENGINE_BRIEF" in aj["fixer"]["prompt"] and "character for character" in aj["fixer"]["prompt"],
+      "agents: fixer on claude-sonnet-5-5 by default, repairs extracts + Study part 1 from page images")
+check(es.agents_json({"MODEL": "claude-opus-5-5", "MODEL_FIXER": "claude-sonnet-5-6"})["fixer"]["model"] == "claude-sonnet-5-6"
+      and es.agents_json({"MODEL_FIXER": "$(id)"})["fixer"]["model"] == "claude-sonnet-5-5"
+      and es.engine_config({"model_fixer": "claude-haiku-5-5"})["MODEL_FIXER"] == "claude-haiku-5-5"
+      and es.engine_config({"model_fixer": "bad model!"})["MODEL_FIXER"] == "claude-sonnet-5-5"
+      and es.agents_json({"MODEL_REVIEW": "claude-opus-5-5", "MODEL_FIXER": "claude-sonnet-5-5"})["drafter"]["model"] == "claude-opus-5-5"
+      and es.agents_json({"MODEL_REVIEW": "claude-opus-5-5", "MODEL_FIXER": "claude-sonnet-5-5"})["reviewer"]["model"] == "claude-opus-5-5",
+      "agents/config: model_fixer read from Settings when valid, else the default; drafter / reviewer models unchanged")
+r = subprocess.run([sys.executable, TOOL, "agents", agf], capture_output=True, text=True, encoding="utf-8",
+                   env=dict(os.environ, MODEL_FIXER="claude-sonnet-5-7"))
+check(r.returncode == 0 and json.load(open(agf, encoding="utf-8"))["fixer"]["model"] == "claude-sonnet-5-7",
+      "agents CLI: MODEL_FIXER from env")
+check(all("appended below this prompt" in v["prompt"] and "once, fully" not in v["prompt"] for v in es.agents_json({}).values()),
+      "agents: the prompt says the brief is appended (workflow appends tools/ENGINE_BRIEF.md), not 'read it once'")
 
 facts = {"pages": 2, "facts": [
     {"page": 1, "document": "निर्देशपत्र", "items": [{"what": "नस्ती क्र.", "value": "संकीर्ण-2026/979/प्र.क्र.130/का.6", "clear": True},
@@ -676,10 +706,21 @@ if pymupdf and FONTF:
     json.dump({"note": {"first": "पत्रास अनुसरुन सादर.", "paras": ["शासन निर्णयात “" + LINE.replace("नवीन", "जुनी") + "” अशी तरतूद आहे (पृ.2/प.वि.)."]},
                "related": [{"heading": "GR", "text": ["“" + LINE + "”"], "source": "परि. 2 (पृ.2/प.वि.)"}]},
               open(spx, "w", encoding="utf-8"), ensure_ascii=False)
-    r = run("extracts", ox, spx, os.path.join(tmp, "absent_study.json"))
+    rpx = os.path.join(tmp, "rp_x"); os.makedirs(rpx)
+    r = run("extracts", ox, spx, os.path.join(tmp, "absent_study.json"), RP=rpx)
+    # Q-F2 (audit 05.11.2026): a SOFT warning ("पडताळणी अपूर्ण — …"), not an owner-only "मॉडेल:" line -> it reaches
+    # the Study part 7 (tools/study_warnings.py drops only owner-only lines); the note is called टिप्पणी
+    sys.path.insert(0, os.path.join(ROOT, "tools"))
+    import study_warnings as SW
     check(r.returncode == 0 and run_row["state"] == "running" and len(run_row["warnings"]) == 1
-          and run_row["warnings"][0].startswith("मॉडेल: उतारा-तपासणी — टिप्पणीतील 1 अवतरणे मूळ PDF शी जुळली नाहीत"),
-          f"extracts: note-body quote mismatch -> warning only ({run_row['warnings']} {r.stderr[:200]})")
+          and run_row["warnings"][0].startswith("पडताळणी अपूर्ण — टिप्पणीतील अवतरणे: 1 अवतरणे")
+          and "टिप्पणी परि. 2" in run_row["warnings"][0] and "नोंद" not in run_row["warnings"][0]
+          and SW.study_lines(run_row["warnings"]) == run_row["warnings"],
+          f"extracts: note-body quote mismatch -> soft warning that reaches the Study part 7 ({run_row['warnings']} {r.stderr[:200]})")
+    # S-F3: no quote text in the Actions log; the details are in the runner-private $RP/extracts.log
+    check("जुनी योजना" not in r.stdout and "योजना" not in r.stdout and "extracts:" in r.stdout
+          and "योजना" in open(os.path.join(rpx, "extracts.log"), encoding="utf-8").read(),
+          f"extracts: log without case text, details in $RP/extracts.log ({r.stdout[:300]!r})")
 else:
     print("skip  extracts (pymupdf or Devanagari font missing)")
 
@@ -1085,11 +1126,15 @@ r = run("finish", out, ENGINE_WORK_DIR=ow)
 srows = sorted((f for f in DB["case_files"] if f["kind"] == "spec"), key=lambda f: f["original_name"])
 check(r.returncode == 0 and run_row["state"] == "done" and not run_row["warnings"]
       and [(f["original_name"], f["version"], f["storage_path"]) for f in srows]
-      == [("enclosures.json", 1, "outputs/7/spec/v1/enclosures.json"), ("spec.json", 1, "outputs/7/spec/v1/spec.json")]
-      and json.loads(STORE["outputs/7/spec/v1/spec.json"]) == {"note": {"paras": ["सादर."]}},
+      == [("enclosures.json", 1, "outputs/7/spec/v1/r11/enclosures.json"), ("spec.json", 1, "outputs/7/spec/v1/r11/spec.json")]
+      and json.loads(STORE["outputs/7/spec/v1/r11/spec.json"]) == {"note": {"paras": ["सादर."]}},
       f"draft edit finish: spec.json + enclosures.json -> kind spec, one version, rows ({srows} {run_row['warnings']} {r.stderr[:200]})")
-sh = next(l["h"] for l in LOG if l["m"] == "POST" and l["path"] == "/storage/v1/object/outputs/7/spec/v1/spec.json")
+sh = next(l["h"] for l in LOG if l["m"] == "POST" and l["path"] == "/storage/v1/object/outputs/7/spec/v1/r11/spec.json")
 check(sh.get("Content-Type") == "application/json", "draft edit finish: spec content-type json")
+# L-F7: the spec rows record the run (r<run id> in the key) and come after the run's note_letter / package rows (ids)
+nlrow = max((f for f in DB["case_files"] if f["kind"] == "note_letter"), key=lambda f: f["id"])
+check(all("/r11/" in f["storage_path"] for f in srows) and min(f["id"] for f in srows) > nlrow["id"],
+      "draft edit finish: spec rows carry the run id and are newer than the run's note_letter row (L-F7)")
 # next run: version 2; enclosures.json absent -> only spec.json, stderr line, no warning
 os.remove(os.path.join(ow, "enclosures.json"))
 real_study(os.path.join(out, "CR130_2026_Study.docx"))
@@ -1110,9 +1155,60 @@ REJECT_KINDS.add("spec"); run_row.update(state="running", warnings=[])
 real_study(os.path.join(out, "CR130_2026_Study.docx"))
 r = run("finish", out, ENGINE_WORK_DIR=ow)
 check(r.returncode == 0 and run_row["state"] == "done" and any("0013" in w and "सुधारणा-फाइल" in w for w in run_row["warnings"])
-      and "outputs/7/spec/v3/spec.json" not in STORE and sum(f["kind"] == "spec" for f in DB["case_files"]) == n_spec,
+      and "outputs/7/spec/v3/r11/spec.json" not in STORE and sum(f["kind"] == "spec" for f in DB["case_files"]) == n_spec,
       f"draft edit finish, enum missing: warning names migration 0013, run done, orphan removed ({run_row['warnings']})")
 REJECT_KINDS.clear()
+
+# --- L-F1 (audit 05.11.2026): every call names itself (Cloudflare error 1010 refuses Python's default User-Agent)
+check(LOG and all(l["h"].get("User-Agent") == "prastav-kaksha-engine/1" for l in LOG),
+      f"User-Agent prastav-kaksha-engine/1 on every Supabase call ({sorted({l['h'].get('User-Agent') for l in LOG})})")
+LOG.clear(); WSTEPS.clear()
+r = subprocess.run([sys.executable, TOOL, "step", "प्रगती"], capture_output=True, text=True, encoding="utf-8",
+                   env=dict(noenv, ENGINE_SECRETS=os.path.join(tmp, "absent.env"), CASE_ID="7", RUN_ID="11", RUN_TOKEN="rt-1",
+                            WORKER=BASE, PYTHONIOENCODING="utf-8"))
+wl = [l for l in LOG if l["path"] == "/api/engine/step"]
+check(r.returncode == 0 and len(WSTEPS) == 1 and wl and wl[0]["h"].get("User-Agent") == "prastav-kaksha-engine/1",
+      "step through the Worker: User-Agent prastav-kaksha-engine/1 (no Cloudflare 1010)")
+
+# --- L-F8: state / step change only while the run is queued / running; a closed run is never resurrected
+run_row.update(state="failed", step="मूळ कारण", warnings=[])
+r = run("step", "उशिरा आलेली प्रगती")
+check(r.returncode == 0 and run_row["state"] == "failed" and run_row["step"] == "मूळ कारण",
+      "step on a failed run: the failure reason is not overwritten")
+r = run("fetch", os.path.join(tmp, "case_closed"), _keep_state=True)
+check(r.returncode == 1 and run_row["state"] == "failed" and run_row["step"] == "मूळ कारण",
+      f"fetch on a failed run: not resurrected to running, exit 1 ({r.stderr[:200]})")
+real_study(os.path.join(out, "CR130_2026_Study.docx"))
+json.dump({"state": "done", "summary": "s", "warnings": []}, open(os.path.join(out, "status.json"), "w", encoding="utf-8"), ensure_ascii=False)
+na = len([a for a in DB["activity"] if a["action"] == "run_done"])
+r = run("finish", out, _keep_state=True)
+check(r.returncode == 1 and run_row["state"] == "failed" and run_row["step"] == "मूळ कारण"
+      and len([a for a in DB["activity"] if a["action"] == "run_done"]) == na
+      and any("आधीच बंद" in w for w in run_row["warnings"]),
+      f"finish on a failed run: files kept, state stays failed, no run_done, one warning ({run_row['warnings']})")
+run_row.update(state="done", step="तयार", warnings=[])
+r = run("fail", "नंतरचे अपयश")
+check(r.returncode == 1 and run_row["state"] == "done" and run_row["step"] == "तयार"
+      and not any(a["action"] == "run_failed" and a["detail"].get("reason") == "नंतरचे अपयश" for a in DB["activity"]),
+      "fail on a done run: stays done, no run_failed activity")
+pl = [l for l in LOG if l["m"] == "PATCH" and l["path"] == "/rest/v1/runs" and b'"state"' in l["body"]]
+check(pl and all(l["q"].get("state") == ["in.(queued,running)"] for l in pl), "every state PATCH filters state=in.(queued,running)")
+
+# --- S-F3: no case text (file names, quotes, reasons) in the Actions log
+run_row.update(state="running", warnings=[])
+real_study(os.path.join(out, "CR130_2026_Study.docx"))
+rpf = os.path.join(tmp, "rp_fail"); os.makedirs(rpf)
+r = run("finish", out)
+check(r.returncode == 0 and "finished:" in r.stdout and PROP not in r.stdout and "CR130_2026" not in r.stdout,
+      f"finish: log lists kinds / versions only ({r.stdout[:200]!r})")
+run_row.update(state="running")
+r = run("fail", "श्री. अ. ब. क यांचा प्रस्ताव अपूर्ण", RP=rpf)
+check(r.returncode == 1 and run_row["state"] == "failed" and "श्री." not in r.stderr + r.stdout
+      and "श्री. अ. ब. क" in open(os.path.join(rpf, "fail_reason.log"), encoding="utf-8").read(),
+      f"fail: the reason is stored on the run and in $RP, not printed ({r.stderr[:200]!r})")
+check(es0.log_safe_lines(["OK: fonts", "FAIL: note पृ. references — पृ.99/प.वि. श्री. नाव", "WARN: x श्री. नाव", "ALL OK | pages 3 | toc 2"])
+      == ["OK: fonts", "FAIL: note पृ. references", "ALL OK | pages 3 | toc 2", "WARN lines: 1 (details: runner-private log)"],
+      "log_safe_lines: check names only, WARN counted")
 
 srv.shutdown()
 print("ALL TESTS PASSED")

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """verify_outputs.py <outdir> <PREFIX> "<package pdf>" <proposal pages> [--original-name NAME] [--desk ID]
+                    [--case-meta meta.json] [--details FILE]
 Quality gate for one proposal's three outputs (PROPOSAL_SOP.md Step 7; rules INSTRUCTIONS.md §4).
 Prints one line per check ("OK: ..." / "FAIL: ...", plus "WARN: ..." lines that never fail) and "ALL OK" only when
 every check passes; exit code 1 otherwise.
@@ -20,7 +21,8 @@ Checks
  Note (start of Note_and_Letter up to "संबंधित माहिती (संदर्भासाठी)" or the letter):
   - signer chain = INSTRUCTIONS §4.6 names in order, "अ.मु.स. (वित्त)" last
   - "अ.मु.स. (वित्त)" present  <=>  the last numbered para (+ a separate closing line "मान्यतेस्तव सादर.") sends the file
-    to Finance / Public Health (lint_spec.finance_route)
+    to Finance / Public Health (lint_spec.finance_route); a full closing para above the signers (spec note.closing "सबब,
+    …", one of lint_spec.LAST_FORMS) is the last para itself, as in lint_spec.last_para (audit Q-F5)
  Note body and letter: no BANNED word
  C27 (02.11.2026; all SOFT — delivered with a "पडताळणी अपूर्ण" warning):
   - no "पॅकेज" anywhere in the Note_and_Letter (संबंधित माहिती too; the Study keeps "पॅकेज PDF पृ. N")
@@ -31,7 +33,8 @@ Checks
     "जसेच्या तसे", "जशीच्या तशी" (Abhi 03.11.2026)
   - source line = the last paragraph "(…)" of each numbered संबंधित माहिती item (before the next bold numbered heading or
     the end); it ends with "(पृ.N/प.वि.)" (printed "(…, पृ.N/प.वि.)") or carries no page marker
-    (lint_spec.related_source_problems)
+    (lint_spec.related_source_problems); the printed form is read back on the LAST "पृ." (audit 05.11.2026 Q-F4: a
+    source naming the GR's own page "(…, पृ.40, पृ.20/प.वि.)" is fine)
   - metadata (tools/clean_meta.py): Study, Note_and_Letter, Order_Draft, Parawise — core properties blank, app.xml
     Application without a tool name, no Word comments, no tracked changes; package PDF — Info dictionary blank, no tool
     name in XMP, no annotation title/subject/content
@@ -66,7 +69,8 @@ Checks
  status.json (when <outdir>/status.json exists): `letter_needed` is true/false and true <=> a letter is present
  Study: headings भाग 0 … भाग 7
  Optional outputs (02.11.2026; only when the file exists — absent = no line, ALL OK unaffected):
-  <PREFIX>_Order_Draft.docx (शासन आदेश-मसुदा) and <PREFIX>_Parawise.docx (परिच्छेदनिहाय अभिप्राय, English):
+  <PREFIX>_Order_Draft.docx (शासन आदेश-मसुदा), <PREFIX>_Parawise.docx (परिच्छेदनिहाय अभिप्राय, English) and (audit
+  05.11.2026 Q-F13) <PREFIX>_Affidavit.docx (शपथपत्र) / <PREFIX>_LQ_Answer.docx (विधानमंडळ प्रश्नाचे उत्तर):
   fonts (four rFonts = DVOT-SurekhMR incl. headers/footers), no internal ids, no repo paths, पृ. references within
   1..package pages (text inside “ ” skipped); C27: no "पॅकेज" / warning / AI word (outside quotes), metadata blank
  Package PDF:
@@ -81,6 +85,17 @@ Checks
     proposal-side pages: proposal pages == <proposal pages> or proposal + reply pages == <proposal pages>
   - "annotations on proposal pages (none)": no annotation on proposal (and reply-part) pages;
     "annotations (Highlight only)": only Highlight annotations elsewhere
+ Audit 05.11.2026 additions:
+  - Q-F8 (WARN): the note's "उपरोक्त वस्तुस्थिती" list has 3 to 6 items (sub-point paragraphs / table data rows) and no “…”
+  - Q-F6 (WARN): "उल्लेख नाही" / "आढळून येत नाही" outside the missing-info para (lint_spec.missing_scatter warnings)
+  - Q-F14 (--case-meta meta.json; FAIL, soft): every letter number line "…-<year>/<file no>/प्र.क्र.<n>/…" against the case
+    row: file_no ("संकीर्ण-2026/979/प्र.क्र.130/का.6", "2026/979" or "979") year + number, प्र.क्र. vs file_no's प्र.क्र. /
+    cr_no; "____" blanks not compared; no file_no / cr_no in the meta = nothing compared
+  - Q-F17 (WARN): each cited "पृ.N/प.वि." reference whose pages all lie after the proposal has a Highlight on one of
+    them; each Highlight on an enclosure page has >= 50 % of its words in the note's extracts (related + body quotes);
+    pages with an unusable text layer skipped; a package with no Highlight at all -> "OK: highlight coverage — skipped"
+  - S-F3: --details FILE (or env CASE_DETAILS_FILE): full lines to FILE, stdout with each quoted segment replaced by its
+    length (lint_spec.out / redact) — check names, block / page numbers and counts stay
  The engine (tools/engine_supabase.py verify) treats only these FAILs as HARD (case failed): "… opens" (Study,
  Note_and_Letter, package PDF), "… internal ids", "… repo paths", "annotations on proposal pages"; every other FAIL is
  delivered with a "पडताळणी अपूर्ण — …" warning.
@@ -105,7 +120,8 @@ from lint_spec import (AMS, BANNED, BARE_CLOSING_RE, FIN, ID_RE, LH_EMAIL, RELAT
                        MISSING_FORM, MISSING_HEAD, SIGNERS, banned_hits, desk_signers, finance_problems, heading_problems, id_hits,
                        lang_hits, ma_hits, ns, num, part_no, ref_problems, repo_hits, requests_info, signer_problems,
                        style_hits, unquoted, warn_hits, PKG_WORD, draft_word_hits, related_source_problems,
-                       missing_scatter, flow_warnings, DO_FIRST_PERSON_RE)
+                       missing_scatter, flow_warnings, DO_FIRST_PERSON_RE, SUMMARY_HEAD_RE, summary_problems,
+                       NUMLIST, LAST_FORMS, out, redact, details_arg, set_details, details_active)
 from mkdocs import DO_WISH, DO_SUBSCRIPTION  # noqa: E402 — अर्धशासकीय पत्र ending (GAD specimen)
 INTRO_HEAD = "उपरोक्त विषयाबाबत"  # letter intro paragraph (lint_spec.INTRO_START begins with it)
 UO_LINE_RE = re.compile(r"^\S.*विभागाकडे\s+अनौपचारिक\s+संदर्भ\s+कार्यासन(?:\s|$)")   # note "uo" block (mkdocs.uo_lines)
@@ -122,7 +138,8 @@ def check(name, problems):
     results.append(not problems)
     if problems:
         shown = "; ".join(problems[:6]) + (f"; … (+{len(problems) - 6})" if len(problems) > 6 else "")
-        print(f"FAIL: {name} — {shown}")
+        # S-F3: with a details file only the problem text is redacted (the check name stays — engine_supabase parses it)
+        out(f"FAIL: {name} — {shown}", f"FAIL: {name} — {redact(shown)}")
     else:
         print(f"OK: {name}")
 
@@ -133,7 +150,7 @@ def check(name, problems):
 
 def warn(msg):
     """WARN-level finding: printed as "WARN: …", does not count as a FAIL (ALL OK still possible)."""
-    print(f"WARN: {msg}")
+    out(f"WARN: {msg}")
 
 
 def el_text(el):
@@ -180,7 +197,9 @@ def font_problems(d, label):
 
 
 # optional outputs (02.11.2026, docs/COURT_AND_ORDERS_RESEARCH.md B7–B9): file suffix -> label in the check lines
-EXTRA_DOCS = (("_Order_Draft.docx", "Order_Draft"), ("_Parawise.docx", "Parawise"))
+EXTRA_DOCS = (("_Order_Draft.docx", "Order_Draft"), ("_Parawise.docx", "Parawise"),
+              # audit 05.11.2026 Q-F13: tools/build_affidavit.py / tools/build_lq.py outputs
+              ("_Affidavit.docx", "Affidavit"), ("_LQ_Answer.docx", "LQ_Answer"))
 
 
 def doc_text(d):
@@ -283,8 +302,142 @@ def do_letter_problems(blocks, doc, dk):
     return out
 
 
+def source_of_line(t):
+    """A printed related source line "(…, पृ.N/प.वि.)" (mkdocs) -> the spec form "… (पृ.N/प.वि.)" for
+    lint_spec.related_source_problems. Audit Q-F4: anchored on the LAST "पृ." — the GR's own page may come before it
+    ("(…, पृ.40, पृ.20/प.वि.)" -> "…, पृ.40 (पृ.20/प.वि.)")."""
+    return re.sub(r",\s*(पृ\.(?:(?!पृ\.)[^()])*?/\s*प\.वि\.)$", r" (\1)", re.sub(r"^\((?:स्रोत:\s*)?|\)$", "", t))
+
+
+def summary_blocks(blocks):
+    """lint_spec.summary_problems entries from the note's docx blocks: each "उपरोक्त वस्तुस्थिती" paragraph, its items = the
+    paragraphs (sub-points) and table data rows after it up to the next numbered / "सबब," paragraph (audit Q-F8)."""
+    out_, cur = [], None
+    for i, b in enumerate(blocks):
+        t = ns(b["text"])
+        if not t:
+            continue
+        if b["kind"] == "p" and SUMMARY_HEAD_RE.search(unquoted(t)):
+            cur = (f"note block {i + 1}", t, []); out_.append(cur); continue
+        if cur is None:
+            continue
+        if b["kind"] == "p" and re.match(r"[0-9०-९]+\.|सबब\s*,", t):
+            cur = None; continue
+        if b["kind"] == "tbl":
+            cur[2].extend(r for r in b["text"].split("\n")[1:] if r.strip(" |"))
+        else:
+            cur[2].append(t)
+    return out_
+
+
+FILE_NO_RE = re.compile(r"(?<![0-9])((?:19|20)[0-9]{2})\s*/\s*([0-9]+)(?![0-9])")
+LETTER_REF_PARTS_RE = re.compile(r"-\s*([0-9_]{2,4})\s*/\s*([0-9_]+)\s*/\s*प्र\.\s*क्र\.\s*([0-9_]+)\s*/")
+
+
+def ref_meta_problems(line, meta):
+    """audit Q-F14: the letter number "संकिर्ण-<year>/<file no>/प्र.क्र.<n>/का.6" against the case row (--case-meta
+    file_no, e.g. "संकीर्ण-2026/979/प्र.क्र.130/का.6" / "2026/979" / "979"; cr_no). Blanks "____" are not compared."""
+    m = LETTER_REF_PARTS_RE.search(line)
+    if not m:
+        return []
+    year, fno, crn = m.groups()
+    fn = str(meta.get("file_no") or "").strip()
+    want_year = want_no = None
+    fm = FILE_NO_RE.search(fn)
+    if fm:
+        want_year, want_no = fm.groups()
+    elif re.fullmatch(r"[0-9]+", fn):
+        want_no = fn
+    pm = re.search(r"प्र\.\s*क्र\.\s*([0-9]+)", fn)
+    want_cr = pm.group(1) if pm else (str(meta.get("cr_no")).strip() if meta.get("cr_no") not in (None, "") else None)
+    P = []
+    if want_year and "_" not in year and year != want_year:
+        P.append(f"letter no. year {year} != file no. year {want_year}")
+    if want_no and "_" not in fno and fno.lstrip("0") != want_no.lstrip("0"):
+        P.append(f"letter no. file no. {fno} != case file no. {want_no}")
+    if want_cr and want_cr.isdigit() and "_" not in crn and crn.lstrip("0") != want_cr.lstrip("0"):
+        P.append(f"letter no. प्र.क्र. {crn} != C R no. {want_cr}")
+    return P
+
+
+def _cited_groups(texts):
+    """[(reference, [pages])] of every "पृ.N/प.वि." in texts (quotes skipped)."""
+    out_ = []
+    for t in texts:
+        for mt in re.finditer(r"पृ\.((?:(?!पृ\.)[^/\n]){0,40}?)/\s*प\.वि\.", unquoted(t or "")):
+            inner = mt.group(1).strip()
+            if not re.fullmatch(NUMLIST, inner):
+                continue
+            pages = []
+            for part in re.split(r"\s*,\s*", inner):
+                ends = [num(x) for x in re.split(r"\s*(?:-|–|ते)\s*", part) if x.strip()]
+                pages += list(range(ends[0], ends[-1] + 1)) if len(ends) == 2 and ends[1] - ends[0] < 400 else ends
+            out_.append((mt.group(0), pages))
+    return out_
+
+
+def highlight_findings(P, proposal_pages, ctx):
+    """audit Q-F17 (WARN only): (status text, warnings). (a) each cited reference whose pages all lie after the proposal
+    (GR / enclosure pages) has a Highlight on at least one of them; (b) each Highlight on an enclosure page lies inside a
+    quoted extract of the note (its words >= 50 % in the related extracts / note-body quotes). Skipped when the package
+    has no Highlight at all (stand-in / unmarked package); (b) skips pages whose text layer is unusable (scan, legacy
+    font, garbled ToUnicode — tools/extract_check.py rules)."""
+    import extract_check as X
+    hl = {}
+    for i, pg in enumerate(P, 1):
+        rs = [a.rect for a in pg.annots() if a.type[1] == "Highlight"]
+        if rs:
+            hl[i] = rs
+    if not hl:
+        return "skipped: the package has no highlight annotations (no data to compare)", []
+    W = []
+    groups = _cited_groups([ctx.get("note", "")] + list(ctx.get("sources") or []))
+    seen = set()
+    for ref, pages in groups:
+        enc = [p for p in pages if 1 <= p <= len(P) and p not in proposal_pages]
+        key = tuple(enc)
+        if not enc or len(enc) != len(pages) or key in seen:
+            continue
+        seen.add(key)
+        if not any(p in hl for p in enc):
+            W.append(f"cited GR page(s) {ref.replace('/प.वि.', '').replace('पृ.', '')} — no highlight on the quoted lines "
+                     f"(§4.11)")
+    corpus = " ".join([ctx.get("related", "")] + re.findall(r"“([^”]*)”", ctx.get("note", "")))
+    cw = set(X.words(corpus))
+    checked = 0
+    for p, rects in sorted(hl.items()):
+        if p in proposal_pages:
+            continue
+        pg = P[p - 1]
+        full = pg.get_text("text") or ""
+        letters = len(re.findall(r"\w", full)) or 1
+        legacy = len(X.DEVA.findall(full)) < 0.2 * letters and len(re.findall(r"[\u00a0-\u00ff]", full)) > 0.03 * letters
+        if len(X.norm(full)) < 50 or X.garbled(full) or legacy:   # scan / garbled ToUnicode / legacy Devanagari font
+            continue
+        for r in rects:
+            hw = X.words(pg.get_textbox(r) or "")
+            if len(hw) < 3:
+                continue
+            checked += 1
+            cov = sum(1 for w in hw if w in cw) / len(hw)
+            if cov < 0.5:
+                W.append(f"page {p}: highlight not inside any quoted extract ({int(cov * 100)} % of its {len(hw)} words "
+                         f"in the note's extracts; §4.13)")
+    return f"{len(hl)} highlighted page(s), {len(seen)} cited GR reference(s), {checked} highlight(s) compared", W
+
+
 def main(argv):
-    argv = list(argv); orig = None; desk_arg = None
+    argv = list(argv); orig = None; desk_arg = None; meta = None
+    set_details(details_arg(argv), "verify_outputs " + " ".join(argv[1:]))   # audit S-F3
+    if "--case-meta" in argv:   # audit Q-F14: the case row (file_no, cr_no, cr_year) — engine_supabase case_meta
+        i = argv.index("--case-meta")
+        if i + 1 >= len(argv):
+            print(__doc__); return 2
+        try:
+            meta = json.load(open(argv[i + 1], encoding="utf-8-sig"))
+        except Exception as e:
+            check("case meta opens", [f"{argv[i + 1]}: {e.__class__.__name__}"]); meta = {}
+        del argv[i:i + 2]
     if "--desk" in argv:   # C30: desk profile id (else detected from the note's header line, else law-desk6)
         i = argv.index("--desk")
         if i + 1 >= len(argv):
@@ -298,6 +451,7 @@ def main(argv):
     if len(argv) != 5:
         print(__doc__); return 2
     out, pre, pkg, npp = argv[1], argv[2], argv[3], int(argv[4])
+    hl_ctx = None
     try:
         P = m.open(pkg); N = len(P)
     except Exception as e:
@@ -383,8 +537,7 @@ def main(argv):
                 if paras and re.match(r"^\(.*\)$", paras[-1]):
                     t = paras[-1]
                     rel_own.append(t)
-                    rel_src.append(re.sub(r",\s*(पृ\.[^()]*?/\s*प\.वि\.)$", r" (\1)",
-                                          re.sub(r"^\((?:स्रोत:\s*)?|\)$", "", t)))
+                    rel_src.append(source_of_line(t))
         check("no warning / working / AI words (note, संबंधित माहिती heading/source, letter)",
               [f"{where}: '{w}'" for where, t in (("note", note_txt), ("संबंधित माहिती", "\n".join(rel_own)),
                                                  ("letter", letter_txt))
@@ -423,6 +576,9 @@ def main(argv):
         nheads = [(f"note block {i + 1} (table)", b["text"].split("\n", 1)[0].split(" | "))
                   for i, b in enumerate(bl[:note_end]) if b["kind"] == "tbl" and b["text"]]
         for x in flow_warnings(nseq, nheads, [("संबंधित माहिती", rel_txt)] if rel_txt else []):
+            warn(x)
+        # audit Q-F8: "उपरोक्त वस्तुस्थिती" list — 3 to 6 items (sub-point paragraphs / table data rows), no “…” quote
+        for x in summary_problems(summary_blocks(bl[:note_end])):
             warn(x)
         # WARN level (lint_spec.warn_hits: शुद्धलेखन नियम 1–4, 3, 12, 14) — printed, never a FAIL
         for where, t in (("note", note_txt), ("letter", letter_txt)):
@@ -468,6 +624,11 @@ def main(argv):
         # a separate closing line "मान्यतेस्तव सादर." (spec note.closing, Format-1/2) belongs to the last para (as in lint_spec)
         if numbered and sig_start and BARE_CLOSING_RE.match(ntexts[sig_start - 1]):
             last = last + " " + ntexts[sig_start - 1]
+        # audit Q-F5: a full closing para (spec note.closing "सबब, …", printed unnumbered right above the signers) is the
+        # last para, as lint_spec.last_para reads it
+        elif numbered and sig_start and not re.match(r"[0-9०-९]+\.", ntexts[sig_start - 1]) \
+                and any(r.match(ntexts[sig_start - 1]) for r in LAST_FORMS):
+            last = ntexts[sig_start - 1]
         check("अ.मु.स. (वित्त) <=> Finance last para", finance_problems(last, has_ams, dk))
 
         # status.json `letter_needed` (engine; reported to the app) must agree with the built file
@@ -504,6 +665,7 @@ def main(argv):
             if kram is None: pr.append("'क्रमांक :-' line missing")
             elif not _desk.letter_ref_re(dk).search(bl[kram]["text"]):
                 pr.append(f"ref no. not {dk['letter']['ref_hint']}: '{ns(bl[kram]['text'])}'")
+
             if prati is None: pr.append("'प्रति,' missing")
             lh_email = (dk["letter"].get("email") or "").strip()   # checked only when the profile has one (C30)
             if lh_email and lh_email not in std_txt: pr.append(f"letterhead e-mail {lh_email} missing")
@@ -533,6 +695,12 @@ def main(argv):
             for line in _desk.letter_end_lines(dk):   # C30: signature / post / copy line of the desk profile
                 if ns(line) not in lt: en.append(f"line '{ns(line)}' missing")
             check("letter ending (§4.5)", en)
+        if meta and has_letter:   # audit Q-F14: every letter's number line against the case row (--case-meta)
+            lines = [ns(b["text"]) for b in bl[lstart:] if b["kind"] == "p"
+                     and (re.match(r"\s*क्रमांक\s*:?\s*-", b["text"]) or DO_LINE_RE.match(b["text"]))]
+            check("letter ref no. = case file no. (--case-meta)",
+                  [x for ln in lines for x in ref_meta_problems(ln, meta)])
+        hl_ctx = {"note": note_txt, "related": rel_txt, "sources": rel_src}
 
     # ---------------- optional outputs (order draft, parawise) ----------------
     for suffix, label in EXTRA_DOCS:
@@ -605,6 +773,12 @@ def main(argv):
         # two checks: annotations on the proposal pages are HARD for the engine (engine_supabase HARD_CHECK); the type rule is soft
         check("annotations on proposal pages (none)", an_prop)
         check("annotations (Highlight only)", an_kind)
+        # audit Q-F17 (WARN only): every cited GR page range has a highlight; every highlight lies in a quoted extract
+        if hl_ctx is not None:
+            msg, ws = highlight_findings(P, unmarked, hl_ctx)
+            print(f"OK: highlight coverage — {msg}")
+            for x in ws:
+                warn(x)
 
     ok = all(results)
     print("ALL OK" if ok else "FIX THE FAILS ABOVE", "| pages", N, "| toc", len(P.get_toc()) if P is not None else 0)

@@ -16,8 +16,16 @@ subagent / stage took the time.
       duration, model, turns, tool uses, image reads; background agents end at their task_notification / last own
       message); the 10 slowest other tool calls (Bash command first 80 chars, Read path); Read calls of images per
       owner; assistant turns per model (main / subagents); the result's modelUsage per model (tokens, cost).
-      Writes everything to <timeline.json>; --line writes ONE short "मॉडेल: वेळ — …" line (first stream) for
-      engine_supabase.py note. Missing / garbled lines are skipped; exit 0 always.
+      C-A (audit 05.11.2026): per subagent call and per agent type (and the main session) the tokens of its own
+      assistant messages (message.usage: input, output, cache read, cache write; one count per message id) and an
+      ESTIMATED cost: each model's real costUSD from the result's modelUsage is shared out in proportion to the
+      price-weighted tokens (input 1, output 5, cache write 1.25, cache read 0.1 — the ratios of the Anthropic price
+      list, the same as tools/edit_drafts.py cost_of), so the parts add up to the billed total; no usage / no
+      modelUsage -> "-". Writes everything to <timeline.json>; --line writes the "मॉडेल: वेळ — …" line (first stream:
+      time AND estimated cost per agent type) for engine_supabase.py note, then a second owner-only line
+      "मॉडेल: उप-एजंट खर्च (अंदाजे) — …" (turns, tokens). S-F3: the Actions log shows no agent descriptions and only
+      the program / folder of a tool call (case file names stay in <timeline.json>, runner-private). Missing / garbled
+      lines are skipped; exit 0 always.
   stages <stages.tsv> <job_t0> [<timeline.json>]
       the "वेळ-तक्ता" at the end of the job: one row per runner step from <stages.tsv> lines
       "<name>\\t<start epoch>\\t<end epoch>", the rest of the job since <job_t0> (set-up, install, queue), and the
@@ -121,6 +129,59 @@ def detail(name, inp):
     return SECRET_RE.sub("…", d)[:80]
 
 
+# C-A: price weights relative to the input price (Anthropic price list ratios; edit_drafts.cost_of uses the same)
+WEIGHTS = {"input": 1.0, "output": 5.0, "cache_write": 1.25, "cache_read": 0.1}
+USAGE_KEYS = {"input": "input_tokens", "output": "output_tokens", "cache_read": "cache_read_input_tokens",
+              "cache_write": "cache_creation_input_tokens"}
+MU_KEYS = {"input": "inputTokens", "output": "outputTokens", "cache_read": "cacheReadInputTokens",
+           "cache_write": "cacheCreationInputTokens"}
+
+
+def weighted(tok):
+    return sum(WEIGHTS[k] * (tok.get(k) or 0) for k in WEIGHTS)
+
+
+def model_rates(model_usage):
+    """result modelUsage -> {model: $ per weighted token} (only models with a cost and tokens)."""
+    out = {}
+    for m, u in (model_usage or {}).items():
+        if not isinstance(u, dict):
+            continue
+        c = _num(u.get("costUSD"))
+        w = weighted({k: _num(u.get(v)) or 0 for k, v in MU_KEYS.items()})
+        if c is not None and w > 0:
+            out[m] = c / w
+    return out
+
+
+def rate_of(rates, model):
+    """rate of a stream model id in modelUsage (keys may carry a suffix such as "[1m]" or a date)."""
+    if model in rates:
+        return rates[model]
+    for k, v in rates.items():
+        if str(k).startswith(str(model)) or str(model).startswith(str(k)):
+            return v
+    return None
+
+
+def usage_cost(by_model, rates):
+    """{model: tokens} -> (total tokens dict, estimated $ or None)."""
+    tot = {k: 0 for k in WEIGHTS}
+    cost, known = 0.0, True
+    for m, tok in by_model.items():
+        for k in tot:
+            tot[k] += tok.get(k) or 0
+        w = weighted(tok)
+        if w <= 0:
+            continue
+        r = rate_of(rates, m)
+        if r is None:
+            known = False
+        else:
+            cost += w * r
+    return tot, (round(cost, 4) if known and any(tot.values()) else None)
+
+
 def analyse(events, agent_models=None):
     agent_models = agent_models or {}
     out = {"lines": len(events)}
@@ -130,6 +191,7 @@ def analyse(events, agent_models=None):
     tools, order, tasks_by_id = {}, [], {}
     child = {}          # parent_tool_use_id -> {"first", "last", "models": set, "turns": set}
     turns = {}          # (owner "main"/"sub", model) -> set(message ids)
+    usage = {}          # (owner tool id or "main", message id) -> (model, {input, output, cache_read, cache_write})
     init = None
     res = None
     for ts, o in events:
@@ -161,6 +223,11 @@ def analyse(events, agent_models=None):
             mid = m.get("id") or o.get("uuid") or ts
             if model != "<synthetic>":
                 turns.setdefault(("sub" if pid else "main", model), set()).add(mid)
+                u = m.get("usage") if isinstance(m.get("usage"), dict) else None
+                if u:   # one message is streamed as several lines with the same id: keep the largest counts
+                    cur = usage.get((pid or "main", mid), (model, {}))[1]
+                    usage[(pid or "main", mid)] = (model, {k: max(cur.get(k) or 0, _num(u.get(v)) or 0)
+                                                           for k, v in USAGE_KEYS.items()})
             if pid:
                 if model != "<synthetic>":
                     child[pid]["models"].add(model)
@@ -195,6 +262,15 @@ def analyse(events, agent_models=None):
         elif typ == "result":
             res = o
     out.update(t0=t0, t1=t1, total_s=round(t1 - t0, 1), init=init)
+    rates = {}
+    if res:
+        rates = model_rates(res.get("modelUsage") if isinstance(res.get("modelUsage"), dict) else {})
+    own = {}            # owner -> {model: tokens}
+    for (ow, _), (model, tok) in usage.items():
+        bm = own.setdefault(ow, {})
+        t = bm.setdefault(model, {k: 0 for k in WEIGHTS})
+        for k in WEIGHTS:
+            t[k] += tok.get(k) or 0
     if res:
         mu = res.get("modelUsage") if isinstance(res.get("modelUsage"), dict) else {}
         out["result"] = {k: res.get(k) for k in ("subtype", "is_error", "num_turns", "duration_ms", "duration_api_ms", "total_cost_usd",
@@ -242,7 +318,9 @@ def analyse(events, agent_models=None):
             n_tools = sum(1 for x in tools.values() if x.get("parent") == tid)
             n_img = sum(1 for x in tools.values() if x.get("parent") == tid and x.get("name") == "Read"
                         and str((x.get("input") or {}).get("file_path") or "").lower().endswith(IMG_EXT))
+            tok, cst = usage_cost(own.get(tid) or {}, rates)
             agents.append({"id": tid, "type": label(tid), "owner": owner(t), "description": " ".join(str(inp.get("description") or "").split())[:60],
+                           "tokens": tok if any(tok.values()) else None, "cost_usd": cst,
                            "start_s": round(t["start"] - t0, 1), "end_s": round(end - t0, 1), "dur_s": round(end - t["start"], 1),
                            "end_by": how, "background": bg, "model": model, "turns": len(c.get("turns") or ()),
                            "tool_uses": n_tools if n_tools else t.get("cli_tool_uses"), "image_reads": n_img,
@@ -258,6 +336,23 @@ def analyse(events, agent_models=None):
     for x in others:
         b = by_name.setdefault(x["name"] or "?", {"calls": 0, "sum_s": 0.0})
         b["calls"] += 1; b["sum_s"] = round(b["sum_s"] + x["dur_s"], 1)
+    mtok, mcost = usage_cost(own.get("main") or {}, rates)
+    out["main_usage"] = {"tokens": mtok if any(mtok.values()) else None, "cost_usd": mcost}
+    by_type = {}
+    for x in agents:
+        b = by_type.setdefault(x["type"], {"type": x["type"], "calls": 0, "turns": 0, "dur_s": 0.0,
+                                            "tokens": {k: 0 for k in WEIGHTS}, "cost_usd": 0.0, "cost_known": True})
+        b["calls"] += 1; b["turns"] += x["turns"]; b["dur_s"] = round(b["dur_s"] + x["dur_s"], 1)
+        for k in WEIGHTS:
+            b["tokens"][k] += (x["tokens"] or {}).get(k) or 0
+        if x["cost_usd"] is None:
+            b["cost_known"] = False
+        else:
+            b["cost_usd"] = round(b["cost_usd"] + x["cost_usd"], 4)
+    for b in by_type.values():
+        if not b.pop("cost_known"):
+            b["cost_usd"] = None
+    out["agent_costs"] = sorted(by_type.values(), key=lambda b: -(b["cost_usd"] or 0))
     out.update(agents=agents, slow_tools=others[:10], tool_totals=by_name, image_reads=img,
                turns=[{"owner": o, "model": m, "turns": len(s)} for (o, m), s in sorted(turns.items())])
     return out
@@ -279,6 +374,41 @@ def table(rows, head):
         print("  " + "  ".join(c.ljust(w[i]) for i, c in enumerate(r)))
 
 
+SAFE_TOKEN = re.compile(r"^[A-Za-z0-9_.=:+-]{1,40}$")
+
+
+def safe_detail(name, d):
+    """S-F3: a tool call's detail without case text for the Actions log — Bash: the program and its first plain
+    option / repo script (no file names under /tmp); Read / Write / Edit: the folder and the extension; Glob / Grep /
+    others: nothing. The full detail stays in <timeline.json> (runner-private)."""
+    d = str(d or "")
+    if name == "Bash":
+        out = []
+        for t in d.split()[:3]:
+            if t.startswith("tools/") and SAFE_TOKEN.match(t[6:]) or SAFE_TOKEN.match(t):
+                out.append(t)
+            else:
+                break
+        return " ".join(out)
+    if name in ("Read", "Write", "Edit", "NotebookEdit"):
+        folder, base = os.path.split(d)
+        ext = os.path.splitext(base)[1].lower()
+        return (folder if folder.isascii() else "…") + "/*" + (ext if SAFE_TOKEN.match(ext or "-") else "")
+    return ""
+
+
+def money(c):
+    return f"${c:.2f}" if _num(c) is not None else "-"
+
+
+def ktok(tok):
+    """weighted-free total of a tokens dict -> "12.3k" / "1.2M" (all four kinds)."""
+    if not tok:
+        return "-"
+    n = sum(v or 0 for v in tok.values())
+    return f"{n / 1e6:.1f}M" if n >= 1e6 else f"{n / 1e3:.1f}k" if n >= 1e3 else str(int(n))
+
+
 def print_stream(label, a):
     print(f"== {label}: वेळ-विभागणी / timeline ({a.get('lines', 0)} lines) ==")
     if not a.get("lines"):
@@ -294,14 +424,23 @@ def print_stream(label, a):
           + ("" if r else "; no result line"))
     if a.get("agents"):
         print("  subagents (Agent/Task):")
-        table([[x["type"], x["description"], mmss(x["start_s"]), mmss(x["end_s"]), mmss(x["dur_s"]), x["model"], x["turns"],
+        # S-F3: no description column (the orchestrator's delegation text may name the case); it is in timeline.json
+        table([[x["type"], mmss(x["start_s"]), mmss(x["end_s"]), mmss(x["dur_s"]), x["model"], x["turns"],
                  x["tool_uses"] if x["tool_uses"] is not None else "-", x["image_reads"], mmss(x["cli_s"]),
-                 ("bg/" if x["background"] else "") + x["end_by"], x["status"] or "-"] for x in a["agents"]],
-              ["type", "description", "start", "end", "dur", "model", "turns", "tools", "img", "cli_dur", "end by", "status"])
+                 ("bg/" if x["background"] else "") + x["end_by"], x["status"] or "-", ktok(x.get("tokens")),
+                 money(x.get("cost_usd"))] for x in a["agents"]],
+              ["type", "start", "end", "dur", "model", "turns", "tools", "img", "cli_dur", "end by", "status", "tokens", "≈cost"])
+    if a.get("agent_costs") or (a.get("main_usage") or {}).get("tokens"):
+        mu = a.get("main_usage") or {}
+        print("  cost per agent type (estimate: modelUsage cost shared by price-weighted tokens):")
+        table([[b["type"], b["calls"], b["turns"], mmss(b["dur_s"]), ktok(b["tokens"]), money(b["cost_usd"])]
+               for b in a.get("agent_costs") or []]
+              + [["main (orchestrator)", "-", "-", "-", ktok(mu.get("tokens")), money(mu.get("cost_usd"))]],
+              ["type", "calls", "turns", "dur", "tokens", "≈cost"])
     if a.get("slow_tools"):
         print("  10 slowest other tool calls:")
         table([[x["name"], x["owner"], mmss(x["start_s"]), mmss(x["dur_s"]) + ("" if x["finished"] else "+"),
-                "ERR" if x["error"] else "", x["detail"]] for x in a["slow_tools"]],
+                "ERR" if x["error"] else "", safe_detail(x["name"], x["detail"])] for x in a["slow_tools"]],
               ["tool", "by", "start", "dur", "", "detail"])
     if a.get("tool_totals"):
         print("  tool totals: " + ", ".join(f"{k} {v['calls']}× {mmss(v['sum_s'])}" for k, v in
@@ -325,18 +464,32 @@ def summary_line(a):
     tot = {}
     for x in a.get("agents") or []:
         tot[x["type"]] = tot.get(x["type"], 0.0) + x["dur_s"]
-    parts = [f"{k} {v / 60:.1f}" for k, v in sorted(tot.items(), key=lambda kv: -kv[1])[:5]]
+    cost = {b["type"]: b.get("cost_usd") for b in a.get("agent_costs") or []}
+    parts = [f"{k} {v / 60:.1f}" + (f" मि ${cost[k]:.2f}" if _num(cost.get(k)) is not None else "")
+             for k, v in sorted(tot.items(), key=lambda kv: -kv[1])[:5]]
     tt = a.get("tool_totals") or {}
     b = tt.get("Bash")
     line = f"मॉडेल: वेळ — Claude एकूण {a.get('total_s', 0) / 60:.1f} मि"
     if parts:
-        line += "; " + ", ".join(parts) + " मि"
+        line += "; " + ", ".join(parts) + ("" if parts[-1].split()[-1].startswith("$") else " मि")
     if b:
         line += f"; Bash {b['calls']}× {b['sum_s'] / 60:.1f} मि"
     img = sum((a.get("image_reads") or {}).values())
     if img:
         line += f"; प्रतिमा-वाचन {img}"
     return line[:300]
+
+
+def cost_line(a):
+    """C-A: the second owner-only line — estimated cost, calls, turns and tokens per agent type and the main session."""
+    rows = [b for b in a.get("agent_costs") or [] if b.get("tokens") and any(b["tokens"].values())]
+    mu = a.get("main_usage") or {}
+    if not rows and not mu.get("tokens"):
+        return ""
+    parts = [f"{b['type']} {money(b['cost_usd'])} ({b['calls']}×, {b['turns']} फेऱ्या, {ktok(b['tokens'])} tok)" for b in rows]
+    if mu.get("tokens"):
+        parts.append(f"मुख्य सत्र {money(mu.get('cost_usd'))} ({ktok(mu['tokens'])} tok)")
+    return ("मॉडेल: उप-एजंट खर्च (अंदाजे) — " + ", ".join(parts))[:300]
 
 
 def cmd_report(args):
@@ -360,7 +513,7 @@ def cmd_report(args):
             agent_models = {k: v.get("model") for k, v in d.items() if isinstance(v, dict) and v.get("model")}
         except Exception:
             agent_models = {}
-    res, first_line = {}, None
+    res, first_line, second_line = {}, None, None
     for lab, path in streams:
         if not os.path.exists(path):
             continue
@@ -373,6 +526,7 @@ def cmd_report(args):
         print_stream(lab, a)
         if first_line is None:
             first_line = summary_line(a)
+            second_line = cost_line(a)
     if out_json:
         try:
             json.dump(res, open(out_json, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
@@ -380,11 +534,13 @@ def cmd_report(args):
             print("run_timeline: timeline.json not written:", e, file=sys.stderr)
     if line_file:
         try:
-            open(line_file, "w", encoding="utf-8").write((first_line or "") + "\n")
+            open(line_file, "w", encoding="utf-8").write((first_line or "") + "\n" + (second_line + "\n" if second_line else ""))
         except Exception:
             pass
     if first_line:
         print(first_line)
+    if second_line:
+        print(second_line)
 
 
 def cmd_stages(args):

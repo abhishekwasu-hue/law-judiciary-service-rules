@@ -203,7 +203,86 @@ class Workflow(unittest.TestCase):
         self.assertIn('"$T/run_timeline.py" report "$RP/timeline.json"', wf)
         self.assertIn('ES note "$(head -n 1 "$RP/timeline.line")" || true', wf)
         self.assertIn("name: Stage times (वेळ-तक्ता)", wf)
-        self.assertEqual(wf.count('>> "$RP/stages.tsv"; } 2>/dev/null || true\' EXIT'), 9)   # 9 timed steps; trap never changes rc
+        # 8 timed steps since prep_pages and the precedent sources share one step (audit 05.11.2026); trap never changes rc
+        self.assertEqual(wf.count('>> "$RP/stages.tsv"; } 2>/dev/null || true\' EXIT'), 8)
+
+
+class Cost(unittest.TestCase):
+    """C-A (audit 05.11.2026): per-subagent tokens / estimated cost from message.usage, shared out of modelUsage."""
+
+    def stream(self):
+        U = lambda i, o, cr=0, cw=0: {"input_tokens": i, "output_tokens": o, "cache_read_input_tokens": cr,
+                                     "cache_creation_input_tokens": cw}
+        def a(mid, model, parent, usage, content=None):
+            o = asst(mid, model, content or [{"type": "text", "text": "x"}], parent)
+            o["message"]["usage"] = usage
+            return o
+        res = {"type": "result", "subtype": "success", "num_turns": 4, "total_cost_usd": 3.0,
+               "modelUsage": {H: {"inputTokens": 1000, "outputTokens": 200, "cacheReadInputTokens": 0,
+                                  "cacheCreationInputTokens": 0, "costUSD": 0.5},
+                              O + "[1m]": {"inputTokens": 3000, "outputTokens": 600, "cacheReadInputTokens": 10000,
+                                           "cacheCreationInputTokens": 0, "costUSD": 2.5}}}
+        return [
+            (0, a("m1", H, None, U(1000, 200), [tu("a1", "Agent", {"subagent_type": "drafter", "description": "श्री. नाव यांचा प्रस्ताव"}),
+                                                tu("a2", "Agent", {"subagent_type": "fixer", "description": "उतारा दुरुस्ती"})])),
+            (1, a("d1", O, "a1", U(1000, 100, 5000))),
+            (2, a("d1", O, "a1", U(1000, 300, 5000))),     # same message id streamed again: counted once (max)
+            (3, a("f1", O, "a2", U(2000, 300, 5000))),
+            (4, a("f1", "<synthetic>", "a2", U(0, 0))),
+            (5, user(["a1", "a2"])),
+            (6, {"type": "assistant", "message": {"id": "m2", "model": H, "content": [
+                tu("b1", "Bash", {"command": "pdftoppm -r 110 /tmp/case/in/proposal/श्री नाव प्रस्ताव.pdf /tmp/x"})]},
+                 "parent_tool_use_id": None}),
+            (8, user(["b1"])),
+            (9, res)]
+
+    def test_costs(self):
+        a = RT.analyse(self.stream())
+        ag = {x["type"]: x for x in a["agents"]}
+        self.assertEqual(ag["drafter"]["tokens"], {"input": 1000, "output": 300, "cache_write": 0, "cache_read": 5000})
+        # Opus rate = 2.5 / (3000 + 5*600 + 0.1*10000) = 2.5 / 7000; drafter weighted 1000 + 1500 + 500 = 3000
+        self.assertAlmostEqual(ag["drafter"]["cost_usd"], round(2.5 * 3000 / 7000, 4))
+        self.assertAlmostEqual(ag["fixer"]["cost_usd"], round(2.5 * 4000 / 7000, 4))
+        self.assertAlmostEqual(ag["drafter"]["cost_usd"] + ag["fixer"]["cost_usd"], 2.5, places=3)
+        self.assertAlmostEqual(a["main_usage"]["cost_usd"], 0.5)
+        self.assertEqual([b["type"] for b in a["agent_costs"]], ["fixer", "drafter"])
+        ln = RT.summary_line(a)
+        self.assertIn("$", ln)
+        cl = RT.cost_line(a)
+        self.assertTrue(cl.startswith("मॉडेल: उप-एजंट खर्च (अंदाजे) — fixer $1.43"), cl)
+        self.assertIn("मुख्य सत्र $0.50", cl)
+        self.assertLessEqual(len(cl), 300)
+
+    def test_no_usage_no_cost(self):
+        a = RT.analyse(RT.read_events(self.tsv)) if hasattr(self, "tsv") else RT.analyse([(t, o) for t, o in STREAM])
+        self.assertTrue(all(x["cost_usd"] is None and x["tokens"] is None for x in a["agents"]))
+        self.assertEqual(RT.cost_line(a), "")
+
+    def test_report_log_has_no_case_text(self):
+        """S-F3: descriptions and case file names stay in timeline.json; the log shows types, programs and costs."""
+        with tempfile.TemporaryDirectory() as d:
+            tsv, js, line = (os.path.join(d, x) for x in ("s.tsv", "t.json", "t.line"))
+            with open(tsv, "w", encoding="utf-8") as f:
+                for t, o in self.stream():
+                    f.write(f"{1000 + t:.3f}\t{json.dumps(o, ensure_ascii=False)}\n")
+            p = subprocess.run([sys.executable, "-I", TOOL, "report", js, f"main={tsv}", "--line", line],
+                               capture_output=True, text=True, timeout=60)
+            self.assertEqual(p.returncode, 0, p.stderr)
+            self.assertNotIn("श्री", p.stdout)
+            self.assertNotIn("प्रस्ताव", p.stdout)
+            self.assertIn("pdftoppm -r 110", p.stdout)
+            self.assertIn("cost per agent type", p.stdout)
+            d2 = json.load(open(js, encoding="utf-8"))
+            self.assertIn("श्री. नाव", json.dumps(d2, ensure_ascii=False))   # kept runner-private
+            lines = open(line, encoding="utf-8").read().splitlines()
+            self.assertEqual(len(lines), 2)
+            self.assertTrue(lines[0].startswith("मॉडेल: वेळ — ") and lines[1].startswith("मॉडेल: उप-एजंट खर्च (अंदाजे) — "))
+
+    def test_safe_detail(self):
+        self.assertEqual(RT.safe_detail("Bash", "python3 tools/lint_spec.py /tmp/work/spec.json"), "python3 tools/lint_spec.py")
+        self.assertEqual(RT.safe_detail("Bash", "grep -n श्री /tmp/x"), "grep -n")
+        self.assertEqual(RT.safe_detail("Read", "/tmp/case/in/proposal/श्री नाव.pdf"), "/tmp/case/in/proposal/*.pdf")
+        self.assertEqual(RT.safe_detail("Grep", "श्री नाव"), "")
 
 
 if __name__ == "__main__":

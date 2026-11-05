@@ -23,6 +23,9 @@ Warnings
   - Devanagari outside “…” quotes (the affidavit is in English; Marathi GR text stays in quotes, §4.30 (4))
   - no reply row on the prayer clauses (Rule 58(3): every point of the petition)
   - a reply shorter than 8 words (Rule 58 Note (ii)); §4.30 contempt-prone wording (lint_parawise.contempt_hits)
+Audit 05.11.2026: WARN Q-F12 — affidavit.on_behalf_of names the High Court Registry (Registrar / High Court / महाप्रबंधक /
+प्रबंधक): the joint affidavit is on behalf of the State respondents only (INSTRUCTIONS §4.35; lint_spec.registry_hits).
+S-F3: --details FILE (or env CASE_DETAILS_FILE) — full lines to FILE, quoted segments redacted on stdout.
 """
 import json
 import os
@@ -140,10 +143,13 @@ def warnings_affidavit(spec):
     for k in ("prayer", "authority"):
         for phrase, fix in lint_parawise.contempt_hits(_txt(af.get(k))):
             W.append(f"affidavit.{k}: contempt-prone wording '{phrase}' — e.g. {fix}")
+    W += lint_parawise.registry_warnings(af, "affidavit")   # §4.35 (audit 05.11.2026 Q-F12)
     return W
 
 
 def main(argv):
+    argv = list(argv)
+    lint_spec.set_details(lint_spec.details_arg(argv), "lint_affidavit " + " ".join(argv[1:]))   # audit S-F3
     if len(argv) != 2:
         print(__doc__); return 2
     try:
@@ -155,9 +161,9 @@ def main(argv):
         print(f"{argv[1]}: no 'affidavit' block"); return 1
     probs = lint_affidavit(spec)
     for p in probs:
-        print(p)
+        lint_spec.out(p)
     for w in warnings_affidavit(spec):
-        print("WARN " + w)
+        lint_spec.out("WARN " + w)
     if not probs:
         print("LINT OK")
     return 1 if probs else 0

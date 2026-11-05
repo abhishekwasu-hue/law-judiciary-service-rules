@@ -44,8 +44,10 @@ Commands ("deliver with warnings", Abhi 02.11.2026: drafts are never thrown away
                       listed kind whose file is absent -> warning); absence is fine; more than one of a kind, or a refused upload (enum value missing until
                       migration 0006 / 0010 is applied) -> a runs.warnings line, never a failure.
                       Draft edit (04.11.2026, docs/DRAFT_EDIT_DESIGN.md): $ENGINE_WORK_DIR (default /tmp/work)
-                      spec.json + enclosures.json -> kind "spec", outputs/<case>/spec/v<n>/<name> (one version for
-                      both); absent -> a stderr line only; refused (migration 0013 not applied) -> a runs.warnings line.
+                      spec.json + enclosures.json -> kind "spec", outputs/<case>/spec/v<n>/r<run>/<name> (one version
+                      for both; r<run> = this run, L-F7); absent -> a stderr line only; refused (migration 0013 not
+                      applied) -> a runs.warnings line. State changes (fetch running, finish done, fail failed) only
+                      while the run is queued / running (L-F8; a closed run is never resurrected).
   claude_result <claude.json> [<stderr file>] [<exit code>] [--part1 <part1.json>] [--part1-no-cost] [--first <first.json>]
                 [--killed] [--wall <seconds>] [--status <status.json>] [--gateway-cost F --gateway-provider P]
                       Claude Code `--output-format json` result(s) -> runs.cost_usd and num_turns = SUM of the main run,
@@ -77,7 +79,8 @@ Commands ("deliver with warnings", Abhi 02.11.2026: drafts are never thrown away
   extracts <outdir> <spec.json> <study.json> [<ocr dir>] [--extra PATH ...]
                       tools/extract_check.py on the delivered `related` + Study part 3 (+ note body “…” quotes) vs the
                       package PDF, with the in-run --extra sources (register/, service-rules/, OLDCASES/t, PRECEDENT; A1
-                      H7). Never fails the case: a MISMATCH -> "पडताळणी अपूर्ण — उतारे: …"; unverifiable / note-body
+                      H7). Never fails the case: a MISMATCH -> "पडताळणी अपूर्ण — उतारे: …"; a note-body MISMATCH ->
+                      "पडताळणी अपूर्ण — टिप्पणीतील अवतरणे: …" (Q-F2: reaches the Study part 7); unverifiable
                       results -> "मॉडेल: उतारा-तपासणी — …" lines.
   config <cfg.json>   (local) the non-secret run settings from the Worker's /api/engine/config JSON as KEY=VALUE
                       lines for $GITHUB_ENV: MODEL (main tier = drafter, every quality-critical task; from Settings,
@@ -87,7 +90,8 @@ Commands ("deliver with warnings", Abhi 02.11.2026: drafts are never thrown away
                       default claude-opus-5-5), EFFORT (default medium), BUDGET_USD (SOFT,
                       default 0.75 — information only, never stops or degrades the run). Invalid values -> defaults.
   agents <out.json>   (local) Claude Code --agents JSON: drafter (MODEL_REVIEW, else MODEL — C30 03.11.2026: the
-                      note is drafted by Opus), study_writer + related_writer (MODEL_LIGHT), reviewer (MODEL_REVIEW)
+                      note is drafted by Opus), study_writer + related_writer (MODEL_LIGHT), fixer (MODEL_FIXER,
+                      default claude-sonnet-5-5: extract / part-1 repairs, C-B), reviewer (MODEL_REVIEW)
                       [+ drafter_strong (MODEL_STRONG, when it differs from the drafter's model)].
   part1check <facts.json> <study_part1.json>
                       (local) cheap-tier Study part 1 vs the main tier's facts: every number/date (and Devanagari
@@ -174,8 +178,14 @@ def now():
     return datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds")
 
 
+# L-F1 (audit 05.11.2026): Cloudflare in front of the Worker (and Supabase) refuses Python's default "Python-urllib/3.x"
+# User-Agent with error 1010 (HTTP 403) — live progress text froze in full and edit runs. Every call from this tool (and
+# tools/edit_drafts.py, which uses http / cmd_step_worker) names itself.
+USER_AGENT = "prastav-kaksha-engine/1"
+
+
 def http(method, url, body=None, headers=None, raw=False):
-    h = {"apikey": KEY, "Authorization": f"Bearer {KEY}"}
+    h = {"apikey": KEY, "Authorization": f"Bearer {KEY}", "User-Agent": USER_AGENT}
     h.update(headers or {})
     data = body
     if body is not None and not isinstance(body, (bytes, bytearray)):
@@ -200,8 +210,59 @@ def enc(path):
     return "/".join(urllib.parse.quote(s, safe="") for s in path.split("/"))
 
 
+# L-F8 (audit 05.11.2026): a run's state / step changes only while it is active. A run the Worker's sweep (or the user)
+# already marked failed / done is never resurrected (failed -> running -> done) and its stored failure reason (runs.step)
+# is not overwritten by a late progress line. Other fields (warnings, cost, log_url) are written in any state.
+ACTIVE_STATES = ("queued", "running")
+ACTIVE_FILTER = "state=in.(" + ",".join(ACTIVE_STATES) + ")"
+
+
 def patch_run(fields):
+    """PATCH this run. With "state" or "step" in `fields` only while the run is queued / running (ACTIVE_FILTER). ->
+    True when the row was changed (or the server sent no row list), False when a state change matched no active row."""
+    if "state" in fields:
+        rows = rest("PATCH", f"runs?id=eq.{RUN}&{ACTIVE_FILTER}&select=id,state", fields, "return=representation")
+        return rows is None or bool(rows)
+    if "step" in fields:
+        rest("PATCH", f"runs?id=eq.{RUN}&{ACTIVE_FILTER}", fields, "return=minimal")
+        return True
     rest("PATCH", f"runs?id=eq.{RUN}", fields, "return=minimal")
+    return True
+
+
+def private_log(name, text):
+    """S-F3 (audit 05.11.2026): case text (quotes, subjects, names, summaries) stays out of the Actions log (kept 90 days).
+    Details go to the runner-private directory $RP (700, runner user; default /tmp/runner-priv) when it exists -> path
+    or None. Never fails."""
+    d = os.environ.get("RP") or "/tmp/runner-priv"
+    if not os.path.isdir(d):
+        return None
+    p = os.path.join(d, safe_name(name))
+    try:
+        with open(p, "a", encoding="utf-8") as f:
+            f.write(str(text or "").rstrip("\n") + "\n")
+        return p
+    except OSError:
+        return None
+
+
+def log_safe_lines(lines):
+    """verify_outputs.py / extract_check.py stdout -> lines without case text for the Actions log: "OK: <check>" /
+    "FAIL: <check>" (the detail after " — " dropped), WARN / MISMATCH lines only counted, the closing line kept."""
+    out, warn, miss = [], 0, 0
+    for l in lines:
+        t = l.rstrip()
+        if t.startswith(("OK:", "FAIL:", "FAIL ")):
+            out.append(t.split(" — ", 1)[0][:120])
+        elif t.startswith("WARN"):
+            warn += 1
+        elif t.startswith(("MISMATCH", "UNVERIFIABLE")):
+            miss += 1
+        elif t.startswith(("ALL OK", "FIX THE FAILS", "EXTRACTS OK", "EXTRACTS FAIL")):
+            out.append(t[:160])
+    if warn: out.append(f"WARN lines: {warn} (details: runner-private log)")
+    if miss: out.append(f"MISMATCH / UNVERIFIABLE lines: {miss} (details: runner-private log)")
+    return out
 
 
 def activity(action, detail):
@@ -435,7 +496,9 @@ def cmd_fetch(work):
             "files": [{k: f[k] for k in ("id", "kind", "original_name", "version", "storage_path", "created_at")} for f in files]}
     os.makedirs(work, exist_ok=True)
     json.dump(info, open(os.path.join(work, "case.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)
-    patch_run({"state": "running", "started_at": now(), "step": "पाने वाचत आहे"})
+    if not patch_run({"state": "running", "started_at": now(), "step": "पाने वाचत आहे"}):
+        # L-F8: the run was already failed / done (sweep, cancel) — never resurrected
+        print("engine_supabase fetch: run is no longer queued/running — not started", file=sys.stderr); sys.exit(1)
     if warns:
         add_warnings(warns)
     print(f"fetched {len(got)} file(s) -> {work}/in")
@@ -476,7 +539,9 @@ def cmd_case_meta(args):
     d = os.path.dirname(os.path.abspath(outp))
     os.makedirs(d, exist_ok=True)
     json.dump(meta, open(outp, "w", encoding="utf-8"), ensure_ascii=False, indent=1)
-    print("case_meta:", json.dumps(meta, ensure_ascii=False))
+    # S-F3: no file name (often the subject) in the Actions log
+    print("case_meta: written", ", ".join(f"{k}={meta[k]}" for k in ("proposal_pages", "work_type", "desk") if k in meta),
+          f"outputs={len(meta['outputs']) if isinstance(meta.get('outputs'), list) else None}")
 
 
 def storage_name(n):
@@ -620,10 +685,18 @@ def upload_extras(out, st=None):
 # Draft edit (docs/DRAFT_EDIT_DESIGN.md point 1 + Addendum A, 04.11.2026): the run's spec.json (every draft is built
 # from it) and enclosures.json (what tools/pkg3.py put into the package) are kept as file kind `spec`, so
 # tools/edit_drafts.py can change a draft / add to the package without a full run. Both files of one run get the SAME
-# version: <case>/spec/v<n>/spec.json and <case>/spec/v<n>/enclosures.json (ASCII names, no storage_name: both are .json).
-# Not shown in the app's file lists. ENGINE_WORK_DIR overrides /tmp/work (tests).
+# version: <case>/spec/v<n>/r<run id>/spec.json and …/enclosures.json (ASCII names, no storage_name: both are .json).
+# L-F7 (audit 05.11.2026): the r<run id> segment records which run wrote them, and the rows are inserted AFTER the
+# run's note_letter / package rows (identity ids grow), so tools/edit_drafts.py refuses an edit when the newest spec
+# row is older than the newest note_letter / package row (the last full run's spec upload failed -> an edit would
+# change an older draft). Not shown in the app's file lists. ENGINE_WORK_DIR overrides /tmp/work (tests).
 SPEC_FILES = ("spec.json", "enclosures.json")
 SPEC_MIGRATION = "0013"
+
+
+def spec_object(ver, name, run=None):
+    """Storage key of a spec file: <case>/spec/v<ver>/r<run>/<name> (L-F7: the run that wrote it)."""
+    return f"{CASE}/spec/v{ver}/r{run or RUN}/{name}"
 
 
 def work_dir():
@@ -647,7 +720,7 @@ def upload_spec():
     try:
         ver = next_version("spec")
         for n, p in present:
-            path = f"{CASE}/spec/v{ver}/{n}"
+            path = spec_object(ver, n)
             http("POST", f"{BASE}/storage/v1/object/outputs/{enc(path)}", open(p, "rb").read(),
                  {"Content-Type": "application/json", "x-upsert": "true"})
             put.append({"kind": "spec", "name": n, "version": ver, "path": path})
@@ -738,9 +811,18 @@ def cmd_finish(out):
     uploaded += spec_up
     extra_warn += spec_warn
     lst = lambda k: st.get(k) if isinstance(st.get(k), list) else []
-    patch_run({"state": "done", "finished_at": now(), "step": "तयार", "summary": st.get("summary") or "",
-               "letter_needed": bool(st.get("letter_needed")), "essential_points": lst("essential_points"),
-               "grs_attached": lst("grs_attached"), "grs_missing": lst("grs_missing")})
+    if not patch_run({"state": "done", "finished_at": now(), "step": "तयार", "summary": st.get("summary") or "",
+                      "letter_needed": bool(st.get("letter_needed")), "essential_points": lst("essential_points"),
+                      "grs_attached": lst("grs_attached"), "grs_missing": lst("grs_missing")}):
+        # L-F8: the run was failed / closed meanwhile (sweep, cancel): it stays as it is (never resurrected); the files
+        # are stored as new versions of the case
+        try:
+            add_warnings(["आउटपुट जतन झाले, पण ही प्रक्रिया त्याआधीच बंद झाली होती — स्थिती बदलली नाही"])
+        except Exception:
+            pass
+        print(f"engine_supabase finish: run is no longer running — {len(uploaded)} file(s) stored, state not changed",
+              file=sys.stderr)
+        sys.exit(1)
     rest("PATCH", f"cases?id=eq.{CASE}", {"stage": "मसुदा तयार"}, "return=minimal")
     fill_case(st.get("case"))
     sw = [str(x).strip()[:300] for x in lst("warnings") if str(x).strip()]  # engine notes for Abhi (e.g. C R not found)
@@ -752,7 +834,7 @@ def cmd_finish(out):
         except Exception as e:
             print("engine_supabase: status warnings not stored:", e, file=sys.stderr)
     activity("run_done", {"run_id": int(RUN), "files": uploaded})
-    print("finished:", ", ".join(f"{u['kind']} v{u['version']} {u['name']}" for u in uploaded))
+    print("finished:", ", ".join(f"{u['kind']} v{u['version']}" for u in uploaded))   # S-F3: no file names
 
 
 CATS = {"वेतननिश्चिती", "भत्ते", "निवृत्तीवेतन", "जुनी पेन्शन", "विशेष वेतन", "विमा/GPF", "सेवा", "न्यायिक वेतन", "वैद्यकीय", "इतर"}
@@ -853,7 +935,7 @@ def claude_fields(results, wall=None):
 
 
 DEFAULTS = {"model": "claude-opus-5-5", "model_light": "claude-haiku-5-5", "model_review": "claude-opus-5-5", "model_strong": "",
-            "effort": "medium", "budget_usd": 0.75}
+            "model_fixer": "claude-sonnet-5-5", "effort": "medium", "budget_usd": 0.75}
 EFFORTS = ("low", "medium", "high", "xhigh", "max")
 OFF = ("none", "off", "no", "-", "0", "false")
 MODEL_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:@\[\]/-]{1,99}")
@@ -867,7 +949,8 @@ def engine_config(cfg):
     MODEL_LIGHT = cheap tier (orchestrator, tools, builds, lint/verify fixes, Study parts 1-7 except 0, note `related`),
     MODEL_REVIEW = final reviewer/approver (Opus-class; checks and minimally corrects note + letter + part 0; the run
     is not "done" without its approval), MODEL_STRONG = optional one-way escalation tier above MODEL
-    (empty / "none" = off). BUDGET_USD is SOFT: the run is never stopped or degraded for it; going over it only adds
+    (empty / "none" = off), MODEL_FIXER = the `fixer` subagent (C-B, audit 05.11.2026: repairs of mismatched extracts /
+    Study part-1 pages; Settings key model_fixer, default claude-sonnet-5-5). BUDGET_USD is SOFT: the run is never stopped or degraded for it; going over it only adds
     the information line "खर्च अंदाजापेक्षा जास्त — माहितीसाठी"."""
     cfg = cfg if isinstance(cfg, dict) else {}
     def model(k):
@@ -890,7 +973,7 @@ def engine_config(cfg):
     if strong == main:
         strong = ""
     out = {"MODEL": main, "MODEL_LIGHT": model("model_light"), "MODEL_REVIEW": model("model_review"),
-           "MODEL_STRONG": strong, "EFFORT": eff,
+           "MODEL_STRONG": strong, "MODEL_FIXER": model("model_fixer"), "EFFORT": eff,
            "BUDGET_USD": f"{bud:.2f}"}
     out.update(provider_config(cfg))
     return out
@@ -1102,6 +1185,19 @@ DRAFTER = (" Never stop or refuse: write every output you can. Missing C R/file 
            "(brief [I4.31]). Only references needed to decide the demand, each fact once, office order with linking "
            "openers, one quote per sentence, पृ.N/प.वि. once per document, no 'पृ./प.वि.' table column, 3-6 decisive "
            "facts in 'उपरोक्त वस्तुस्थिती', no quote cut with '…' (brief [I4.34]).")
+FIXER = (" You repair ONLY what the delegation message lists: (a) extracts that tools/extract_check.py reported as "
+         "MISMATCH (spec `related` items, Study part-3 blocks, note-body “…” quotes) — open the cited package page image "
+         "(/tmp/work/pkgpages or render the page of the package PDF), copy the cited passage character for character "
+         "into the same place and keep its source line and पृ.N/प.वि. / (पॅकेज PDF पृ. N); when the passage is not on the "
+         "cited page, find it on the neighbouring pages of the same GR and correct only the page number; (b) Study "
+         "part-1 pages that part1check reported — re-read that proposal page image (WORKDIR/pages/p-NN.png; "
+         "p-NN.ocr.txt only as a cross-check) and rewrite that page's Marathi rendering exactly, every number, date, "
+         "name and amount as on the page. Never paraphrase, shorten (no cut with '…', brief [I4.34]) or fill gaps; "
+         "in the note body change only the “…” text and its पृ.N/प.वि.; never change the note body's own sentences, "
+         "the letter, the GR choice, the letter-or-not decision or Study part 0; never re-run the whole study. After the repair run "
+         "`python3 tools/extract_check.py` (or part1check) again on what you changed and report the result; anything "
+         "still mismatched -> one line 'पडताळणी अपूर्ण — उतारा <where>' / 'पडताळणी अपूर्ण — भाग 1 पान N' (the drafter "
+         "takes it over).")
 WRITER = (" If an extract cannot be matched to its page, report it as 'पडताळणी अपूर्ण — उतारा …'; never invent text.")
 NEVER_STOP = (" Never stop: a missing C R / file no. / date is \"____\", an unreadable page or value is \"अस्पष्ट\", a "
               "GR that cannot be fetched goes to grs_missing — each with a warning line, never a reason to stop, refuse "
@@ -1116,11 +1212,12 @@ def agents_json(conf, brief="tools/ENGINE_BRIEF.md"):
     khupch short jhali detail asayla pahije", the detailed note is drafted by Opus) = research, facts, letter-or-not,
     DETAILED note body + letter, Study part 0; `study_writer`
     and `related_writer` (MODEL_LIGHT) = Study parts 2-4, 7 (5-6 copied) and the note's `related` extracts, checked by
-    tools/extract_check.py (mismatches go back to drafter); `reviewer` (MODEL_REVIEW) = final check + approval;
+    tools/extract_check.py (mismatches go to `fixer`, MODEL_FIXER = Sonnet-class, C-B; still failing -> drafter);
+    `reviewer` (MODEL_REVIEW) = final check + approval;
     `drafter_strong` (MODEL_STRONG) only when configured and different from the drafter's model. Prompts are fixed
     text (stable prefix for prompt caching)."""
     base = ("You are a subagent of the Law & Judiciary engine run (one case). The binding rules are " + brief +
-            " (read it once, fully) and the tool docstrings in /tmp/work/TOOL_DOCS.md; INSTRUCTIONS.md wins on any doubt"
+            " (its full text is appended below this prompt by the workflow — do not read the file again) and the tool docstrings in /tmp/work/TOOL_DOCS.md; INSTRUCTIONS.md wins on any doubt"
             " (grep the exact item). Nothing of your own; verbatim quotes with source; unreadable = \"अस्पष्ट\". "
             "Do exactly the task in the delegation message, write the files it names, and reply in at most 5 lines "
             "(files written, open doubts, anything you could not read). Batch independent tool calls in one message; "
@@ -1132,8 +1229,9 @@ def agents_json(conf, brief="tools/ENGINE_BRIEF.md"):
                        "original pages; read facts/numbers/dates/names/handwriting/stamps from the proposal page images; "
                        "letter-or-not decision; GR selection for the note body and the enclosures; DETAILED note body "
                        "(brief [I4.29], 12 elements) and concise letter spec; the optional spec `order` / `orders` (order drafts) / `parawise` (court remarks, English) / `affidavit` (affidavit in reply, English) / `lq` (legislature question answer) "
-                       "per the brief's court and order-draft rules; Study part 0; extracts and Study part 1 pages that failed their check; content "
-                       "fixes that lint/verify still reports after 2 mechanical attempts.",
+                       "per the brief's court and order-draft rules; Study part 0; extracts and Study part 1 pages only "
+                       "when the fixer reported them still failing; content fixes that lint/verify still reports after 2 "
+                       "mechanical attempts.",
         "prompt": base + DRAFTER, "model": dmodel}}
     if conf.get("MODEL_STRONG") and conf["MODEL_STRONG"] != dmodel:
         out["drafter_strong"] = {
@@ -1154,6 +1252,14 @@ def agents_json(conf, brief="tools/ENGINE_BRIEF.md"):
                        "sources never use the words \"स्रोत\" or \"जसाच्या तसा\"; never \"पॅकेज PDF\", warnings, remarks "
                        "or any mention of AI (INSTRUCTIONS §4.27); checked by tools/extract_check.py.",
         "prompt": base + VERBATIM + WRITER, "model": light}
+    # C-B (audit 05.11.2026): mechanical repairs (extract mismatches, Study part-1 pages from the page images) went to
+    # the Opus drafter in every recent run (8–14 turns); a Sonnet-class fixer does them. Drafter / reviewer unchanged.
+    out["fixer"] = {
+        "description": "Repair tier (Sonnet-class). Repairs mismatched extracts (tools/extract_check.py MISMATCH: "
+                       "spec `related`, Study part 3, note-body quotes) and Study part-1 pages that part1check "
+                       "reported, from the package / proposal page images, character for character; re-checks them. "
+                       "Never drafts or changes the note body, letter, GR choice or Study part 0.",
+        "prompt": base + FIXER, "model": fixer_model(conf)}   # own verbatim rule (VERBATIM forbids note-body changes)
     out["reviewer"] = {
         "description": "Final review and approval (Opus-class). Checks every number/date/name of the note, letter and "
                        "Study part 0 against the page images, the rules (INSTRUCTIONS §4 incl. §4.18, the brief), the "
@@ -1165,6 +1271,13 @@ def agents_json(conf, brief="tools/ENGINE_BRIEF.md"):
     return out
 
 
+def fixer_model(conf):
+    """The `fixer` subagent's model: MODEL_FIXER (Settings model_fixer) when valid, else claude-sonnet-5-5."""
+    conf = conf if isinstance(conf, dict) else {}
+    v = str(conf.get("MODEL_FIXER") or "").strip()
+    return v if MODEL_RE.fullmatch(v) else DEFAULTS["model_fixer"]
+
+
 def drafter_model(conf):
     """The `drafter` subagent's model (C30, Abhi 03.11.2026: the note is drafted by Opus): MODEL_REVIEW (Opus-class)
     when set, else MODEL. MODEL stays the Settings value for anything else that names it."""
@@ -1174,7 +1287,7 @@ def drafter_model(conf):
 
 def cmd_agents(args):
     """agents <out.json> — writes agents_json(env MODEL, MODEL_LIGHT, MODEL_REVIEW, MODEL_STRONG)."""
-    conf = {k: os.environ.get(k, "") for k in ("MODEL", "MODEL_LIGHT", "MODEL_REVIEW", "MODEL_STRONG")}
+    conf = {k: os.environ.get(k, "") for k in ("MODEL", "MODEL_LIGHT", "MODEL_REVIEW", "MODEL_STRONG", "MODEL_FIXER")}
     conf["MODEL"] = conf["MODEL"] or DEFAULTS["model"]
     conf["MODEL_REVIEW"] = conf["MODEL_REVIEW"] or DEFAULTS["model_review"]
     json.dump(agents_json(conf), open(args[0], "w", encoding="utf-8"), ensure_ascii=False, indent=1)
@@ -1644,7 +1757,8 @@ def cmd_verify(args):
         warns += notes
         kind, why = part1_gate(review_dir)
         if kind:
-            print("verify:", why)
+            print("verify: PART1 not confirmed (stored as a warning)")   # S-F3: the values stay out of the log
+            private_log("verify.log", f"part1: {why}")
             warns.append(why if kind == "warn" else soft_line("भाग 1", why))
         else:
             print("verify: PART1 OK")
@@ -1703,7 +1817,9 @@ def cmd_verify(args):
     r = subprocess.run(cmd, capture_output=True, text=True,
                        encoding="utf-8", errors="replace")
     lines = (r.stdout or "").splitlines()
-    print(r.stdout, end="")
+    private_log("verify.log", r.stdout or "")
+    for l in log_safe_lines(lines):   # S-F3: check names only; details in $RP/verify.log and runs.warnings
+        print(l)
     hard, soft = classify_verify(lines)
     clean = r.returncode == 0 and not hard and not soft and any(l.startswith("ALL OK") for l in lines)
     if not clean and not hard and not soft:
@@ -1746,8 +1862,10 @@ def cmd_extracts(args):
     """extracts <outdir> <spec.json> <study.json> [<ocr dir>] [--extra PATH ...] — final verbatim guard
     (tools/extract_check.py) on the delivered `related` + Study part 3 (+ the note body's “…” quotes, --note-body)
     against the package PDF, with the same --extra sources as the in-run check (extra_sources). Never fails the case
-    ("deliver with warnings"): a MISMATCH is a "पडताळणी अपूर्ण — उतारे: …" warning; unverifiable extracts and every
-    note-body result are "मॉडेल: उतारा-तपासणी — …" warning lines."""
+    ("deliver with warnings"): a MISMATCH is a "पडताळणी अपूर्ण — उतारे: …" warning; a note-body quote mismatch is a
+    "पडताळणी अपूर्ण — टिप्पणीतील अवतरणे: …" warning (Q-F2: it reaches the Study part 7); unverifiable extracts /
+    quotes stay owner-only "मॉडेल: उतारा-तपासणी — …" lines. The tool's stdout (quote text) goes to $RP/extracts.log,
+    the Actions log gets counts only (S-F3)."""
     args = list(args)
     extra = []
     while "--extra" in args:
@@ -1777,7 +1895,9 @@ def cmd_extracts(args):
         cmd += ["--extra", x]
     rj = os.path.join(out, ".extracts.json")
     r = subprocess.run(cmd + ["--json", rj], capture_output=True, text=True, encoding="utf-8", errors="replace")
-    print(r.stdout, end="")
+    private_log("extracts.log", r.stdout or "")
+    for l in log_safe_lines((r.stdout or "").splitlines()):   # S-F3: no quote text in the Actions log
+        print(l)
     try:
         recs = json.load(open(rj, encoding="utf-8"))
     except Exception:
@@ -1790,18 +1910,28 @@ def cmd_extracts(args):
     unv = [x for x in main_r if x.get("status") == "unverifiable"]
     nbad = [x for x in note_r if x.get("status") == "mismatch"]
     nunv = [x for x in note_r if x.get("status") == "unverifiable"]
-    where = lambda xs: "; ".join(sorted({str(x.get("where")) for x in xs}))[:180]
+    where = lambda xs: note_where("; ".join(sorted({str(x.get("where")) for x in xs})))[:180]
     lines = []
     if bad:
         lines.append(soft_line("उतारे", f"{len(bad)} उतारे मूळ PDF शी जसेच्या तसे जुळले नाहीत ({where(bad)}) — वापरण्यापूर्वी तपासा"))
     if unv:
         lines.append(f"मॉडेल: उतारा-तपासणी — {len(unv)} उतारे पडताळता आले नाहीत (स्कॅन/विस्कळीत मजकूर-स्तर)")
-    if nbad:
-        lines.append(f"मॉडेल: उतारा-तपासणी — टिप्पणीतील {len(nbad)} अवतरणे मूळ PDF शी जुळली नाहीत ({where(nbad)}) — तपासावे")
+    if nbad:   # Q-F2 (audit 05.11.2026): a soft warning -> runs.warnings AND the Study part 7 (not owner-only)
+        lines.append(note_quote_line(len(nbad), where(nbad)))
     if nunv:
         lines.append(f"मॉडेल: उतारा-तपासणी — टिप्पणीतील {len(nunv)} अवतरणे पडताळता आली नाहीत (पृ.N/प.वि. नाही / स्कॅन)")
     add_warnings(lines)
     print("extracts:", "MISMATCH (warning)" if bad else "OK")
+
+
+def note_where(w):
+    """extract_check.py labels the note body "नोंद परि. N"; the app and the Study say टिप्पणी (owner 04.11.2026)."""
+    return str(w or "").replace("नोंद परि.", "टिप्पणी परि.")
+
+
+def note_quote_line(n, where):
+    """Q-F2: the soft warning for note-body “…” quotes that do not match their cited package page (Study part 7)."""
+    return soft_line("टिप्पणीतील अवतरणे", f"{n} अवतरणे नमूद पानाशी शब्दशः जुळली नाहीत ({note_where(where)}) — वापरण्यापूर्वी तपासणी आवश्यक")
 
 
 def cmd_warn(text):
@@ -1833,7 +1963,8 @@ def cmd_step_worker(text):
         print("engine_supabase step: no run token / worker", file=sys.stderr); return
     req = urllib.request.Request(f"{worker.rstrip('/')}/api/engine/step", method="POST",
                                  data=json.dumps({"run_id": int(run), "step": (text or "")[:200]}, ensure_ascii=False).encode("utf-8"),
-                                 headers={"Authorization": f"Bearer {tok}", "Content-Type": "application/json"})
+                                 headers={"Authorization": f"Bearer {tok}", "Content-Type": "application/json",
+                                          "User-Agent": USER_AGENT})   # L-F1: default UA -> Cloudflare 1010
     try:
         with urllib.request.urlopen(req, timeout=30) as r: r.read()
     except Exception as e:
@@ -1845,12 +1976,19 @@ def cmd_fail(reason):
     try:
         cur = (rest("GET", f"runs?id=eq.{RUN}&select=state,step") or [{}])[0]
         if cur.get("state") == "failed":
-            print("run already failed:", cur.get("step"), file=sys.stderr); sys.exit(1)
-        patch_run({"state": "failed", "step": reason, "finished_at": now()})
+            print("run already failed (earlier reason kept)", file=sys.stderr); sys.exit(1)
+        # L-F8: only an active run becomes failed (a done run is never turned into failed, nor a failed one re-failed)
+        if not patch_run({"state": "failed", "step": reason, "finished_at": now()}):
+            print("run is no longer queued/running — state not changed", file=sys.stderr); sys.exit(1)
         activity("run_failed", {"run_id": int(RUN), "reason": reason})
+    except SystemExit:
+        raise
     except Exception as e:
         print("engine_supabase: could not record failure:", e, file=sys.stderr)
-    print("FAILED:", reason, file=sys.stderr)
+        print("FAILED:", reason, file=sys.stderr)   # not stored anywhere else -> the log keeps it
+        sys.exit(1)
+    private_log("fail_reason.log", reason)
+    print(f"FAILED (reason stored on the run, {len(reason)} chars)", file=sys.stderr)   # S-F3
     sys.exit(1)
 
 
