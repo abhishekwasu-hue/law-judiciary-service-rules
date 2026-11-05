@@ -465,3 +465,11 @@ class OwnerDecisions05Nov(unittest.TestCase):
         self.assertTrue([x for x in L.lint_warnings(s) if x not in base and "लॉजिंग" in x])
         s["note"]["paras"][0] = sample("CR131_2026_special-pay_info-letter.json")["note"]["paras"][0] + " “WP (L) लॉजिंग”"
         self.assertFalse([x for x in L.lint_warnings(s) if x not in base and "लॉजिंग" in x])
+
+    def test_order_numbers_kept(self):
+        """Abhi 05.11.2026: "आदेशाचे क्रमांक ठेवा" — order numbers are not letter numbers (C1 removes only पत्र क्र.)."""
+        for t in ("पदोन्नती आदेश क्र. स्था/12/2026 सोबतच्या पत्रान्वये कळविले आहे.",
+                  "कार्यालयीन आदेश क्रमांक 45/2026 नुसार पत्र प्राप्त झाले.",
+                  "वेतननिश्चिती आदेश क्र. 7/2025, दि. 01.01.2025 च्या पत्रासह सादर."):
+            with self.subTest(t=t[:30]):
+                self.assertEqual(L.note_letter_no_hits(t), [])

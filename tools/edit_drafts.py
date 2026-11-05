@@ -114,8 +114,8 @@ Rules (binding):
    number) or tables {"table": [[header cells], [row cells], …], "bold_last": false}. Keep the signer chain as it is.
    Para 1 of the टिप्पणी ("first") names each covering letter by its authority, date and पृ.N/प.वि. only and never
    carries a letter number (INSTRUCTIONS §4.29(1)); the same for every letter anywhere in the टिप्पणी (§4.29(5),
-   §4.30(7), 05.11.2026): when you touch a para, drop any "क्र. …" of an incoming letter and keep the date (GR, petition
-   and case numbers stay; a department's U.O. reference no. "अनौपचारिक संदर्भ क्र. …" and another desk's
+   §4.30(7), 05.11.2026): when you touch a para, drop any "क्र. …" of an incoming letter and keep the date (GR, order
+   (आदेश क्र.), petition and case numbers stay; a department's U.O. reference no. "अनौपचारिक संदर्भ क्र. …" and another desk's
    reference no. stay when the record has one; never add one or a "____" for it). A petition in the टिप्पणी / letter
    is "रिट याचिका क्र. <N>/<YYYY>", without "(लॉजिंग)" (05.11.2026).
    A letter table asks only for data; documents go in a numbered list after it.

@@ -27,7 +27,8 @@ Rules (spec.json)
   - C1 (Abhi 05.11.2026, option आ; §4.29(1)/(5), §4.30(7), §4.36): no incoming letter number anywhere else in the note
     body either (paras incl. table cells, sub, closing; outside quotes and पृ.N/प.वि.): "क्र." / "क्रमांक" + a token with a
     digit or "/" within 4 words after or 6 words before a पत्र-word (पत्र, पत्रास, पत्रान्वये, स्मरणपत्र …); GR / case /
-    order / point words right before "क्र." (शासन निर्णय, परिपत्रक, याचिका, अर्ज, प्र. क्र., अ.क्र., मुद्दा …), a U.O.
+    order / point words right before "क्र." (शासन निर्णय, परिपत्रक, आदेश — order nos. are kept, Abhi 05.11.2026 "आदेशाचे
+    क्रमांक ठेवा" —, याचिका, अर्ज, प्र. क्र., अ.क्र., मुद्दा …), a U.O.
     reference of any department / another desk's reference no. ("अनौपचारिक संदर्भ क्र. …", "कार्यासन … संदर्भ क्र. …";
     Abhi 05.11.2026 — kept) and the Section's own file no. ("संकिर्ण-…") excepted (note_letter_no_hits)
   - C2 (Abhi 05.11.2026, option आ; §4.18, §4.31(अ)): the missing-info para lists its items inline after ":-" — "(1) …;
