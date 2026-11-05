@@ -104,7 +104,7 @@ WARN level (spec.json; note body and letter, text outside quotes; related and si
   - §4.37 (05.11.2026, owner decisions D1–D4, docs/FLOW_RESEARCH.md; flow_warnings, table_shape_warnings,
     para_count_warnings, para2_warnings): "जुने रूप §4.37" for the list "उपरोक्त वस्तुस्थिती पुढीलप्रमाणे आहे:-" and for a
     condition table (header "अट" + "… स्थिती"); a prayers table (header "प्रार्थना") -> "§4.37 मुद्देनिहाय"; a note table
-    whose data cells are mostly non-numeric (no digit, no "____"), unless a service-detail header (नाव / पद / पदनाम /
+    whose data cells are mostly not figures (figure_cell: digits, short "22 वर्षे" / "____"), unless a service-detail header (नाव / पद / पदनाम /
     नियुक्ती / दिनांक / कालावधी); more than 10 numbered paras; para 2 of a note answering a letter not opening "सदर
     पत्रान्वये" / "उपरोक्त पत्रान्वये" (court / legislature notes excepted: §4.32 (अ) petition sentence)
   - §4.28 (03.11.2026): the note's last para names every draft in the spec (letter "पत्राचे", reminder "स्मरणपत्राचे",
@@ -1080,6 +1080,8 @@ def is_condition_header(cells):
     cs = [c for c in cells or [] if isinstance(c, str)]
     return any(COND_HDR_RE.search(c) and any(STATUS_HDR_RE.search(d) for k, d in enumerate(cs) if k != i)
                for i, c in enumerate(cs))
+
+
 PRAYER_HDR_RE = re.compile(r"प्रार्थना")
 OLD437 = "जुने रूप §4.37"
 CURLY_QUOTE_RE = re.compile(r"“[^”]*”")

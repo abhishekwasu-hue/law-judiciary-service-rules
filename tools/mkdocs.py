@@ -8,7 +8,7 @@ spec.json:
  "note": {
    "first": "text of para 1 (starts after a tab; ends with ... सादर.)",
    "paras": [{"table": [["अ.क्र.","..."],["1","..."]], "bold_last": false} or "para text without number (numbering 2., 3., ... added automatically)", ...],
-   "sub": {"<para index in paras, 0-based>": ["(१) ...", "(२) ..."]},   # optional lettered/numbered sub-points after that para
+   "sub": {"<para index in paras, 0-based>": ["(१) ...", "(२) ..."]},   # optional sub-points after that para (§4.37: one issue per numbered para, its facts here); a leading "(1)" / "(अ)" / "1)" marker hangs at 1 cm, the text at 2 cm
    "closing": "सबब, उपरोक्त माहिती तक्त्याच्या स्वरूपात कळविण्याबाबतच्या पत्राचे प्रारूप पृ.      /प.वि. वर मान्यतेस्तव सादर. मान्य झाल्यास पत्र निर्गमित करण्यात येईल.",
               # or (no letter): "सबब, ... प्रस्ताव वित्त विभागाच्या मान्यतेस्तव सादर करण्यात येत आहे."  (PROPOSAL_SOP Step 4)
    "signers": ["(अ.मा. वसू)", "क. अ. (अ.का.)", "अ.स. (श्री. वडनेरकर)", "उ.वि.स. नि. उ.स. (श्री. बोंद्रे)", "सचिव व व. वि. स. (श्री. बिले)"]
@@ -171,6 +171,9 @@ def uo_lines(spec):
             f"क्रमांक {_blank(u.get('no'))} दिनांक {_blank(u.get('date'))}"]
 
 
+SUB_MARK_RE = re.compile(r"^\s*(\(\s*(?:[0-9०-९]{1,3}|[अ-औ]|[a-z]{1,4})\s*\)|[0-9०-९]{1,3}\))\s*")
+
+
 def build_note(spec, out):
     from docx.shared import Cm
     d = docx.Document(NOTE_T); body, P, sect = fresh(d); fix_styles(d)
@@ -187,7 +190,13 @@ def build_note(spec, out):
             add_table(d, sect, t["table"], t.get("bold_last", False)); continue
         add(body, sect, numbered, d, f"{k}.\t{t}"); k += 1
         for s in subs.get(str(i), []):
-            add(body, sect, numbered, d, f"\t{s}", left=Cm(1.0), first=Cm(-0.0))
+            # INSTRUCTIONS §4.37 D1 (05.11.2026): a sub-point "(1) …" / "(अ) …" / "1) …" hangs like the office's Word
+            # numbering — marker at 1 cm, text and its wrapped lines at 2 cm; an item without a marker stays as before
+            m = SUB_MARK_RE.match(s)
+            if m:
+                add(body, sect, numbered, d, f"{m.group(1)}\t{s[m.end():]}", left=Cm(2.0), first=Cm(-1.0))
+            else:
+                add(body, sect, numbered, d, f"\t{s}", left=Cm(1.0), first=Cm(-0.0))
     add(body, sect, close, d, "\t " + n.get("closing", "मान्यतेस्तव सादर."))
     add(body, sect, blank, d, " ")
     # §4.6 (Abhi 05.11.2026, his own note page): the first `signers_right` lines of the desk chain — the preparer's name
