@@ -1198,12 +1198,18 @@ def note_table_rows(n):
 # numbered paras (FLOW_RESEARCH §2.1; ~5–8 for an ordinary proposal). Soft WARN above MAX_NUMBERED (para 1 + every
 # printed numbered para; note.closing is printed without a number and not counted).
 MAX_NUMBERED = 10
+# Court notes follow the §4.32 (ई) story order (petition → prayers → service → GR → comparison → correspondence →
+# petition points → pending proposal → सबब: about 10 issues of their own), so their soft limit is higher (05.11.2026).
+MAX_NUMBERED_COURT = 14
 
 
-def para_count_warnings(n):
+def para_count_warnings(n, spec=None):
     paras = n.get("paras") if isinstance(n.get("paras"), list) else []
     k = 1 + sum(1 for x in paras if isinstance(x, str) and x.strip())
-    if k > MAX_NUMBERED:
+    first = next((x for x in paras if isinstance(x, str) and x.strip()), "")
+    court = bool(isinstance(spec, dict) and (spec.get("parawise") or spec.get("affidavit"))) or \
+        bool(re.search(r"याचिका|प्रतिवादी\s+क्र\.", first))
+    if k > (MAX_NUMBERED_COURT if court else MAX_NUMBERED):
         return [f"note.paras: {k} numbered paras — §4.37 D1: one issue per numbered para, its facts as sub-points "
                 f"(note.sub); about 5–8 for an ordinary proposal (office median 5)"]
     return []
@@ -1551,7 +1557,7 @@ def lint_warnings(spec):
           f"'पत्राचे प्रारूप व शासन निर्णयाचे प्रारूप पृ.      /प.वि. वर मान्यतेस्तव सादर.')" for d in drafts_unnamed(spec)]
     # §4.37 (05.11.2026, D1/D3/D4): descriptive tables, numbered-para count, para 2 opener
     W += table_shape_warnings(note_table_rows(n))
-    W += para_count_warnings(n)
+    W += para_count_warnings(n, spec)
     W += para2_warnings(spec)
     # audit 05.11.2026: Q-F9 long sentences, Q-F11 court para 2/3, Q-F12 registry copies, Q-F19 demand, Q-F21 library refs
     own = [(p, t) for p, t in body if not re.search(r"\.table\[", p)]

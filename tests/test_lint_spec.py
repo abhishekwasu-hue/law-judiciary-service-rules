@@ -26,72 +26,30 @@ ENV.pop("LINT_SKIP", None); ENV.pop("STUDY_ALLOW_MISSING_PART1", None)
 # audit 05.11.2026 (docs/AUDIT_2026-11-05.md Part 3 Q-F6/F8/F9/F11/F19/F21): WARN findings of the NEW audit lints on the
 # approved samples — real violations of the newer rules (the samples predate §4.29–§4.35; owner decision C5 / R-F5 on
 # re-baselining). Each entry = the warning text before ' — '. A sample may lose an entry when it is repaired; a NEW
-# warning on a sample fails test_all_samples_lint_ok.
+# warning on a sample fails test_all_samples_lint_ok. 05.11.2026: the Q-F8 'उपरोक्त वस्तुस्थिती' item-count entries are
+# gone with the check (§4.37 D2); §4.37 WARNs are not listed here — the samples are being rebuilt to §4.37.
 AUDIT_KNOWN_WARNS = {
-    # 05.11.2026 (Abhi: U.O. ref no. only when the record has one): the generic memo example carries a blank
-    # "अनौपचारिक संदर्भ क्रमांक ____" (template blank for a concurrence that is on record) — WARN only
+    # Known WARN-level findings on the approved samples after the 05.11.2026 rewrite (§4.36, §4.37). Each is a real,
+    # owner-visible point that the sample keeps on purpose: quote / source text that cannot be completed from the repo,
+    # or a sentence taken over from the approved record. Any NEW finding fails the test.
+    # generic memo example: a template blank for a concurrence that is on record (§4.36 C1 "असल्यास")
     'ORDER_memo_example': {
         'note.paras[1]: blank U.O. reference no.',
     },
-    'COURT_info_needed_example': {
-        'note.paras[0]: demand',
-    },
-    'COURT_wp_parawise_example': {
-        'note.paras[0]: court note para 2',
-        'note.paras[1]: court note para 3',
-        'note.paras[0]: demand',
-    },
-    'CR122_2026_pay-fixation_info-letter': {
-        'note.paras[6]: sentence 1 has 49 words',
-        "related[2].source: 'पूर्वोदाहरण-ग्रंथालय'",
-        "related[3].source: 'पूर्वोदाहरण-ग्रंथालय'",
-    },
-    'CR128_2026_retirement-age_info-letter': {
-        'note.paras[6]: sentence 1 has 47 words',
-    },
+    # CR130: the letter's intro sentence is the approved CR130 wording (the proposal PDF is not in the repo)
     'CR130_2026_old-pension_info-letter-via-HC': {
-        'note.paras[0]: sentence 2 has 49 words',
-        'note.paras[9]: sentence 1 has 44 words',
-        'note.paras[10]: sentence 1 has 73 words',
         'letter.intro: sentence 1 has 44 words',
-        "related[4].source: 'पूर्वोदाहरण-ग्रंथालय'",
-        "related[5].source: 'पूर्वोदाहरण-ग्रंथालय'",
     },
-    'CR133_2026_DLI-insurance_info-letter': {
-        'note.paras[0]: sentence 2 has 58 words',
-    },
-    'CR66_2026_finance-approval_no-letter': {
-        'note.paras[3]: sentence 1 has 55 words',
-        'note.paras[8]: sentence 1 has 71 words',
-        "related[2].source: 'पूर्वोदाहरण-ग्रंथालय'",
-    },
+    # HTE: the owner's own model note — the undertaking sentence "… उल्लेख नाही" is kept as written
     'HTE_2026_overpayment-waiver_finance-concurrence': {
-        'note.sub.13[1]: missing-info remark',
-        'note.sub.18[3]: missing-info remark',
-        "note.paras[18]: 'उपरोक्त वस्तुस्थिती' list has 7 items",
-        'note.sub.9[0]: sentence 2 has 47 words',
-        'note.sub.9[1]: sentence 1 has 56 words',
-        'note.closing: sentence 1 has 53 words',
+        'note.sub.9[1]: missing-info remark',
     },
-    'ORDER_addendum_example': {
-        'note.paras[0]: demand',
-    },
-    'ORDER_circular_example': {
-        'note.paras[0]: demand',
-    },
+    # WP35697: the §4.32 (अ) respondents sentence lists every respondent in petition order (one point, many names)
     'WP35697_2026_old-pension_finance-opinion': {
-        "note.paras[22]: 'उपरोक्त वस्तुस्थिती' list has 10 items",
-        "note.paras[22]: 'उपरोक्त वस्तुस्थिती' list carries 1 quote(s) “…”",
         'note.paras[0]: sentence 2 has 43 words',
-        'note.paras[20]: sentence 1 has 58 words',
-        'note.paras[21]: sentence 2 has 49 words',
     },
     'WP35697_2026_parawise_GP-letter': {
-        "note.paras[23]: 'उपरोक्त वस्तुस्थिती' list has 10 items",
-        "note.paras[23]: 'उपरोक्त वस्तुस्थिती' list carries 1 quote(s) “…”",
         'note.paras[0]: sentence 2 has 43 words',
-        'note.paras[19]: sentence 1 has 58 words',
-        'note.paras[20]: sentence 2 has 49 words',
         'letter.intro: sentence 1 has 66 words',
     },
 }
@@ -855,7 +813,7 @@ class AuditA1Fixes(unittest.TestCase):
     def test_cr66_sample_text_repaired(self):
         txt = json.dumps(self.s66, ensure_ascii=False)
         self.assertNotIn("प्रशासकीय मा.", txt); self.assertNotIn("मा. मा.", txt)
-        self.assertEqual(txt.count("मा. प्रशासकीय न्यायमूर्ती समिती"), 3)
+        self.assertEqual(txt.count("मा. प्रशासकीय न्यायमूर्ती समिती"), 2)   # 05.11.2026 §4.37 D2: the third was in the removed "उपरोक्त वस्तुस्थिती" list
 
     # ---- 2. REF_NO ----
     def test_ref_no_both_spellings(self):
