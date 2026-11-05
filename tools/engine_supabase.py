@@ -1199,12 +1199,16 @@ REVIEW = (" You are the final approver. LOOK at the proposal page images (WORKDI
           "Also write \"coverage\" (table: demand/contention/condition → where answered in the note/letter/draft, पृ.) "
           "and \"contradictions\" (list of conflicting dates/amounts/names/posts across note, letter, drafts and "
           "proposal, with पृ.) into review.json — for Study part 7 only, never into the note (INSTRUCTIONS §4.30). "
-          "Missing information / documents (brief [I4.31], INSTRUCTIONS §4.31): only in the ONE para 'प्रस्तावासोबत "
-          "खालील माहिती उपलब्ध नाही:-' just before the last para, essential items only; move any 'नमूद नाही / जोडलेले "
+          "Missing information / documents (brief [I4.31], INSTRUCTIONS §4.31): only in the ONE para 'सदर प्रकरणी … "
+          "प्रस्तावाचे अवलोकन केले असता, त्यामध्ये खालील माहिती आढळून येत नाही:- (1) …' just before the last para, essential items only; move any 'नमूद नाही / जोडलेले "
           "नाही / उपलब्ध नाही / प्रस्तावासोबत नाही' remark elsewhere into it, and a missing table value becomes '____'. "
           "Relevance + flow (brief [I4.34], INSTRUCTIONS §4.34): remove references not needed to decide the demand "
           "(endorsement nos., copy lines, reminder history, meta lines) and repeated facts, link the paras, one quote per "
-          "sentence, no 'पृ./प.वि.' table column, fact summary 3-6 decisive lines without पृ.; minimal edits.")
+          "sentence, no 'पृ./प.वि.' table column; minimal edits. Flow (brief [I4.37], INSTRUCTIONS §4.37): each numbered "
+          "para ONE issue with its facts as note.sub points (merge one-fact paras), each opened with an office linking "
+          "word, para 2 'सदर / उपरोक्त पत्रान्वये …' (not court notes), tables only for figures and the service-detail "
+          "table (conditions, duties, demands, prayers, chronology, opinions point-wise), no separate fact-summary list "
+          "— the last para opens 'उपरोक्त वस्तुस्थिती विचारात घेता, …' then 'सबब, …'; lint '§4.37' WARN lines = checklist.")
 DRAFTER = (" Never stop or refuse: write every output you can. Missing C R/file no. → PREFIX Case<id>_<year>, ref_no "
            "'संकिर्ण-<year>/____/प्र.क्र.____/का.6'; unclear → 'अस्पष्ट'. Each problem you cannot resolve → report it in "
            "one line starting 'पडताळणी अपूर्ण — <what, where>' for status.json `warnings`. On a redraft request, fix "
@@ -1216,8 +1220,11 @@ DRAFTER = (" Never stop or refuse: write every output you can. Missing C R/file 
            "concise (§4.15, §4.20). Missing information / documents only in the ONE missing-info para just before the "
            "last para, essential items only; elsewhere (paras, tables, fact summary) no such remark, '____' in tables "
            "(brief [I4.31]). Only references needed to decide the demand, each fact once, office order with linking "
-           "openers, one quote per sentence, पृ.N/प.वि. once per document, no 'पृ./प.वि.' table column, 3-6 decisive "
-           "facts in 'उपरोक्त वस्तुस्थिती', no quote cut with '…' (brief [I4.34]).")
+           "openers, one quote per sentence, पृ.N/प.वि. once per document, no 'पृ./प.वि.' table column, no quote cut with "
+           "'…' (brief [I4.34]). Flow (brief [I4.37]): one issue per numbered para, its facts as note.sub points (~5-8 "
+           "numbered paras), para 2 'सदर पत्रान्वये …', tables only for figures and the service-detail table, conditions "
+           "linked to the proposal's facts in sentences (no condition table), no separate fact-summary list — the last "
+           "para opens 'उपरोक्त वस्तुस्थिती विचारात घेता, …' with the decisive facts, then 'सबब, …'.")
 FIXER = (" You repair ONLY what the delegation message lists: (a) extracts that tools/extract_check.py reported as "
          "MISMATCH (spec `related` items, Study part-3 blocks, note-body “…” quotes) — open the cited package page image "
          "(/tmp/work/pkgpages or render the page of the package PDF), copy the cited passage character for character "

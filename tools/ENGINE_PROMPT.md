@@ -91,7 +91,11 @@ Cost: measured $3.0–3.9 per full run, Opus 90–96 % of it (docs/AUDIT_2026-11
    आढळून येत नाही:- …" (05.11.2026) just before the last para, items inline "(1) …; (2) …." (no table), essential items only, "____"
    in tables [I4.31]; no incoming letter no. anywhere in the note [I4.36]; only references needed
    to decide the demand, each fact once, office order with linking openers, one quote per sentence, पृ.N/प.वि. once
-   per document and no पृ. table column, 3-6 decisive facts in "उपरोक्त वस्तुस्थिती", no quote cut with "…" [I4.34];
+   per document and no पृ. table column, no quote cut with "…" [I4.34]; flow [I4.37]: one issue per numbered para
+   with its facts as `note.sub` points (~5-8 numbered paras), para 2 "सदर पत्रान्वये …", each numbered para opened with
+   an office linking word, tables only for figures and the service-detail table (conditions, duties, demands, prayers,
+   chronology, objections, opinions point-wise; no "अट / प्रस्तावातील स्थिती" table), no separate "उपरोक्त वस्तुस्थिती
+   पुढीलप्रमाणे आहे:-" list — the last para opens "उपरोक्त वस्तुस्थिती विचारात घेता, …" with the decisive facts, then "सबब, …";
    the letter concise [I4.15]), /tmp/work/study_part0.json (part 0 as a build_study part), /tmp/work/status_core.json (summary,
    letter_needed, essential_points, grs_attached, grs_missing, case) — the drafts = case.json `outputs` <list or
    null> (section "Drafts ticked by the user": `letters` / `orders` / `parawise`; null -> also `parawise` / `order`
@@ -149,8 +153,13 @@ Cost: measured $3.0–3.9 per full run, Opus 90–96 % of it (docs/AUDIT_2026-11
    documents only in the one missing-info para, items inline (no table), essential items only, no such remark
    elsewhere, "____" in tables; brief [I4.36]: drop any incoming letter no. from the note (keep authority + date);
    brief [I4.34]: remove references not needed to decide the demand (endorsement nos., copy lines, reminder history,
-   meta lines) and repeated facts, link the paras, split glued quotes, drop "पृ./प.वि." table columns, cut the fact
-   summary to 3-6 decisive lines without पृ. — minimal edits, never a fact the decision needs); after your edits run `python3 tools/lint_spec.py /tmp/work/spec.json` until LINT OK, then write the
+   meta lines) and repeated facts, link the paras, split glued quotes, drop "पृ./प.वि." table columns — minimal edits,
+   never a fact the decision needs; brief [I4.37] flow: each numbered para ONE issue (merge one-fact paras into
+   sub-points of their issue), each opened with an office linking word (not the same opener twice running), para 2
+   "सदर / उपरोक्त पत्रान्वये …" (not court notes), no descriptive table (condition / duties / demands / prayers /
+   chronology / opinions -> linked sentences or sub-points; figures and the service-detail table stay tables), no
+   separate fact-summary list (fold its decisive facts into the last para "उपरोक्त वस्तुस्थिती विचारात घेता, … सबब, …");
+   lint WARN lines "§4.37" are the checklist); after your edits run `python3 tools/lint_spec.py /tmp/work/spec.json` until LINT OK, then write the
    hashes and /tmp/work/review.json." If `changes` > 0: copy the corrected part 0 / note / letter text into
    study.json (parts 0, 5, 6), then lint -> build -> extract_check -> verify again.
    Always (also with `changes` 0; INSTRUCTIONS §4.30, Abhi 03.11.2026): append to study.json part 7 the blocks
@@ -291,11 +300,12 @@ on the page images):
   पहावी.") and ALL respondents in the petition's order in flowing sentences ("सदर याचिकेत <R1> यांना प्रतिवादी क्र. 1, …
   आणि <Rn> यांना प्रतिवादी क्र. N करण्यात आले आहे (पृ.N/प.वि.).", Marathi designations, e.g. Registrar General =
   महाप्रबंधक, मा. उच्च न्यायालय) + the verification date — no choppy "प्रतिवादी क्र. 1 …;" list, no separate respondents
-  para; the SECOND = "सदर याचिकेद्वारे याचिकाकर्त्यांनी पुढीलप्रमाणे प्रमुख मागण्या केल्या आहेत (पृ.N/प.वि.):-" + table
-  अ.क्र. | प्रार्थना | मागणी (each prayer in Marathi, petition order; minor prayers in one row); the English prayers
-  verbatim FIRST in `related`. Then the §4.32 (ई) story order with linking words (service + applicable rule, relied GR +
-  concurrence, comparison judgments/GRs, correspondence in date order, contentions, pending related proposal,
-  "उपरोक्त वस्तुस्थिती पुढीलप्रमाणे आहे:-", सबब); respectful plural; sentences under 40 words; the hearing date as
+  para; the SECOND = "सदर याचिकेद्वारे याचिकाकर्त्यांनी पुढीलप्रमाणे प्रमुख मागण्या केल्या आहेत (पृ.N/प.वि.):-" + the
+  prayers as sub-points "(अ) …; (आ) …" in `note.sub` (each prayer in Marathi, petition order; minor prayers in one
+  sub-point; no prayers table — INSTRUCTIONS §4.37, Abhi 05.11.2026); the English prayers verbatim FIRST in `related`.
+  Then the §4.32 (ई) story order with linking words (service + applicable rule, relied GR + concurrence, comparison
+  judgments/GRs, correspondence in date order, contentions, pending related proposal, the last para "उपरोक्त वस्तुस्थिती
+  विचारात घेता, … सबब, …"), one issue per numbered para with sub-points (brief [I4.37]); respectful plural; sentences under 40 words; the hearing date as
   stated in the notice.
 - Joint affidavit (INSTRUCTIONS §4.35, brief [I4.35]; model samples/specs/WP35697_2026_parawise_GP-letter.json): several
   State respondents -> `parawise.on_behalf_of` (and `affidavit.on_behalf_of`) = ALL State respondents ("Respondent Nos. 1

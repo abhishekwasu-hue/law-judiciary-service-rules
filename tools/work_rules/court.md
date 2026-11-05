@@ -9,8 +9,9 @@ binding rules exactly (pointers, not copies — the rule text is in INSTRUCTIONS
 - INSTRUCTIONS.md §4.32 (court-petition note): para 2 = the petition (petitioners, court, petition no., पृ.N/प.वि.) and
   ALL respondents in the petition's order as flowing sentences ("<R1> यांना प्रतिवादी क्र. 1, … करण्यात आले आहे"), with the
   verification date; para 3 = "सदर याचिकेद्वारे याचिकाकर्त्यांनी पुढीलप्रमाणे प्रमुख मागण्या केल्या आहेत (पृ.N/प.वि.):-" +
-  table अ.क्र. | प्रार्थना | मागणी (each prayer in Marathi, petition order); the English prayers verbatim FIRST in
-  `related`; story order and linking words (§4.32 (ई)); respectful plural, Marathi designations; the petition as "रिट याचिका क्र. <N>/<YYYY>" in the Marathi note and letter,
+  sub-points "(अ) …; (आ) …" (`note.sub`; each prayer in Marathi, petition order; no prayers table — §4.37, Abhi 05.11.2026
+  "प्रार्थना अ"); the English prayers verbatim FIRST in `related`; story order and linking words (§4.32 (ई), §4.37: one
+  issue per numbered para, tables only for figures / service details, last para "उपरोक्त वस्तुस्थिती विचारात घेता, …"); respectful plural, Marathi designations; the petition as "रिट याचिका क्र. <N>/<YYYY>" in the Marathi note and letter,
   no "(लॉजिंग)" (Abhi 05.11.2026; English parawise / affidavit case titles unchanged).
 - INSTRUCTIONS.md §4.35 (joint affidavit): several State respondents -> ONE joint affidavit "शासनाच्या वतीने" on behalf of
   all of them (parawise / affidavit `on_behalf_of` = all State respondents; the GP letter asks the one joint draft; copy
