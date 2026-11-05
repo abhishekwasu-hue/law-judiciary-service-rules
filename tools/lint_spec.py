@@ -1386,6 +1386,10 @@ def lint_warnings(spec):
     for path, t in body:   # Abhi 05.11.2026: a U.O. ref no. only when the record has one — never a "____" placeholder
         if UO_BLANK_RE.search(unquoted(t)):
             W.append(f"{path}: blank U.O. reference no. — {UO_BLANK_MSG}")
+    for path, t in body + letter_strings(spec):   # Abhi 05.11.2026: "रिट याचिका क्र. N/YYYY" — no "(लॉजिंग)"
+        if "लॉजिंग" in unquoted(t):
+            W.append(f"{path}: 'लॉजिंग' — "
+                     f"फक्त 'रिट याचिका क्र. <N>/<YYYY>' (वापरकर्ता, 05.11.2026, §4.32(अ))")
     rel_txt = [(pth, t) for pth, t in strings(spec.get("related", []), "related") if re.search(r"\.text(\[|$)", pth)]
     W += flow_warnings(note_seq(n), note_tables(n), rel_txt)   # C32 §4.34 relevance + flow
     W += [f"{last_para(n)[0]}: last para — does not name the draft {d} (§4.28: name every draft made, e.g. "

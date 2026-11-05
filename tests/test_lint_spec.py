@@ -28,6 +28,11 @@ ENV.pop("LINT_SKIP", None); ENV.pop("STUDY_ALLOW_MISSING_PART1", None)
 # re-baselining). Each entry = the warning text before ' — '. A sample may lose an entry when it is repaired; a NEW
 # warning on a sample fails test_all_samples_lint_ok.
 AUDIT_KNOWN_WARNS = {
+    # 05.11.2026 (Abhi: U.O. ref no. only when the record has one): the generic memo example carries a blank
+    # "अनौपचारिक संदर्भ क्रमांक ____" (template blank for a concurrence that is on record) — WARN only
+    'ORDER_memo_example': {
+        'note.paras[1]: blank U.O. reference no.',
+    },
     'COURT_info_needed_example': {
         'note.paras[0]: demand',
     },
@@ -276,7 +281,11 @@ class LintSpec(unittest.TestCase):
             s["note"].setdefault("sub", {})[str(i)] = ["(अ) प्रमाणपत्र जोडलेले नाही."]
         s = copy.deepcopy(self.s122); f(s)
         self.assertEqual([p for p in L.lint_spec(s) if "4.31" in p], [])
-        self.assertEqual([w for w in L.lint_warnings(s) if "4.31" in w], [])
+        # C2 (Abhi 05.11.2026, option आ): the table after the para is still owned by it (no §4.31 remark error), but the
+        # items belong inline — a WARN for the table
+        ws = [w for w in L.lint_warnings(s) if "4.31" in w]
+        self.assertEqual([w for w in ws if "table after the missing-info para" not in w], [])
+        self.assertEqual(len(ws), 1, ws)
 
     def test_431_quoted_remark_ok(self):
         s = copy.deepcopy(self.s122)

@@ -116,7 +116,7 @@ Both are optional keys of the same spec.json; engine detail: tools/ENGINE_PROMPT
     "पार्श्वभूमी थोडक्यात खालीलप्रमाणे आहे:-" and numbered facts with पृ.N/प.वि.
   - Para 2 / para 3 (INSTRUCTIONS §4.32, Abhi 03.11.2026): para 2 = flowing sentences: "<petitioners> यांनी … दाखल केलेली रिट
     याचिका क्र. __ (पृ.) कृपया पहावी. सदर याचिकेत <R1> यांना प्रतिवादी क्र. 1, <R2> यांना प्रतिवादी क्र. 2, … आणि <Rn> यांना प्रतिवादी
-    क्र. N करण्यात आले आहे (पृ.)." + verification date (no choppy list); story order and linking words for all paras
+    क्र. N करण्यात आले आहे (पृ.)." + verification date (no choppy list); the petition is "रिट याचिका क्र. <N>/<YYYY>" in the Marathi note and letter, never "(लॉजिंग)" (Abhi 05.11.2026; English parawise / affidavit titles unchanged); story order and linking words for all paras
     (§4.32 (ई)); para 3 =
     "सदर याचिकेद्वारे याचिकाकर्त्यांनी पुढीलप्रमाणे प्रमुख मागण्या केल्या आहेत (पृ.N/प.वि.):-" + table अ.क्र. | प्रार्थना | मागणी
     (each prayer in Marathi, petition order); the English prayers verbatim go FIRST in `related`. Respectful plural, Marathi

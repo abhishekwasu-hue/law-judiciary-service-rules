@@ -456,3 +456,12 @@ class OwnerDecisions05Nov(unittest.TestCase):
         s["note"]["paras"][0] += " वित्त विभागाच्या अनौपचारिक संदर्भ क्र. ____ नुसार."
         w = [x for x in L.lint_warnings(s) if x not in base]
         self.assertTrue([x for x in w if "blank U.O. reference no." in x], w)
+
+    def test_lodging_word_warns(self):
+        """Abhi 05.11.2026: "रिट याचिका क्र. N/YYYY" — no "(लॉजिंग)" in the Marathi note / letter (quotes exempt)."""
+        s = sample("CR131_2026_special-pay_info-letter.json")
+        base = L.lint_warnings(s)
+        s["note"]["paras"][0] += " रिट याचिका (लॉजिंग) क्र. 123/2026 पहावी."
+        self.assertTrue([x for x in L.lint_warnings(s) if x not in base and "लॉजिंग" in x])
+        s["note"]["paras"][0] = sample("CR131_2026_special-pay_info-letter.json")["note"]["paras"][0] + " “WP (L) लॉजिंग”"
+        self.assertFalse([x for x in L.lint_warnings(s) if x not in base and "लॉजिंग" in x])
