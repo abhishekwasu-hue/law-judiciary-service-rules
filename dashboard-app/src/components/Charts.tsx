@@ -125,6 +125,3 @@ export function HomeCharts({ catData, stageData, monthly, byOffice, avgDays, onC
 }
 
 /** Days spent in each stage of one case (ब्रीफिंग tab). */
-export function StageDaysChart({ days }: { days: { stage: string; days: number }[] }) {
-  return <HBar data={days} nameKey="stage" dataKey="days" fill={TONE_HEX.navy} unit={v => [`${v} दिवस`, '']} />;
-}

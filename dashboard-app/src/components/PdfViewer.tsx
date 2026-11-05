@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { PDFDocumentProxy, PDFPageProxy } from 'pdfjs-dist';
 import { fileBytes, humanError } from '../lib/api';
-import { openPdf } from '../lib/pdf';
+import { openPdf, preparePdf } from '../lib/pdf';
 import { Skeleton } from './ui';
 import { isChunkError, reloadOnceForNewBuild } from './ErrorBoundary';
 
@@ -135,8 +135,12 @@ export default function PdfViewer({ fileId, url, jumpTo }: { fileId?: number; ur
     setErr('');
     (async () => {
       try {
-        const data = fileId != null ? (await fileBytes(fileId)).data : await (await fetch(url!)).arrayBuffer();
-        d = await openPdf(data);
+        // P7: pdf.js and its worker load while the file downloads (they used to wait for each other)
+        const [bytes] = await Promise.all([
+          fileId != null ? fileBytes(fileId).then(x => x.data) : fetch(url!).then(r => r.arrayBuffer()),
+          preparePdf(),
+        ]);
+        d = await openPdf(bytes);
         if (!alive) return void d.destroy();
         setDoc(d);
         const o = await resolveOutline(d);

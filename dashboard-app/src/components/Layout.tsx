@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth, useCanWrite } from '../lib/auth';
 import CommandPalette, { type PaletteMode } from './CommandPalette';
-import { useData } from '../lib/data';
+import { useData, useLatestRuns } from '../lib/data';
 import { isStale, isWaiting } from '../lib/constants';
 import { crLabel } from '../lib/format';
 import type { Run } from '../lib/types';
@@ -14,7 +14,7 @@ import ErrorBoundary from './ErrorBoundary';
 
 /** Runs still processing (queued or running, not stale). */
 export function useActiveRuns(): Run[] {
-  const { latestRuns } = useData();
+  const latestRuns = useLatestRuns();
   return [...latestRuns.values()].filter(r => (r.state === 'queued' || r.state === 'running') && !isStale(r));
 }
 
@@ -25,13 +25,42 @@ export function activeRunsText(active: Run[]): string {
   return [r ? `${r} प्रक्रिया चालू` : '', w ? `${w} प्रतीक्षेत` : ''].filter(Boolean).join(', ');
 }
 
+// U9: cases whose run the current page already shows in its own status card (नवीन प्रस्ताव: one proposal or the bulk boxes)
+// are left out of the global bar, so the same run is not shown twice on that page.
+let shownHere: ReadonlySet<number> = new Set();
+const shownBy = new Map<symbol, number[]>(); // one entry per mounted page part that shows runs itself
+const shownSubs = new Set<() => void>();
+const publishShown = () => {
+  shownHere = new Set([...shownBy.values()].flat());
+  shownSubs.forEach(f => f());
+};
+const subscribeShown = (f: () => void) => {
+  shownSubs.add(f);
+  return () => void shownSubs.delete(f);
+};
+/** A page part shows these cases' runs itself (while mounted). */
+export function useRunsShownHere(caseIds: (number | null | undefined)[]) {
+  const key = caseIds.filter((x): x is number => typeof x === 'number').sort((a, b) => a - b).join(',');
+  const me = useRef(Symbol('runs-shown'));
+  useEffect(() => {
+    const k = me.current;
+    shownBy.set(k, key ? key.split(',').map(Number) : []);
+    publishShown();
+    return () => {
+      shownBy.delete(k);
+      publishShown();
+    };
+  }, [key]);
+}
+
 /** Global bar: runs still processing, each a link to its case (Abhi 01.11.2026 — progress must not "disappear" when he
  *  leaves the page). Not shown on the मुख्य पृष्ठ, whose प्रतीक्षा-यादी card lists the same runs with their times (UI audit
  *  S3: the same runs were shown twice there); the प्रकरणे page keeps this bar and has no card. On /nasti the नस्ती bar shows
  *  them (dot on the phone, a short link on desktop) — above the full-height frame this bar overlapped / pushed it. */
 function ActiveRunsBar({ className = '' }: { className?: string }) {
   const { cases } = useData();
-  const active = useActiveRuns();
+  const hidden = useSyncExternalStore(subscribeShown, () => shownHere);
+  const active = useActiveRuns().filter(r => !hidden.has(r.case_id));
   if (!active.length) return null;
   return (
     <div className={`no-print mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-blue-900 dark:border-blue-900 dark:bg-blue-900/30 dark:text-blue-100 ${className}`} role="status">
@@ -42,7 +71,7 @@ function ActiveRunsBar({ className = '' }: { className?: string }) {
         {active.map(r => {
           const c = cases.find(x => x.id === r.case_id);
           return (
-            <NavLink key={r.id} to={`/cases/${r.case_id}`} className="shrink-0 whitespace-nowrap rounded-md bg-white px-2.5 py-1 text-sm font-semibold text-blue-800 underline-offset-2 hover:underline dark:bg-navy-800 dark:text-blue-200">
+            <NavLink key={r.id} to={`/cases/${r.case_id}`} className="inline-flex min-h-tap shrink-0 items-center whitespace-nowrap rounded-md bg-white px-2.5 py-1 text-sm font-semibold text-blue-800 underline-offset-2 hover:underline dark:bg-navy-800 dark:text-blue-200">
               {c ? crLabel(c) : `प्रकरण क्र. ${r.case_id}`} → उघडा
             </NavLink>
           );
@@ -263,7 +292,7 @@ export default function Layout() {
         <div className="mt-auto space-y-2 text-sm">
           <button className="btn-ghost w-full justify-between" onClick={() => setPalette('cases')} title="Ctrl + K">
             <span><span aria-hidden="true">🔎</span> प्रकरण शोध</span>
-            <span className="text-xs font-normal text-slate-400">Ctrl K</span>
+            <span className="text-xs font-normal text-slate-500 dark:text-slate-400">Ctrl K</span>
           </button>
           <button className="btn-ghost w-full justify-start" onClick={() => setPick(true)}>
             <span aria-hidden="true">✏️</span> मसुद्यात सुधारणा

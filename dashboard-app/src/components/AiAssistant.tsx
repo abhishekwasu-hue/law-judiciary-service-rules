@@ -85,7 +85,7 @@ export default function AiAssistant() {
         // bottom padding while it is shown, and toasts sit above it (index.css .ai-fab-on)
         <button type="button" onClick={() => setOpen(true)} aria-label="AI सहाय्यक — प्रस्तावात बदल" title="AI सहाय्यक — प्रस्तावात बदल"
           className="ai-fab no-print fixed bottom-[calc(4.25rem+env(safe-area-inset-bottom))] right-3 z-40 flex h-14 w-14 items-center justify-center rounded-full text-white sm:h-auto sm:w-auto sm:justify-start sm:gap-2 sm:py-2 sm:pl-2 sm:pr-4 md:bottom-6 md:right-6">
-          <span className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-lg font-black text-orange-600 shadow sm:h-12 sm:w-12">AI</span>
+          <span className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-lg font-black text-orange-700 shadow sm:h-12 sm:w-12">AI</span>
           <span className="hidden text-left leading-tight sm:block"><b className="block text-base">AI सहाय्यक</b><span className="text-xs text-white/90">प्रस्तावात बदल हवा?</span></span>
         </button>
       )}
@@ -93,7 +93,7 @@ export default function AiAssistant() {
         <div className="fixed inset-0 z-50 flex justify-end bg-black/30 md:items-end md:p-6" role="dialog" aria-modal="true" aria-label="AI सहाय्यक" onClick={() => setOpen(false)}>
           <div className="flex h-full w-full flex-col overflow-hidden bg-slate-50 shadow-2xl dark:bg-navy-950 md:h-[min(85vh,760px)] md:w-[440px] md:rounded-2xl" onClick={e => e.stopPropagation()}>
             <div className="edit-head flex items-center gap-3 px-4 py-3">
-              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-base font-black text-orange-600">AI</span>
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-base font-black text-orange-700">AI</span>
               <div className="min-w-0 flex-1">
                 <div className="text-lg font-bold">AI सहाय्यक</div>
                 <div className="text-sm text-white/90">टिप्पणी किंवा मसुद्यातील बदलासाठी</div>

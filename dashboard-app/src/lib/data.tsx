@@ -1,15 +1,46 @@
 // Shared case + letter store for list, फलक (Kanban), Home and the command palette. Reads go straight to Supabase (RLS).
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { sb } from './supabase';
 import { api, humanError } from './api';
 import { useAuth, useCanWrite } from './auth';
 import type { Case, Letter, Run } from './types';
 import { isEditRun } from './constants';
 import { addDaysISO, crLabel, ownerDetail, setViewerIsOwner, todayISO } from './format';
+import { isMissingColumn, latestRunPerCase, RUN_LIST_COLUMNS } from './perf';
 import { useToast } from '../components/Toast';
 
+type Res<T> = { data: T[] | null; error: { message: string; code?: string } | null };
+type Reads = [Res<Case>, Res<Letter>, Res<Run>];
+
+// P4: the runs list reads only the columns the shared store uses. An old DB without one of them (migrations 0007 / 0011 /
+// 0013 not applied) answers "column does not exist" → that read is repeated with '*' and '*' is kept for this app load.
+let runCols = RUN_LIST_COLUMNS;
+async function readRuns(): Promise<Res<Run>> {
+  const q = (cols: string) => sb().from('runs').select(cols).order('created_at', { ascending: false }).limit(500);
+  let r = (await q(runCols)) as unknown as Res<Run>;
+  if (r.error && runCols !== '*' && isMissingColumn(r.error)) {
+    runCols = '*';
+    r = (await q('*')) as unknown as Res<Run>;
+  }
+  return r;
+}
+const readAll = (): Promise<Reads> =>
+  Promise.all([
+    sb().from('cases').select('*').order('created_at', { ascending: false }) as unknown as Promise<Res<Case>>,
+    sb().from('letters').select('*').order('created_at', { ascending: false }) as unknown as Promise<Res<Letter>>,
+    readRuns(),
+  ]);
+
+// P2: started by AuthProvider as soon as a stored session exists, in parallel with GET /api/me (before: me → page → data).
+// The first DataProvider read takes it once; RLS decides what a non-member gets (nothing), and that result is then unused.
+let early: Promise<Reads> | null = null;
+export function prefetchData() {
+  const p = readAll();
+  early = p;
+  p.catch(() => { if (early === p) early = null; });
+}
+
 interface DataState {
-  latestRuns: Map<number, Run>;
   cases: Case[];
   letters: Letter[];
   loading: boolean;
@@ -21,6 +52,9 @@ interface DataState {
   setCaseLetters: (caseId: number, rows: Letter[]) => void;
 }
 const Ctx = createContext<DataState>(null as unknown as DataState);
+// P6: the latest runs live in their own context, so a Realtime run update (progress step) re-renders only the run views
+// (list badges, प्रतीक्षा-यादी, global bar), not every page that reads the cases.
+const RunsCtx = createContext<Map<number, Run>>(new Map());
 
 export function DataProvider({ children }: { children: ReactNode }) {
   // the viewer's role for helpers called without `isOwner` (humanError, cleanReason …): set during render, before children
@@ -43,11 +77,9 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const fetchAll = useCallback(async () => {
     // A failed read keeps the previous data and reports the error (never shown as "no cases").
     try {
-      const [c, l, r] = await Promise.all([
-        sb().from('cases').select('*').order('created_at', { ascending: false }),
-        sb().from('letters').select('*').order('created_at', { ascending: false }),
-        sb().from('runs').select('*').order('created_at', { ascending: false }).limit(500),
-      ]);
+      const pre = early;
+      early = null;
+      const [c, l, r] = await (pre ? pre.catch(() => readAll()) : readAll());
       // staff: which lists could not be read + the Marathi reason; the owner also gets the raw Supabase text (X2)
       const failed = ([['प्रकरणे', c.error], ['पत्रे', l.error], ['प्रक्रिया', r.error]] as const).filter(([, e]) => e);
       setError(
@@ -59,13 +91,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
       if (!c.error) setCases((c.data as Case[]) || []);
       if (!l.error) setLetters((l.data as Letter[]) || []);
       if (!r.error) {
-        const m = new Map<number, Run>();
-        for (const x of (r.data as Run[]) || []) {
-          // सुधारणा-चॅट runs never stand for the case's processing state (list badges, queue, global bar)
-          if (!isEditRun(x) && !m.has(x.case_id)) m.set(x.case_id, x);
-          runState.current.set(x.id, x.state);
-        }
-        setLatestRuns(m);
+        const rows = (r.data as Run[]) || [];
+        for (const x of rows) runState.current.set(x.id, x.state);
+        // सुधारणा-चॅट runs never stand for the case's processing state (list badges, queue, global bar)
+        setLatestRuns(latestRunPerCase(rows));
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -183,9 +212,19 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  return <Ctx.Provider value={{ cases, letters, latestRuns, loading, error, refresh, setStage, patchLocal, setCaseLetters }}>{children}</Ctx.Provider>;
+  const value = useMemo(
+    () => ({ cases, letters, loading, error, refresh, setStage, patchLocal, setCaseLetters }),
+    [cases, letters, loading, error, refresh, setStage, patchLocal, setCaseLetters],
+  );
+  return (
+    <Ctx.Provider value={value}>
+      <RunsCtx.Provider value={latestRuns}>{children}</RunsCtx.Provider>
+    </Ctx.Provider>
+  );
 }
 export const useData = () => useContext(Ctx);
+/** Latest (non-edit) run of every case, live via Realtime. */
+export const useLatestRuns = () => useContext(RunsCtx);
 
 /** Letter awaiting reply: sent, no reply received. */
 export const isPendingLetter = (l: Letter) => !!l.sent_date && !l.reply_received_date && l.status !== 'उत्तर प्राप्त';

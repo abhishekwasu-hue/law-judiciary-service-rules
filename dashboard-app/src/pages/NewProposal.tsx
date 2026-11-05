@@ -14,6 +14,7 @@ import type { Case, Run } from '../lib/types';
 import { Field, Progress, Section, Spinner } from '../components/ui';
 import { useToast } from '../components/Toast';
 import RunProgress, { useRuns } from '../components/RunProgress';
+import { useRunsShownHere } from '../components/Layout';
 import DraftPicker, { CompactDraftPicker } from '../components/DraftPicker';
 import BulkUpload, { BULK_MAX, startText, userError } from '../components/BulkUpload';
 
@@ -93,6 +94,7 @@ export default function NewProposal() {
   const [pendingRun, setPendingRun] = useState<number | null>(null); // run dispatched; its Realtime row may not be here yet
   const runs = useRuns(created?.id ?? null);
   const run: Run | undefined = created ? runs?.[0] : undefined; // ignore the previous case after reset
+  useRunsShownHere([created?.id]); // U9: the status card shows this run — not again in the global bar
   const statusRef = useRef<HTMLDivElement>(null);
   const dupRef = useRef<HTMLDivElement>(null);
   const yearRef = useRef<HTMLInputElement>(null);

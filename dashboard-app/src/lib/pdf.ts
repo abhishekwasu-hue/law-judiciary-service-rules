@@ -14,10 +14,39 @@ export function pdfjs() {
   return lib;
 }
 
-export async function openPdf(data: ArrayBuffer): Promise<PDFDocumentProxy> {
-  const m = await pdfjs();
-  return m.getDocument({ data: new Uint8Array(data) }).promise;
+// P7: one pdf.js worker for the whole app, started early (warmPdf / preparePdf) so the PDF does not wait for the 1.4 MB worker
+// file: pdf.js starts its own download of a URL only after its worker is up, so the file is fetched by us, in parallel.
+// Measured (mock, Fast 3G, 4x CPU, 1.1 MB package): URL + Range loading 21.7 s, bytes after worker 17.4 s, bytes in parallel
+// with the worker: see docs/AUDIT_2026-11-05.md. A document's destroy() does not end a worker passed in like this.
+let worker: Promise<import('pdfjs-dist').PDFWorker | undefined> | null = null;
+function sharedWorker() {
+  if (!worker) {
+    worker = pdfjs().then(m => {
+      try {
+        return new m.PDFWorker();
+      } catch {
+        return undefined; // pdf.js then makes its own worker per document, as before
+      }
+    });
+    worker.catch(() => { worker = null; });
+  }
+  return worker;
 }
+/** Case page opened: load pdf.js and start its worker when the browser is idle (no visible cost). */
+export function warmPdf() {
+  const w = window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number };
+  const go = () => void sharedWorker().catch(() => undefined);
+  if (w.requestIdleCallback) w.requestIdleCallback(go, { timeout: 5000 });
+  else setTimeout(go, 2000);
+}
+
+export async function openPdf(data: ArrayBuffer): Promise<PDFDocumentProxy> {
+  const [m, w] = await Promise.all([pdfjs(), sharedWorker()]);
+  return m.getDocument({ data: new Uint8Array(data), worker: w }).promise;
+}
+
+/** P7: start pdf.js + its worker now (the PDF tab calls this before it downloads the file, so both load at the same time). */
+export const preparePdf = () => sharedWorker().then(() => undefined);
 
 /** Subject line from page 1's text layer ("विषय :- …"), if the PDF has one. Scanned PDFs return ''. */
 export async function guessSubject(file: File): Promise<string> {

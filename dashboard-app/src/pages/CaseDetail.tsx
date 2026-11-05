@@ -11,6 +11,8 @@ import { Chip, Empty, Field, Modal, Skeleton, Spinner } from '../components/ui';
 import { useToast } from '../components/Toast';
 import { useRuns } from '../components/RunProgress';
 import NastiLink from '../components/NastiLink';
+import { warmPdf } from '../lib/pdf';
+import { pointsToCheck } from '../lib/perf';
 import { BriefingTab, DownloadStrip, HistoryTab, LettersTab, NoteTab, PackageTab, StudyTab } from './CaseTabs';
 
 // `short`: phone labels (3 x 2 grid, all six visible — UI audit C3)
@@ -66,6 +68,8 @@ export default function CaseDetail() {
   const runs = useMemo(() => (allRuns ? allRuns.filter(r => !isEditRun(r)) : null), [allRuns]);
   const editRuns = useMemo(() => (allRuns ? allRuns.filter(isEditRun) : null), [allRuns]);
   const [hasSpec, setHasSpec] = useState(false);
+  // P7: the PDF tab's pdf.js + worker start loading when the browser is idle after the case page opened
+  useEffect(() => warmPdf(), []);
 
   const c = cases.find(x => x.id === id) ?? single ?? null;
   // the case currently shown: responses that arrive for an earlier id are dropped
@@ -289,7 +293,7 @@ export default function CaseDetail() {
             <p className={`mt-1 text-lg ${c.subject ? '' : 'text-slate-600 dark:text-slate-300'}`}>{caseSubject(c, lastDone?.summary)}</p>
             {nWarn > 0 && (
               <Link to="?tab=study" className="no-print mt-1 inline-flex min-h-tap max-w-full items-center underline-offset-2 hover:underline">
-                <span className="chip bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-100">⚠ वापरण्यापूर्वी {nWarn} मुद्दे तपासावेत (अभ्यास-फाइल, भाग 7)</span>
+                <span className="chip bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-100">⚠ वापरण्यापूर्वी {pointsToCheck(nWarn)} (अभ्यास-फाइल, भाग 7)</span>
               </Link>
             )}
           </div>

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { ApiError, api, downloadFile, humanError, runStartText, uploadFile, type RunStart } from '../lib/api';
 import { ACTION_LABEL, DRAFT_KEYS, EXTRA_OUTPUT_KINDS, FIELD_LABEL, FILE_KIND_LABEL, INPUT_KINDS, INPUT_KIND_LABEL, LETTER_STATUSES, RUN_STATE_LABEL, TONE_HEX, draftsText, editTargetLabel, runActive, runTone, type DraftKey, type InputKind } from '../lib/constants';
 import { sameDrafts, suggestDrafts } from '../lib/drafts';
@@ -7,8 +7,9 @@ import { useAuth } from '../lib/auth';
 import EditChat from '../components/EditChat';
 import { asArray, cleanReason as cleanReasonLib, daysBetween, fmtDate, fmtDateTime, isCriticalWarning, textOf, todayISO } from '../lib/format';
 import { diffLines, type DiffLine } from '../lib/diff';
+import { barPercents } from '../lib/perf';
 import type { Activity, CaseFile, Letter, Run } from '../lib/types';
-import { Chip, Empty, Field, Modal, Section, Skeleton, SkeletonRows, Spinner } from '../components/ui';
+import { Chip, Empty, Field, Modal, Section, SkeletonRows, Spinner } from '../components/ui';
 import { useToast } from '../components/Toast';
 import RunProgress, { OwnerRunLines, RunCost } from '../components/RunProgress';
 import PdfViewer from '../components/PdfViewer';
@@ -16,7 +17,23 @@ import DocxView, { docxParagraphs } from '../components/DocxView';
 import type { CaseCtx } from './CaseDetail';
 
 // Recharts loads only with this chart (not with the case page).
-const StageDaysChart = lazy(() => import('../components/Charts').then(m => ({ default: m.StageDaysChart })));
+/** P3: the case page's one small chart as plain bars (the Recharts file, 112 KB gz, is no longer loaded for it). */
+function StageDaysBars({ days }: { days: { stage: string; days: number }[] }) {
+  const pct = barPercents(days.map(d => d.days));
+  return (
+    <ul className="space-y-2" aria-label="टप्पानिहाय दिवस">
+      {days.map((d, i) => (
+        <li key={d.stage} className="grid grid-cols-[minmax(0,9rem)_1fr] items-center gap-2 sm:grid-cols-[minmax(0,14rem)_1fr]">
+          <span className="text-sm leading-tight text-slate-700 dark:text-slate-200">{d.stage}</span>
+          <span className="flex min-w-0 items-center gap-2">
+            <span className="h-5 rounded-r bg-navy-500 dark:bg-navy-300" style={{ width: `${pct[i]}%` }} aria-hidden="true" />
+            <span className="shrink-0 text-sm font-semibold">{d.days} दिवस</span>
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
 
 // newest upload first (created_at): `version` counts per original_name, so a corrected file under a new name is v1 (A3 audit;
 // the engine also takes the newest proposal by created_at)
@@ -299,9 +316,7 @@ export function BriefingTab({ ctx }: { ctx: CaseCtx }) {
                 टप्पानिहाय दिवस (या प्रकरणाचे) <span aria-hidden="true" className="group-open:rotate-180">▼</span>
               </summary>
               <div className="border-t border-slate-200 p-4 dark:border-navy-800">
-                <Suspense fallback={<Skeleton className="h-40 w-full" />}>
-                  <StageDaysChart days={days} />
-                </Suspense>
+                <StageDaysBars days={days} />
               </div>
             </details>
           )}

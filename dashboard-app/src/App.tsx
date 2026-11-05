@@ -1,4 +1,4 @@
-import { lazy, Suspense, type ComponentType } from 'react';
+import { lazy, Suspense, useEffect, type ComponentType } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider, useAuth } from './lib/auth';
 import { DataProvider } from './lib/data';
@@ -9,6 +9,7 @@ import { Skeleton, Spinner } from './components/ui';
 import Setup from './pages/Setup';
 import Login, { NotMember } from './pages/Login';
 import { isChunkError, reloadOnceForNewBuild } from './components/ErrorBoundary';
+import { routeChunk } from './lib/perf';
 
 /** lazy() that survives a redeploy: a failed page-file load reloads the page once (guarded per build, no loop). */
 function lazyRetry<T extends ComponentType<object>>(load: () => Promise<{ default: T }>) {
@@ -20,10 +21,31 @@ function lazyRetry<T extends ComponentType<object>>(load: () => Promise<{ defaul
   );
 }
 
-const Home = lazyRetry(() => import('./pages/Home'));
+// P2: the three most-used pages. The one the address needs starts loading with the app (in parallel with config, login and
+// /api/me — it used to wait for them); the other two are fetched when the browser is idle after the first page is shown.
+const loadHome = () => import('./pages/Home');
+const loadCases = () => import('./pages/Cases');
+const loadCaseDetail = () => import('./pages/CaseDetail');
+const PAGE_LOADERS = { home: loadHome, cases: loadCases, case: loadCaseDetail } as const;
+const first = typeof location !== 'undefined' ? routeChunk(location.pathname) : null;
+if (first) void PAGE_LOADERS[first]().catch(() => undefined); // a failure is retried (and reported) by lazyRetry
+let warmed = false;
+/** After the first page has painted: fetch the other main page files into the cache (no execution cost until opened). */
+function warmPages() {
+  if (warmed) return;
+  warmed = true;
+  const go = () => {
+    for (const [k, load] of Object.entries(PAGE_LOADERS)) if (k !== first) void load().catch(() => undefined);
+  };
+  const w = window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number };
+  if (w.requestIdleCallback) w.requestIdleCallback(go, { timeout: 4000 });
+  else setTimeout(go, 1500);
+}
+
+const Home = lazyRetry(loadHome);
 const NewProposal = lazyRetry(() => import('./pages/NewProposal'));
-const Cases = lazyRetry(() => import('./pages/Cases'));
-const CaseDetail = lazyRetry(() => import('./pages/CaseDetail'));
+const Cases = lazyRetry(loadCases);
+const CaseDetail = lazyRetry(loadCaseDetail);
 const GrLibrary = lazyRetry(() => import('./pages/GrLibrary'));
 const RegisterSearch = lazyRetry(() => import('./pages/RegisterSearch'));
 const Settings = lazyRetry(() => import('./pages/Settings'));
@@ -61,6 +83,15 @@ function Gate() {
   if (phase === 'setup') return <Setup />;
   if (phase === 'login') return <Login />;
   if (phase === 'not_member') return <NotMember />;
+  return <Ready />;
+}
+
+function Ready() {
+  useEffect(() => {
+    // two frames after the first app paint: the page is on screen, the network is free for the other page files
+    const id = requestAnimationFrame(() => requestAnimationFrame(warmPages));
+    return () => cancelAnimationFrame(id);
+  }, []);
   return (
     <DataProvider>
       <BrowserRouter>

@@ -2,7 +2,21 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import type { Session } from '@supabase/supabase-js';
 import { api, ApiError, humanError } from './api';
 import { initSupabase, sb } from './supabase';
+import { parseInlineConfig, type PublicConfig } from './perf';
+import { prefetchData } from './data';
 import type { Me } from './types';
+
+/** P2: the Worker inlines GET /api/public-config into index.html (#pk-config) → no round trip before login; without it
+ *  (dev server, older Worker) the endpoint is called as before. Used once: "पुन्हा प्रयत्न करा" asks the server again. */
+let inlineUsed = false;
+async function publicConfig(): Promise<PublicConfig> {
+  if (!inlineUsed) {
+    inlineUsed = true;
+    const c = parseInlineConfig(typeof document !== 'undefined' ? document.getElementById('pk-config')?.textContent : null);
+    if (c) return c;
+  }
+  return api<PublicConfig>('/api/public-config');
+}
 
 export type Phase = 'loading' | 'error' | 'setup' | 'login' | 'not_member' | 'ready';
 interface AuthState {
@@ -31,7 +45,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     (async () => {
       setPhase('loading');
       try {
-        const cfg = await api<{ configured: boolean; supabase_url: string; supabase_anon_key: string }>('/api/public-config');
+        const cfg = await publicConfig();
         if (!alive) return;
         if (!cfg.configured) {
           setPhase('setup');
@@ -49,6 +63,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             return;
           }
           try {
+            // P2: the first data reads start now, alongside /api/me (they used to wait for it)
+            prefetchData();
             // /api/me also makes the owner email a member on its first sign-in (worker currentUser()).
             const m = await api<Me>('/api/me');
             if (!alive) return;

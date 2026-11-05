@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { useData, overdueIds } from '../lib/data';
+import { useData, useLatestRuns, overdueIds } from '../lib/data';
 import { useCanWrite } from '../lib/auth';
 import { CATEGORIES, STAGES, WORK_TYPES, stageTone, workTypeLabel, workTypeOf } from '../lib/constants';
 import WorkTypeChips from '../components/WorkTypeChips';
@@ -10,6 +10,7 @@ import { humanError } from '../lib/api';
 import type { Case, Run } from '../lib/types';
 import { Chip, Empty, SkeletonRows } from '../components/ui';
 import { useToast } from '../components/Toast';
+import { PAGE_STEP, pageRows } from '../lib/perf';
 
 // short stage words for the table chips (UI audit S20: long chips wrapped into round blobs); the full stage is the tooltip
 const STAGE_SHORT: Record<string, string> = { 'पत्र पाठवले (माहिती प्रतीक्षेत)': 'माहिती प्रतीक्षेत', 'वित्त/सा.प्र.वि. कडे': 'वित्त/सा.प्र.वि.' };
@@ -17,6 +18,54 @@ function StageChip({ stage }: { stage: string }) {
   return <span className="whitespace-nowrap"><Chip tone={stageTone(stage)} title={stage}>{STAGE_SHORT[stage] || stage}</Chip></span>;
 }
 const Urgent = () => <span className="chip ml-1.5 bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-100">तातडीचे</span>;
+
+const workShort = (c: Case) => WORK_TYPES.find(w => w.id === workTypeOf(c))?.short;
+const subjectOf = (c: Case, run: Run | undefined) => c.subject || <span className="text-slate-500 dark:text-slate-400">{run?.summary || 'विषय PDF वरून येईल'}</span>;
+
+/** P5/P6: one list row; memo → a Realtime update of one case / run re-renders that row only. */
+const TableRow = memo(function TableRow({ c, run, late, open }: { c: Case; run: Run | undefined; late: boolean; open: (id: number) => void }) {
+  return (
+    <tr className="cursor-pointer border-b border-slate-100 hover:bg-slate-50 dark:border-navy-800/60 dark:hover:bg-navy-800/50" onClick={() => open(c.id)}>
+      <td className="td whitespace-nowrap font-semibold"><Link to={`/cases/${c.id}`} onClick={e => e.stopPropagation()} className="inline-flex min-h-tap items-center underline-offset-2 hover:underline">{crLabel(c)}</Link>{c.priority === 'तातडीचे' && <div><Urgent /></div>}</td>
+      <td className="td whitespace-nowrap"><RunStateBadge run={run} /></td>
+      <td className="td min-w-[18rem]"><div className="line-clamp-2">{subjectOf(c, run)}</div></td>
+      <td className="td whitespace-nowrap">{c.category}<div className="text-xs text-slate-500 dark:text-slate-400">{workShort(c)}</div></td>
+      <td className="td max-w-[14rem]"><div className="line-clamp-2 text-sm" title={c.office || undefined}>{c.office || '—'}</div></td>
+      <td className="td"><StageChip stage={c.stage} /></td>
+      <td className="td whitespace-nowrap">{late ? <Chip tone="red">मुदत संपली</Chip> : fmtDate(c.due_date)}</td>
+    </tr>
+  );
+});
+const CardRow = memo(function CardRow({ c, run, late }: { c: Case; run: Run | undefined; late: boolean }) {
+  return (
+    <li>
+      <Link to={`/cases/${c.id}`} className="card block p-3">
+        <div className="flex items-center justify-between gap-2">
+          <span className="font-bold">{crLabel(c)}{c.priority === 'तातडीचे' && <Urgent />}</span>
+          {late ? <Chip tone="red">मुदत संपली</Chip> : <span className="truncate text-sm text-slate-500 dark:text-slate-400">{workShort(c)} • {c.category}</span>}
+        </div>
+        <div className="mt-1 line-clamp-2">{subjectOf(c, run)}</div>
+        <dl className="mt-2 grid grid-cols-[auto_1fr] items-center gap-x-2 gap-y-1 text-sm">
+          <dt className="text-slate-500 dark:text-slate-400">नस्तीचा टप्पा</dt><dd><StageChip stage={c.stage} /></dd>
+          {run && <><dt className="text-slate-500 dark:text-slate-400">मसुदे</dt><dd><RunStateBadge run={run} /></dd></>}
+        </dl>
+      </Link>
+    </li>
+  );
+});
+
+/** md and up: the table; phone: the cards. Only one of the two is rendered (both were in the page, one hidden by CSS). */
+function useWide(): boolean {
+  const q = '(min-width: 768px)';
+  const [wide, setWide] = useState(() => typeof window !== 'undefined' && window.matchMedia(q).matches);
+  useEffect(() => {
+    const m = window.matchMedia(q);
+    const on = () => setWide(m.matches);
+    m.addEventListener('change', on);
+    return () => m.removeEventListener('change', on);
+  }, []);
+  return wide;
+}
 
 /** Stage changed from the टप्पेनिहाय board: shown 8 s with "पूर्ववत" (UI audit S18: the change was immediate, no undo). */
 interface Undo { id: number; label: string; from: string; to: string }
@@ -40,7 +89,8 @@ function exportCsv(rows: Case[], overdue: Set<number>) {
 }
 
 export default function Cases() {
-  const { cases, letters, loading, error, setStage, latestRuns } = useData();
+  const { cases, letters, loading, error, setStage } = useData();
+  const latestRuns = useLatestRuns();
   const canWrite = useCanWrite();
   const toast = useToast();
   const nav = useNavigate();
@@ -51,6 +101,10 @@ export default function Cases() {
   const [filtersOpen, setFiltersOpen] = useState(false); // phone only: the selects fold behind "फिल्टर (n)" (UI audit S4)
   const [undo, setUndo] = useState<Undo | null>(null);
   const undoTimer = useRef<number>();
+  const wide = useWide();
+  const open = useCallback((id: number) => nav(`/cases/${id}`), [nav]);
+  // P5: the list shows PAGE_STEP rows, "अधिक दाखवा (N)" adds the next; search / filters still run over every case
+  const [shown, setShown] = useState(PAGE_STEP);
 
   useEffect(() => {
     if (sp.get('focus')) {
@@ -83,6 +137,14 @@ export default function Cases() {
       return true;
     });
   }, [cases, sp, overdue]);
+  const filterKey = FILTER_KEYS.map(k => sp.get(k) || '').join('|');
+  useEffect(() => setShown(PAGE_STEP), [filterKey]);
+  const page = useMemo(() => pageRows(rows, shown), [rows, shown]);
+  const moreBtn = page.more > 0 && (
+    <button type="button" className="btn-ghost w-full" onClick={() => setShown(n => n + PAGE_STEP)}>
+      अधिक दाखवा ({page.more})
+    </button>
+  );
 
   // every filter incl. the search text (UI audit S19: a text-only search had no one-tap way back)
   const active = FILTER_KEYS.filter(k => sp.get(k));
@@ -175,45 +237,25 @@ export default function Cases() {
         <div className="card"><Empty icon="🔍" title="जुळणारे प्रकरण नाही" hint="कृपया शोध किंवा फिल्टर बदलावा."><button className="btn-primary" onClick={clearAll}>सर्व फिल्टर काढा</button></Empty></div>
       ) : view === 'table' ? (
         <>
-          <div className="card hidden overflow-x-auto md:block">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-slate-200 dark:border-navy-800">
-                  <th className="th">C R</th><th className="th">मसुदे</th><th className="th">विषय</th><th className="th">प्रवर्ग</th><th className="th">कार्यालय</th><th className="th">नस्तीचा टप्पा</th><th className="th">मुदत</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map(c => (
-                  <tr key={c.id} className="cursor-pointer border-b border-slate-100 hover:bg-slate-50 dark:border-navy-800/60 dark:hover:bg-navy-800/50" onClick={() => nav(`/cases/${c.id}`)}>
-                    <td className="td whitespace-nowrap font-semibold"><Link to={`/cases/${c.id}`} onClick={e => e.stopPropagation()} className="underline-offset-2 hover:underline">{crLabel(c)}</Link>{c.priority === 'तातडीचे' && <div><Urgent /></div>}</td>
-                    <td className="td whitespace-nowrap"><RunStateBadge run={latestRuns.get(c.id)} /></td>
-                    <td className="td min-w-[18rem]"><div className="line-clamp-2">{c.subject || <span className="text-slate-500 dark:text-slate-400">{latestRuns.get(c.id)?.summary || 'विषय PDF वरून येईल'}</span>}</div></td>
-                    <td className="td whitespace-nowrap">{c.category}<div className="text-xs text-slate-500 dark:text-slate-400">{WORK_TYPES.find(w => w.id === workTypeOf(c))?.short}</div></td>
-                    <td className="td max-w-[14rem]"><div className="line-clamp-2 text-sm" title={c.office || undefined}>{c.office || '—'}</div></td>
-                    <td className="td"><StageChip stage={c.stage} /></td>
-                    <td className="td whitespace-nowrap">{overdue.has(c.id) ? <Chip tone="red">मुदत संपली</Chip> : fmtDate(c.due_date)}</td>
+          {wide ? (
+            <div className="card overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-slate-200 dark:border-navy-800">
+                    <th className="th">C R</th><th className="th">मसुदे</th><th className="th">विषय</th><th className="th">प्रवर्ग</th><th className="th">कार्यालय</th><th className="th">नस्तीचा टप्पा</th><th className="th">मुदत</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <ul className="space-y-2 md:hidden">
-            {rows.map(c => (
-              <li key={c.id}>
-                <Link to={`/cases/${c.id}`} className="card block p-3">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-bold">{crLabel(c)}{c.priority === 'तातडीचे' && <Urgent />}</span>
-                    {overdue.has(c.id) ? <Chip tone="red">मुदत संपली</Chip> : <span className="truncate text-sm text-slate-500 dark:text-slate-400">{WORK_TYPES.find(w => w.id === workTypeOf(c))?.short} • {c.category}</span>}
-                  </div>
-                  <div className="mt-1 line-clamp-2">{c.subject || <span className="text-slate-500 dark:text-slate-400">{latestRuns.get(c.id)?.summary || 'विषय PDF वरून येईल'}</span>}</div>
-                  <dl className="mt-2 grid grid-cols-[auto_1fr] items-center gap-x-2 gap-y-1 text-sm">
-                    <dt className="text-slate-500 dark:text-slate-400">नस्तीचा टप्पा</dt><dd><StageChip stage={c.stage} /></dd>
-                    {latestRuns.get(c.id) && <><dt className="text-slate-500 dark:text-slate-400">मसुदे</dt><dd><RunStateBadge run={latestRuns.get(c.id)} /></dd></>}
-                  </dl>
-                </Link>
-              </li>
-            ))}
-          </ul>
+                </thead>
+                <tbody>
+                  {page.visible.map(c => <TableRow key={c.id} c={c} run={latestRuns.get(c.id)} late={overdue.has(c.id)} open={open} />)}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <ul className="space-y-2">
+              {page.visible.map(c => <CardRow key={c.id} c={c} run={latestRuns.get(c.id)} late={overdue.has(c.id)} />)}
+            </ul>
+          )}
+          {moreBtn}
         </>
       ) : (
         <Kanban rows={rows} overdue={overdue} canWrite={canWrite} onMove={(id, st) => void move(id, st)} runs={latestRuns} />

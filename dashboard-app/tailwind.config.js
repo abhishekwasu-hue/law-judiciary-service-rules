@@ -5,8 +5,9 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Mukta', '"Noto Sans Devanagari"', 'system-ui', 'sans-serif'],
-        head: ['"Noto Sans Devanagari"', 'Mukta', 'system-ui', 'sans-serif'],
+        // P9: only Mukta 400 + 700 is downloaded (index.html); semibold text uses the 700 face, headings use Mukta too
+        sans: ['Mukta', 'system-ui', 'sans-serif'],
+        head: ['Mukta', 'system-ui', 'sans-serif'],
       },
       colors: {
         navy: {

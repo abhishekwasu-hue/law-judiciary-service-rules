@@ -7,6 +7,7 @@ import { dueSoon, isPendingLetter, useData } from '../lib/data';
 import { ACTION_LABEL, CATEGORIES, STAGES, stageTone, type Tone } from '../lib/constants';
 import { crLabel, daysBetween, fmtDateTime, monthLabel, textOf, todayISO } from '../lib/format';
 import type { Activity } from '../lib/types';
+import { ACTIVITY_COLUMNS, TODO_TOP } from '../lib/perf';
 import { Empty, Section, Skeleton, Spinner } from '../components/ui';
 import QueueCard from '../components/QueueCard';
 import WorkTypeChips from '../components/WorkTypeChips';
@@ -54,7 +55,7 @@ function SpendLine({ spend }: { spend: Spend | null | 'err' }) {
   const pct = ok && spend.limit_usd > 0 ? (spend.spent_usd / spend.limit_usd) * 100 : 0;
   const tone: Tone = !ok ? 'slate' : pct >= 100 ? 'red' : pct >= 80 ? 'amber' : 'green';
   return (
-    <Link to="/settings" className="col-span-full inline-flex flex-wrap items-baseline gap-x-2 text-sm text-slate-600 hover:underline dark:text-slate-300" title={ok ? `${spend.runs} प्रक्रिया • ${Math.round(pct)}%` : undefined}>
+    <Link to="/settings" className="col-span-full inline-flex min-h-tap flex-wrap items-center gap-x-2 text-sm text-slate-600 hover:underline dark:text-slate-300" title={ok ? `${spend.runs} प्रक्रिया • ${Math.round(pct)}%` : undefined}>
       <span className="font-semibold">या महिन्याचा खर्च (फक्त मालकांना दिसतो):</span>
       {spend === null ? <Skeleton className="inline-block h-4 w-16" /> : (
         <b className={TONE_TEXT[tone]}>{ok ? `${fmtUsd(spend.spent_usd)} / ${fmtUsd(spend.limit_usd)}${pct >= 100 ? ' • मर्यादा संपली' : ''}` : '—'}</b>
@@ -69,34 +70,67 @@ export default function Home() {
   const [reloading, setReloading] = useState(false);
   const [actTry, setActTry] = useState(0);
   const nav = useNavigate();
+  // P4: two small reads instead of 12 months of every action (read twice before): the last 8 events (हालचाल) and this month's
+  // stage changes (या महिन्यात बंद). The 12-month stage changes for the आलेख are read only when the charts are opened.
   const [acts, setActs] = useState<Activity[] | null>(null);
+  const [monthActs, setMonthActs] = useState<Activity[] | null>(null);
+  const [chartActs, setChartActs] = useState<Activity[] | null>(null);
   const isOwner = useAuth().me?.role === 'owner';
   const [spend, setSpend] = useState<Spend | null | 'err'>(null);
   useEffect(() => {
     if (isOwner) void getSpend().then(setSpend, () => setSpend('err'));
-  }, [isOwner, cases.length]);
+  }, [isOwner, actTry]);
   // charts folded by default on every width (UI audit S23: open, they took ~60 % of the desktop page); one tap opens them
   const [chartsOpen, setChartsOpen] = useState(false);
+  const [allTodo, setAllTodo] = useState(false); // U2: "आज करायचे" shows TODO_TOP rows until "सर्व N पाहा"
 
+  const monthStart = useMemo(() => {
+    const d = new Date();
+    return new Date(d.getFullYear(), d.getMonth(), 1).toISOString();
+  }, []);
+  // read on open, on "पुन्हा प्रयत्न" and when the tab comes back (not on every case-count change any more)
+  const [visTick, setVisTick] = useState(0);
   useEffect(() => {
+    const on = () => document.visibilityState === 'visible' && setVisTick(n => n + 1);
+    document.addEventListener('visibilitychange', on);
+    return () => document.removeEventListener('visibilitychange', on);
+  }, []);
+  useEffect(() => {
+    let alive = true;
+    const fail = (e: unknown) => {
+      if (!alive) return;
+      setActErr(e instanceof Error ? e.message : String(e));
+      setActs(a => a ?? []);
+      setMonthActs(a => a ?? []);
+    };
+    void Promise.all([
+      sb().from('activity').select(ACTIVITY_COLUMNS).order('at', { ascending: false }).limit(8),
+      sb().from('activity').select(ACTIVITY_COLUMNS).eq('action', 'stage_changed').gte('at', monthStart).order('at', { ascending: false }).limit(2000),
+    ]).then(([r, m]) => {
+      if (!alive) return;
+      const e = r.error || m.error;
+      setActErr(e ? e.message : '');
+      if (!r.error) setActs((r.data as unknown as Activity[]) || []);
+      else setActs(a => a ?? []);
+      if (!m.error) setMonthActs((m.data as unknown as Activity[]) || []);
+      else setMonthActs(a => a ?? []);
+    }, fail);
+    return () => { alive = false; };
+  }, [actTry, visTick, monthStart]);
+  useEffect(() => {
+    if (!chartsOpen || chartActs) return;
     const since = new Date();
     since.setMonth(since.getMonth() - 12);
-    void sb().from('activity').select('*').gte('at', since.toISOString()).order('at', { ascending: false }).limit(2000).then(
-      ({ data, error: e }) => {
-        setActErr(e ? e.message : '');
-        if (!e) setActs((data as Activity[]) || []);
-        else setActs(a => a ?? []);
-      },
-      (e: unknown) => {
-        setActErr(String(e));
-        setActs(a => a ?? []);
-      },
+    void sb().from('activity').select(ACTIVITY_COLUMNS).eq('action', 'stage_changed').gte('at', since.toISOString()).order('at', { ascending: false }).limit(5000).then(
+      ({ data, error: e }) => setChartActs(e ? [] : ((data as unknown as Activity[]) || [])),
+      () => setChartActs([]),
     );
-  }, [cases.length, actTry]);
+  }, [chartsOpen, chartActs, actTry]);
   const anyErr = [error, actErr].filter(Boolean).join(' • ');
   async function reloadAll() {
     setReloading(true);
     setActTry(n => n + 1);
+    setChartActs(null);
     await refresh();
     setReloading(false);
   }
@@ -112,11 +146,8 @@ export default function Home() {
   ) : null;
 
   const byId = useMemo(() => new Map(cases.map(c => [c.id, c])), [cases]);
-  const monthStart = useMemo(() => {
-    const d = new Date();
-    return new Date(d.getFullYear(), d.getMonth(), 1).toISOString();
-  }, []);
-  const closedEvents = useMemo(() => (acts || []).filter(a => a.action === 'stage_changed' && a.detail?.to === 'बंद'), [acts]);
+  const isClose = (a: Activity) => a.action === 'stage_changed' && a.detail?.to === 'बंद';
+  const closedEvents = useMemo(() => (chartActs || []).filter(isClose), [chartActs]);
 
   const kpi = useMemo(() => {
     const n = (s: string) => cases.filter(c => c.stage === s).length;
@@ -125,9 +156,9 @@ export default function Home() {
       study: n('अभ्यास चालू'),
       waiting: n('पत्र पाठवले (माहिती प्रतीक्षेत)'),
       finance: n('वित्त/सा.प्र.वि. कडे'),
-      closed: actErr ? ('na' as const) : acts ? new Set(closedEvents.filter(a => a.at >= monthStart).map(a => a.case_id)).size : null,
+      closed: actErr ? ('na' as const) : monthActs ? new Set(monthActs.filter(a => isClose(a) && a.at >= monthStart).map(a => a.case_id)).size : null,
     };
-  }, [cases, acts, actErr, closedEvents, monthStart]);
+  }, [cases, monthActs, actErr, monthStart]);
 
   const today = todayISO();
   const todo = useMemo(() => dueSoon(letters, 7), [letters]);
@@ -170,7 +201,7 @@ export default function Home() {
     // From stage_changed events: time spent in `from` stage = this change − previous change (or case creation).
     const per = new Map<string, number[]>();
     const evByCase = new Map<number, Activity[]>();
-    for (const a of acts || []) if (a.action === 'stage_changed' && a.case_id) (evByCase.get(a.case_id) || evByCase.set(a.case_id, []).get(a.case_id)!).push(a);
+    for (const a of chartActs || []) if (a.action === 'stage_changed' && a.case_id) (evByCase.get(a.case_id) || evByCase.set(a.case_id, []).get(a.case_id)!).push(a);
     for (const [cid, evs] of evByCase) {
       const c = byId.get(cid);
       if (!c) continue;
@@ -186,7 +217,7 @@ export default function Home() {
       const v = per.get(s)!;
       return { name: s, value: Math.round((v.reduce((p, q) => p + q, 0) / v.length) * 10) / 10 };
     });
-  }, [acts, byId]);
+  }, [chartActs, byId]);
   const byOffice = useMemo(() => {
     const m = new Map<string, number>();
     for (const l of letters) if (isPendingLetter(l)) {
@@ -223,12 +254,13 @@ export default function Home() {
       {errCard && <div className="order-first lg:col-span-2">{errCard}</div>}
 
       <div className="order-1 min-w-0 lg:order-4">
-        <Section title="आज करायचे" right={<Link to="/cases?overdue=1" className="text-sm font-semibold text-navy-700 hover:underline dark:text-slate-200">सर्व मुदत संपलेली →</Link>}>
+        <Section title="आज करायचे" right={<Link to="/cases?overdue=1" className="inline-flex min-h-tap items-center text-sm font-semibold text-navy-700 hover:underline dark:text-slate-200">सर्व मुदत संपलेली →</Link>}>
           {error && todoRows.length === 0 ? readErr : todoRows.length === 0 ? (
             <Empty icon="✅" title="आज काही प्रलंबित नाही" hint="मुदत संपलेली किंवा 7 दिवसांत येणारी उत्तरे व प्रकरणे येथे दिसतील." />
           ) : (
+            <>
             <ul className="divide-y divide-slate-100 dark:divide-navy-800">
-              {todoRows.map(r => {
+              {(allTodo ? todoRows : todoRows.slice(0, TODO_TOP)).map(r => {
                 const c = byId.get(r.caseId);
                 const late = r.due < today;
                 const n = Math.abs(daysBetween(r.due, today));
@@ -247,6 +279,12 @@ export default function Home() {
                 );
               })}
             </ul>
+            {todoRows.length > TODO_TOP && (
+              <button type="button" className="btn-ghost mt-2 w-full" aria-expanded={allTodo} onClick={() => setAllTodo(o => !o)}>
+                {allTodo ? 'कमी दाखवा ▲' : `सर्व ${todoRows.length} पाहा ▼`}
+              </button>
+            )}
+            </>
           )}
         </Section>
       </div>
@@ -296,7 +334,8 @@ export default function Home() {
           <span>आलेख</span>
           <span className="text-sm font-normal text-slate-500 dark:text-slate-400">{chartsOpen ? 'लपवा ▲' : 'दाखवा ▼'}</span>
         </summary>
-      {chartsOpen && (
+      {chartsOpen && !chartActs && <div className="mt-4 grid gap-4 lg:grid-cols-2">{[0, 1].map(i => <Skeleton key={i} className="h-72 w-full" />)}</div>}
+      {chartsOpen && chartActs && (
         <Suspense fallback={<div className="mt-4 grid gap-4 lg:grid-cols-2">{[0, 1].map(i => <Skeleton key={i} className="h-72 w-full" />)}</div>}>
           <HomeCharts
             catData={catData}

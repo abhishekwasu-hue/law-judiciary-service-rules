@@ -6,6 +6,7 @@ import { RUN_STATE_LABEL, RUN_STEPS, STALE_REASON, isEditRun, isStale, isWaiting
 import { asArray, cleanReason, cleanStep, criticalWarnings, fmtDateTime, isOwnerOnlyLine, studyWarningTexts, textOf } from '../lib/format';
 import { useAuth } from '../lib/auth';
 import { Chip, Progress, Spinner } from './ui';
+import { studyPointsText } from '../lib/perf';
 
 /** Glossary wording for a run state (प्रक्रिया प्रतीक्षेत / चालू / पूर्ण / अयशस्वी). */
 const STATE_TEXT: Record<string, string> = { queued: 'प्रक्रिया प्रतीक्षेत', running: 'प्रक्रिया चालू', done: 'प्रक्रिया पूर्ण', failed: 'प्रक्रिया अयशस्वी' };
@@ -177,7 +178,7 @@ const MODEL_PREFIX = 'मॉडेल:';
 export function StudyWarningsLine({ run, studyHref, className = '' }: { run: Run | undefined; studyHref?: string; className?: string }) {
   const n = run && run.state === 'done' ? studyWarningTexts(run.warnings).length : 0;
   if (!n) return null;
-  const text = `तपासणीचे ${n} मुद्दे अभ्यास-फाइलमध्ये (भाग 7 शेवटी) आहेत — कृपया वापरण्यापूर्वी पाहावेत.`;
+  const text = studyPointsText(n); // U6: 1 मुद्दा … पाहावा / N मुद्दे … पाहावेत
   return (
     <div className={`text-sm text-slate-600 dark:text-slate-300 break-words [overflow-wrap:anywhere] ${className}`}>
       ⓘ {studyHref ? <Link className="font-semibold text-navy-600 underline-offset-2 hover:underline dark:text-navy-200" to={studyHref}>{text}</Link> : text}
@@ -270,7 +271,7 @@ export default function RunProgress({ run, retryHint }: { run: Run; retryHint?: 
                 done ? 'bg-green-100 text-green-900 dark:bg-green-900/40 dark:text-green-200'
                   : cur ? 'bg-blue-100 text-blue-900 dark:bg-blue-900/40 dark:text-blue-200'
                     : failed && i === idx ? 'bg-red-100 text-red-900 dark:bg-red-900/40 dark:text-red-200'
-                      : 'bg-slate-100 text-slate-500 dark:bg-navy-800 dark:text-slate-400'
+                      : 'bg-slate-100 text-slate-600 dark:bg-navy-800 dark:text-slate-300'
               }`}
             >
               {cur && <span className="mr-1 inline-block h-2 w-2 animate-pulse rounded-full bg-blue-600" aria-hidden="true" />}

@@ -13,7 +13,8 @@ import { DEFAULT_DESK, DEFAULT_WORK_TYPE, DESKS, INPUT_KINDS, INPUT_KIND_LABEL, 
 import { suggestDrafts } from '../lib/drafts';
 import { fmtBytes } from '../lib/format';
 import { guessSubject } from '../lib/pdf';
-import { useData } from '../lib/data';
+import { useLatestRuns } from '../lib/data';
+import { useRunsShownHere } from './Layout';
 import type { Case } from '../lib/types';
 import { CompactDraftPicker } from './DraftPicker';
 import { RunStateBadge } from './RunProgress';
@@ -66,8 +67,9 @@ const ST_TEXT: Record<St, string> = {
 export default function BulkUpload({ overBudget }: { overBudget: boolean }) {
   const toast = useToast();
   const isOwner = useAuth().me?.role === 'owner';
-  const { latestRuns } = useData();
+  const latestRuns = useLatestRuns();
   const [rows, setRows] = useState<Row[]>([]);
+  useRunsShownHere(rows.map(r => r.caseId)); // U9: each box shows its run — not again in the global bar
   const [bulkWork, setBulkWork] = useState<WorkType>(DEFAULT_WORK_TYPE);
   const [desk, setDesk] = useState<string>(DEFAULT_DESK);
   const [busy, setBusy] = useState(false);

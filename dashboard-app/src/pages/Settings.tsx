@@ -87,7 +87,7 @@ export function checkSettings(v: Record<string, string>): string | null {
 const ROLE_LABEL: Record<string, string> = { owner: 'मालक', staff: 'कार्यासन कर्मचारी', senior: 'वरिष्ठ (फक्त वाचन)' };
 
 /** Raw setting key as small grey text after the Marathi hint (S3). */
-const KeyTag = ({ k }: { k: string }) => <span className="mt-0.5 block break-all font-mono text-xs text-slate-400 dark:text-slate-500">{k}</span>;
+const KeyTag = ({ k }: { k: string }) => <span className="mt-0.5 block break-all font-mono text-xs text-slate-500 dark:text-slate-400">{k}</span>;
 
 /** Collapsible section (S2): summary is a full-width tap target (S7). */
 function Fold({ title, sub, children }: { title: string; sub?: string; children: ReactNode }) {

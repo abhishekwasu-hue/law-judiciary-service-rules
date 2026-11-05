@@ -265,7 +265,7 @@ export default function EditChat({ ctx }: { ctx: CaseCtx }) {
     <section id="edit-chat" ref={boxRef} className={`card edit-panel relative min-w-0 scroll-mt-20 overflow-hidden ${seen ? 'seen' : ''} ${drag ? 'ring-4 ring-saffron-500' : ''}`} aria-label="सुधारणा" {...dragProps}>
       <div className="edit-head flex items-center justify-between gap-2 px-4 py-3">
         <div className="min-w-0">
-          <h2 className="flex items-center gap-2 text-lg font-bold">✏️ सुधारणा-चॅट <span className={`${seen ? '' : 'blink-badge '}rounded-full bg-white px-3 py-1 text-base font-black text-orange-600 shadow`}>AI</span></h2>
+          <h2 className="flex items-center gap-2 text-lg font-bold">✏️ सुधारणा-चॅट <span className={`${seen ? '' : 'blink-badge '}rounded-full bg-white px-3 py-1 text-base font-black text-orange-700 shadow`}>AI</span></h2>
           <p className="text-sm text-white/90">टिप्पणी किंवा मसुद्यात (पत्र, शासन निर्णय इ.) बदल हवा असल्यास कृपया येथे नमूद करावे</p>
         </div>
       </div>
@@ -303,8 +303,8 @@ export default function EditChat({ ctx }: { ctx: CaseCtx }) {
         ) : !ctx.canWrite ? null : (
           <form onSubmit={ask} className="space-y-2">
             <label className="flex min-w-0 items-center gap-2 text-sm">
-              <span className="shrink-0 font-semibold">कशात</span>
-              <select className="input min-w-0 py-1" value={tgt} disabled={busy} onChange={e => setTarget(e.target.value as EditTarget)} aria-label="सुधारणा कशात">
+              <span className="shrink-0 font-semibold">कोणत्या मसुद्यात बदल:</span>
+              <select className="input min-w-0 py-1" value={tgt} disabled={busy} onChange={e => setTarget(e.target.value as EditTarget)} aria-label="कोणत्या मसुद्यात बदल">
                 {targets.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
               </select>
             </label>

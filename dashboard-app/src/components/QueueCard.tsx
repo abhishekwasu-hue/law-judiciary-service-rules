@@ -3,8 +3,8 @@
 // and the typical run time of recent runs (useTypicalRunSeconds — same basis as the run page's ETA).
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useData } from '../lib/data';
-import { TONE_HEX, isStale, isWaiting, type Tone } from '../lib/constants';
+import { useData, useLatestRuns } from '../lib/data';
+import { isStale, isWaiting, type Tone } from '../lib/constants';
 import { crLabel } from '../lib/format';
 import type { Run } from '../lib/types';
 import { Chip, Spinner } from './ui';
@@ -16,10 +16,14 @@ const sameDay = (iso: string | null | undefined, d: Date) => {
   return x.getFullYear() === d.getFullYear() && x.getMonth() === d.getMonth() && x.getDate() === d.getDate();
 };
 
+// U3: the fixed TONE_HEX colours were 2.1–2.8:1 on the dark card → text classes with a dark-mode shade (as Home's counts)
+const NUM_TEXT: Partial<Record<Tone, string>> = {
+  green: 'text-green-700 dark:text-green-400', blue: 'text-blue-700 dark:text-blue-300', amber: 'text-amber-700 dark:text-amber-300',
+};
 function Num({ label, value, tone }: { label: string; value: number; tone: Tone }) {
   return (
     <div className="rounded-lg bg-slate-50 px-2 py-2 text-center dark:bg-navy-800/60">
-      <div className="font-head text-2xl font-bold leading-none sm:text-3xl" style={{ color: TONE_HEX[tone] }}>{value}</div>
+      <div className={`font-head text-2xl font-bold leading-none sm:text-3xl ${NUM_TEXT[tone] || 'text-slate-700 dark:text-slate-200'}`}>{value}</div>
       <div className="mt-1 text-sm font-semibold leading-tight text-slate-600 dark:text-slate-300">{label}</div>
     </div>
   );
@@ -42,7 +46,8 @@ export function queueRows(runs: Run[], typicalSec: number | null, now: number): 
 }
 
 export default function QueueCard({ className = '' }: { className?: string }) {
-  const { cases, latestRuns } = useData();
+  const { cases } = useData();
+  const latestRuns = useLatestRuns();
   const typical = useTypicalRunSeconds();
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
