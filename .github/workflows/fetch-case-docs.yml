@@ -5,7 +5,7 @@ permissions:
   contents: write
 jobs:
   fetch:
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.RUNS_ON || '"ubuntu-latest"') }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262   # v4.4.0
         with: { fetch-depth: 1, persist-credentials: false }   # S-F14: the commit step authenticates itself

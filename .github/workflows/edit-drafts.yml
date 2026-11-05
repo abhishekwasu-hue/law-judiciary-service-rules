@@ -24,7 +24,7 @@ env:
   RP: /tmp/runner-priv
 jobs:
   edit:
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.RUNS_ON || '"ubuntu-latest"') }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262   # v4.4.0
@@ -36,6 +36,10 @@ jobs:
         timeout-minutes: 5
         run: |
           set -euo pipefail
+          # self-hosted VPS runner (docs/VPS_RUNNER.md): no file of an earlier job ($RP, secrets, /tmp job dirs) is re-used
+          if [ "${RUNNER_ENVIRONMENT:-}" = self-hosted ] && [ -x /opt/vps-runner/cleanup.sh ]; then
+            sudo /opt/vps-runner/cleanup.sh pre || true
+          fi
           mkdir -m 700 -p "$RP"
           E="$GITHUB_EVENT_PATH"
           CASE_ID=$(jq -r '.client_payload.case_id // .inputs.case_id // empty' "$E")

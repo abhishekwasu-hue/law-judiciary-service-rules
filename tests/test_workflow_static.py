@@ -46,6 +46,26 @@ class WorkflowStatic(unittest.TestCase):
                     os.unlink(f.name)
                 self.assertEqual(r.returncode, 0, f"{n} / {st.get('name')}: {r.stderr}")
 
+    RUNS_ON = "${{ fromJSON(vars.RUNS_ON || '\"ubuntu-latest\"') }}"
+
+    def test_runs_on_switchable(self):
+        """docs/VPS_RUNNER.md (05.11.2026): EVERY job takes its runner from the repository variable RUNS_ON
+        (["self-hosted","prastav"] = the VPS runner); without the variable it is GitHub's ubuntu-latest."""
+        for n in self.names:
+            doc = load(n)
+            for jid, job in doc["jobs"].items():
+                self.assertEqual(job.get("runs-on"), self.RUNS_ON, f"{n} / {jid}")
+            self.assertNotIn("runs-on: ubuntu-latest", open(os.path.join(WF, n), encoding="utf-8").read(), n)
+
+    def test_self_hosted_leftover_guard(self):
+        snap = step(load("process-proposal.yml"), "Snapshot runner tools")["run"]
+        g = snap.index('if [ "${RUNNER_ENVIRONMENT:-}" = self-hosted ]')
+        self.assertLess(g, snap.index('mkdir -m 700 "$RP"'))
+        self.assertIn("sudo /opt/vps-runner/cleanup.sh pre || true", snap)
+        self.assertIn("if id engine >/dev/null 2>&1 || mountpoint -q /srv/engine", snap)
+        ed = step(load("edit-drafts.yml"), "Get run config")["run"]
+        self.assertLess(ed.index("sudo /opt/vps-runner/cleanup.sh pre"), ed.index('mkdir -m 700 -p "$RP"'))
+
     def test_checkout_pinned_without_credentials(self):
         # S-F14 (audit 05.11.2026): EVERY workflow — SHA-pinned checkout, no persisted credentials
         for n in self.names:

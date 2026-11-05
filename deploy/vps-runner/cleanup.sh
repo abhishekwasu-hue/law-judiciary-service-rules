@@ -1,7 +1,7 @@
 #!/bin/bash
 # Wipes everything a job leaves behind on the self-hosted runner container (docs/VPS_RUNNER.md), so no proposal file,
 # secret or `engine` user survives a job. Never fails (always exit 0): a cleanup problem must not fail the job.
-#   started    runner hook ACTIONS_RUNNER_HOOK_JOB_STARTED (before the first step; this job's _work/_temp is kept)
+#   started    runner hook ACTIONS_RUNNER_HOOK_JOB_STARTED (before the first step; _work is left alone)
 #   completed  runner hook ACTIONS_RUNNER_HOOK_JOB_COMPLETED (after the last step)
 #   boot       container start (entrypoint.sh): leftovers of a job cut off by a restart
 #   pre        from a workflow step (process-proposal.yml first step): like `started`, but leaves _work alone
@@ -61,17 +61,19 @@ if [ "$MODE" != pre ]; then
   find /var/tmp /dev/shm -mindepth 1 -maxdepth 1 -exec rm -rf {} + 2>/dev/null || true
 fi
 
-# 6) the runner's _work: workspace checkouts (and, after a job, _temp) emptied; the runner's own dirs are kept
-#    (_actions = downloaded actions of this job, _tool = tool cache fallback, _PipelineMapping, _update)
+# 6) the runner's _work after a job (and at boot): the checkout dirs _work/<repo>/<repo> are emptied (kept as empty
+#    dirs), _temp emptied; the runner's own dirs are kept (_actions, _tool, _PipelineMapping, _update). Not at `started`
+#    (this job's dirs are set up already; actions/checkout cleans the workspace) and not in `pre`.
 W=/home/runner/_work
-if [ "$MODE" != pre ] && [ -d "$W" ]; then
+if { [ "$MODE" = completed ] || [ "$MODE" = boot ]; } && [ -d "$W" ]; then
   for d in "$W"/* "$W"/.[!.]*; do
     [ -e "$d" ] || continue
     case "$(basename "$d")" in
       _actions|_tool|_PipelineMapping|_update) continue ;;
-      _temp) [ "$MODE" = started ] && continue ;;
+      _temp) depth=1 ;;
+      *) depth=2 ;;
     esac
-    if [ -d "$d" ] && [ ! -L "$d" ]; then find "$d" -mindepth 1 -delete 2>/dev/null || rm -rf "${d:?}"/* "${d:?}"/.[!.]* 2>/dev/null
+    if [ -d "$d" ] && [ ! -L "$d" ]; then find "$d" -mindepth "$depth" -delete 2>/dev/null || true
     else rm -f "$d"; fi
   done
 fi

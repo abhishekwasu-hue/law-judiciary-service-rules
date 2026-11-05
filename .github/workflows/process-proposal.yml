@@ -36,7 +36,7 @@ env:
   POST_RESERVE_MIN: '20'
 jobs:
   run:
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.RUNS_ON || '"ubuntu-latest"') }}
     timeout-minutes: 180
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262   # v4.4.0
@@ -48,6 +48,16 @@ jobs:
           set -euo pipefail
           # job start (minus a minute for queueing/checkout) -> remaining-time budget of the Claude step
           echo "JOB_T0=$(( $(date +%s) - 60 ))" >> "$GITHUB_ENV"
+          # self-hosted VPS runner (docs/VPS_RUNNER.md): the container outlives the job, so an earlier job's `engine`
+          # user, /srv/engine mount or $RP must be gone before `engine`-free setup starts (the runner hooks wipe them;
+          # this is the second check). GitHub-hosted VMs are always fresh: nothing runs there.
+          if [ "${RUNNER_ENVIRONMENT:-}" = self-hosted ]; then
+            if [ -x /opt/vps-runner/cleanup.sh ]; then sudo /opt/vps-runner/cleanup.sh pre || true; fi
+            if id engine >/dev/null 2>&1 || mountpoint -q /srv/engine 2>/dev/null || [ -e "$RP" ] || [ -e "$ENGINE_SECRETS" ]; then
+              echo "self-hosted runner not clean (engine user / /srv/engine mount / $RP left by an earlier job)"
+              exit 1
+            fi
+          fi
           mkdir -m 700 "$RP"
           sudo rm -rf "$T" /opt/engine-scripts /opt/engine-samples
           sudo cp -a tools "$T"; sudo cp -a scripts/engine /opt/engine-scripts; sudo cp -a samples /opt/engine-samples
