@@ -1112,6 +1112,9 @@ NOT_LETTER_WORD_RE = re.compile(r"^(?:प्र\.?|अ\.?|जी\.?आर\.?|य
                                 r"|petition|application|g\.?r\.?)",
                                 re.I)
 OWN_FILE_NO_RE = re.compile(r"^संकि?ी?र्ण-")
+UO_BLANK_RE = re.compile(r"(?:अनौपचारिक\s+)?संदर्भ\s+(?:क्र\.|क्रमांक)\s*:?\s*-?\s*_{2,}")
+UO_BLANK_MSG = ("अनौपचारिक / इतर कार्यासनाचा संदर्भ क्रमांक अभिलेखावर असल्यासच; नसल्यास ओळ किंवा '____' नको "
+                "(वापरकर्ता, 05.11.2026, §4.36)")
 UO_REF_WORD_RE = re.compile(r"^(?:संदर्भ|अनौपचारिक|कार्यासन\S*|का\.\s?[0-9०-९]+|U\.?\s?O\.?|यु\.\s?ओ\.?|अ\.\s?सं\.?)$", re.I)
 NOTE_LETTER_NO_MSG = ("टिप्पणीत पत्राचा क्रमांक नको — प्राधिकारी, दिनांक व पृ.N/प.वि. पुरेसे "
                       "(§4.29(1)/(5), §4.30(7), 05.11.2026 C1 पर्याय आ)")
@@ -1380,6 +1383,9 @@ def lint_warnings(spec):
     W = [f"{path}: {m}" for path, t in body + letter for m in warn_hits(t)]
     W += missing_scatter(note_seq(n))[1]   # §4.31 placement
     W += missing_inline_problems(n)[1]   # C2 (05.11.2026): a table after the missing-info para
+    for path, t in body:   # Abhi 05.11.2026: a U.O. ref no. only when the record has one — never a "____" placeholder
+        if UO_BLANK_RE.search(unquoted(t)):
+            W.append(f"{path}: blank U.O. reference no. — {UO_BLANK_MSG}")
     rel_txt = [(pth, t) for pth, t in strings(spec.get("related", []), "related") if re.search(r"\.text(\[|$)", pth)]
     W += flow_warnings(note_seq(n), note_tables(n), rel_txt)   # C32 §4.34 relevance + flow
     W += [f"{last_para(n)[0]}: last para — does not name the draft {d} (§4.28: name every draft made, e.g. "

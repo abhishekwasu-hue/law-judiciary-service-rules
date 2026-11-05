@@ -448,3 +448,11 @@ class OwnerDecisions05Nov(unittest.TestCase):
         src = open(os.path.join(TOOLS, "verify_outputs.py"), encoding="utf-8").read()
         self.assertIn('"missing-info items inline §4.31(अ) C2 (note body)"', src)
         self.assertIn('"no incoming letter no. in the note §4.29 C1 (note body)"', src)
+
+    def test_uo_blank_placeholder_warns(self):
+        """Abhi 05.11.2026: "प्रत्येक वेळी अनौपचारिक संदर्भ असेलच असे नाही असल्यास ठेवावे" — no "____" U.O. number."""
+        s = sample("CR131_2026_special-pay_info-letter.json")
+        base = L.lint_warnings(s)
+        s["note"]["paras"][0] += " वित्त विभागाच्या अनौपचारिक संदर्भ क्र. ____ नुसार."
+        w = [x for x in L.lint_warnings(s) if x not in base]
+        self.assertTrue([x for x in w if "blank U.O. reference no." in x], w)
