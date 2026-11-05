@@ -69,6 +69,16 @@
   no rule dropped). Gap: tools/verify_outputs.py does not check the _Affidavit / _LQ_Answer files yet.
 
 ## Pending
+25. **05.11.2026 owner rule decisions (INSTRUCTIONS §4.36) — on main + deployed:** C1 (आ) no incoming LETTER number anywhere in
+    the note (order nos., GR / petition / C R nos., U.O. and other-desk reference nos. only when on record — kept); C2 (आ) +
+    wording (आ): missing-info para "सदर प्रकरणी <प्राधिकारी> यांच्या दि. … रोजीच्या प्रस्तावाचे अवलोकन केले असता, त्यामध्ये खालील
+    माहिती आढळून येत नाही:- (1) …; (2) …." inline; C3 (अ) court para 1 GP letter form / "सादर."; "(लॉजिंग)" dropped in Marathi
+    note/letter; C4 no change; C5 (आ) old samples rewritten (CR66/122/128/130/133, COURT_*) — owner saw the comparison PDF;
+    C7 (अ) affidavit Times New Roman (+ DVOT-SurekhMR for Marathi); cropped scan letters stay as plain words. Brief at
+    31,740 / 31,744 bytes — next change needs compaction. **Open (Abhi):** flow decisions from docs/FLOW_RESEARCH.md —
+    (1) one issue per numbered para with sub-points, (2) "उपरोक्त वस्तुस्थिती" list vs "उपरोक्त वस्तुस्थिती विचारात घेता," in
+    the सबब para, (3) condition table vs linked condition sentences, (4) para 2 "सदर पत्रान्वये …". Owner asked for 2–3 of his
+    own approved notes as flow models (not yet given).
 24. **05.11.2026 second round (Abhi: "Yes go ahead", "Run multiple agent") — deployed:** Q-F1 tools/fact_check.py (note/letter
     dates, amounts, letter nos., names vs the cited package page; soft warnings ≤4 to Study part 7, wide-mode misses owner-only;
     inside workflow step "Check extracts"); Q-F15 tools/consistency_check.py (same facts across note / letter / orders / parawise /
