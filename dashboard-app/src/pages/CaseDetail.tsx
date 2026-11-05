@@ -213,7 +213,8 @@ export default function CaseDetail() {
       <div className="card"><Empty icon="❓" title="प्रकरण सापडले नाही" hint="कृपया प्रकरणांच्या यादीतून पुन्हा निवडावे."><Link className="btn-ghost" to="/cases">प्रकरणे</Link></Empty></div>
     );
 
-  async function changeStage(s: string) {
+  async function changeStage(s: string, undo = false) {
+    const from = c?.stage || '';
     try {
       if (cases.find(x => x.id === id)) await setStage(id, s);
       else {
@@ -221,7 +222,8 @@ export default function CaseDetail() {
         if (error) throw new Error(error.message);
         setSingle(x => (x ? { ...x, stage: s } : x));
       }
-      toast(`टप्पा बदलला: ${s}`);
+      if (undo) toast(`टप्पा पूर्ववत केला: “${s}”`, 'info');
+      else toast(`टप्पा बदलला: “${s}”`, 'ok', from && from !== s ? { label: '↶ पूर्ववत करा', run: () => void changeStage(from, true) } : undefined);
     } catch (e) {
       toast(humanError(e), 'err');
     }

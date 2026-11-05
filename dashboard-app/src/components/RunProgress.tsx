@@ -294,17 +294,28 @@ export default function RunProgress({ run, retryHint }: { run: Run; retryHint?: 
   );
 }
 
-/** Compact live status of a case's latest run (list rows, global bar). */
+/** Column header for RunStateBadge (UI audit S5: "स्थिती" next to "टप्पा" was unexplained) and its tooltip. */
+export const RUN_COL = 'प्रक्रियेची स्थिती';
+export const RUN_COL_HINT = 'टिप्पणी, पत्र व इतर मसुदे तयार करण्याच्या प्रक्रियेची स्थिती';
+
+/** Compact live status of a case's latest run (list rows, global bar). One glossary word per state, with a short
+ *  tooltip (UI audit S5): प्रतीक्षेत / चालू / पूर्ण / अयशस्वी. */
 export function RunStateBadge({ run }: { run: Run | undefined }) {
-  if (!run) return <span className="text-sm text-slate-500">—</span>;
+  if (!run) return <span className="text-sm text-slate-500 dark:text-slate-400" title="या प्रकरणी अद्याप प्रक्रिया सुरू केलेली नाही.">—</span>;
   const stale = isStale(run);
-  if (!stale && isWaiting(run)) return <Chip tone="amber">⏳ प्रतीक्षेत</Chip>;
+  if (!stale && isWaiting(run))
+    return <Chip tone="amber" title="आधीची प्रक्रिया पूर्ण झाल्यावर ही प्रक्रिया क्रमाने आपोआप सुरू होईल.">⏳ प्रतीक्षेत</Chip>;
   if (!stale && (run.state === 'queued' || run.state === 'running'))
     return (
-      <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-100 px-2.5 py-0.5 text-sm font-bold text-blue-900 dark:bg-blue-900/40 dark:text-blue-100">
-        <Spinner className="h-3.5 w-3.5" /> प्रक्रिया चालू
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-100 px-2.5 py-0.5 text-sm font-bold text-blue-900 dark:bg-blue-900/40 dark:text-blue-100" title="मसुदे तयार होत आहेत. पूर्ण झाल्यावर फाइल प्रकरणात उपलब्ध होतील.">
+        <Spinner className="h-3.5 w-3.5" /> चालू
       </span>
     );
-  if (run.state === 'done') return criticalWarnings(run.warnings).length ? <Chip tone="amber">⚠ तयार — तपासणी अपूर्ण</Chip> : <Chip tone="green">✓ तयार</Chip>;
-  return <Chip tone="red">{stale ? 'वेळ संपली' : 'अयशस्वी'}</Chip>;
+  if (run.state === 'done')
+    return criticalWarnings(run.warnings).length
+      ? <Chip tone="amber" title="फाइल तयार आहेत. कृपया वापरण्यापूर्वी अभ्यास-फाइलमधील इशारे पाहावेत, ही विनंती.">⚠ पूर्ण — इशारे पाहावेत</Chip>
+      : <Chip tone="green" title="टिप्पणी, पत्र व इतर फाइल प्रकरणात उपलब्ध आहेत.">✓ पूर्ण</Chip>;
+  return stale
+    ? <Chip tone="red" title={STALE_REASON}>✕ अयशस्वी (वेळ संपली)</Chip>
+    : <Chip tone="red" title="प्रक्रिया पूर्ण झाली नाही. कृपया प्रकरण उघडून 'पुन्हा तयार करा' वापरावे, ही विनंती.">✕ अयशस्वी</Chip>;
 }

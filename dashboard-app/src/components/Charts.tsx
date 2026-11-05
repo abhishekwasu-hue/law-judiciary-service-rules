@@ -8,6 +8,9 @@ const CAT_COLORS = ['#2b4477', '#ee8a1c', '#3b82f6', '#0d9488', '#7c3aed', '#be1
 const TICK = { fontSize: 12, fill: '#64748b' };
 const chartAxis = { tick: TICK };
 const tipStyle = { contentStyle: { borderRadius: 8, fontSize: 14 } };
+/** Marathi axis title (UI audit leftover: the axes had no title). */
+const axisTitle = (value: string, position: 'insideBottom' | 'insideLeft', extra: Record<string, unknown> = {}) =>
+  ({ value, position, fill: TICK.fill, fontSize: 12, ...extra });
 
 /** Category-axis width (px) and line length (UTF-16 units) for wrapped Devanagari labels: fits a 360 px phone. */
 const LABEL_W = 112;
@@ -43,15 +46,15 @@ function WrapTick({ x, y, payload }: { x?: number; y?: number; payload?: { value
 /** Height that gives each bar row room for up to 3 wrapped (14 px) label lines. */
 const rowsHeight = (n: number) => Math.max(160, n * 54 + 40);
 
-function HBar({ data, dataKey = 'value', nameKey = 'name', fill, cells, unit, onPick }: {
-  data: Record<string, unknown>[]; dataKey?: string; nameKey?: string; fill?: string; cells?: string[]; unit: (v: number) => [string | number, string]; onPick?: (name: string) => void;
+function HBar({ data, dataKey = 'value', nameKey = 'name', fill, cells, unit, onPick, xTitle }: {
+  data: Record<string, unknown>[]; dataKey?: string; nameKey?: string; fill?: string; cells?: string[]; unit: (v: number) => [string | number, string]; onPick?: (name: string) => void; xTitle: string;
 }) {
   return (
-    <div style={{ height: rowsHeight(data.length) }}>
+    <div style={{ height: rowsHeight(data.length) + 20 }}>
       <ResponsiveContainer>
-        <BarChart data={data} layout="vertical" margin={{ left: 0, right: 16, top: 4, bottom: 4 }}>
+        <BarChart data={data} layout="vertical" margin={{ left: 0, right: 16, top: 4, bottom: 22 }}>
           <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#94a3b833" />
-          <XAxis type="number" allowDecimals={false} {...chartAxis} />
+          <XAxis type="number" allowDecimals={false} {...chartAxis} label={axisTitle(xTitle, 'insideBottom', { offset: -14 })} />
           <YAxis type="category" dataKey={nameKey} width={LABEL_W} interval={0} tick={<WrapTick />} />
           <Tooltip {...tipStyle} formatter={(v: number) => unit(v)} />
           <Bar dataKey={dataKey} fill={fill} radius={[0, 4, 4, 0]} className={onPick ? 'cursor-pointer' : undefined} onClick={(d: { name?: string }) => onPick && d.name && onPick(d.name)}>
@@ -93,17 +96,17 @@ export function HomeCharts({ catData, stageData, monthly, byOffice, avgDays, onC
         </div>
       </Section>
       <Section title="टप्पानिहाय प्रकरणे">
-        <HBar data={stageData} cells={stageData.map(d => TONE_HEX[d.tone])} unit={v => [v, 'प्रकरणे']} onPick={onStage} />
+        <HBar data={stageData} cells={stageData.map(d => TONE_HEX[d.tone])} unit={v => [v, 'प्रकरणे']} onPick={onStage} xTitle="प्रकरणांची संख्या" />
       </Section>
       <Section title="मासिक: प्राप्त विरुद्ध बंद">
         <div className="h-64">
           <ResponsiveContainer>
-            <LineChart data={monthly} margin={{ left: -16, right: 8 }}>
+            <LineChart data={monthly} margin={{ left: 4, right: 8, bottom: 18 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#94a3b833" />
-              <XAxis dataKey="name" {...chartAxis} />
-              <YAxis allowDecimals={false} {...chartAxis} />
+              <XAxis dataKey="name" {...chartAxis} label={axisTitle('महिना', 'insideBottom', { offset: -12 })} />
+              <YAxis allowDecimals={false} width={44} {...chartAxis} label={axisTitle('प्रकरणांची संख्या', 'insideLeft', { angle: -90, style: { textAnchor: 'middle' }, dx: 4 })} />
               <Tooltip {...tipStyle} />
-              <Legend wrapperStyle={{ fontSize: 13 }} />
+              <Legend verticalAlign="top" wrapperStyle={{ fontSize: 13 }} />
               <Line type="monotone" dataKey="प्राप्त" stroke={TONE_HEX.navy} strokeWidth={2} dot={{ r: 3 }} />
               <Line type="monotone" dataKey="बंद" stroke={TONE_HEX.green} strokeWidth={2} dot={{ r: 3 }} />
             </LineChart>
@@ -112,12 +115,12 @@ export function HomeCharts({ catData, stageData, monthly, byOffice, avgDays, onC
       </Section>
       <Section title="कार्यालयनिहाय प्रलंबित उत्तरे">
         {byOffice.length === 0 ? <Empty icon="✅" title="प्रलंबित उत्तर नाही" /> : (
-          <HBar data={byOffice} fill={TONE_HEX.amber} unit={v => [v, 'उत्तरे']} onPick={n => n !== 'नमूद नाही' && onOffice(n)} />
+          <HBar data={byOffice} fill={TONE_HEX.amber} unit={v => [v, 'उत्तरे']} onPick={n => n !== 'नमूद नाही' && onOffice(n)} xTitle="प्रलंबित उत्तरांची संख्या" />
         )}
       </Section>
       <Section title="सरासरी दिवस — टप्पानिहाय" className="lg:col-span-2">
         {avgDays.length === 0 ? <Empty title="टप्पे बदलल्यावर येथे दिसेल" /> : (
-          <HBar data={avgDays} fill={TONE_HEX.navy} unit={v => [`${v} दिवस`, 'सरासरी']} onPick={onStage} />
+          <HBar data={avgDays} fill={TONE_HEX.navy} unit={v => [`${v} दिवस`, 'सरासरी']} onPick={onStage} xTitle="सरासरी दिवस" />
         )}
       </Section>
     </div>

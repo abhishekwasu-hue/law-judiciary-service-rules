@@ -5,7 +5,7 @@ import { useCanWrite } from '../lib/auth';
 import { CATEGORIES, STAGES, WORK_TYPES, stageTone, workTypeLabel, workTypeOf } from '../lib/constants';
 import WorkTypeChips from '../components/WorkTypeChips';
 import { crLabel, fmtDate } from '../lib/format';
-import { RunStateBadge } from '../components/RunProgress';
+import { RUN_COL, RUN_COL_HINT, RunStateBadge } from '../components/RunProgress';
 import { humanError } from '../lib/api';
 import type { Case, Run } from '../lib/types';
 import { Chip, Empty, SkeletonRows } from '../components/ui';
@@ -17,6 +17,7 @@ const STAGE_SHORT: Record<string, string> = { 'पत्र पाठवले (
 function StageChip({ stage }: { stage: string }) {
   return <span className="whitespace-nowrap"><Chip tone={stageTone(stage)} title={stage}>{STAGE_SHORT[stage] || stage}</Chip></span>;
 }
+const STAGE_COL_HINT = 'नस्ती कार्यालयीन कामकाजात सध्या कोणत्या टप्प्यावर आहे (कार्यासनाने बदलावयाचा)';
 const Urgent = () => <span className="chip ml-1.5 bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-100">तातडीचे</span>;
 
 const workShort = (c: Case) => WORK_TYPES.find(w => w.id === workTypeOf(c))?.short;
@@ -46,8 +47,8 @@ const CardRow = memo(function CardRow({ c, run, late }: { c: Case; run: Run | un
         </div>
         <div className="mt-1 line-clamp-2">{subjectOf(c, run)}</div>
         <dl className="mt-2 grid grid-cols-[auto_1fr] items-center gap-x-2 gap-y-1 text-sm">
-          <dt className="text-slate-500 dark:text-slate-400">नस्तीचा टप्पा</dt><dd><StageChip stage={c.stage} /></dd>
-          {run && <><dt className="text-slate-500 dark:text-slate-400">मसुदे</dt><dd><RunStateBadge run={run} /></dd></>}
+          <dt className="text-slate-500 dark:text-slate-400" title={STAGE_COL_HINT}>नस्तीचा टप्पा</dt><dd><StageChip stage={c.stage} /></dd>
+          {run && <><dt className="text-slate-500 dark:text-slate-400" title={RUN_COL_HINT}>{RUN_COL}</dt><dd><RunStateBadge run={run} /></dd></>}
         </dl>
       </Link>
     </li>
@@ -67,13 +68,11 @@ function useWide(): boolean {
   return wide;
 }
 
-/** Stage changed from the टप्पेनिहाय board: shown 8 s with "पूर्ववत" (UI audit S18: the change was immediate, no undo). */
-interface Undo { id: number; label: string; from: string; to: string }
 
 const FILTER_KEYS = ['q', 'work', 'category', 'stage', 'office', 'year', 'overdue'] as const;
 
 function exportCsv(rows: Case[], overdue: Set<number>) {
-  const head = ['C R क्र.', 'वर्ष', 'नस्ती क्र.', 'विषय', 'कामाचा प्रकार', 'प्रवर्ग', 'टप्पा', 'प्राधान्य', 'कर्मचारी', 'पद', 'कार्यालय', 'आवक दिनांक', 'मुदत', 'मुदत संपली', 'नोंद दिनांक'];
+  const head = ['C R क्र.', 'वर्ष', 'नस्ती क्र.', 'विषय', 'कामाचा प्रकार', 'प्रवर्ग', 'नस्तीचा टप्पा', 'प्राधान्य', 'कर्मचारी', 'पद', 'कार्यालय', 'आवक दिनांक', 'मुदत', 'मुदत संपली', 'नोंद दिनांक'];
   const esc = (v: unknown) => {
     const s = v == null ? '' : String(v);
     return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
@@ -99,8 +98,6 @@ export default function Cases() {
   const searchRef = useRef<HTMLInputElement>(null);
   const overdue = useMemo(() => overdueIds(cases, letters), [cases, letters]);
   const [filtersOpen, setFiltersOpen] = useState(false); // phone only: the selects fold behind "फिल्टर (n)" (UI audit S4)
-  const [undo, setUndo] = useState<Undo | null>(null);
-  const undoTimer = useRef<number>();
   const wide = useWide();
   const open = useCallback((id: number) => nav(`/cases/${id}`), [nav]);
   // P5: the list shows PAGE_STEP rows, "अधिक दाखवा (N)" adds the next; search / filters still run over every case
@@ -113,7 +110,6 @@ export default function Cases() {
       setSp(sp, { replace: true });
     }
   }, [sp, setSp]);
-  useEffect(() => () => window.clearTimeout(undoTimer.current), []);
 
   const setParam = (k: string, v: string) => {
     const n = new URLSearchParams(sp);
@@ -151,19 +147,23 @@ export default function Cases() {
   const panelActive = (['category', 'stage', 'office', 'year', 'overdue'] as const).filter(k => sp.get(k)).length;
   const clearAll = () => setSp(view === 'kanban' ? { view: 'kanban' } : {}, { replace: true });
 
-  const move = useCallback(async (id: number, stage: string, isUndo = false) => {
+  // Stage changed from the टप्पेनिहाय board: the toast offers "पूर्ववत करा" for 8 s (UI audit S18: the change was
+  // immediate, no undo); undo sets the old stage back through the same setStage call.
+  const move = useCallback(async (id: number, stage: string) => {
     const c = cases.find(x => x.id === id);
     const from = c?.stage || '';
     try {
       await setStage(id, stage);
-      window.clearTimeout(undoTimer.current);
-      if (isUndo || !c) {
-        setUndo(null);
-        toast(`टप्पा पूर्ववत: ${stage}`, 'info');
-      } else {
-        setUndo({ id, label: crLabel(c), from, to: stage });
-        undoTimer.current = window.setTimeout(() => setUndo(null), 8000);
-      }
+      if (c && from && from !== stage)
+        toast(`${crLabel(c)}: टप्पा “${stage}”`, 'info', {
+          label: '↶ पूर्ववत करा',
+          run: () => {
+            setStage(id, from).then(
+              () => toast(`टप्पा पूर्ववत केला: “${from}”`, 'info'),
+              e => toast(humanError(e), 'err'),
+            );
+          },
+        });
     } catch (e) {
       toast(humanError(e), 'err');
     }
@@ -242,7 +242,7 @@ export default function Cases() {
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-slate-200 dark:border-navy-800">
-                    <th className="th">C R</th><th className="th">मसुदे</th><th className="th">विषय</th><th className="th">प्रवर्ग</th><th className="th">कार्यालय</th><th className="th">नस्तीचा टप्पा</th><th className="th">मुदत</th>
+                    <th className="th">C R</th><th className="th" title={RUN_COL_HINT}>{RUN_COL}</th><th className="th">विषय</th><th className="th">प्रवर्ग</th><th className="th">कार्यालय</th><th className="th" title={STAGE_COL_HINT}>नस्तीचा टप्पा</th><th className="th">मुदत</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -261,14 +261,6 @@ export default function Cases() {
         <Kanban rows={rows} overdue={overdue} canWrite={canWrite} onMove={(id, st) => void move(id, st)} runs={latestRuns} />
       )}
 
-      {undo && (
-        <div className="no-print fixed inset-x-0 bottom-[calc(8.5rem+env(safe-area-inset-bottom))] z-[61] flex justify-center px-4 md:bottom-[6.5rem]" role="status">
-          <div className="flex max-w-md flex-wrap items-center gap-x-3 gap-y-1 rounded-lg bg-navy-800 px-4 py-2.5 text-white shadow-lg">
-            <span className="min-w-0 font-semibold">{undo.label}: टप्पा “{undo.to}”</span>
-            <button type="button" className="min-h-tap rounded-md bg-white/15 px-3 font-bold hover:bg-white/25" onClick={() => void move(undo.id, undo.from, true)}>↶ पूर्ववत</button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
