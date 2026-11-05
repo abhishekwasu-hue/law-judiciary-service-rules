@@ -77,7 +77,8 @@ HON_MR = re.compile(r"(?<![ऀ-ॿ])(?:श्रीमती|श्रीम\.|�
 HON_EN = re.compile(r"(?<![A-Za-z])(?:Shrimati|Smt\.?|Shri\.?|Mr\.|Mrs\.|Ms\.|Kum\.)\s*")
 TOK_MR = re.compile(r"[ऀ-ॿ]+\.?")
 TOK_EN = re.compile(r"[A-Z][A-Za-z]*\.?")
-STOP_MR = {"हे", "ह्या", "या", "व", "आणि", "तसेच", "तथा", "किंवा", "ही", "हा", "इतर", "रोजी", "दि.", "क्र.", "येथे"}
+STOP_MR = {"हे", "ह्या", "या", "व", "आणि", "तसेच", "तथा", "किंवा", "ही", "हा", "इतर", "रोजी", "दि.", "क्र.", "येथे",
+           "सदर", "त्यानंतर", "तथापि", "याबाबत", "त्यानुषंगाने", "उपरोक्त", "सबब", "शासन", "प्रस्ताव"}
 STOP_EN = {"And", "Vs", "Vs.", "V.", "The", "Of", "Petitioner", "Respondent"}
 INVISIBLE = re.compile("[‌‍़]")   # ZWNJ, ZWJ, nukta
 
@@ -146,6 +147,15 @@ def crs(t):
     return [f"{int(m.group(1))}-{m.group(2)}" for m in CR_RE.finditer(t)]
 
 
+BASE_LETTER = re.compile(r"[\u0905-\u0939\u0958-\u0961]")   # independent vowels + consonants
+
+
+def initial(w, latin):
+    """"आर." / "व्ही." / "ह." / "R." — at most two base letters before the dot."""
+    w = w.rstrip(".")
+    return len(w) <= 2 if latin else len(BASE_LETTER.findall(w)) <= 2
+
+
 def names(t, latin=False):
     """[(tokens, script)] of person names after an honorific."""
     out = []
@@ -161,12 +171,12 @@ def names(t, latin=False):
                 break
             toks.append(INVISIBLE.sub("", w.rstrip(".")))
             pos = mm.end()
-            if w.endswith(".") and len(w) > 4 + (0 if latin else 0):   # a long word with a full stop ends the sentence
+            if w.endswith(".") and not initial(w, latin):   # a full stop after a word (not an initial) ends the name
                 break
-            sp = re.match(r"[ \t]+", t[pos:])
-            if not sp or len(sp.group(0)) > 2:
+            sp = re.match(r"[ \t]*", t[pos:]).group(0)
+            if len(sp) > 2 or (not sp and not w.endswith(".")):   # "ह.ना." needs no space after an initial
                 break
-            pos += len(sp.group(0))
+            pos += len(sp)
         toks = [x for x in toks if x]
         if toks:
             out.append((tuple(x.lower() if latin else x for x in toks), "lat" if latin else "dev"))
@@ -215,7 +225,7 @@ def documents(spec, study=None):
     if isinstance(spec.get("affidavit"), dict):
         docs.append(("शपथपत्र", True, list(walk(spec["affidavit"], "affidavit"))))
     if isinstance(spec.get("lq"), dict):
-        docs.append(("विधानमंडळ उत्तर", False, list(walk(spec["lq"], "lq", SKIP_KEYS | {"members", "minister"}) )))
+        docs.append(("विधानमंडळ उत्तर", False, list(walk(spec["lq"], "lq"))))
     if isinstance(study, dict):
         for i, part in enumerate(study.get("parts") or []):
             if isinstance(part, dict) and L.part_no(str(part.get("heading") or "")) == 0:

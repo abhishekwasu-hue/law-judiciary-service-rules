@@ -64,7 +64,9 @@ def sentence_spans(t):
         if t[m.start()] == ".":
             w = re.search(r"(\S*)$", t[:m.start()]).group(1)
             w = w.lstrip("(“\"'")
-            if len(w) <= 2 or "." in w or w in SENT_ABBR or re.fullmatch(r"[0-9०-९]+", w or "x"):
+            if w.endswith((")", "”")) or re.fullmatch(r"[0-9०-९][0-9०-९.,/\-]*[0-9०-९]", w) and len(w) >= 3:
+                pass   # "… (पृ.3/प.वि.)." / "…”." / "… दि. 25.03.2026." / "… 1,300." end a sentence
+            elif len(w) <= 2 or "." in w or w in SENT_ABBR:
                 continue
         out.append((s, m.end())); s = m.end()
     if s < len(t):
@@ -334,6 +336,9 @@ def check(pdf, spec, ocr_dir=None, no_ocr=False):
                 if hit: break
             if hit:
                 r.update(status="ok", found_on=[hit], why="")
+            elif src == 0:   # the cited page cannot be read: a hit elsewhere proves nothing (no false "elsewhere")
+                r.update(status="unverifiable", why="इंग्रजी पान (नाव देवनागरीत)" if english else
+                         "स्कॅन/legacy-font/विस्कळीत मजकूर-स्तर, OCR उपलब्ध नाही")
             else:
                 other = []
                 for p in range(1, tx.n + 1):
@@ -343,9 +348,6 @@ def check(pdf, spec, ocr_dir=None, no_ocr=False):
                         other.append(p)
                 if other:
                     r.update(status="elsewhere", found_on=other[:5], why=f"नमूद पानावर नाही; पृ.{other[:5]} वर आढळले")
-                elif src == 0:
-                    r.update(status="unverifiable", why="इंग्रजी पान (नाव देवनागरीत)" if english else
-                             "स्कॅन/legacy-font/विस्कळीत मजकूर-स्तर, OCR उपलब्ध नाही")
                 else:
                     r.update(status="mismatch", why="नमूद पानावर आढळले नाही")
             recs.append(r); seen[key] = r

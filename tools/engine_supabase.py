@@ -89,6 +89,12 @@ Commands ("deliver with warnings", Abhi 02.11.2026: drafts are never thrown away
                       Study part 7); facts without a page ref not on the proposal pages and unverifiable facts ->
                       owner-only "मॉडेल: तथ्य-तपासणी — …" lines. Never fails the case; no case text in the log (S-F3:
                       details in $RP/facts.log).
+  consistency <spec.json> [<study.json>]
+                      tools/consistency_check.py (audit 05.11.2026 Q-F15, INSTRUCTIONS §4.30(2)) on the delivered spec
+                      (+ Study part 0): a date / amount / C R no. of a draft not in the note, a name spelled two ways, a
+                      petition no. that differs, one name with two posts -> SOFT warning "पडताळणी अपूर्ण — विसंगती:
+                      <what>, <doc A> / <doc B>" (reaches the Study part 7; at most 6 + one "आणखी …" line). Never fails the
+                      case; the Actions log gets the summary count only (S-F3: details in $RP/consistency.log).
   config <cfg.json>   (local) the non-secret run settings from the Worker's /api/engine/config JSON as KEY=VALUE
                       lines for $GITHUB_ENV: MODEL (main tier = drafter, every quality-critical task; from Settings,
                       default claude-opus-5-5; Abhi's plan: Sonnet),
@@ -2011,6 +2017,49 @@ def cmd_facts(args):
     add_warnings(fact_lines(recs if isinstance(recs, list) else []))
 
 
+def consistency_lines(recs, cap=6):
+    """consistency_check.py records -> SOFT runs.warnings lines "पडताळणी अपूर्ण — विसंगती: <what>, <doc A> / <doc B>
+    (<json path>)" (Q-F15; they reach the Study part 7), at most `cap` + one "आणखी …" line."""
+    recs = [r for r in recs if isinstance(r, dict) and r.get("what")]
+    lines = []
+    for r in recs[:cap]:
+        docs = (list(r.get("docs") or []) + ["", ""])[:2]
+        where = (r.get("where") or [""])[0]
+        lines.append(soft_line("विसंगती", f"{r['what']}, {docs[0]} / {docs[1]}" + (f" ({where})" if where else "")))
+    if len(recs) > cap:
+        lines.append(soft_line("विसंगती", f"आणखी {len(recs) - cap} विसंगती — टिप्पणी, पत्र व प्रारूपे वापरण्यापूर्वी तपासा"))
+    return lines
+
+
+def cmd_consistency(args):
+    """consistency <spec.json> [<study.json>] — cross-document consistency (tools/consistency_check.py, audit Q-F15) of
+    the delivered spec and the Study part 0. Never fails the case; warnings via consistency_lines; the tool's lines (fact
+    values) only in $RP/consistency.log, the Actions log gets the summary count (S-F3)."""
+    args = list(args)
+    if not args or not os.path.exists(args[0]):
+        return print("consistency_check: not run (no spec.json)")
+    cmd = [sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "consistency_check.py"), args[0]]
+    cmd += ["--study", args[1]] if len(args) > 1 and os.path.exists(args[1]) else []
+    rp = os.environ.get("RP") or "/tmp/runner-priv"
+    if os.path.isdir(rp):
+        cmd += ["--details", os.path.join(rp, "consistency.log")]
+    import tempfile
+    fd, rj = tempfile.mkstemp(prefix=".consistency-", suffix=".json", dir=rp if os.path.isdir(rp) else None)
+    os.close(fd)
+    env = {k: v for k, v in os.environ.items() if k != "CASE_DETAILS_FILE"}
+    try:
+        r = subprocess.run(cmd + ["--json", rj], capture_output=True, text=True, encoding="utf-8", errors="replace", env=env)
+        summ = [l for l in (r.stdout or "").splitlines() if l.startswith("consistency_check:")]
+        print(summ[-1] if summ else f"consistency_check: not run (exit {r.returncode})")   # S-F3: counts only
+        try:
+            recs = json.load(open(rj, encoding="utf-8"))
+        except Exception:
+            return add_warnings([f"मॉडेल: विसंगती-तपासणी — साधन चालले नाही (exit {r.returncode})"])
+    finally:
+        if os.path.exists(rj): os.remove(rj)
+    add_warnings(consistency_lines(recs if isinstance(recs, list) else []))
+
+
 def note_where(w):
     """extract_check.py labels the note body "नोंद परि. N"; the app and the Study say टिप्पणी (owner 04.11.2026)."""
     return str(w or "").replace("नोंद परि.", "टिप्पणी परि.")
@@ -2091,7 +2140,7 @@ def main(a):
     if len(a) in (2, 5) and a[0] == "litellm_config":
         return cmd_litellm_config(a[1:])
     if len(a) < 2 or a[0] not in ("fetch", "step", "log_url", "finish", "fail", "claude_result", "verify", "warn",
-                                  "extracts", "facts", "case_meta", "note"):
+                                  "extracts", "facts", "consistency", "case_meta", "note"):
         print(__doc__); sys.exit(2)
     c, arg = a[0], " ".join(a[1:])
     if c == "step" and not has_supabase():
@@ -2110,13 +2159,14 @@ def main(a):
         elif c == "note": cmd_note(arg)
         elif c == "extracts": cmd_extracts(a[1:])
         elif c == "facts": cmd_facts(a[1:])
+        elif c == "consistency": cmd_consistency(a[1:])
         elif c == "case_meta": cmd_case_meta(a[1:])
     except SystemExit:
         raise
     except Exception as e:
-        if c in ("extracts", "facts"):  # the final verbatim guard / fact check never fail the case ("deliver with warnings")
+        if c in ("extracts", "facts", "consistency"):  # the final guards never fail the case ("deliver with warnings")
             try:
-                lab = "उतारा-तपासणी" if c == "extracts" else "तथ्य-तपासणी"
+                lab = {"extracts": "उतारा-तपासणी", "facts": "तथ्य-तपासणी"}.get(c, "विसंगती-तपासणी")
                 add_warnings([f"मॉडेल: {lab} — साधन चालले नाही ({str(e)[:120]})"])
             except Exception:
                 pass

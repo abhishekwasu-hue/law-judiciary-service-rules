@@ -722,8 +722,54 @@ if pymupdf and FONTF:
     check("जुनी योजना" not in r.stdout and "योजना" not in r.stdout and "extracts:" in r.stdout
           and "योजना" in open(os.path.join(rpx, "extracts.log"), encoding="utf-8").read(),
           f"extracts: log without case text, details in $RP/extracts.log ({r.stdout[:300]!r})")
+    # --- facts (audit Q-F1): a note date not on its cited page -> soft warning (Study part 7); no case text in the log
+    json.dump({"note": {"first": "सादर.", "paras": ["शासन निर्णय दि. 09.09.2019 रोजीचा आहे (पृ.2/प.वि.)."]}},
+              open(spx, "w", encoding="utf-8"), ensure_ascii=False)
+    rpf = os.path.join(tmp, "rp_f"); os.makedirs(rpf)
+    run_row.update(state="running", step="तपासणी चालू", warnings=[])
+    r = run("facts", ox, spx, RP=rpf)
+    check(r.returncode == 0 and run_row["state"] == "running" and len(run_row["warnings"]) == 1
+          and run_row["warnings"][0].startswith("पडताळणी अपूर्ण — टिप्पणीतील तथ्य: टिप्पणी परि. 2 दिनांक पृ.2 वर आढळली नाही")
+          and SW.study_lines(run_row["warnings"]) == run_row["warnings"]
+          and not os.path.exists(os.path.join(ox, ".facts.json")),
+          f"facts: note date not on its cited page -> soft warning that reaches the Study part 7 ({run_row['warnings']} {r.stderr[:200]})")
+    check("09.09.2019" not in r.stdout and "fact_check: 1 facts" in r.stdout
+          and "09.09.2019" in open(os.path.join(rpf, "facts.log"), encoding="utf-8").read(),
+          f"facts: log without case text, details in $RP/facts.log ({r.stdout[:300]!r})")
+    run_row.update(state="running", step="तपासणी चालू", warnings=[])
+    r = run("facts", os.path.join(tmp, "absent_out"), spx)
+    check(r.returncode == 0 and run_row["warnings"] == [], f"facts: no status.json -> nothing, exit 0 ({r.stderr[:200]})")
 else:
     print("skip  extracts (pymupdf or Devanagari font missing)")
+
+# --- consistency: cross-document check (audit 05.11.2026 Q-F15) -> soft warnings that reach the Study part 7
+spc = os.path.join(tmp, "spec_c.json")
+json.dump({"note": {"first": "पत्रास अनुसरून सादर.", "paras": ["श्री. अनंत वडनेरकर यांना रु. 1,00,000/- अदा झाले आहेत."]},
+           "letter": {"ref_no": "संकिर्ण-2026/1/प्र.क्र.1/का.6", "date": "__.__.2026",
+                      "points": ["श्री. अनंत वडणेरकर यांना रु. 1,10,000/- अदा झाले आहेत."]}},
+          open(spc, "w", encoding="utf-8"), ensure_ascii=False)
+rpc = os.path.join(tmp, "rp_c"); os.makedirs(rpc)
+run_row.update(state="running", step="तपासणी चालू", warnings=[])
+r = run("consistency", spc, os.path.join(tmp, "absent_study.json"), RP=rpc)
+sys.path.insert(0, os.path.join(ROOT, "tools"))
+import study_warnings as SW2
+check(r.returncode == 0 and run_row["state"] == "running" and len(run_row["warnings"]) == 2
+      and all(w.startswith("पडताळणी अपूर्ण — विसंगती: ") for w in run_row["warnings"])
+      and any("रु. 1,10,000/- टिप्पणीत नाही, पत्र / टिप्पणी" in w for w in run_row["warnings"])
+      and SW2.study_lines(run_row["warnings"]) == run_row["warnings"],
+      f"consistency: amount / name differences -> soft warnings for the Study part 7 ({run_row['warnings']} {r.stderr[:200]})")
+check("वडणेरकर" not in r.stdout and "1,10,000" not in r.stdout and "consistency_check: 2 docs" in r.stdout
+      and "वडणेरकर" in open(os.path.join(rpc, "consistency.log"), encoding="utf-8").read()
+      and not [x for x in os.listdir(rpc) if x.startswith(".consistency-")],
+      f"consistency: log = summary count only, details in $RP/consistency.log, no scratch file ({r.stdout[:300]!r})")
+recs = [{"what": f"दिनांक 0{i}.01.2026 टिप्पणीत नाही", "docs": ["पत्र", "टिप्पणी"], "where": ["letter.points[0]"]} for i in range(1, 9)]
+cl = es0.consistency_lines(recs)
+check(len(cl) == 7 and cl[-1].startswith("पडताळणी अपूर्ण — विसंगती: आणखी 2 विसंगती")
+      and cl[0] == "पडताळणी अपूर्ण — विसंगती: दिनांक 01.01.2026 टिप्पणीत नाही, पत्र / टिप्पणी (letter.points[0])",
+      f"consistency_lines: at most 6 + one 'आणखी' line ({cl[:2]})")
+run_row.update(state="running", warnings=[])
+r = run("consistency", os.path.join(tmp, "absent_spec.json"))
+check(r.returncode == 0 and run_row["warnings"] == [], f"consistency: no spec.json -> nothing, exit 0 ({r.stdout[:120]!r})")
 
 # --- H1: secrets file instead of job env; progress through the Worker when no Supabase key is reachable
 noenv = {k: v for k, v in os.environ.items() if not k.startswith("SUPABASE")}
