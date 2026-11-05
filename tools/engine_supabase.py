@@ -82,6 +82,13 @@ Commands ("deliver with warnings", Abhi 02.11.2026: drafts are never thrown away
                       H7). Never fails the case: a MISMATCH -> "पडताळणी अपूर्ण — उतारे: …"; a note-body MISMATCH ->
                       "पडताळणी अपूर्ण — टिप्पणीतील अवतरणे: …" (Q-F2: reaches the Study part 7); unverifiable
                       results -> "मॉडेल: उतारा-तपासणी — …" lines.
+  facts <outdir> <spec.json> [<ocr dir>]
+                      tools/fact_check.py (audit 05.11.2026 Q-F1) on the delivered spec vs the package PDF and the
+                      runner's own OCR: a date / amount / letter no. / name of the note not on the page it cites ->
+                      SOFT warning "पडताळणी अपूर्ण — टिप्पणीतील तथ्य: <position> <kind> पृ.N वर आढळली नाही" (reaches the
+                      Study part 7); facts without a page ref not on the proposal pages and unverifiable facts ->
+                      owner-only "मॉडेल: तथ्य-तपासणी — …" lines. Never fails the case; no case text in the log (S-F3:
+                      details in $RP/facts.log).
   config <cfg.json>   (local) the non-secret run settings from the Worker's /api/engine/config JSON as KEY=VALUE
                       lines for $GITHUB_ENV: MODEL (main tier = drafter, every quality-critical task; from Settings,
                       default claude-opus-5-5; Abhi's plan: Sonnet),
@@ -1933,6 +1940,77 @@ def cmd_extracts(args):
     print("extracts:", "MISMATCH (warning)" if bad else "OK")
 
 
+FACT_KIND = {"date": "दिनांक", "amount": "रक्कम", "letter_no": "पत्र-क्र.", "name": "नाव"}
+
+
+def fact_lines(recs, cap=4):
+    """fact_check.py records -> runs.warnings lines (audit Q-F1). Facts whose para cites a page (mode sentence / para /
+    table / sub) and that are not on it -> SOFT lines (Study part 7), at most `cap` + one "आणखी …" line; facts without a
+    page ref (mode wide: letters, paras after the first mention) and unverifiable facts -> owner-only "मॉडेल:" lines.
+    Lines carry positions, kinds and pages only (S-F3)."""
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from fact_check import pages_label
+    recs = [r for r in recs if isinstance(r, dict) and not r.get("dup")]
+    bad = [r for r in recs if r.get("status") in ("mismatch", "elsewhere")]
+    cited = [r for r in bad if r.get("mode") != "wide"]
+    wide = [r for r in bad if r.get("mode") == "wide"]
+    unv = [r for r in recs if r.get("status") == "unverifiable"]
+    lines = []
+    for r in cited[:cap]:
+        chk = "पत्रातील तथ्य" if str(r.get("where", "")).startswith("पत्र") else "टिप्पणीतील तथ्य"
+        tail = (f" (पृ.{','.join(str(x) for x in (r.get('found_on') or [])[:3])} वर आढळली)"
+                if r.get("status") == "elsewhere" else "")
+        lines.append(soft_line(chk, f"{r.get('where')} {FACT_KIND.get(r.get('kind'), 'तथ्य')} "
+                                    f"{pages_label(r.get('pages'))} वर आढळली नाही{tail} — वापरण्यापूर्वी तपासा"))
+    if len(cited) > cap:
+        lines.append(soft_line("टिप्पणीतील तथ्य", f"आणखी {len(cited) - cap} तथ्ये नमूद पानावर आढळली नाहीत — वापरण्यापूर्वी तपासा"))
+    if wide:
+        pos = "; ".join(sorted({str(r.get("where")) for r in wide}))[:150]
+        lines.append(f"मॉडेल: तथ्य-तपासणी — पान-संदर्भ नसलेली {len(wide)} तथ्ये प्रस्तावाच्या पानांत आढळली नाहीत ({pos})"[:300])
+    if unv:
+        lines.append(f"मॉडेल: तथ्य-तपासणी — {len(unv)} तथ्ये पडताळता आली नाहीत (स्कॅन / OCR नाही / इंग्रजी पान)"[:300])
+    return lines
+
+
+def cmd_facts(args):
+    """facts <outdir> <spec.json> [<ocr dir>] — fact-anchor check (tools/fact_check.py, audit Q-F1) of the delivered
+    spec against the package PDF, on the runner's own OCR. Never fails the case; warnings via fact_lines; the tool's
+    details (fact values) only in $RP/facts.log, the Actions log gets counts (S-F3)."""
+    args = list(args)
+    if len(args) < 2:
+        return
+    out, spec = args[:2]
+    try:
+        st = json.load(open(os.path.join(out, "status.json"), encoding="utf-8"))
+    except Exception:
+        st = {}
+    if not isinstance(st, dict) or st.get("state") != "done" or not os.path.exists(spec):
+        return
+    pkg = os.path.join(out, os.path.basename(str(st.get("package_pdf") or "")))
+    if not st.get("package_pdf") or not os.path.exists(pkg):
+        pp = package_pdfs(out)
+        pkg = pp[0] if len(pp) == 1 else ""
+    if not pkg:
+        return add_warnings(["मॉडेल: तथ्य-तपासणी — पॅकेज PDF सापडली नाही, तपासणी झाली नाही"])
+    cmd = [sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "fact_check.py"), pkg, "--spec", spec]
+    cmd += ["--ocr-dir", args[2]] if len(args) > 2 and os.path.isdir(args[2]) else ["--no-ocr"]
+    rp = os.environ.get("RP") or "/tmp/runner-priv"
+    if os.path.isdir(rp):
+        cmd += ["--details", os.path.join(rp, "facts.log")]
+    rj = os.path.join(out, ".facts.json")
+    env = {k: v for k, v in os.environ.items() if k != "CASE_DETAILS_FILE"}
+    r = subprocess.run(cmd + ["--json", rj], capture_output=True, text=True, encoding="utf-8", errors="replace", env=env)
+    summ = [l for l in (r.stdout or "").splitlines() if l.startswith("fact_check:")]
+    print(summ[-1] if summ else f"fact_check: not run (exit {r.returncode})")   # S-F3: counts only
+    try:
+        recs = json.load(open(rj, encoding="utf-8"))
+    except Exception:
+        return add_warnings([f"मॉडेल: तथ्य-तपासणी — साधन चालले नाही (exit {r.returncode})"])
+    finally:
+        if os.path.exists(rj): os.remove(rj)
+    add_warnings(fact_lines(recs if isinstance(recs, list) else []))
+
+
 def note_where(w):
     """extract_check.py labels the note body "नोंद परि. N"; the app and the Study say टिप्पणी (owner 04.11.2026)."""
     return str(w or "").replace("नोंद परि.", "टिप्पणी परि.")
@@ -2013,7 +2091,7 @@ def main(a):
     if len(a) in (2, 5) and a[0] == "litellm_config":
         return cmd_litellm_config(a[1:])
     if len(a) < 2 or a[0] not in ("fetch", "step", "log_url", "finish", "fail", "claude_result", "verify", "warn",
-                                  "extracts", "case_meta", "note"):
+                                  "extracts", "facts", "case_meta", "note"):
         print(__doc__); sys.exit(2)
     c, arg = a[0], " ".join(a[1:])
     if c == "step" and not has_supabase():
@@ -2031,13 +2109,15 @@ def main(a):
         elif c == "warn": cmd_warn(arg)
         elif c == "note": cmd_note(arg)
         elif c == "extracts": cmd_extracts(a[1:])
+        elif c == "facts": cmd_facts(a[1:])
         elif c == "case_meta": cmd_case_meta(a[1:])
     except SystemExit:
         raise
     except Exception as e:
-        if c == "extracts":  # the final verbatim guard never fails the case ("deliver with warnings")
+        if c in ("extracts", "facts"):  # the final verbatim guard / fact check never fail the case ("deliver with warnings")
             try:
-                add_warnings([f"मॉडेल: उतारा-तपासणी — साधन चालले नाही ({str(e)[:120]})"])
+                lab = "उतारा-तपासणी" if c == "extracts" else "तथ्य-तपासणी"
+                add_warnings([f"मॉडेल: {lab} — साधन चालले नाही ({str(e)[:120]})"])
             except Exception:
                 pass
             print(f"engine_supabase {c}: {e}", file=sys.stderr); sys.exit(0)

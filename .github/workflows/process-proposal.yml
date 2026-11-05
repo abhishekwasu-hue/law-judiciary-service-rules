@@ -587,12 +587,15 @@ jobs:
           S0=$(date +%s); trap '{ printf "%s\t%s\t%s\n" "Verify outputs" "$S0" "$(date +%s)" >> "$RP/stages.tsv"; } 2>/dev/null || true' EXIT
           CM=(); [ -s "$RP/runner-case.json" ] && CM=(--case-meta "$RP/runner-case.json")
           python3 "$T/engine_supabase.py" verify /tmp/out /tmp/case --review /tmp/work --claude "$RP/claude.json" "${CM[@]}"
-      - name: Check extracts (extract_check.py on the runner's own OCR)
+      # + the fact-anchor check (audit 05.11.2026 Q-F1, tools/fact_check.py): dates / amounts / letter nos. / names of the
+      # note vs the page they cite, on the same runner-own OCR; soft warnings only, never fails the job (S-F3: counts only).
+      - name: Check extracts (extract_check.py + fact_check.py on the runner's own OCR)
         timeout-minutes: 10
         run: |
           S0=$(date +%s); trap '{ printf "%s\t%s\t%s\n" "Check extracts" "$S0" "$(date +%s)" >> "$RP/stages.tsv"; } 2>/dev/null || true' EXIT
           OCR=(); [ -d "$RP/pkgpages" ] && OCR=("$RP/pkgpages")
           python3 "$T/engine_supabase.py" extracts /tmp/out /tmp/work/spec.json /tmp/work/study.json "${OCR[@]}"
+          timeout 5m python3 "$T/engine_supabase.py" facts /tmp/out /tmp/work/spec.json "${OCR[@]}" || echo "fact check not completed (warning only)"
       - name: Upload outputs and finish
         timeout-minutes: 10
         run: |

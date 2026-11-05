@@ -189,6 +189,7 @@ Both are optional keys of the same spec.json; engine detail: tools/ENGINE_PROMPT
 - letter: new page/section; ref no. `संकिर्ण-<year>/<file no>/प्र.क्र.<n>/का.6`; e-mail; विषय/संदर्भ bold + centre; "आपला," (no "आपली,"); "( राजेश वडनेरकर )", "अवर सचिव ,महाराष्ट्र शासन", "प्रत : निवड नस्ती";
 - Study headings भाग 0 … भाग 7;
 - package: original file name (not `*_Proposal_with_GRs.pdf`); exactly "पृ. i / N" in the bottom strip of every page; bookmarks; page count = proposal + enclosure pages of `<pdf>.map.json` (no separator pages); no mark "TEXT NOT FOUND"/0 hits; no annotation on proposal pages; only Highlight annotations; docx core properties and PDF metadata blank, no AI/tool names (§4.27).
+- facts (WARN only, audit Q-F1): `python3 tools/fact_check.py "<package pdf>" --spec spec.json [--ocr-dir DIR] --details FILE` — every date / amount / letter no. / name of the note and letter (outside “…”) must occur on the पृ.N/प.वि. page it cites (no ref in the para: the proposal pages); NOT FOUND / ELSEWHERE lines = check that fact against the page image.
 
 Then a second read of every number and date against the page images.
 

@@ -57,9 +57,9 @@ _MON = "|".join(sorted(MONTHS, key=len, reverse=True))
 DATE_RE = re.compile(r"(?<![\d./-])(\d{1,2})[./-](\d{1,2})[./-](\d{4})(?![\d])")
 DATE_EN1 = re.compile(rf"(?<![\dA-Za-z])(\d{{1,2}})(?:st|nd|rd|th)?\s+(?:of\s+)?({_MON})\.?,?\s+(\d{{4}})(?!\d)", re.I)
 DATE_EN2 = re.compile(rf"(?<![A-Za-z])({_MON})\.?\s+(\d{{1,2}})(?:st|nd|rd|th)?,?\s+(\d{{4}})(?!\d)", re.I)
-_GROUPED = r"\d{1,3}(?:,\d{2})*,\d{3}|\d{1,3}(?:,\d{3})+"
-AMT_PREFIX = re.compile(rf"(?:रु\.|रुपये|Rs\.?|INR|₹)\s*({_GROUPED}|\d+)(\.\d{{1,2}})?", re.I)
-AMT_BARE = re.compile(rf"(?<![\d,./-])({_GROUPED})(\.\d{{1,2}})?(?![\d,])")
+_GROUPED = r"\d{1,3}(?:,\d{2,3})*,\d{3}"   # Indian 76,23,814 / Western 7,623,814
+AMT_PREFIX = re.compile(rf"(?:रु\.|रुपये|Rs\.?|INR|₹)\s*({_GROUPED}|\d+)(\.\d{{1,2}})?(?!\d|,\d)", re.I)
+AMT_BARE = re.compile(rf"(?<![\d,./-])({_GROUPED})(\.\d{{1,2}})?(?!\d|,\d)")
 CR_RE = re.compile(r"(?<![A-Za-zऀ-ॿ])C\.?\s?R\.?\s*(?:No\.?\s*)?(\d{1,4})\s*[-/]\s*(\d{4})(?!\d)")
 _QUAL = r"(?:\s*\([^)]{0,20}\))*"
 CASE_MR = re.compile(r"(रिट\s+याचिका|जनहित\s+याचिका|अवमान\s+याचिका|विशेष\s+अनुमती\s+याचिका|मूळ\s+अर्ज|"
@@ -366,7 +366,7 @@ def check(spec, study=None):
         for (toks, post), p in f["post"]:
             posts.setdefault(toks, {}).setdefault(post, []).append((lab, p))
     for toks, pm in posts.items():
-        ps = sorted(pm)
+        ps = list(pm)   # first-seen order (note first)
         for i, x in enumerate(ps):
             for y in ps[i + 1:]:
                 if re.sub(r"[\s.]", "", x) == re.sub(r"[\s.]", "", y):
