@@ -80,11 +80,11 @@ AUDIT_KNOWN_WARNS = {
         'note.paras[0]: demand',
     },
     'WP35697_2026_old-pension_finance-opinion': {
-        "note.paras[21]: 'उपरोक्त वस्तुस्थिती' list has 10 items",
-        "note.paras[21]: 'उपरोक्त वस्तुस्थिती' list carries 1 quote(s) “…”",
+        "note.paras[22]: 'उपरोक्त वस्तुस्थिती' list has 10 items",
+        "note.paras[22]: 'उपरोक्त वस्तुस्थिती' list carries 1 quote(s) “…”",
         'note.paras[0]: sentence 2 has 43 words',
-        'note.paras[19]: sentence 1 has 58 words',
-        'note.paras[20]: sentence 2 has 49 words',
+        'note.paras[20]: sentence 1 has 58 words',
+        'note.paras[21]: sentence 2 has 49 words',
     },
     'WP35697_2026_parawise_GP-letter': {
         "note.paras[23]: 'उपरोक्त वस्तुस्थिती' list has 10 items",
