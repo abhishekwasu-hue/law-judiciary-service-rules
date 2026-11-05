@@ -1211,6 +1211,69 @@ check(r.returncode == 0 and run_row["state"] == "done" and any("0013" in w and "
       f"draft edit finish, enum missing: warning names migration 0013, run done, orphan removed ({run_row['warnings']})")
 REJECT_KINDS.clear()
 
+# --- Pending 18 (05.11.2026): chat attachments are inputs of the NEXT full run, once, and its package keeps them
+try:
+    import pymupdf
+    _d = pymupdf.open(); _p = _d.new_page(width=200, height=200); _p.insert_text((40, 40), "scan")
+    PNG = _p.get_pixmap().tobytes("png")
+except ImportError:
+    PNG = None
+GRN = "202511051234567890.pdf"
+chat_rows = [
+    {"id": 61, "case_id": 7, "kind": "gr", "storage_path": "outputs/7/gr/v1/file.pdf", "original_name": GRN, "version": 1, "created_at": "9"},
+    {"id": 64, "case_id": 7, "kind": "gr", "storage_path": "outputs/7/gr/v2/file.pdf", "original_name": GRN, "version": 2, "created_at": "9"},
+    {"id": 62, "case_id": 7, "kind": "extra_doc", "storage_path": "proposals/7/extra_doc/v1/file.png", "original_name": "स्कॅन.png", "version": 1, "created_at": "9"},
+    {"id": 63, "case_id": 7, "kind": "extra_doc", "storage_path": "proposals/7/extra_doc/v1/file.pdf", "original_name": "इतर.pdf", "version": 1, "created_at": "9"},
+    {"id": 65, "case_id": 7, "kind": "extra_doc", "storage_path": "proposals/7/extra_doc/v1/x.pdf", "original_name": "नाकारलेले.pdf", "version": 1, "created_at": "9"}]
+chat_runs = [
+    {"id": 20, "case_id": 7, "kind": "edit", "state": "done", "edit_attachments": [62], "edit_result": {"summary": "जोडले"}},
+    {"id": 21, "case_id": 7, "kind": "edit", "state": "done", "edit_attachments": [65], "edit_result": {"refused": "नाही"}},
+    {"id": 22, "case_id": 7, "kind": "edit", "state": "failed", "edit_attachments": [63], "edit_result": None}]
+if PNG:
+    DB["case_files"] += chat_rows; DB["runs"] += chat_runs
+    STORE.update({"outputs/7/gr/v1/file.pdf": b"%PDF gr old", "outputs/7/gr/v2/file.pdf": b"%PDF gr new",
+                  "proposals/7/extra_doc/v1/file.png": PNG, "proposals/7/extra_doc/v1/file.pdf": b"%PDF other",
+                  "proposals/7/extra_doc/v1/x.pdf": b"%PDF refused"})
+    run_row.update(state="queued", warnings=[])
+    w8 = os.path.join(tmp, "case_chat")
+    r = run("fetch", w8)
+    cj8 = json.load(open(os.path.join(w8, "case.json"), encoding="utf-8"))
+    byname = {}
+    for f in cj8["inputs"]:
+        byname.setdefault(f["original_name"], []).append(f)
+    check(r.returncode == 0 and [f["id"] for f in byname.get(GRN, [])] == [64]
+          and open(os.path.join(w8, "in", "gr", GRN), "rb").read() == b"%PDF gr new" and byname[GRN][0]["package"] is True,
+          f"Pending 18 fetch: chat GR (kind gr) -> in/gr/, newest version only, once, package: true ({r.stderr[:200]})")
+    sc = byname.get("स्कॅन.png", [{}])[0]
+    check(sc.get("package") is True and sc.get("package_pdf_path") == "in/extra_doc/स्कॅन.png.pdf"
+          and open(os.path.join(w8, sc["package_pdf_path"]), "rb").read(5) == b"%PDF-",
+          f"Pending 18 fetch: chat image (done edit run) package: true + converted PDF ({sc})")
+    check(all("package" not in byname[n][0] for n in ("इतर.pdf", "नाकारलेले.pdf", "उत्तर.pdf")),
+          "Pending 18 fetch: uploads / refused or failed edit attachments are ordinary inputs (no package mark)")
+    check(len(cj8["inputs"]) == len({f["id"] for f in cj8["inputs"]}), "Pending 18 fetch: no input fetched twice")
+    # finish: the chat GR enclosed once, the image missing -> one warning (Study + run warnings); twice -> warning
+    ow8 = os.path.join(tmp, "work_chat"); os.makedirs(ow8)
+    def fin8(encs):
+        json.dump(encs, open(os.path.join(ow8, "enclosures.json"), "w", encoding="utf-8"), ensure_ascii=False)
+        json.dump({"state": "done", "summary": "s", "warnings": []}, open(os.path.join(out, "status.json"), "w", encoding="utf-8"), ensure_ascii=False)
+        real_study(os.path.join(out, "CR130_2026_Study.docx"))
+        run_row.update(state="running", warnings=[])
+        return run("finish", out, ENGINE_WORK_DIR=ow8)
+    r = fin8({"proposal_parts": [], "enclosures": [{"path": f"/tmp/case/in/gr/{GRN}", "pages": "", "label": "GR"},
+                                                   {"path": "pdf/gr/y.pdf", "pages": "1"}]})
+    pw = [w for w in run_row["warnings"] if "सुधारणा-चॅटमध्ये" in w]
+    check(r.returncode == 0 and run_row["state"] == "done" and len(pw) == 1 and "स्कॅन.png" in pw[0] and "GR सह PDF मध्ये नाही" in pw[0],
+          f"Pending 18 finish: chat image missing from enclosures.json -> warning; chat GR enclosed -> none ({run_row['warnings']})")
+    r = fin8([{"path": f"in/gr/{GRN}", "pages": ""}, {"path": "/tmp/case/in/extra_doc/स्कॅन.png.pdf", "pages": ""},
+              {"path": f"/tmp/case/in/gr/{GRN}", "pages": "1"}])
+    pw = [w for w in run_row["warnings"] if "सुधारणा-चॅटमध्ये" in w]
+    check(r.returncode == 0 and len(pw) == 1 and GRN in pw[0] and "2 वेळा" in pw[0],
+          f"Pending 18 finish: chat GR enclosed twice -> warning; converted image path counts ({run_row['warnings']})")
+    DB["case_files"] = [f for f in DB["case_files"] if f not in chat_rows]
+    DB["runs"] = [x for x in DB["runs"] if x not in chat_runs]
+else:
+    print("skip  Pending 18 chat inputs (pymupdf missing)")
+
 # --- L-F1 (audit 05.11.2026): every call names itself (Cloudflare error 1010 refuses Python's default User-Agent)
 check(LOG and all(l["h"].get("User-Agent") == "prastav-kaksha-engine/1" for l in LOG),
       f"User-Agent prastav-kaksha-engine/1 on every Supabase call ({sorted({l['h'].get('User-Agent') for l in LOG})})")

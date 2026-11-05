@@ -396,6 +396,51 @@ def test_package_attach_only(sb, tmp_path, monkeypatch):
     assert newest == {"spec.json", "enclosures.json"}                  # one version for both
     enc = json.loads(sb.objects[next(f for f in sp if f["version"] == v and f["original_name"] == "enclosures.json")["storage_path"]])
     assert enc[0]["path"].startswith("pdf/gr/") and enc[1]["case_file_id"] == a1["id"] and enc[2]["gr_code"] == code
+    # Pending 18: the GR fetched by सांकेतांक is kept as a case_files row (kind gr) -> input of the next full run
+    grs = [f for f in sb.files if f["kind"] == "gr"]
+    assert [(f["original_name"], f["version"]) for f in grs] == [(f"{code}.pdf", 1)]
+    assert sb.objects[grs[0]["storage_path"]] == open(gr_pdf, "rb").read()
+    # the same सांकेतांक again in a later edit: no second gr row (one input only)
+    sb.run.update({"state": "queued", "edit_message": f"GR {code} पुन्हा जोडा", "edit_attachments": []})
+    ED.run_edit(str(tmp_path / "w2"), api_key="sk")
+    assert len([f for f in sb.files if f["kind"] == "gr"]) == 1
+
+
+def test_full_run_layout_of_chat_inputs_resolves(sb, tmp_path, monkeypatch):
+    """Pending 18: a full run after a chat attachment encloses in/gr/<code>.pdf and in/extra_doc/<image>.pdf (converted
+    at fetch); a later edit resolves both from the case_files rows and rebuilds the package page for page."""
+    import subprocess
+    spec = sample("CR131_2026_special-pay_info-letter.json")
+    sb.add("note_letter", "CR131_2026_Note_and_Letter.docx", b"old")
+    prop = blank_pdf(str(tmp_path / "prop.pdf"), 2)
+    sb.add("proposal", "प्रस्ताव.pdf", open(prop, "rb").read(), bucket="inputs")
+    code = "202401011234567890"
+    grp = blank_pdf(str(tmp_path / "g.pdf"), 2)
+    sb.add("gr", f"{code}.pdf", open(grp, "rb").read())
+    img = pymupdf.open(); pg = img.new_page(width=300, height=400); pg.insert_text((50, 50), "image")
+    png = pg.get_pixmap().tobytes("png")
+    sb.add("extra_doc", "उत्तर-पत्र.png", png, bucket="inputs")
+    imgpdf = tmp_path / "img.pdf"
+    with pymupdf.open(stream=png, filetype="png") as d:
+        imgpdf.write_bytes(d.convert_to_pdf())
+    ej = tmp_path / "e.json"
+    ej.write_text(json.dumps([{"path": str(imgpdf), "pages": "", "label": "उत्तर-पत्र"},
+                              {"path": grp, "pages": "", "label": "GR"}], ensure_ascii=False), encoding="utf-8")
+    old = tmp_path / "प्रस्ताव-out.pdf"
+    r = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "pkg3.py"), prop, str(ej), str(old)], cwd=ROOT,
+                       capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
+    n_old = len(pymupdf.open(str(old)))
+    sb.add("package_pdf", "प्रस्ताव.pdf", old.read_bytes())
+    sb.add("spec", "spec.json", json.dumps(spec, ensure_ascii=False).encode("utf-8"))
+    saved = [{"path": "/tmp/case/in/extra_doc/उत्तर-पत्र.png.pdf", "pages": "", "label": "उत्तर-पत्र"},
+             {"path": f"/tmp/case/in/gr/{code}.pdf", "pages": "", "label": "GR"}]
+    sb.add("spec", "enclosures.json", json.dumps(saved, ensure_ascii=False).encode("utf-8"))
+    a = sb.add("extra_doc", "नवीन.pdf", open(blank_pdf(str(tmp_path / "n.pdf"), 1), "rb").read(), bucket="inputs")
+    monkeypatch.setattr(ED, "post_json", FakeAPI([]))
+    sb.run.update({"edit_target": "package", "edit_message": "जोडा", "edit_attachments": [a["id"]]})
+    er = ED.run_edit(str(tmp_path / "w"), api_key="sk")
+    assert er["attached"] == [{"title": "नवीन", "pages": f"पृ.{n_old + 1}/प.वि."}] and er["files"] == ["package_pdf"]
 
 
 def test_package_old_case_refused(sb, tmp_path):

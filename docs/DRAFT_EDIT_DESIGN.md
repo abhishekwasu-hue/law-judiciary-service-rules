@@ -73,3 +73,7 @@ Study edits; edits that need the proposal, GRs or a new draft type (full run); c
   attached files (capped, for quoting) → spec ops (e.g. a new para / related extract citing the new pages) → lint → rebuild →
   upload. Message that only attaches (no text change asked) → no model call at all (cost 0).
 - `edit_result` gets `attached: [{title, pages}]`.
+- **Later full runs (05.11.2026, HANDOVER Pending 18):** chat attachments (kind `gr` rows, incl. GRs fetched by सांकेतांक, stored
+  by the edit job; `edit_attachments` of done, not refused edit runs) are inputs of every later full run (`in/gr/`,
+  `in/extra_doc/`; case.json `"package": true`, image -> `<image>.pdf`), enclosed once; `finish` warns otherwise.
+  `model_edit` accepts Claude model ids only (direct Anthropic API).

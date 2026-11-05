@@ -23,6 +23,10 @@ caching): this file, then tools/ENGINE_BRIEF.md, then the tool docstrings, then 
   `WORKDIR/in/approval/` = Finance / GAD approval or concurrence received (वित्त/सा.प्र.वि. मान्यता) — the record for an
   order draft (B7); `WORKDIR/in/court_notice/` = a court notice (GP/AGP/HC/MAT) — court mode below. Both are read and
   enclosed like a reply (C28, 03.11.2026).
+  `WORKDIR/in/gr/` = GR / rule PDFs the user attached in the draft-edit chat. Every input with `"package": true` (all of
+  in/gr + documents attached in that chat) was added to the GR सह PDF by the user: enclose it ONCE (`package_pdf_path`
+  when given, else `local_path`; `"pages": ""`, no marks unless quoted) with the reply / extra_doc entries; never enclose
+  the same GR again from pdf/ or pdf/gr/; quote it like any GR where it applies (Pending 18; finish warns if missing).
 - Reply / approval / court_notice / extra_doc / additional proposal PDFs IN THE PACKAGE (02.11.2026, A1): they are the FIRST entries of
   enclosures.json, in upload order (all pages `"pages": ""`, label e.g. "प्राप्त उत्तर दि. __" / "अतिरिक्त कागदपत्र",
   no marks), then the GR pages. So reply pages follow the proposal pages in the package; cite them by their package
