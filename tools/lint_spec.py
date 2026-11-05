@@ -46,7 +46,8 @@ Rules (spec.json)
     <मान्यतेस्तव / मान्यतेसाठी / अभिप्रायास्तव / अभिप्रायार्थ / सहमतीस्तव> सादर (करण्यात येत आहे)." or (INSTRUCTIONS §8.3,
     Format-2) "… सार्वजनिक आरोग्य विभागास विनंती करण्यास हरकत नसावी. (मान्यतेस्तव सादर.)" or (approval within the department,
     no draft) "सबब, … मान्यतेस्तव सादर." or (file closure) "सबब, … नस्ती बंद करण्यास मान्यता असावी."; a bare note.closing
-    "मान्यतेस्तव सादर." is read together with the last para
+    "मान्यतेस्तव सादर." is read together with the last para; §4.37 (05.11.2026, D2): each form may be preceded by the lead
+    "उपरोक्त (सर्व) वस्तुस्थिती विचारात घेता, <decisive facts>." (read from its "सबब," / as "सबब," — last_core)
   - spec "order" / "orders" (§4.28) / "parawise" (optional, 02.11.2026): CLI only — tools/lint_order.py lint_order(spec) /
     tools/lint_parawise.py lint_parawise(spec) are imported lazily and their lines added; a missing module is a
     "WARN" line, never an error (lint_extras)
@@ -98,18 +99,23 @@ WARN level (spec.json; note body and letter, text outside quotes; related and si
   - L13 नियम 3 (आदरार्थी): त्याने/तिने -> त्यांनी, त्याचे/तिचे -> त्यांचे, त्याला/तिला -> त्यांना, त्याच्या/तिच्या -> त्यांच्या
   - L14 नियम 1–4 (अनुस्वार): "आपणास" -> "आपणांस"; "यांनां" / "यानां" -> "यांना"
   - C32 §4.34 (03.11.2026, relevance + एकसंध flow; flow_warnings): note-body table header with a "पृ./प.वि." / "पृ."
-    column; "पृष्ठांकन" / "माहितीकरिता देण्यात" outside quotes; quote-gluing "तसेच, “" / "” व “"; an item of the
-    "उपरोक्त वस्तुस्थिती पुढीलप्रमाणे आहे:-" list with "पृ.N/प.वि."; a quoted “…” containing "…" / "..." (note body and
-    related extracts)
+    column; "पृष्ठांकन" / "माहितीकरिता देण्यात" outside quotes; quote-gluing "तसेच, “" / "” व “"; a quoted “…”
+    containing "…" / "..." (note body and related extracts)
+  - §4.37 (05.11.2026, owner decisions D1–D4, docs/FLOW_RESEARCH.md; flow_warnings, table_shape_warnings,
+    para_count_warnings, para2_warnings): "जुने रूप §4.37" for the list "उपरोक्त वस्तुस्थिती पुढीलप्रमाणे आहे:-" and for a
+    condition table (header "अट" + "… स्थिती"); a prayers table (header "प्रार्थना") -> "§4.37 मुद्देनिहाय"; a note table
+    whose data cells are mostly non-numeric (no digit, no "____"), unless a service-detail header (नाव / पद / पदनाम /
+    नियुक्ती / दिनांक / कालावधी); more than 10 numbered paras; para 2 of a note answering a letter not opening "सदर
+    पत्रान्वये" / "उपरोक्त पत्रान्वये" (court / legislature notes excepted: §4.32 (अ) petition sentence)
   - §4.28 (03.11.2026): the note's last para names every draft in the spec (letter "पत्राचे", reminder "स्मरणपत्राचे",
     order kinds "शासन निर्णयाचे / शुद्धिपत्रकाचे / …", parawise "परिच्छेदनिहाय"; drafts_unnamed)
   - audit 05.11.2026 (docs/AUDIT_2026-11-05.md; samples' known findings: tests/test_lint_spec.py AUDIT_KNOWN_WARNS):
     Q-F6 "उल्लेख (केलेला) नाही" / "आढळून येत / आले नाही" outside the missing-info para (MISSING_REMARK_WARN_RE);
-    Q-F8 "उपरोक्त वस्तुस्थिती" list not 3–6 items (note.sub / table data rows / inline "(1)" markers) or a “…” in it;
+    (Q-F8 "उपरोक्त वस्तुस्थिती" 3–6 items: dropped 05.11.2026 with the list itself, §4.37 D2);
     Q-F9 own-text sentence (outside quotes; note body strings, letter intro / points / closing / body) of more than 40
     words (an abbreviation dot after a one-akshara word does not end a sentence); Q-F11 court note (spec "parawise" /
-    "affidavit"): para 2 without "प्रतिवादी क्र."; with "parawise" also para 3 not "… मागण्या …:-" + a table with a
-    "प्रार्थना" column (§4.32);
+    "affidavit"): para 2 without "प्रतिवादी क्र."; with "parawise" also para 3 not "… मागण्या …:-" + the prayers as
+    sub-points "(अ) …" (note.sub, or inline) (§4.32 (आ), §4.37);
     Q-F12 a letter to a "वकील" with a copy to the High Court Registry (§4.35; on_behalf_of: lint_parawise /
     lint_affidavit); Q-F19 no demand word in para 1–2 (court note: 1–3) when para 1 answers an incoming letter / petition
     (§4.30(3)); Q-F21 "पूर्वोदाहरण-ग्रंथालय" in a related heading / source
@@ -188,7 +194,39 @@ _DRAFT_ITEM = rf"{_DRAFT_KIND}(?:\s+प्रारूपे?)?"
 LAST_COMBINED_RE = re.compile(rf"^सबब\s*,.*{_DRAFT_ITEM}(?:\s*,\s*|\s+व\s+)[^.]{{0,160}}?{_DRAFT_KIND}\s+प्रारूपे?\s+"
                               r"पृ\.[^/]{0,40}/\s*प\.वि\.\s*वर\s+मान्यतेस्तव\s+सादर(?:\s+करण्यात\s+येत\s+आहे)?\s*\."
                               r"(?:\s*मान्य\s+झाल्यास\s+[^.]{0,160}निर्गमित\s+करण्यात\s+(?:येईल|येतील)\s*\.)?$", re.S)
-LAST_FORMS = (LAST_LETTER_RE, LAST_COMBINED_RE, LAST_FIN_RE, LAST_ORDER_RE, LAST_DEPT_RE, LAST_PHD_RE, LAST_DEPT_APPROVAL_RE, LAST_CLOSE_RE)
+# §4.37 (Abhi 05.11.2026, D2 "2अ"): the last para may open with the office lead "उपरोक्त (सर्व) वस्तुस्थिती विचारात घेता, …"
+# (FLOW_RESEARCH §1: 34 hits / 21 files) — "उपरोक्त वस्तुस्थिती विचारात घेता, <decisive facts>. सबब, <action>." or
+# "उपरोक्त वस्तुस्थिती विचारात घेता, सबब, …" or "उपरोक्त वस्तुस्थिती विचारात घेता, <action>." ("सबब, उपरोक्त वस्तुस्थिती
+# विचारात घेता, …" already starts with "सबब,"). The forms below are matched on the para with that lead normalised to
+# "सबब, …" (last_core); the endings are unchanged.
+LAST_LEAD_RE = re.compile(r"^उपरोक्त\s+(?:सर्व\s+)?(?:परिच्छेद[^,]{0,40}\s+)?वस्तुस्थिती\s+विचारात\s+घेता\s*,\s*")
+
+
+def last_core(t):
+    """The last para with a leading "उपरोक्त वस्तुस्थिती विचारात घेता, …" normalised: the text from the first "सबब," on,
+    else "सबब, " + the rest (§4.37 D2)."""
+    t = t or ""
+    m = LAST_LEAD_RE.match(t)
+    if not m:
+        return t
+    k = re.search(r"सबब\s*,", t[m.end():])
+    return t[m.end() + k.start():] if k else "सबब, " + t[m.end():]
+
+
+class _LeadTolerant:
+    """A LAST_* regex whose .match() reads the para through last_core (§4.37 D2); .pattern / .search as the regex."""
+    def __init__(self, rx):
+        self.rx, self.pattern = rx, rx.pattern
+
+    def match(self, t):
+        return self.rx.match(last_core(t))
+
+    def search(self, t):
+        return self.rx.search(last_core(t))
+
+
+LAST_FORMS = tuple(_LeadTolerant(r) for r in (LAST_LETTER_RE, LAST_COMBINED_RE, LAST_FIN_RE, LAST_ORDER_RE, LAST_DEPT_RE,
+                                              LAST_PHD_RE, LAST_DEPT_APPROVAL_RE, LAST_CLOSE_RE))
 BARE_CLOSING_RE = re.compile(r"^(?:प्रस्ताव\s+)?मान्यतेस्तव\s+सादर\s*\.?$")   # Format-1/2: "मान्यतेस्तव सादर." as its own line
 # अ.मु.स. (वित्त) route (§4.6, §8.3 "फक्त नस्ती वित्त/सा.आ.वि. कडे जाताना"): the last para sends the file to Finance or to PHD
 _ROUTE_TAIL = rf"(?:च्या\s+{_ACTION}|स\s+(?:पुन:श्च\s+)?विनंती|कडे\s+(?:पाठवि|सादर))"
@@ -1025,12 +1063,25 @@ def drafts_unnamed(spec):
 # relevance + एकसंध flow — WARN level only (never an error; verify_outputs prints the same as "WARN: …"). Note body:
 # a table whose header row has a "पृ./प.वि." / "पृ." column (the ref goes in the sentence before the table); forwarding
 # trivia "पृष्ठांकन" / "माहितीकरिता देण्यात" outside quotes; quote-gluing "तसेच, “" / "” व “" (one quote per sentence);
-# an item of the "उपरोक्त वस्तुस्थिती पुढीलप्रमाणे आहे:-" list carrying "पृ.N/प.वि." (refs are in the body). Note body and
-# related extracts: a quoted “…” containing "…" or "..." (a shortened quote, §1.1).
+# §4.37 (Abhi 05.11.2026, D2/D3): the old summary list "उपरोक्त वस्तुस्थिती पुढीलप्रमाणे आहे:-" (0 in the office corpus,
+# FLOW_RESEARCH §1) and the "अट / प्रस्तावातील स्थिती" condition table ("प्रस्तावातील स्थिती": corpus 0) -> "जुने रूप §4.37";
+# a court prayers table (header "प्रार्थना") -> "§4.37 मुद्देनिहाय". Note body and related extracts: a quoted “…”
+# containing "…" or "..." (a shortened quote, §1.1).
 PAGE_COL_RE = re.compile(r"^\s*(?:पृ|पृष्ठ)\s*\.?\s*(?:क्र\s*\.?\s*)?(?:/\s*प\s*\.\s*वि\s*\.?)?\s*$")
 TRIVIA_RE = re.compile(r"पृष्ठांकन(?!ाचे\s+प्रारूप|\s+निर्गमित)|माहितीकरिता\s+देण्यात")  # 04.11.2026: the endorsement draft itself ([I4.33]) is not trivia
 GLUE_RE = re.compile(r"तसेच\s*,\s*“|”\s*व\s*“")
-SUMMARY_HEAD_RE = re.compile(r"उपरोक्त\s+वस्तुस्थिती\s+(?:पुढीलप्रमाणे|खालीलप्रमाणे)")
+SUMMARY_HEAD_RE = re.compile(r"उपरोक्त\s+वस्तुस्थिती\s+(?:पुढीलप्रमाणे|खालीलप्रमाणे)")   # the old list (§4.37: WARN)
+COND_HDR_RE = re.compile(r"(?<![ऀ-ॿ])(?:अट|अटी|परिस्थिती)(?![ऀ-ॿ])")   # a condition cell ("अट", "परिच्छेद 12 मधील परिस्थिती")
+STATUS_HDR_RE = re.compile(r"स्थिती")   # + ANOTHER cell "प्रस्तावातील स्थिती" / "… वस्तुस्थिती" = the old condition table
+
+
+def is_condition_header(cells):
+    """True for the old "अट / प्रस्तावातील स्थिती" condition-table header (§4.29(9) before 05.11.2026)."""
+    cs = [c for c in cells or [] if isinstance(c, str)]
+    return any(COND_HDR_RE.search(c) and any(STATUS_HDR_RE.search(d) for k, d in enumerate(cs) if k != i)
+               for i, c in enumerate(cs))
+PRAYER_HDR_RE = re.compile(r"प्रार्थना")
+OLD437 = "जुने रूप §4.37"
 CURLY_QUOTE_RE = re.compile(r"“[^”]*”")
 SHORT_QUOTE_RE = re.compile(r"…|\.\.\.")
 FLOW_SRC = "(§4.34)"
@@ -1049,6 +1100,13 @@ def flow_warnings(seq, headers=(), related=()):
             if isinstance(c, str) and PAGE_COL_RE.match(c):
                 add(f"{lab}: table column '{c.strip()}' — no पृ./प.वि. column; give the reference once in the sentence "
                     f"before the table {FLOW_SRC}")
+        cs = [c for c in cells or [] if isinstance(c, str)]
+        if is_condition_header(cs):
+            add(f"{lab}: condition table ('अट / … स्थिती') — {OLD437}: state each condition and the proposal's fact in "
+                f"linked sentences / sub-points ('वरील अटीनुसार …; परंतु, सदर प्रकरणात …')")
+        if any(PRAYER_HDR_RE.search(c) for c in cs):
+            add(f"{lab}: prayers table — §4.37 मुद्देनिहाय: the prayers as sub-points '(अ) …; (आ) …' in petition order "
+                f"(§4.32(आ))")
     for lab, t, _ in seq:
         for m in TRIVIA_RE.finditer(unquoted(t)):
             add(f"{lab}: forwarding detail '{m.group(0)}' — endorsement nos. / copies-for-information are not needed "
@@ -1060,15 +1118,118 @@ def flow_warnings(seq, headers=(), related=()):
             if SHORT_QUOTE_RE.search(m.group(0)):
                 add(f"{lab}: shortened quote ('…' / '...' inside “…”) — quote the passage in full (§1.1) {FLOW_SRC}")
                 break
-    for i, (lab, t, isp) in enumerate(seq):
+    for lab, t, isp in seq:
         if isp and SUMMARY_HEAD_RE.search(unquoted(t)):
-            j = i + 1
-            while j < len(seq) and not seq[j][2]:
-                if REF_LOOSE.search(seq[j][1] or ""):
-                    add(f"{seq[j][0]}: 'उपरोक्त वस्तुस्थिती' item carries a पृ./प.वि. reference — the summary has no "
-                        f"page refs (they are in the body) {FLOW_SRC}")
-                j += 1
+            add(f"{lab}: 'उपरोक्त वस्तुस्थिती पुढीलप्रमाणे आहे:-' list — {OLD437}: the last para opens 'उपरोक्त "
+                f"वस्तुस्थिती विचारात घेता, …' with the decisive facts in one or two short sentences, then 'सबब, …'")
     return W
+
+
+# §4.37 D3 (Abhi 05.11.2026: "तक्ता टेबल यामध्ये माहिती संख्या विषयक आकडेमोड असेल तरच योग्य वाटते …"; "सेवा अ"): a
+# note-body table is for numerical / calculation data or the service-detail table. Heuristic (WARN only), chosen for
+# few false positives (tried on all samples/specs tables, 05.11.2026): a data cell is a "figure" when at least a quarter
+# of its non-space characters are digits (ASCII / Devanagari: "27.05.2025", "रु.60,000") or it is short (<= 20 chars)
+# and holds a digit or a "____" blank ("22 वर्षे", an unknown figure); a long sentence with one date in it is words. A
+# serial-number column ("अ.क्र." / "क्र.") is skipped (always digits), and so is the label column of a key-value table
+# ("तपशील | माहिती": the labels are words by nature, the values decide). A table is flagged only with at least 2 data
+# cells and fewer than half of them figures — amount, period, post-count and pay tables are mostly figures, while a
+# condition / duties / demands / correspondence / opinions table is words. Any header cell naming नाव / पद / पदनाम /
+# नियुक्ती / दिनांक / कालावधी marks the service-detail (or a dated) table and is never flagged. Old condition and
+# prayers tables already carry their own §4.37 message (flow_warnings) and are not counted twice.
+SERVICE_HDR_RE = re.compile(r"(?<![ऀ-ॿ])(?:नाव|पद|नियुक्ती|दिनांक|कालावधी)")
+SERIAL_HDR_RE = re.compile(r"^\s*(?:अ\s*\.?\s*क्र|अनु\s*\.?\s*क्र|क्र\s*\.|क्रमांक\s*$|Sr\.?|S\.\s*No)")
+NUMERIC_CELL_RE = re.compile(r"[0-9०-९]|_{3,}")
+LABEL_HDR_RE = re.compile(r"^\s*(?:तपशील|बाब|विवरण|घटक)\s*$")
+
+
+def figure_cell(c):
+    t = re.sub(r"\s", "", c or "")
+    if not t:
+        return False
+    nd = len(re.findall(r"[0-9०-९]", t))
+    return nd * 4 >= len(t) or (len(t) <= 20 and bool(NUMERIC_CELL_RE.search(t)))
+
+
+def table_shape_warnings(tables):
+    """tables = [(label, rows)] (rows = list of cell lists, row 0 = header) -> §4.37 D3 WARN strings."""
+    W = []
+    for lab, rows in tables:
+        if not rows or not isinstance(rows[0], list):
+            continue
+        hdr = [c if isinstance(c, str) else "" for c in rows[0]]
+        if any(SERVICE_HDR_RE.search(c) for c in hdr) or any(PRAYER_HDR_RE.search(c) for c in hdr) or \
+                is_condition_header(hdr):
+            continue
+        skip = {k for k, c in enumerate(hdr) if SERIAL_HDR_RE.match(c)}
+        rest = [k for k in range(len(hdr)) if k not in skip]
+        if len(rest) >= 2 and LABEL_HDR_RE.match(hdr[rest[0]]):
+            skip.add(rest[0])
+        cells = [c.strip() for r in rows[1:] if isinstance(r, list) for k, c in enumerate(r)
+                 if k not in skip and isinstance(c, str) and c.strip()]
+        if len(cells) >= 2 and sum(figure_cell(c) for c in cells) * 2 < len(cells):
+            W.append(f"{lab}: descriptive table — §4.37 मुद्देनिहाय: tables only for figures (amounts, arrears, recovery, "
+                     f"burden, pay, post counts, periods) or the service-detail table; conditions, duties, demands, "
+                     f"chronology and opinions as linked sentences / sub-points")
+    return W
+
+
+def note_table_rows(n):
+    """[(JSON path, rows)] of every {"table": [...]} in the note body (as note_tables, with all rows)."""
+    out = []
+    def walk(o, path):
+        if isinstance(o, dict):
+            if isinstance(o.get("table"), list) and o["table"] and isinstance(o["table"][0], list):
+                out.append((f"{path}.table", o["table"]))
+            for k, v in o.items():
+                if k != "table":
+                    walk(v, f"{path}.{k}")
+        elif isinstance(o, list):
+            for i, x in enumerate(o):
+                walk(x, f"{path}[{i}]")
+    for k in ("first", "paras", "sub", "closing"):
+        if k in n:
+            walk(n[k], f"note.{k}")
+    return out
+
+
+# §4.37 D1 (Abhi 05.11.2026, "1अ"): one issue per numbered para, its facts as sub-points (note.sub); office median 5
+# numbered paras (FLOW_RESEARCH §2.1; ~5–8 for an ordinary proposal). Soft WARN above MAX_NUMBERED (para 1 + every
+# printed numbered para; note.closing is printed without a number and not counted).
+MAX_NUMBERED = 10
+
+
+def para_count_warnings(n):
+    paras = n.get("paras") if isinstance(n.get("paras"), list) else []
+    k = 1 + sum(1 for x in paras if isinstance(x, str) and x.strip())
+    if k > MAX_NUMBERED:
+        return [f"note.paras: {k} numbered paras — §4.37 D1: one issue per numbered para, its facts as sub-points "
+                f"(note.sub); about 5–8 for an ordinary proposal (office median 5)"]
+    return []
+
+
+# §4.37 D4 (Abhi 05.11.2026, "4अ"): when para 1 answers an incoming letter, para 2 (the first numbered para) opens
+# "सदर पत्रान्वये …" (FLOW_RESEARCH §1: 20 / 17 CR) or, when para 1 cites several letters, "उपरोक्त पत्रान्वये …" (13 / 12)
+# — who asks what, one sentence. Not for court notes (para 2 = the §4.32 (अ) petition sentence; also any note whose
+# para 2 names a petition / respondents) or a legislature question note (spec "lq").
+PARA2_OPEN_RE = re.compile(r"^(?:सदर|उपरोक्त|वरील)\s+(?:पत्रां?न्वये|पत्रां?द्वारे|पत्रांअन्वये)")
+FIRST_LETTER_RE = re.compile(r"पत्रां?स\s+अनुसरून|पत्रासोबत|पत्रांसोबत")
+
+
+def para2_warnings(spec):
+    n = spec.get("note") if isinstance(spec, dict) and isinstance(spec.get("note"), dict) else None
+    if n is None or spec.get("parawise") or spec.get("affidavit") or spec.get("lq"):
+        return []
+    if not FIRST_LETTER_RE.search(unquoted(n.get("first") or "")):
+        return []
+    paras = n.get("paras") if isinstance(n.get("paras"), list) else []
+    idx = [i for i, x in enumerate(paras) if isinstance(x, str) and x.strip()]
+    if not idx:
+        return []
+    t = ns(unquoted(paras[idx[0]]))
+    if PARA2_OPEN_RE.match(t) or re.search(r"याचिका|प्रतिवादी\s+क्र\.", t):
+        return []
+    return [f"note.paras[{idx[0]}]: para 2 — §4.37 D4: open 'सदर पत्रान्वये …' ('उपरोक्त पत्रान्वये …' when para 1 cites "
+            f"several letters): who asks what, one sentence"]
 
 
 def note_tables(n):
@@ -1208,48 +1369,8 @@ def missing_inline_problems(n):
     return P, W
 
 
-# Q-F8 (WARN, §4.29(10) / §4.34(आ)): the "उपरोक्त वस्तुस्थिती पुढीलप्रमाणे आहे:-" list has 3 to 6 decisive facts, one line
-# each, no “…” quote (the quotes are in the body)
-SUMMARY_MIN, SUMMARY_MAX = 3, 6
-INLINE_ITEM_RE = re.compile(r"\(\s*[0-9०-९]+\s*\)")
-
-
-def summary_problems(entries):
-    """entries = [(label, head text, [item texts])] — one per "उपरोक्त वस्तुस्थिती" para; items = its sub-points / table
-    data rows (none: the "(1) … (2) …" markers in the head para after the heading are counted). -> WARN strings."""
-    W = []
-    for lab, head, items in entries:
-        tail = SUMMARY_HEAD_RE.split(head or "", 1)[-1]
-        k = len(items) if items else len(INLINE_ITEM_RE.findall(unquoted(tail)))
-        if k and not SUMMARY_MIN <= k <= SUMMARY_MAX:
-            W.append(f"{lab}: 'उपरोक्त वस्तुस्थिती' list has {k} items — 3 to 6 decisive facts, one line each "
-                     f"(§4.29(10), §4.34(आ))")
-        nq = sum(len(CURLY_QUOTE_RE.findall(x or "")) for x in list(items) + ([tail] if not items else []))
-        if nq:
-            W.append(f"{lab}: 'उपरोक्त वस्तुस्थिती' list carries {nq} quote(s) “…” — facts only, the quotes stay in the body "
-                     f"(§4.34(आ))")
-    return W
-
-
-def summary_entries(n):
-    """summary_problems() entries of a spec note: the string para with the heading, its note.sub items and the table
-    data rows (all rows after the header) of the non-string items right after it."""
-    paras = n.get("paras") if isinstance(n.get("paras"), list) else []
-    sub = n.get("sub") if isinstance(n.get("sub"), dict) else {}
-    out = []
-    for i, x in enumerate(paras):
-        if not (isinstance(x, str) and SUMMARY_HEAD_RE.search(unquoted(x))):
-            continue
-        items = [t for t in sub.get(str(i), []) if isinstance(t, str) and t.strip()]
-        j = i + 1
-        while j < len(paras) and not isinstance(paras[j], str):
-            y = paras[j]
-            if isinstance(y, dict) and isinstance(y.get("table"), list):
-                items += [" ".join(c for c in r if isinstance(c, str)) for r in y["table"][1:] if isinstance(r, list)]
-            items += [t for t in sub.get(str(j), []) if isinstance(t, str) and t.strip()]
-            j += 1
-        out.append((f"note.paras[{i}]", x, items))
-    return out
+# Q-F8 (05.11.2026): the "उपरोक्त वस्तुस्थिती" 3–6 item count is dropped with the list itself (§4.37 D2; the old list
+# now gets the "जुने रूप §4.37" WARN in flow_warnings).
 
 
 # Q-F9 (WARN, §4.18 / §4.32(इ) "एका वाक्यात एक मुद्दा (40 शब्दांपेक्षा लांब वाक्य नको)"): own-text sentence (outside “…”
@@ -1296,9 +1417,12 @@ def long_sentence_warnings(items):
 
 # Q-F11 (WARN, §4.32 (अ)/(आ)): a court note (spec with "parawise" / "affidavit") — para 2 names the respondents in order
 # ("… यांना प्रतिवादी क्र. 1, …") and para 3 lists the prayers ("सदर याचिकेद्वारे याचिकाकर्त्यांनी पुढीलप्रमाणे प्रमुख मागण्या …:-"
-# + a table with a "प्रार्थना" column). Model: samples/specs/WP35697_2026_old-pension_finance-opinion.json.
+# + the prayers as sub-points "(अ) …; (आ) …" — note.sub of that para or inline markers; §4.37 D3 "प्रार्थना अ", 05.11.2026;
+# an old prayers table still counts here and gets its own "§4.37 मुद्देनिहाय" WARN in flow_warnings).
+# Model: samples/specs/WP35697_2026_old-pension_finance-opinion.json.
 RESP_RE = re.compile(r"प्रतिवादी\s+क्र\.")
 PRAYER_HEAD_RE = re.compile(r"मागण्या")
+SUBPOINT_RE = re.compile(r"\(\s*(?:[अ-औ]|[0-9०-९]+|[a-z])\s*\)")
 
 
 def court_shape_warnings(spec):
@@ -1316,13 +1440,17 @@ def court_shape_warnings(spec):
         return W   # affidavit stage: the prayers were tabled in the earlier parawise note (para 3 checked with "parawise")
     ok3 = False
     if len(idx) > 1 and PRAYER_HEAD_RE.search(unquoted(paras[idx[1]])):
+        sub = n.get("sub") if isinstance(n.get("sub"), dict) else {}
         nxt = paras[idx[1] + 1] if idx[1] + 1 < len(paras) else None
         hdr = nxt.get("table")[0] if isinstance(nxt, dict) and isinstance(nxt.get("table"), list) and nxt["table"] \
             and isinstance(nxt["table"][0], list) else []
-        ok3 = any(isinstance(c, str) and "प्रार्थना" in c for c in hdr)
+        tail = unquoted(paras[idx[1]]).split(":-", 1)[-1] if ":-" in paras[idx[1]] else ""
+        ok3 = bool([t for t in sub.get(str(idx[1]), []) if isinstance(t, str) and t.strip()]) \
+            or bool(SUBPOINT_RE.search(tail)) or any(isinstance(c, str) and "प्रार्थना" in c for c in hdr)
     if not ok3:
         W.append(f"note.paras[{idx[1] if len(idx) > 1 else 1}]: court note para 3 — 'सदर याचिकेद्वारे याचिकाकर्त्यांनी "
-                 f"पुढीलप्रमाणे प्रमुख मागण्या केल्या आहेत (पृ.N/प.वि.):-' + table 'अ.क्र. | प्रार्थना | मागणी' (§4.32(आ))")
+                 f"पुढीलप्रमाणे प्रमुख मागण्या केल्या आहेत (पृ.N/प.वि.):-' + the prayers as sub-points '(अ) …; (आ) …' "
+                 f"(§4.32(आ), §4.37)")
     return W
 
 
@@ -1419,9 +1547,11 @@ def lint_warnings(spec):
     W += flow_warnings(note_seq(n), note_tables(n), rel_txt)   # C32 §4.34 relevance + flow
     W += [f"{last_para(n)[0]}: last para — does not name the draft {d} (§4.28: name every draft made, e.g. "
           f"'पत्राचे प्रारूप व शासन निर्णयाचे प्रारूप पृ.      /प.वि. वर मान्यतेस्तव सादर.')" for d in drafts_unnamed(spec)]
-    # audit 05.11.2026: Q-F8 summary list, Q-F9 long sentences, Q-F11 court para 2/3, Q-F12 registry copies, Q-F19 demand,
-    # Q-F21 library refs
-    W += summary_problems(summary_entries(n))
+    # §4.37 (05.11.2026, D1/D3/D4): descriptive tables, numbered-para count, para 2 opener
+    W += table_shape_warnings(note_table_rows(n))
+    W += para_count_warnings(n)
+    W += para2_warnings(spec)
+    # audit 05.11.2026: Q-F9 long sentences, Q-F11 court para 2/3, Q-F12 registry copies, Q-F19 demand, Q-F21 library refs
     own = [(p, t) for p, t in body if not re.search(r"\.table\[", p)]
     own += [(p, t) for p, t in letter if re.match(r"letters?(?:\[\d+\])?\.(?:intro|points\[\d+\]|closing|body\[\d+\])$", p)]
     W += long_sentence_warnings(own)

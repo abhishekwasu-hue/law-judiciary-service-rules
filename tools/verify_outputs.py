@@ -52,8 +52,9 @@ Checks
   WARN when that para is not just before the last (numbered or "सबब,") para
  Note body (C32 §4.34, 03.11.2026; lint_spec.flow_warnings, WARN only — never FAIL, ALL OK unaffected): a table
   header with a "पृ./प.वि." / "पृ." column; "पृष्ठांकन" / "माहितीकरिता देण्यात" outside quotes; quote-gluing "तसेच, “" /
-  "” व “"; an "उपरोक्त वस्तुस्थिती पुढीलप्रमाणे आहे:-" item with "पृ.N/प.वि."; a quoted “…” with "…" / "..." (also in
-  संबंधित माहिती)
+  "” व “"; a quoted “…” with "…" / "..." (also in संबंधित माहिती); §4.37 (05.11.2026): "जुने रूप §4.37" for the list
+  "उपरोक्त वस्तुस्थिती पुढीलप्रमाणे आहे:-" and an "अट / … स्थिती" condition table, a prayers table ("§4.37 मुद्देनिहाय"),
+  a descriptive table (lint_spec.table_shape_warnings: data cells mostly non-figures, service-detail headers excepted)
  Note_and_Letter (whole file): no repo paths (register/, service-rules/, precedent-library/, pdf/, repo, रेपो)
  Letter (when present: a "प्रति," or "क्रमांक :-" paragraph):
   - starts on a new page / new section (page break or section break before the letterhead)
@@ -92,7 +93,7 @@ Checks
   - "annotations on proposal pages (none)": no annotation on proposal (and reply-part) pages;
     "annotations (Highlight only)": only Highlight annotations elsewhere
  Audit 05.11.2026 additions:
-  - Q-F8 (WARN): the note's "उपरोक्त वस्तुस्थिती" list has 3 to 6 items (sub-point paragraphs / table data rows) and no “…”
+  - Q-F8: dropped 05.11.2026 with the "उपरोक्त वस्तुस्थिती" list (§4.37 D2; the old list is a flow WARN above)
   - Q-F6 (WARN): "उल्लेख नाही" / "आढळून येत नाही" outside the missing-info para (lint_spec.missing_scatter warnings)
   - Q-F14 (--case-meta meta.json; FAIL, soft): every letter number line "…-<year>/<file no>/प्र.क्र.<n>/…" against the case
     row: file_no ("संकीर्ण-2026/979/प्र.क्र.130/का.6", "2026/979" or "979") year + number, प्र.क्र. vs file_no's प्र.क्र. /
@@ -126,7 +127,7 @@ from lint_spec import (AMS, BANNED, BARE_CLOSING_RE, FIN, ID_RE, LH_EMAIL, RELAT
                        MISSING_FORM, MISSING_HEAD, SIGNERS, banned_hits, desk_signers, finance_problems, heading_problems, id_hits,
                        lang_hits, ma_hits, ns, num, part_no, ref_problems, repo_hits, requests_info, signer_problems,
                        style_hits, unquoted, warn_hits, PKG_WORD, draft_word_hits, related_source_problems,
-                       missing_scatter, flow_warnings, DO_FIRST_PERSON_RE, SUMMARY_HEAD_RE, summary_problems,
+                       missing_scatter, flow_warnings, DO_FIRST_PERSON_RE, table_shape_warnings, LAST_LEAD_RE,
                        NUMLIST, LAST_FORMS, out, redact, details_arg, set_details, details_active,
                        MISSING_HEAD_RE, MISSING_INLINE_RE, MISSING_INLINE_MSG, note_letter_no_hits,
                        MISSING_OLD_HEAD, MISSING_OLD_MSG, MISSING_NEW_COLON_RE)
@@ -323,27 +324,6 @@ def source_of_line(t):
     lint_spec.related_source_problems. Audit Q-F4: anchored on the LAST "पृ." — the GR's own page may come before it
     ("(…, पृ.40, पृ.20/प.वि.)" -> "…, पृ.40 (पृ.20/प.वि.)")."""
     return re.sub(r",\s*(पृ\.(?:(?!पृ\.)[^()])*?/\s*प\.वि\.)$", r" (\1)", re.sub(r"^\((?:स्रोत:\s*)?|\)$", "", t))
-
-
-def summary_blocks(blocks):
-    """lint_spec.summary_problems entries from the note's docx blocks: each "उपरोक्त वस्तुस्थिती" paragraph, its items = the
-    paragraphs (sub-points) and table data rows after it up to the next numbered / "सबब," paragraph (audit Q-F8)."""
-    out_, cur = [], None
-    for i, b in enumerate(blocks):
-        t = ns(b["text"])
-        if not t:
-            continue
-        if b["kind"] == "p" and SUMMARY_HEAD_RE.search(unquoted(t)):
-            cur = (f"note block {i + 1}", t, []); out_.append(cur); continue
-        if cur is None:
-            continue
-        if b["kind"] == "p" and re.match(r"[0-9०-९]+\.|सबब\s*,", t):
-            cur = None; continue
-        if b["kind"] == "tbl":
-            cur[2].extend(r for r in b["text"].split("\n")[1:] if r.strip(" |"))
-        else:
-            cur[2].append(t)
-    return out_
 
 
 FILE_NO_RE = re.compile(r"(?<![0-9])((?:19|20)[0-9]{2})\s*/\s*([0-9]+)(?![0-9])")
@@ -587,7 +567,9 @@ def main(argv):
         check("official Marathi §4.19 (note body, letter)", lg)
         # §4.31 (Abhi 03.11.2026): missing information / documents only in ONE missing-info para (its table / unnumbered
         # sub-points belong to it); a numbered or "सबब," paragraph starts a new para (SOFT, like every non-HARD check)
-        nseq = [(f"note block {i + 1}", b["text"], b["kind"] == "p" and bool(re.match(r"[0-9०-९]+\.|सबब\s*,", ns(b["text"]))))
+        # a para = a numbered paragraph, a "सबब, …" closing or (§4.37 D2) a closing that opens "उपरोक्त वस्तुस्थिती विचारात घेता,"
+        nseq = [(f"note block {i + 1}", b["text"], b["kind"] == "p" and bool(re.match(r"[0-9०-९]+\.|सबब\s*,", ns(b["text"]))
+                                                                            or LAST_LEAD_RE.match(ns(b["text"]))))
                 for i, b in enumerate(bl[:note_end]) if ns(b["text"])]
         mp, mw = missing_scatter(nseq)
         check("missing information in ONE para §4.31 (note body)", mp)
@@ -615,8 +597,10 @@ def main(argv):
                   for i, b in enumerate(bl[:note_end]) if b["kind"] == "tbl" and b["text"]]
         for x in flow_warnings(nseq, nheads, [("संबंधित माहिती", rel_txt)] if rel_txt else []):
             warn(x)
-        # audit Q-F8: "उपरोक्त वस्तुस्थिती" list — 3 to 6 items (sub-point paragraphs / table data rows), no “…” quote
-        for x in summary_problems(summary_blocks(bl[:note_end])):
+        # §4.37 D3 (Abhi 05.11.2026): tables only for figures or the service-detail table (lint_spec.table_shape_warnings)
+        ntabs = [(f"note block {i + 1} (table)", [r.split(" | ") for r in b["text"].split("\n")])
+                 for i, b in enumerate(bl[:note_end]) if b["kind"] == "tbl" and b["text"]]
+        for x in table_shape_warnings(ntabs):
             warn(x)
         # WARN level (lint_spec.warn_hits: शुद्धलेखन नियम 1–4, 3, 12, 14) — printed, never a FAIL
         for where, t in (("note", note_txt), ("letter", letter_txt)):
