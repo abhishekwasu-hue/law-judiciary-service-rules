@@ -69,6 +69,20 @@
   no rule dropped). Gap: tools/verify_outputs.py does not check the _Affidavit / _LQ_Answer files yet.
 
 ## Pending
+24. **05.11.2026 second round (Abhi: "Yes go ahead", "Run multiple agent") — deployed:** Q-F1 tools/fact_check.py (note/letter
+    dates, amounts, letter nos., names vs the cited package page; soft warnings ≤4 to Study part 7, wide-mode misses owner-only;
+    inside workflow step "Check extracts"); Q-F15 tools/consistency_check.py (same facts across note / letter / orders / parawise /
+    affidavit / lq / Study part 0; ≤6 soft warnings; step "Check consistency"); Q-F10 shortened quotes completed in 5 samples
+    (CR130 table cells 1 and 3 left: proposal PDF not in repo; COURT_* Rule 58 page 71 cropped letters completed as plain words —
+    asked Abhi whether to show them in [ ]); UI leftovers (run-state badge words, column headers, chart axis labels, toast with
+    "पूर्ववत करा" also on the case page); small security (upload magic bytes, step text cleaning, OTP shouldCreateUser false +
+    owner auth user at setup, migration 0015 cases column guard + activity insert only by trigger, pinned checkouts,
+    hash-locked engine requirements); S-F1/S-F2 engine isolation behind KV engine_isolation (default off; docs/ENGINE_ISOLATION.md;
+    egress allowlist: Worker, gr.maharashtra.gov.in, archive.org, sci.gov.in, bombayhighcourt.nic.in,
+    finance.maharashtra.gov.in). Tests: pytest 630 passed, worker 54/54, all samples LINT OK, app build OK.
+    **Owner actions:** migration 0015 (supabase/migrations/20261105000015_case_column_guard.sql); Supabase Auth: turn off
+    "Allow new users to sign up". **Needs live runs:** fact/consistency warning rates on a real case; engine_isolation "on" test
+    per docs/ENGINE_ISOLATION.md. Still open: letters_write for staff, members see all members (S-F7 rest).
 23. **05.11.2026 owner decisions done:** (a) note signer chain §4.6 changed on Abhi's own note page ("asa bdal kra"):
     "(अ.मा. वसू)" (not bold) + "क. अ. (अ.का.)" on the right, then अ.स. (श्री. वडनेरकर) / उ.वि.स. नि. उ.स. (श्री. बोंद्रे) /
     सचिव व व. वि. स. (श्री. बिले) left; अ.मु.स. (वित्त) rule unchanged — desk profile signers_right/signers_plain, mkdocs,
