@@ -319,6 +319,6 @@ tail -n +1 -f --pid=$! /root/vps-setup.log
 - Container: `docker run -d --restart unless-stopped --init --cpus 1.5 --memory 5g --memory-swap 5g --pids-limit 4096
   --cap-add SYS_ADMIN --security-opt apparmor=unconfined --log-opt max-size=10m --log-opt max-file=3
   -v vps-prastav-state:/runner-state`. No NET_ADMIN, so `engine_isolation` "on" (egress.sh iptables) cannot work here.
-- Workflows: every job `runs-on: ${{ fromJSON(vars.RUNS_ON || '"ubuntu-latest"') }}`.
+- Workflows: every job `runs-on: ${{ fromJSON(vars.RUNS_ON || '"ubuntu-24.04"') }}`.
 - Not verified without the VPS: the image build (no disk space in the build session), sandbox `mount --bind` inside the
   container, setup-python 3.12 on the runner image, a full engine run.

@@ -36,7 +36,7 @@ env:
   POST_RESERVE_MIN: '20'
 jobs:
   run:
-    runs-on: ${{ fromJSON(vars.RUNS_ON || '"ubuntu-latest"') }}
+    runs-on: ${{ fromJSON(vars.RUNS_ON || '"ubuntu-24.04"') }}
     timeout-minutes: 180
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262   # v4.4.0
@@ -146,7 +146,7 @@ jobs:
           cache: npm
           cache-dependency-path: .github/workflows/process-proposal.yml   # global install, version pinned in this file
       - name: Install tools
-        timeout-minutes: 20
+        timeout-minutes: 35
         run: |
           set -euo pipefail
           S0=$(date +%s); trap '{ printf "%s\t%s\t%s\n" "Install tools" "$S0" "$(date +%s)" >> "$RP/stages.tsv"; } 2>/dev/null || true' EXIT

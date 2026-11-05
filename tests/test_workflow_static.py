@@ -46,11 +46,11 @@ class WorkflowStatic(unittest.TestCase):
                     os.unlink(f.name)
                 self.assertEqual(r.returncode, 0, f"{n} / {st.get('name')}: {r.stderr}")
 
-    RUNS_ON = "${{ fromJSON(vars.RUNS_ON || '\"ubuntu-latest\"') }}"
+    RUNS_ON = "${{ fromJSON(vars.RUNS_ON || '\"ubuntu-24.04\"') }}"
 
     def test_runs_on_switchable(self):
         """docs/VPS_RUNNER.md (05.11.2026): EVERY job takes its runner from the repository variable RUNS_ON
-        (["self-hosted","prastav"] = the VPS runner); without the variable it is GitHub's ubuntu-latest."""
+        (["self-hosted","prastav"] = the VPS runner); without the variable it is GitHub's ubuntu-24.04 (pinned: ubuntu-latest moved to 26.04, slow apt mirror, run #17)."""
         for n in self.names:
             doc = load(n)
             for jid, job in doc["jobs"].items():
