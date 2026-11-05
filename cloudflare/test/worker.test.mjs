@@ -1565,7 +1565,7 @@ test('draft edit: validation — target, message, attachments (this case, kinds,
   } finally { Q = null; dispatchFail = false; monthRuns = []; }
 });
 
-test('draft edit: migration 0013 missing → 409 migration_missing; the queue still works without runs.kind; edit sweep at 30 min', async () => {
+test('draft edit: migration 0013 missing → 409 migration_missing; the queue still works without runs.kind; edit sweep at 90 min (VPS, one runner)', async () => {
   Q = { rows: [], nextId: 800 }; monthRuns = []; dispatchFail = false;
   setParallel('1');   // these steps describe the one-by-one queue (max_parallel_runs 1)
   specCases.add(801);
@@ -1582,8 +1582,8 @@ test('draft edit: migration 0013 missing → 409 migration_missing; the queue st
     assert.deepEqual(sw.failed, [], 'sweep without runs.kind');
     editColumns = true;
     Q.rows.length = 0;
-    // stale edit run (31 min) → failed with its own reason; a 31-min full run and a 10-min edit run are not swept
-    const t31 = new Date(Date.now() - 31 * 60 * 1000).toISOString(), t10 = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+    // stale edit run (91 min) → failed with its own reason; a 31-min full run and a 10-min edit run are not swept
+    const t31 = new Date(Date.now() - 91 * 60 * 1000).toISOString(), t10 = new Date(Date.now() - 10 * 60 * 1000).toISOString();
     Q.rows.push({ id: 811, case_id: 81, kind: 'edit', state: 'running', dispatched_at: t31, created_at: t31 },
                 { id: 812, case_id: 82, kind: 'full', state: 'running', dispatched_at: t31, created_at: t31 },
                 { id: 813, case_id: 83, kind: 'edit', state: 'running', dispatched_at: t10, created_at: t10 });
