@@ -1235,3 +1235,32 @@ class LintCR14MoreWarns(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LintCR50StageWarns(unittest.TestCase):
+    """06.11.2026 (live run CR 50/2020, run 2): a reminder with a missing-info para, a court case's status asked in the
+    letter, para 1 written as two '… सादर.' sentences — WARN only (§4.39 A11, A3, A12)."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.s = load_clean(CR122)
+        cls.base = set(L.lint_warnings(cls.s))
+
+    def new(self, s, needle):
+        return [w for w in L.lint_warnings(s) if needle in w and w not in self.base]
+
+    def test_reminder_with_missing_para(self):
+        s = copy.deepcopy(self.s)
+        s["letter"]["reminder"] = 1
+        self.assertTrue(self.new(s, "A11 स्मरणपत्र-टप्पा"))
+
+    def test_court_status_asked(self):
+        s = copy.deepcopy(self.s)
+        s["letter"]["points"] = list(s["letter"]["points"]) + ["5)\tरिट याचिका (स्टँप) क्र. 34801/2024 ची सद्यःस्थिती व पुढील सुनावणीचा दिनांक;"]
+        self.assertTrue(self.new(s, "court case status asked"))
+
+    def test_para1_two_sentences(self):
+        s = copy.deepcopy(self.s)
+        s["note"]["first"] = ("प्रमुख जिल्हा व सत्र न्यायाधीश, भंडारा यांच्या पृ.1/प.वि. वरील दि. 01.01.2026 रोजीच्या पत्रास अनुसरून सादर. "
+                              "तसेच, प्रबंधक, उच्च न्यायालय (अपील शाखा), मुंबई यांच्या पृ.2/प.वि. वरील दि. 02.01.2026 रोजीच्या पत्रास अनुसरून सादर.")
+        self.assertTrue(self.new(s, "A12 परि. 1 एकच वाक्य"))

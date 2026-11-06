@@ -99,6 +99,14 @@
   tier) still reads every page; agent descriptions (engine_supabase.py) match. Tool docstrings no longer inlined in the
   prompt (Pending 19 closed): /tmp/work/TOOL_DOCS.md read per tool. Saving NOT yet measured — next run's cost line.
 
+- 06.11.2026 CR 50 run 2 (run #20, commit f3055cb, before the COST RULE): A11 worked (stage read from the last letter dt.
+  23.04.2025, no reply on record, स्मरणपत्र-1) and A12 worked (Finance U.O. 289/22/सेवा-3). Left: the reminder also asked new
+  items incl. the writ petition's status / hearing date (A3), the note kept a missing-info para "दि. 03.03.2025 च्या
+  प्रस्तावाचे अवलोकन …" in a reminder stage, para 1 in two "… सादर." sentences. Fix: ACCURACY A11 / A12 text, INSTRUCTIONS
+  §4.39 A11/A12, SOP, skill; lint WARNs "§4.39 A11 स्मरणपत्र-टप्पा", "§4.39 A3/A11 court case status asked" (letter points
+  only), "§4.39 A12 परि. 1 एकच वाक्य". Cost of run #20: $8.04 + part 1 $0.23 (drafter 2 calls $3.13, reviewer $1.52;
+  image reads drafter 66, reviewer 39) — the COST RULE was not in it.
+
 ## Pending
 28. **06.11.2026:** (a) CLOSED 06.11.2026 (Abhi: "अ मान्य"): names in Marathi initials (§4.18, circular 07.05.2018) formed from a Devanagari full name anywhere in the proposal ("सि. श. कुर्ले"); English-initials form only when no Devanagari name exists — §4.18, §4.39 A7, SOP, brief, ACCURACY, skill updated;
     (b) CLOSED 06.11.2026 (decided from the record, §6 never-ask rule): CR133 sample "____ आहे" sentences removed (A5); WP35697 ×2 body quote of the 11.08.2017 order para 18(i) aligned with the source text in GR 17.05.2018 (pdf/gr/201805171732241512.pdf: "Judicial Officers"; "31 st" = superscript, written "31st") (A9).

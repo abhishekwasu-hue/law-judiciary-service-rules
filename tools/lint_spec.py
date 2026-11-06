@@ -1854,6 +1854,29 @@ def repeat_ask_warnings(spec, seq):
     return W
 
 
+STAGE_MSG = ("§4.39 A11 स्मरणपत्र-टप्पा — a reminder needs no missing-info para (nothing new came in); the last para states "
+             "that no reply is on record and submits the reminder")
+COURT_ASK_RE = re.compile(r"याचिका[^;:]{0,80}(?:सद्यःस्थिती|सद्यस्थिती|सद्य:स्थिती|सुनावणी)")
+COURT_ASK_MSG = ("§4.39 A3/A11 court case status asked — no provision of the proposal needs a petition's status / hearing "
+                 "date; do not ask it")
+PARA1_MSG = "§4.39 A12 परि. 1 एकच वाक्य — all letters in one sentence ending '… अनुसरून सादर.' (not two '… सादर.' sentences)"
+
+
+def stage_warnings(spec, seq):
+    """CR 50 run 2 (06.11.2026): reminder + missing-info para; a court case's status asked; para 1 in two sentences."""
+    W = []
+    lets = letters_of(spec)
+    if any(isinstance(L, dict) and L.get("reminder") for _, L in lets) and missing_owned(seq)[0]:
+        W.append(f"note: {STAGE_MSG}")
+    for path, t in letter_strings(spec):   # only the items asked (points / table rows), not the intro of a court letter
+        if ".points" in path and COURT_ASK_RE.search(unquoted(t)):
+            W.append(f"{path}: {COURT_ASK_MSG}")
+    first = spec["note"].get("first") if isinstance(spec.get("note"), dict) else None
+    if isinstance(first, str) and len(re.findall(r"सादर\s*\.", unquoted(first))) > 1:
+        W.append(f"note.first: {PARA1_MSG}")
+    return W
+
+
 def lint_warnings(spec):
     """WARN-level findings "<JSON path>: <message>" (note body and letter outside quotes); never errors."""
     if not isinstance(spec, dict) or not isinstance(spec.get("note"), dict):
@@ -1900,6 +1923,7 @@ def lint_warnings(spec):
     # CR 14/2026 (06.11.2026): a related extract differing from the body quote; one item asked twice
     W += related_mismatch_warnings(spec)
     W += repeat_ask_warnings(spec, seq)
+    W += stage_warnings(spec, seq)
     return W
 
 
