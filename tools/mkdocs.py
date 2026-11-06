@@ -130,7 +130,7 @@ def text_em(s):
         if o in _ZERO or o in (0x200C, 0x200D): continue
         if o in _HALF: w += 0.3
         elif 0x0900 <= o <= 0x097F: w += 0.62
-        elif ch.isdigit(): w += 0.55
+        elif ch.isdigit(): w += 0.62   # wide enough for the widest fallback digits (CR50: "24.08.2020" wrapped at 0.55)
         elif ch in ".,:;'!|()[]/-": w += 0.3
         elif ch == " ": w += 0.25
         elif ch.isupper(): w += 0.68
@@ -471,6 +471,8 @@ def build_letter(spec, out, L=None):
     for k, r in enumerate(refs):
         m = REF_NO_RE.match(r.strip())
         no, txt = (m.group(1) + ")", r.strip()[m.end():].strip()) if m else ("", r.strip())
+        if not no and len(refs) > 1:   # several references: each numbered "1)", "2)" … (§4.38 (अ)), even without a marker
+            no = f"{k + 1})"
         if len(refs) == 1 and not m:   # one reference without a number: label + text
             blk(add(body, sect, P[13], d, "संदर्भ :-\t" + txt, bold=True), SUBJ_TXT, SUBJ_LBL - SUBJ_TXT, [SUBJ_TXT])
         elif k == 0:

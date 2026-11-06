@@ -118,3 +118,27 @@ def test_letter_layout_438(tmp_path):
     assert any(t.startswith("2.\tतसेच, एकत्रित प्रस्ताव") for t in tx)
     assert sum(t.startswith("प्रत ") for t in tx) == 1 and tx[-1] == "\t2)\tनिवड नस्ती"
     assert tx[-2].startswith("प्रत :-\t1)\tप्रमुख जिल्हा")
+
+
+def test_letter_refs_without_numbers_438(tmp_path):
+    """CR50 (06.11.2026): several references written without "1)" markers are still numbered "1)", "2)" … (§4.38 (अ));
+    a single unnumbered reference stays "संदर्भ :-\\t<text>"."""
+    import json, docx
+    import mkdocs as M
+    sp = json.load(open(os.path.join(ROOT, "samples", "specs", "CR131_2026_special-pay_info-letter.json"), encoding="utf-8"))
+    for refs, want in ((["या कार्यासनाचे समक्रमांकाचे पत्र दि. 05.12.2024", "आपले पत्र दि. 03.03.2025"],
+                        ["संदर्भ :-\t1)\tया कार्यासनाचे समक्रमांकाचे पत्र दि. 05.12.2024", "2)\tआपले पत्र दि. 03.03.2025"]),
+                       (["आपले पत्र दि. 03.03.2025"], ["संदर्भ :-\tआपले पत्र दि. 03.03.2025"])):
+        L = dict(sp["letter"], refs=refs)
+        out = str(tmp_path / f"L{len(refs)}.docx")
+        M.build_letter(sp, out, L)
+        tx = [p.text for p in docx.Document(out).paragraphs]
+        for w in want:
+            assert w in tx, (w, tx)
+
+
+def test_date_column_fits():
+    """CR50: a DD.MM.YYYY cell must get a column wide enough not to wrap (digits measured at 0.62 em)."""
+    import mkdocs as M
+    w = M.col_widths([["अ.क्र.", "तपशील", "दिनांक"], ["1", "सिंधुदुर्ग जिल्हा न्यायालयाच्या आस्थापनेवर कनिष्ठ लिपिक पदावर प्रथम नियुक्ती " * 2, "24.08.2020"]], 15.0)
+    assert w[2] >= 2.7, w
