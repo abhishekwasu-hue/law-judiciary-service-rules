@@ -1267,7 +1267,10 @@ def cmd_config(path):
 
 
 VERBATIM = (" Extracts are copied character for character from the cited page (look at the page image where the "
-            "text layer is garbled); never paraphrase, shorten or fill gaps; mark omissions with \"…\". Do not decide "
+            "text layer is garbled); never paraphrase, shorten or fill gaps; mark omissions with \"…\". Never apply "
+            "spelling rules inside an extract (keep 'करुन', 'तरतूदीनुसार', 'पात्रापात्रता' as printed — INSTRUCTIONS "
+            "§4.39 A9); when the note body (spec.json) already quotes the same passage, copy that body text exactly. "
+            "Do not decide "
             "which GR applies and do not change the note body or the letter.")
 REVIEW = (" You are the final approver. LOOK at the proposal page images (WORKDIR/pages/p-NN.png; OCR p-NN.ocr.txt as "
           "a cross-check) for every number, date, name and amount used in the note, the letter and Study part 0. Check "
@@ -1324,11 +1327,21 @@ ACCURACY = (" Accuracy checks (A1-A8; each enforces an existing rule): A1 [I1.1,
             "(circular 07.05.2018: 'ह.ना. आपटे', not 'एच.एन.आपटे') formed from a Devanagari full name found anywhere in the "
             "proposal ('एस. एस. कुर्ले' + 'सिद्धेश्वर शरणप्पा कुर्ले' -> 'श्री. सि. श. कुर्ले'); only when no Devanagari name "
             "exists, the proposal's English-initials form; never invented. "
-            "A8 [I4.34(आ)] a fact in a table is not repeated in a sentence (dates of birth / appointment etc.). lint WARN "
-            "lines tagged §4.34 (उ), §4.31, §4.31 (ई), §4.30 (2) are the checklist for A1, A5, A3, A7.")
+            "A8 [I4.34(आ)] a fact in a table is not repeated in a sentence (dates of birth / appointment / report periods); "
+            "no one-fact para that only repeats a table. A9 [I1.1, I4.39] `related` extracts are character-identical to "
+            "the page: the §4.19 spelling forms never apply inside quotes ('करुन', 'तरतूदीनुसार' stay); a passage quoted "
+            "in the body and in `related` is the same text in both. I4.40: (a) para 1 cites every letter the case started "
+            "from, earlier rounds included; (b) a GR / rule already inside the proposal is not enclosed again, cite its "
+            "proposal pages; (c) the letter's subject = the subject of the proposal's (latest) letter, not the निर्देशपत्र "
+            "and not composed; (d) each item of information / document asked once (no overlapping items). lint WARN "
+            "lines tagged §4.34 (उ), §4.31, §4.31 (ई), §4.30 (2), §1.1, §4.15 are the checklist for A1, A5, A3, A7, A9, "
+            "I4.40(d).")
 REVIEW_ACC = (" Reviewer, for A1-A2: open the original page of EVERY note-body quote (package page image) and check "
               "that the quote starts at its sentence start and that the next 'वरील …नुसार' sentence matches the quoted "
-              "words; for A4: look for this Section's own earlier notes / letters among the proposal pages. Correct "
+              "words; for A4: look for this Section's own earlier notes / letters among the proposal pages; for A9: "
+              "compare every `related` extract with the same passage in the body / on the page letter by letter; for "
+              "I4.40: para 1 letters, no GR enclosed twice (enclosures.json vs the proposal pages), the letter subject "
+              "from the proposal's letter, no repeated items. Correct "
               "directly (minimal edits) and list each correction in review.json `corrections`.")
 DRAFTER = (" Never stop or refuse: write every output you can. Missing C R/file no. → PREFIX Case<id>_<year>, ref_no "
            "'संकिर्ण-<year>/____/प्र.क्र.____/का.6'; unclear → 'अस्पष्ट'. Each problem you cannot resolve → report it in "
