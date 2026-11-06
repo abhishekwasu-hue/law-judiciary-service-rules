@@ -5,6 +5,7 @@ Run: python3 -m pytest -q tests/test_build_parawise.py   (Windows: py -m pytest 
 import copy
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -541,7 +542,9 @@ class TestBuildParawise(unittest.TestCase):
                 d = docx.Document(os.path.join(self.tmp, f"{pre}_Note_and_Letter.docx"))
                 text = "\n".join(x.text for x in d.paragraphs)
                 self.assertIn("आपला,", text)
-                self.assertIn("प्रत : निवड नस्ती", text)
+                # §4.38 (ई): "प्रत" once — "प्रत : निवड नस्ती", or "प्रत :-" + numbered lines ending "निवड नस्ती"
+                self.assertTrue("प्रत : निवड नस्ती" in text or re.search(r"प्रत :-\t1\)\t.*\n\t\d+\)\tनिवड नस्ती", text), text[-300:])
+                self.assertEqual(text.count("प्रत :"), 1)
                 self.assertEqual(len(d.sections), 2)
 
 

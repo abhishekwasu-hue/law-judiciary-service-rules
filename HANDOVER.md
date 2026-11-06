@@ -86,8 +86,8 @@
 - 06.11.2026 CR 14 run 2 review (Abhi: "हो करा, आ हो, इ …, अ …, ई …"): INSTRUCTIONS §4.39 A8 widened + A9 (related extracts verbatim, no spelling normalisation, same text as the body quote); new §4.40 (para 1 all letters incl. earlier rounds; no GR re-enclosed when already in the proposal; letter subject from the proposal's letter; no repeated asks); engine ACCURACY / REVIEW_ACC / VERBATIM (related_writer) updated; lint WARNs "§1.1 संबंधित माहितीतील उतारा मुख्य भागाशी जुळत नाही" and "§4.15 एकच माहिती पुन्हा मागवली"; brief [I4.40]; SOP, skill.
 
 ## Pending
-28. **Open (Abhi, 06.11.2026):** (a) CLOSED 06.11.2026 (Abhi: "अ मान्य"): names in Marathi initials (§4.18, circular 07.05.2018) formed from a Devanagari full name anywhere in the proposal ("सि. श. कुर्ले"); English-initials form only when no Devanagari name exists — §4.18, §4.39 A7, SOP, brief, ACCURACY, skill updated;
-    (b) the CR133 sample carries the same "____ आहे" duplicate of a missing item — Abhi to decide whether to rewrite it.
+28. **06.11.2026:** (a) CLOSED 06.11.2026 (Abhi: "अ मान्य"): names in Marathi initials (§4.18, circular 07.05.2018) formed from a Devanagari full name anywhere in the proposal ("सि. श. कुर्ले"); English-initials form only when no Devanagari name exists — §4.18, §4.39 A7, SOP, brief, ACCURACY, skill updated;
+    (b) CLOSED 06.11.2026 (decided from the record, §6 never-ask rule): CR133 sample "____ आहे" sentences removed (A5); WP35697 ×2 body quote of the 11.08.2017 order para 18(i) aligned with the source text in GR 17.05.2018 (pdf/gr/201805171732241512.pdf: "Judicial Officers"; "31 st" = superscript, written "31st") (A9).
 27. **Self-hosted runner on Abhi's VPS (05.11.2026, Abhi: "Ok go ahead", "दोन्ही मान्य आहे"; no money for GitHub Actions):**
     deploy/vps-runner/ (Dockerfile pinned by digest, entrypoint, cleanup hooks, vps-setup.sh), docs/VPS_RUNNER.md (Marathi owner
     steps). All workflows: runs-on ${{ fromJSON(vars.RUNS_ON || '"ubuntu-latest"') }} — repo variable RUNS_ON =

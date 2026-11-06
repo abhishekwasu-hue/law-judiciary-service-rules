@@ -51,24 +51,11 @@ AUDIT_KNOWN_WARNS = {
     'WP35697_2026_old-pension_finance-opinion': {
         'note.paras[0]: sentence 2 has 43 words',
         "note.sub.8[4]: 'तथापि'",
-        # 06.11.2026 (§1.1 related check): the body quote of the 11.08.2017 order para 18(i) reads "31st" / "judicial
-        # officers", the related extract "31 st" / "Judicial Officers" — a true mismatch kept on the approved sample
-        # (to be checked against the source page; Abhi decides)
-        "note.sub.6[0]: related[2] '31st' / '31 st', 'judicial officers' / 'Judicial Officers'",
     },
     'WP35697_2026_parawise_GP-letter': {
         'note.paras[0]: sentence 2 has 43 words',
         'letter.intro: sentence 1 has 66 words',
         "note.sub.8[4]: 'तथापि'",
-        # 06.11.2026 (§1.1 related check): the body quote of the 11.08.2017 order para 18(i) reads "31st" / "judicial
-        # officers", the related extract "31 st" / "Judicial Officers" — a true mismatch kept on the approved sample
-        # (to be checked against the source page; Abhi decides)
-        "note.sub.6[0]: related[2] '31st' / '31 st', 'judicial officers' / 'Judicial Officers'",
-    },
-    # CR133: the condition sub-point "त्यांचा वेतनबँड व ग्रेड वेतन ____ आहे." while missing-info item (1) also asks the
-    # "वेतनश्रेणी व ग्रेड वेतन" — a true §4.31 duplicate (06.11.2026 CR14 check) kept on the approved sample (needs Abhi)
-    'CR133_2026_DLI-insurance_info-letter': {
-        "note.sub.5[1]: 'ग्रेड वेतन ____ आहे'",
     },
 }
 
