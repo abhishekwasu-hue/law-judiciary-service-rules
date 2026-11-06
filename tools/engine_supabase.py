@@ -1335,7 +1335,12 @@ ACCURACY = (" Accuracy checks (A1-A8; each enforces an existing rule): A1 [I1.1,
             "proposal pages; (c) the letter's subject = the subject of the proposal's (latest) letter, not the निर्देशपत्र "
             "and not composed; (d) each item of information / document asked once (no overlapping items). lint WARN "
             "lines tagged §4.34 (उ), §4.31, §4.31 (ई), §4.30 (2), §1.1, §4.15 are the checklist for A1, A5, A3, A7, A9, "
-            "I4.40(d).")
+            "I4.40(d). A10 [I4.15, I4.30(1)] decide the essential items yourself from the provision: walk every "
+            "condition and procedure step of the governing GR / order against the record; essential = (1) facts that "
+            "decide WHICH clause applies (e.g. from which date a status such as gazetted applies; whether an earlier "
+            "review already took place when the GR says 'एकदाच'), (2) every column of the form the GR prescribes "
+            "(परिशिष्ट / प्रपत्र) that the proposal's form lacks or leaves blank; record each item's basis (para) in "
+            "Study part 4; never leave the choice to the user.")
 REVIEW_ACC = (" Reviewer, for A1-A2: open the original page of EVERY note-body quote (package page image) and check "
               "that the quote starts at its sentence start and that the next 'वरील …नुसार' sentence matches the quoted "
               "words; for A4: look for this Section's own earlier notes / letters among the proposal pages; for A9: "
