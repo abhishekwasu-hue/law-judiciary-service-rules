@@ -299,3 +299,14 @@ class Audit0511TimeCost(unittest.TestCase):
             self.assertIn('mv -f "$t" "pdf/$folder/$name"', t, n)
             self.assertNotIn('rm -f "pdf/$folder/$name"', t, n)
             self.assertNotRegex(t, r'-o "pdf/\$folder/\$name"', n)
+
+
+def test_cost_rule_06_11():
+    """Abhi 06.11.2026 (CR 50 run $8.51): Opus agents read only the page images they use; tool docstrings not inlined."""
+    import pathlib
+    root = pathlib.Path(__file__).resolve().parents[1]
+    prompt = (root / "tools" / "ENGINE_PROMPT.md").read_text(encoding="utf-8")
+    wf = (root / ".github" / "workflows" / "process-proposal.yml").read_text(encoding="utf-8")
+    assert "COST RULE" in prompt and "never every page" in prompt
+    assert "LOOK at every proposal" not in prompt
+    assert "$(cat /tmp/work/TOOL_DOCS.md)" not in wf

@@ -490,8 +490,8 @@ jobs:
 
           $WT_BLOCK
 
-          ## Tool docstrings of the tools this run needs (also in /tmp/work/TOOL_DOCS.md; every tool: /tmp/work/TOOL_DOCS_ALL.md)
-          $(cat /tmp/work/TOOL_DOCS.md)
+          ## Tool docstrings: /tmp/work/TOOL_DOCS.md (tools of this run; Read a tool's section before its first use) and
+          ## /tmp/work/TOOL_DOCS_ALL.md (every tool) — not inlined here (cost, 06.11.2026)
 
           WORKDIR=/tmp/case
           OUTDIR=/tmp/out

@@ -1273,7 +1273,7 @@ VERBATIM = (" Extracts are copied character for character from the cited page (l
             "Do not decide "
             "which GR applies and do not change the note body or the letter.")
 REVIEW = (" You are the final approver. LOOK at the proposal page images (WORKDIR/pages/p-NN.png; OCR p-NN.ocr.txt as "
-          "a cross-check) for every number, date, name and amount used in the note, the letter and Study part 0. Check "
+          "a cross-check) for every number, date, name and amount used in the note, the letter and Study part 0 (only the cited pages and the facts.json pages, never every page: COST RULE). Check "
           "rule compliance (INSTRUCTIONS §4 incl. §4.18; the lint_spec rules), that the letter-or-not decision follows "
           "PROPOSAL_SOP Step 3 / INSTRUCTIONS §4.15, and the official language. Correct /tmp/work/spec.json (note + "
           "letter, and `order` / `orders` / `parawise` / `affidavit` / `lq` when present; not `related`) and /tmp/work/study_part0.json directly with "
@@ -1419,7 +1419,7 @@ def agents_json(conf, brief="tools/ENGINE_BRIEF.md"):
     dmodel = drafter_model(conf)
     out = {"drafter": {
         "description": "Drafter (Opus-class). Research the applicable GR paras, rules and cited SC/HC judgments on their "
-                       "original pages; read facts/numbers/dates/names/handwriting/stamps from the proposal page images; "
+                       "original pages; read facts/numbers/dates/names/handwriting/stamps from the proposal page images of the pages the note / letter / part 0 use, never every page (COST RULE; text / OCR of all pages first); "
                        "letter-or-not decision; GR selection for the note body and the enclosures; DETAILED note body "
                        "(brief [I4.29], 12 elements) and concise letter spec; the optional spec `order` / `orders` (order drafts) / `parawise` (court remarks, English) / `affidavit` (affidavit in reply, English) / `lq` (legislature question answer) "
                        "per the brief's court and order-draft rules; Study part 0; extracts and Study part 1 pages only "

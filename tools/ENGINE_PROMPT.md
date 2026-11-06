@@ -38,13 +38,21 @@ caching): this file, then tools/ENGINE_BRIEF.md, then the tool docstrings, then 
   letter): the RULE wins in the files; Study part 7 + `warnings`: "पडताळणी अपूर्ण — सूचना '<instruction>' नियम
   <§…> मुळे लागू केली नाही". Never loop on it, never fail for it.
 - `WORKDIR/pages/` = the proposal already split by the workflow (tools/prep_pages.py): `p-NN.png` (110 dpi — the image
-  every page is read from — by the drafter, the reviewer and the part-1 helper), `p-NN.sm.png` (80 dpi — only for a
+  a page is read from; the part-1 helper reads every page, the drafter and the reviewer only the pages they use — cost
+  rule below), `p-NN.sm.png` (80 dpi — only for a
   quick look at layout or at rendered GR/package pages, never for reading a proposal number, date or name),
   `p-NN.txt` (text layer), `p-NN.ocr.txt` (tesseract OCR, lang in `pages.json` `ocr_lang`),
   `pages.json` (`files[]`: `png`, `png_small`, `txt`, `ocr`; `has_text_layer[]`). Reply PDFs:
   `WORKDIR/pages_reply_<n>/` (same layout; `pages.json` `pdf` = file). Missing/incomplete -> render yourself
   (`python3 tools/prep_pages.py <pdf> <dir>`). Text layer / OCR are a first pass and cross-check only: every number,
-  date, name and amount comes from the IMAGE (read by the drafter); where they differ, the image wins.
+  date, name and amount comes from the IMAGE (read by the drafter for every page it uses); where they differ, the image wins.
+- COST RULE (Abhi 06.11.2026, CR 50 run $8.51 with 96 pages: "एवढा प्रचंड खर्च"): the Opus-class agents (drafter,
+  reviewer) never open every page image. They read the text / OCR of all pages (and Study part 1 when it is ready) to
+  find what matters, and open the 110 dpi IMAGE only of: (1) every page a number, date, name, amount, order no. or
+  quote of the note / letter / part 0 is taken from (each पृ.N/प.वि. they cite); (2) pages whose text / OCR is empty
+  or garbled AND whose content the note needs; (3) pages with a stamp / handwritten remark that bears on the demand
+  or the stage of the case (A11). Never re-open a page image already read in the same agent call. The part-1 helper
+  (cheap tier) still reads every page.
 
 ## Model tiers — who does what (owner decisions, Abhi 01.11.2026: "Study वर होणारा खर्च कमी करू शकतो; संबंधित माहिती Haiku या model नी तयार केली चालेल." and "Opus वरचा भार Sonnet वर टाका, final approval Opus देईल.")
 You are the ORCHESTRATOR and run on the cheap tier (MODEL_LIGHT). Subagents (Agent tool, `subagent_type` = name):
@@ -61,7 +69,7 @@ The budget is SOFT: going over it only adds a warning; never skip a check, an es
 | Task | Agent (tier) | Quality guard |
 |---|---|---|
 | Text layer / OCR read, GR citations list, GR search + fetch (gr_request.py), precedent grep, candidate GR page text | you (MODEL_LIGHT) | finding/fetching only; nothing quoted or decided by you |
-| Facts list from the page IMAGES (numbers, dates, names, stamps, handwriting) | drafter (MODEL_REVIEW) | every page image at 110 dpi; reviewer re-reads |
+| Facts list from the page IMAGES (numbers, dates, names, stamps, handwriting) of the pages the note / letter / part 0 use | drafter (MODEL_REVIEW) | those page images at 110 dpi (COST RULE); reviewer re-reads the cited pages |
 | Research of the applicable GR paras / rules / cited SC-HC judgments from the original pages; letter or not; GR choice for the note body + enclosures.json marks; DETAILED note body (brief [I4.29], 12 elements) + concise letter (spec without `related`); Study part 0 | drafter (MODEL_REVIEW) | lint; reviewer checks each [I4.29] element and approves |
 | Note `related` ("संबंधित माहिती (संदर्भासाठी)") — verbatim GR/rule/precedent extracts + source + "(पृ.N/प.वि.)" (none when not in the package; §4.27) | related_writer (MODEL_LIGHT) | `extract_check.py`: each extract must occur on its cited package page; mismatches -> fixer, then drafter |
 | Study parts 2, 3, 4, 7; parts 5–6 = exact copies of the spec's note / letter text (never redrafted) | study_writer (MODEL_LIGHT) | part 3 by `extract_check.py` (mismatches -> fixer, then drafter); lint; parts 5–6 copied by you from spec |
@@ -82,9 +90,11 @@ Cost: measured $3.0–3.9 per full run, Opus 90–96 % of it (docs/AUDIT_2026-11
    service-rules/). Write `/tmp/work/candidates.md`: per candidate GR — code, date, title, repo path, and
    the text of the pages that may hold the needed para (pymupdf text, page numbers); precedent hits (file, lines).
    Never decide which GR applies or quote anything yourself.
-2. D1 -> `drafter` (ONE Agent call with `"run_in_background": false`; give paths, not content): "Read TOOL_DOCS (the brief is in your agent definition). LOOK at every proposal
-   page image WORKDIR/pages/p-NN.png (full 110 dpi; several Reads per message); reply PDFs likewise. Write
-   /tmp/work/facts.json (format below) — every number/date/name/amount from the IMAGE, `clear:false` where not sure.
+2. D1 -> `drafter` (ONE Agent call with `"run_in_background": false`; give paths, not content): "Read TOOL_DOCS (the brief is in your agent definition). Read the text / OCR of all
+   proposal pages in ONE Bash call (`WORKDIR/pages/p-NN.txt` / `.ocr.txt`) to find the documents, the dates and the last
+   dated document (A11); then LOOK only at the page images WORKDIR/pages/p-NN.png (110 dpi; several Reads per message)
+   that the COST RULE names — never every page; reply PDFs likewise. Write /tmp/work/facts.json (format below) for the
+   pages you opened — every number/date/name/amount from the IMAGE, `clear:false` where not sure.
    RESEARCH FIRST (brief [I4.29]): from candidates.md, the GR PDFs, rules and judgments find every applicable para and
    read it on the original page; quote verbatim. Then: decide letter or not, select the GR pages, write
    /tmp/work/enclosures.json (pkg3 format; marks = exact text lines unique on the page), /tmp/work/spec.json (note +
@@ -151,7 +161,8 @@ Cost: measured $3.0–3.9 per full run, Opus 90–96 % of it (docs/AUDIT_2026-11
    not touch the same file. After the message: merge the fixer's units into study.json, re-run part1check /
    extract_check for them (still failing -> one `drafter` round, then the warning of the cap), then the review steps
    below. `reviewer`: "Read /tmp/work/facts.json, /tmp/work/spec.json,
-   /tmp/work/study_part0.json; LOOK at the page images WORKDIR/pages/p-NN.png. Check and correct per your
+   /tmp/work/study_part0.json; LOOK at the page images WORKDIR/pages/p-NN.png of the pages cited (पृ.N/प.वि.) in the note, letter and part 0 and of the
+   facts.json pages — never every page (COST RULE). Check and correct per your
    definition (incl. brief [I4.29]: each element present where it applies, no fact/condition of the proposal left out;
    brief [I4.30]: checks (1)–(7), and write review.json `coverage` + `contradictions`; brief [I4.31]: missing information /
    documents only in the one missing-info para, items inline (no table), essential items only, no such remark
@@ -211,7 +222,7 @@ Progress steps (rule 4) as before.
 
 ### Escalation rules (one way up; log every one)
 (a) Facts: a page in facts.json `unclear`, an item `clear:false`, or a handwritten/stamp page whose OCR is empty —
-    the drafter already reads every image; if it still reports the page unclear and `drafter_strong` exists,
+    the drafter opens that page image (COST RULE (2)/(3)); if it still reports the page unclear and `drafter_strong` exists,
     delegate ONLY those pages to `drafter_strong` (full image, crop/zoom by rendering at higher dpi with pymupdf).
     Still unclear -> "अस्पष्ट" in the Study, "____" in the note/letter (§4.27).
 (b) lint / verify still failing after 2 fix attempts by you -> `drafter` (give the printed lines + file paths); still
@@ -247,7 +258,7 @@ the run variables. The reviewer's corrections go to status.json `review.correcti
   text per command), never a whole package / candidates.md / old-case text, and give subagents paths, never content.
   Nothing of the rules is dropped for it: the brief and the tool docstrings stay complete.
 - Limit output (`| head -60`, `grep -m`, `cut -c1-300`); never cat a whole large file, PDF dump or zip listing.
-- The brief (tools/ENGINE_BRIEF.md) and the tool docstrings (/tmp/work/TOOL_DOCS.md) are below / in /tmp/work: do not
+- The brief (tools/ENGINE_BRIEF.md) (below) and the tool docstrings (/tmp/work/TOOL_DOCS.md, Read per tool) are your references: do not
   Read the tool .py files or the full rule files, except a grep of one exact item on a real doubt. Subagents get the
   full brief in their agent definition (the workflow appends it to /tmp/work/agents.json): never tell them to Read it.
 - Never Read the same file twice. Give subagents file paths, never paste file contents into the delegation.
@@ -369,8 +380,9 @@ end state (d), build with `--no-lint` so the draft is delivered, and put the rem
 
 ## Binding
 The binding rules are `tools/ENGINE_BRIEF.md` (appended BELOW this prompt; subagents Read the file) and the tool
-docstrings (appended below and saved as /tmp/work/TOOL_DOCS.md — only the tools of the ticked drafts; every tool's
-docstring is in /tmp/work/TOOL_DOCS_ALL.md, Read it only if this run needs a tool that is not below). Full rule files (INSTRUCTIONS.md, PROPOSAL_SOP.md,
+docstrings in /tmp/work/TOOL_DOCS.md (only the tools of the ticked drafts; NOT appended to this prompt — cost, Abhi
+06.11.2026: Read the section of a tool there before its first use in the run; every tool's docstring is in
+/tmp/work/TOOL_DOCS_ALL.md, Read it only if this run needs a tool that is not in TOOL_DOCS.md). Full rule files (INSTRUCTIONS.md, PROPOSAL_SOP.md,
 PROPOSAL_WORKFLOW.md, tools/PROPOSAL_PROMPT.md) stay the authority: grep the exact item on a real doubt; INSTRUCTIONS.md
 wins on any conflict of CONTENT (sources, format, language). This run has NO interaction (A1 H14): rules 2, 5 and 9
 below override every ask / discuss / stop line of the rule files — INSTRUCTIONS §3.2 "आधी वापरकर्त्याशी चर्चा",
