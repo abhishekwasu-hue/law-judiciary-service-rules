@@ -1112,7 +1112,7 @@ def engine_config(cfg):
 # Providers reachable through the LiteLLM gateway (Worker AI_PROVIDERS; research docs/AI_PROVIDERS_RESEARCH.md):
 # LiteLLM model prefix, env name of its key, default (main, light) models. `ollama` = the office's own model server.
 PROVIDERS = {
-    "gemini": ("gemini/", "GEMINI_API_KEY", ("gemini-2.5-pro", "gemini-2.5-flash")),
+    "gemini": ("gemini/", "GEMINI_API_KEY", ("gemini-3.8-flash", "gemini-3.5-flash-lite")),
     "openai": ("openai/", "OPENAI_API_KEY", ("gpt-6.1-sol", "gpt-5.4-mini")),
     "openrouter": ("openrouter/", "OPENROUTER_API_KEY", ("nvidia/nemotron-3.5-super-vl:free", "google/gemma-4-31b:free")),
     "groq": ("groq/", "GROQ_API_KEY", ("gpt-oss-120b", "qwen3.8-27b")),
@@ -1149,13 +1149,13 @@ def provider_config(cfg):
     em, el = PROVIDERS[ep][2] if ep else ("", "")
     fm, fl = PROVIDERS[fb][2] if fb else ("", "")
     if p1 == "gemini":
-        p1m = m("part1_model", "") or m("gemini_model", "gemini-2.5-flash")
+        p1m = m("part1_model", "") or m("gemini_model", "gemini-3.5-flash-lite")
     elif p1:
         p1m = m("part1_model", "")
     else:
         p1m = ""
     return {"ENGINE_PROVIDER": ep, "ENGINE_MODEL": m("engine_model", em) if ep else "", "ENGINE_MODEL_LIGHT": m("engine_model_light", el) if ep else "",
-            "PART1_PROVIDER": p1 or "claude", "PART1_MODEL": p1m, "GEMINI_MODEL": m("gemini_model", "gemini-2.5-flash"),
+            "PART1_PROVIDER": p1 or "claude", "PART1_MODEL": p1m, "GEMINI_MODEL": m("gemini_model", "gemini-3.5-flash-lite"),
             "FALLBACK_PROVIDER": fb, "FALLBACK_MODEL": m("fallback_model", fm) if fb else "", "FALLBACK_MODEL_LIGHT": m("fallback_model_light", fl) if fb else "",
             "CLOUDFLARE_ACCOUNT_ID": s("cloudflare_account_id") if re.fullmatch(r"[0-9a-f]{32}", s("cloudflare_account_id")) else "",
             "OLLAMA_BASE_URL": s("ollama_base_url").rstrip("/") if URL_RE.fullmatch(s("ollama_base_url")) else ""}

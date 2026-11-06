@@ -148,9 +148,9 @@ def test_run_four_providers(tmp_path):
     assert r.returncode == 0, r.stdout + r.stderr
     res = json.loads((out / "results.json").read_text(encoding="utf-8"))
     runs = {x["label"]: x for x in res["runs"]}
-    assert set(runs) == {"gemini:gemini-2.5-flash", "claude:claude-haiku-5-5", "groq:qwen3.8-27b", "ollama:gemma4:12b"}
+    assert set(runs) == {"gemini:gemini-3.5-flash-lite", "claude:claude-haiku-5-5", "groq:qwen3.8-27b", "ollama:gemma4:12b"}
     assert res["skipped"] == [{"run": "mistral:mistral-small-latest", "reason": "MISTRAL_API_KEY not set"}]
-    g = runs["gemini:gemini-2.5-flash"]["summary"]
+    g = runs["gemini:gemini-3.5-flash-lite"]["summary"]
     assert g["number_recall"] == 1 and g["word_recall"] == 1 and g["cer"] == 0 and g["invented_per_page"] == 0
     assert g["requests"] == 2 and g["in_tokens"] == 2000 and g["pages_json_ok"] == 2
     c = runs["claude:claude-haiku-5-5"]["summary"]
@@ -165,13 +165,13 @@ def test_run_four_providers(tmp_path):
     assert cl["headers"]["x-api-key"] == "sk-ant-test" and cl["body"]["system"].startswith(ab.pv.SYSTEM[:40])
     assert cl["body"]["messages"][0]["content"][0]["source"]["media_type"] == "image/png"
     gm = next(s for s in seen if s["kind"] == "gemini")
-    assert gm["path"] == "/v1beta/models/gemini-2.5-flash:generateContent" and gm["body"]["generationConfig"]["temperature"] == 0
+    assert gm["path"] == "/v1beta/models/gemini-3.5-flash-lite:generateContent" and gm["body"]["generationConfig"]["temperature"] == 0
     cp = [s for s in seen if s["kind"] == "compat"]
     assert {s["path"] for s in cp} == {"/openai/v1/chat/completions", "/v1/chat/completions"}
     assert "Text layer (cross-check only):\n(none)" in cp[0]["body"]["messages"][1]["content"][1]["text"]
     assert len(seen) == 9  # 2 pages x 4 runs + one retried 429
     md = (out / "results.md").read_text(encoding="utf-8")
-    assert "| gemini:gemini-2.5-flash | 2/2 / 2 | 100.0% |" in md and "mistral" in md
+    assert "| gemini:gemini-3.5-flash-lite | 2/2 / 2 | 100.0% |" in md and "mistral" in md
     if importlib.util.find_spec("matplotlib"):  # optional: CI has no matplotlib, the tool then skips the chart
         assert (out / "results.png").stat().st_size > 10000
     assert (out / "raw" / "groq_qwen3.8-27b" / "p1.txt").read_text(encoding="utf-8").endswith("क्र. 777")

@@ -61,14 +61,14 @@ def test_two_pages_ok(tmp_path):
     assert heads == ["PDF पान 1 — निर्देशपत्र (पृ. 11)", "PDF पान 2 — पत्र (पृ. 12)"]
     assert {"para": "दि. 02.08.2026 रोजीचे पत्र"} in p1["blocks"] and all(len(b) == 1 for b in p1["blocks"])
     assert not any(b.get("para") == "" for b in p1["blocks"]), "empty paragraphs dropped"
-    assert seen[0]["path"] == "/v1beta/models/gemini-2.5-flash:generateContent" and seen[0]["key"] == "AIza-test"
+    assert seen[0]["path"] == "/v1beta/models/gemini-3.5-flash-lite:generateContent" and seen[0]["key"] == "AIza-test"
     parts = seen[0]["body"]["contents"][0]["parts"]
     assert parts[0]["inlineData"]["mimeType"] == "image/png" and "cross-check" in parts[1]["text"]
     assert seen[0]["body"]["generationConfig"]["temperature"] == 0
     res = json.loads((out / "part1_result.json").read_text(encoding="utf-8"))
     # 2 pages x (1000 in, 500 out) at 0.30 / 2.50 per 1M = 0.0006 + 0.0025
     assert res["subtype"] == "success" and res["num_turns"] == 2 and abs(res["total_cost_usd"] - 0.0031) < 1e-9
-    assert res["modelUsage"]["gemini-2.5-flash"]["inputTokens"] == 2000
+    assert res["modelUsage"]["gemini-3.5-flash-lite"]["inputTokens"] == 2000
 
 
 def test_retry_then_fail_marks_failed(tmp_path):
@@ -92,7 +92,7 @@ def test_no_key_and_bad_model_name(tmp_path):
     (tmp_path / "out" / "study_part1.failed").unlink()
     r = run(tmp_path, f"http://127.0.0.1:{srv.server_address[1]}", extra=("--model", "../../x"))
     srv.shutdown()
-    assert r.returncode == 0 and seen[0]["path"].endswith("/gemini-2.5-flash:generateContent"), "unsafe model name -> default"
+    assert r.returncode == 0 and seen[0]["path"].endswith("/gemini-3.5-flash-lite:generateContent"), "unsafe model name -> default"
 
 
 def compat_resp(i):

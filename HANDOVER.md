@@ -113,6 +113,14 @@
   18–39 page images. Fixed: OMP_THREAD_LIMIT=1 (prep_pages.OCR_ENV, highlight.py, workflow env); measured 300 s -> 2 s for 4
   pages, 27 pages in 23 s. Run #21 (Settings main AI = Gemini 2.5 Pro) failed at turn 1, $0; its reason is on the case page.
 
+- 06.11.2026 run #21 (Settings: main AI = Gemini, models gemini-2.5-pro / gemini-2.5-flash) failed at turn 1: "There's an issue
+  with the selected model (claude-haiku-5-5) …" — claude-haiku-5-5 is routed by the gateway to gemini-2.5-flash. Google
+  (aistudio.google.com/docs/deprecations + /models, read 06.11.2026): 2.5 Pro / Flash deprecated, "API access to the 2.5
+  models is limited to existing users", shutdown 01.12.2026, replacements 2.5 Pro -> gemini-3.8-flash, 2.5 Flash ->
+  gemini-3.5-flash-lite. Local check: CLI -> LiteLLM gateway -> Google works (fake key -> Google's "API key not valid").
+  Defaults changed to the replacements (engine_supabase PROVIDERS / GEMINI_MODEL, part1_vision, Settings table text — the
+  Settings text needs "Deploy app"). Owner: clear or change the Gemini model fields in Settings; Gemini only with a paid key.
+
 ## Pending
 28. **06.11.2026:** (a) CLOSED 06.11.2026 (Abhi: "अ मान्य"): names in Marathi initials (§4.18, circular 07.05.2018) formed from a Devanagari full name anywhere in the proposal ("सि. श. कुर्ले"); English-initials form only when no Devanagari name exists — §4.18, §4.39 A7, SOP, brief, ACCURACY, skill updated;
     (b) CLOSED 06.11.2026 (decided from the record, §6 never-ask rule): CR133 sample "____ आहे" sentences removed (A5); WP35697 ×2 body quote of the 11.08.2017 order para 18(i) aligned with the source text in GR 17.05.2018 (pdf/gr/201805171732241512.pdf: "Judicial Officers"; "31 st" = superscript, written "31st") (A9).

@@ -20,7 +20,9 @@ Gemini models below; other providers record tokens with cost 0 and a note (free 
 Stdlib only (runs on the runner without extra packages). One request per page; 3 tries on 429/5xx/network errors."""
 import base64, json, os, re, sys, time, urllib.error, urllib.request
 
-DEFAULT_MODEL = "gemini-2.5-flash"
+# 06.11.2026: Google deprecated gemini-2.5-pro / -flash ("API access to the 2.5 models is limited to existing users"; shutdown
+# 01.12.2026) — run #21 failed on them; defaults = Google's own replacements (2.5 Pro -> 3.8 Flash, 2.5 Flash -> 3.5 Flash-Lite).
+DEFAULT_MODEL = "gemini-3.5-flash-lite"
 # OpenAI-compatible chat endpoints (…/chat/completions) and a default vision model per provider (02.11.2026)
 OPENAI_COMPAT = {
     "openai": ("https://api.openai.com/v1", "OPENAI_API_KEY", "gpt-5.4-mini"),

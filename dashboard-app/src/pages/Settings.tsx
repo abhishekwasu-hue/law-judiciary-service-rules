@@ -10,7 +10,7 @@ import { useToast } from '../components/Toast';
 
 // providers reachable through the engine's LiteLLM gateway (Worker AI_PROVIDERS); research 02.11.2026
 const PROVIDERS: { k: string; name: string; free: string; privacy: string; tone: 'green' | 'amber' | 'red'; models: string }[] = [
-  { k: 'gemini', name: 'Google Gemini', free: 'मोफत स्तर आहे', privacy: 'मोफत: Google माहिती वापरते, माणसे वाचू शकतात — गोपनीय नको. सशुल्क: वापर नाही', tone: 'amber', models: 'gemini-2.5-pro, gemini-2.5-flash' },
+  { k: 'gemini', name: 'Google Gemini', free: 'मोफत स्तर आहे', privacy: 'मोफत: Google माहिती वापरते, माणसे वाचू शकतात — गोपनीय नको. सशुल्क: वापर नाही', tone: 'amber', models: 'gemini-3.8-flash, gemini-3.5-flash-lite (2.5 मॉडेल बंद होत आहेत)' },
   { k: 'openai', name: 'OpenAI (ChatGPT)', free: 'मोफत नाही', privacy: 'API माहिती training ला नाही (default)', tone: 'green', models: 'gpt-6.1-sol, gpt-5.4-mini' },
   { k: 'openrouter', name: 'OpenRouter', free: ':free मॉडेल — दिवसाला 50 (credit $10 नंतर 1000) विनंत्या', privacy: 'मोफत मॉडेलचे host माहिती वापरू शकतात — गोपनीय नको', tone: 'red', models: 'google/gemma-4-31b:free, nvidia/nemotron-3.5-super-vl:free' },
   { k: 'groq', name: 'Groq', free: 'मोफत — पण 8K tokens/मिनिट: प्रक्रियेला अपुरे', privacy: 'default: माहिती ठेवत नाही', tone: 'amber', models: 'gpt-oss-120b, qwen3.8-27b' },

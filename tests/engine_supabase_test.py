@@ -466,7 +466,7 @@ c = es.engine_config({})
 check(c == {"MODEL": "claude-opus-5-5", "MODEL_LIGHT": "claude-haiku-5-5", "MODEL_REVIEW": "claude-opus-5-5", "MODEL_STRONG": "",
             "MODEL_FIXER": "claude-sonnet-5-5",
             "EFFORT": "medium", "BUDGET_USD": "0.75", "ENGINE_PROVIDER": "", "ENGINE_MODEL": "", "ENGINE_MODEL_LIGHT": "",
-            "PART1_PROVIDER": "claude", "PART1_MODEL": "", "GEMINI_MODEL": "gemini-2.5-flash", "FALLBACK_PROVIDER": "", "FALLBACK_MODEL": "", "FALLBACK_MODEL_LIGHT": "",
+            "PART1_PROVIDER": "claude", "PART1_MODEL": "", "GEMINI_MODEL": "gemini-3.5-flash-lite", "FALLBACK_PROVIDER": "", "FALLBACK_MODEL": "", "FALLBACK_MODEL_LIGHT": "",
             "CLOUDFLARE_ACCOUNT_ID": "", "OLLAMA_BASE_URL": ""},
       f"config: defaults (drafter, light Haiku, reviewer Opus, no strong tier, soft budget 0.75) {c}")
 c = es.engine_config({"model": "claude-sonnet-5-5", "model_review": "claude-opus-5-5"})
@@ -494,7 +494,7 @@ r = subprocess.run([sys.executable, TOOL, "config", cfgf], capture_output=True, 
                    env={k: v for k, v in os.environ.items() if not k.startswith("SUPABASE")})
 check(r.returncode == 0 and r.stdout.splitlines() == ["MODEL=claude-opus-5-5", "MODEL_LIGHT=claude-haiku-5-5", "MODEL_REVIEW=claude-opus-5-5", "MODEL_STRONG=", "MODEL_FIXER=claude-sonnet-5-5",
       "EFFORT=medium", "BUDGET_USD=0.90",
-      "ENGINE_PROVIDER=", "ENGINE_MODEL=", "ENGINE_MODEL_LIGHT=", "PART1_PROVIDER=claude", "PART1_MODEL=", "GEMINI_MODEL=gemini-2.5-flash",
+      "ENGINE_PROVIDER=", "ENGINE_MODEL=", "ENGINE_MODEL_LIGHT=", "PART1_PROVIDER=claude", "PART1_MODEL=", "GEMINI_MODEL=gemini-3.5-flash-lite",
       "FALLBACK_PROVIDER=", "FALLBACK_MODEL=", "FALLBACK_MODEL_LIGHT=", "CLOUDFLARE_ACCOUNT_ID=", "OLLAMA_BASE_URL="] and "sk-secret" not in r.stdout, f"config CLI: KEY=VALUE lines, no secret, no Supabase env ({r.stdout!r} {r.stderr[:200]})")
 r = subprocess.run([sys.executable, TOOL, "config", os.path.join(tmp, "absent.json")], capture_output=True, text=True, encoding="utf-8")
 check(r.returncode == 0 and "MODEL=claude-opus-5-5" in r.stdout, "config CLI: unreadable file -> defaults")
@@ -521,7 +521,7 @@ check(pc({"engine_provider": "ollama", "ollama_base_url": "file:///etc"})["ENGIN
 check(pc({"fallback_provider": "openai"})["FALLBACK_PROVIDER"] == "" and pc({"fallback_provider": "x", "x_api_key": "k"})["FALLBACK_PROVIDER"] == "",
       "C: fallback needs a known provider and its key")
 c = pc({"fallback_provider": "gemini", "gemini_api_key": "k", "fallback_model": "$(id)", "fallback_model_light": "gemini-2.5-flash-lite"})
-check(c["FALLBACK_PROVIDER"] == "gemini" and c["FALLBACK_MODEL"] == "gemini-2.5-pro" and c["FALLBACK_MODEL_LIGHT"] == "gemini-2.5-flash-lite",
+check(c["FALLBACK_PROVIDER"] == "gemini" and c["FALLBACK_MODEL"] == "gemini-3.8-flash" and c["FALLBACK_MODEL_LIGHT"] == "gemini-2.5-flash-lite",
       f"C: invalid model -> provider default {c}")
 pf = es.provider_failure
 for res, err, rc, want, label in (
