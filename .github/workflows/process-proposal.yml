@@ -19,6 +19,7 @@ concurrency:
   cancel-in-progress: false
 env:
   CLAUDE_CODE_VERSION: '2.1.300'   # exact pin (published 14.10.2026); change deliberately
+  OMP_THREAD_LIMIT: '1'   # tesseract: one thread per process (parallel OCR thrashed: every page timed out, runs #17–#20)
   # C (fallback provider): LiteLLM gateway, installed only when the fallback is used, from the hash-locked
   # tools/requirements-litellm.txt (litellm[proxy]==1.105.1 + its whole dependency tree; pip --require-hashes).
   # H1 (QUALITY_AUDIT §7): keys live in this 700 file of the runner user, never in the job env; the Claude step runs as

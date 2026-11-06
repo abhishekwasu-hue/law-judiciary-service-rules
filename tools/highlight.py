@@ -43,7 +43,8 @@ def ocr_lines(pg, lang):
     try:
         png = os.path.join(tmp, "p.png")
         pg.get_pixmap(dpi=dpi).save(png)
-        r = subprocess.run(["tesseract", png, os.path.join(tmp, "o"), "-l", lang, "tsv"], capture_output=True, text=True)
+        r = subprocess.run(["tesseract", png, os.path.join(tmp, "o"), "-l", lang, "tsv"], capture_output=True, text=True,
+                           env=dict(os.environ, OMP_THREAD_LIMIT="1"))   # see prep_pages.OCR_ENV
         tsv = os.path.join(tmp, "o.tsv")
         if r.returncode != 0 or not os.path.exists(tsv):
             raise RuntimeError(f"tesseract failed (rc {r.returncode}, lang {lang}): {r.stderr.strip()[:300]}")

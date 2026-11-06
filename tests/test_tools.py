@@ -399,3 +399,21 @@ class TestGrRequestCode(TmpCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_ocr_one_thread_per_tesseract(monkeypatch, tmp_path):
+    """06.11.2026 cost audit: tesseract runs with OMP_THREAD_LIMIT=1 (parallel OCR timed out on every page otherwise)."""
+    sys.path.insert(0, TOOLS)
+    import prep_pages
+    seen = {}
+
+    class R:
+        returncode, stdout, stderr = 0, "मजकूर".encode(), b""
+
+    def fake_run(cmd, **kw):
+        seen.update(kw)
+        return R()
+
+    monkeypatch.setattr(prep_pages.subprocess, "run", fake_run)
+    prep_pages.ocr_page("tesseract", "mar+eng", "p.png", str(tmp_path / "p.ocr.txt"))
+    assert seen["env"]["OMP_THREAD_LIMIT"] == "1"

@@ -107,6 +107,12 @@
   only), "§4.39 A12 परि. 1 एकच वाक्य". Cost of run #20: $8.04 + part 1 $0.23 (drafter 2 calls $3.13, reviewer $1.52;
   image reads drafter 66, reviewer 39) — the COST RULE was not in it.
 
+- 06.11.2026 COST / TIME AUDIT (Abhi: "तुम्ही कामाचे खर्चाचे आणि लागणाऱ्या वेळेचे ऑडिट करा"): docs/COST_TIME_AUDIT_2026-11-06.md +
+  chart docs/cost-time-audit-2026-11-06.png. Runs #17–#20: $5.99–$8.50, 42–62 min; Opus 75–89 % of the cost. Root cause:
+  tesseract timed out on EVERY page in every run (parallel processes, OpenMP threads) -> no OCR text -> Opus opened 66–83 +
+  18–39 page images. Fixed: OMP_THREAD_LIMIT=1 (prep_pages.OCR_ENV, highlight.py, workflow env); measured 300 s -> 2 s for 4
+  pages, 27 pages in 23 s. Run #21 (Settings main AI = Gemini 2.5 Pro) failed at turn 1, $0; its reason is on the case page.
+
 ## Pending
 28. **06.11.2026:** (a) CLOSED 06.11.2026 (Abhi: "अ मान्य"): names in Marathi initials (§4.18, circular 07.05.2018) formed from a Devanagari full name anywhere in the proposal ("सि. श. कुर्ले"); English-initials form only when no Devanagari name exists — §4.18, §4.39 A7, SOP, brief, ACCURACY, skill updated;
     (b) CLOSED 06.11.2026 (decided from the record, §6 never-ask rule): CR133 sample "____ आहे" sentences removed (A5); WP35697 ×2 body quote of the 11.08.2017 order para 18(i) aligned with the source text in GR 17.05.2018 (pdf/gr/201805171732241512.pdf: "Judicial Officers"; "31 st" = superscript, written "31st") (A9).

@@ -75,8 +75,15 @@ def ocr_lang():
     return exe, None
 
 
+# One OpenMP thread per tesseract process (06.11.2026 cost audit): several tesseract processes run in parallel here and
+# in pkg_ocr.py; with OpenMP's default threads they thrash on the runner — every page hit the 300 s timeout in runs
+# #17–#20 (prep_pages "ocr none"), so no OCR text existed and the Opus agents had to read every page image. Measured on 4
+# pages of CR 50 in parallel: default threads 300 s (all timed out), OMP_THREAD_LIMIT=1 2 s.
+OCR_ENV = dict(os.environ, OMP_THREAD_LIMIT="1")
+
+
 def ocr_page(exe, lang, png, dst):
-    r = subprocess.run([exe, png, "stdout", "-l", lang], capture_output=True, timeout=300)
+    r = subprocess.run([exe, png, "stdout", "-l", lang], capture_output=True, timeout=300, env=OCR_ENV)
     if r.returncode != 0:
         raise RuntimeError(r.stderr.decode("utf-8", "replace").strip()[-200:] or f"exit {r.returncode}")
     open(dst, "wb").write(r.stdout)
