@@ -81,6 +81,7 @@
   drafter without `run_in_background: false` (CLI 2.1.300 starts subagents in the background by default) and ended its turn;
   the CLI stopped the drafter 10 min later. Fix: ENGINE_PROMPT — every Agent call passes `"run_in_background": false`
   explicitly; workflow — CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 in the engine env (the step timeout still bounds the run).
+- 06.11.2026: skills/lj-prastav-desk6/SKILL.md — updated claude.ai skill (procedure + tools only; all drafting rules point to the repo files, stale rules removed) for Abhi to upload in place of his current skill.
 
 ## Pending
 28. **Open (Abhi, 06.11.2026):** (a) A7 name-form default = the form in the covering letter (provisional; Abhi to confirm);
