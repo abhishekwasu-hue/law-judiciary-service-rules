@@ -51,11 +51,19 @@ AUDIT_KNOWN_WARNS = {
     'WP35697_2026_old-pension_finance-opinion': {
         'note.paras[0]: sentence 2 has 43 words',
         "note.sub.8[4]: 'तथापि'",
+        # 06.11.2026 (§1.1 related check): the body quote of the 11.08.2017 order para 18(i) reads "31st" / "judicial
+        # officers", the related extract "31 st" / "Judicial Officers" — a true mismatch kept on the approved sample
+        # (to be checked against the source page; Abhi decides)
+        "note.sub.6[0]: related[2] '31st' / '31 st', 'judicial officers' / 'Judicial Officers'",
     },
     'WP35697_2026_parawise_GP-letter': {
         'note.paras[0]: sentence 2 has 43 words',
         'letter.intro: sentence 1 has 66 words',
         "note.sub.8[4]: 'तथापि'",
+        # 06.11.2026 (§1.1 related check): the body quote of the 11.08.2017 order para 18(i) reads "31st" / "judicial
+        # officers", the related extract "31 st" / "Judicial Officers" — a true mismatch kept on the approved sample
+        # (to be checked against the source page; Abhi decides)
+        "note.sub.6[0]: related[2] '31st' / '31 st', 'judicial officers' / 'Judicial Officers'",
     },
     # CR133: the condition sub-point "त्यांचा वेतनबँड व ग्रेड वेतन ____ आहे." while missing-info item (1) also asks the
     # "वेतनश्रेणी व ग्रेड वेतन" — a true §4.31 duplicate (06.11.2026 CR14 check) kept on the approved sample (needs Abhi)
@@ -1152,6 +1160,91 @@ class LintCR14Warns(unittest.TestCase):
                       miss_extra="; (3) मा. उच्च न्यायालयाच्या दि. 21.04.2026 च्या पत्राची प्रत")
         self.assertEqual(L.lint_spec(s), L.lint_spec(self.s122))   # WARN only, never an error
 
+
+class LintCR14MoreWarns(unittest.TestCase):
+    """06.11.2026 (live run CR 14/2026): a body quote differing from its related extract (§1.1), one item asked twice
+    (§4.15)."""
+    BODY = ("शासन निर्णय दि. 05.04.2025 च्या परिच्छेद 2(7) मध्ये असे नमूद करण्यात आले आहे की, “सदर शासन निर्णयातील "
+            "तरतूदीनुसार कर्मचाऱ्यांच्या पात्रापात्रतेचे पुनर्विलोकन करुन संपूर्ण सेवा कालावधीचे गोपनीय अहवाल विचारात घेण्यात "
+            "यावेत.” (पृ.9/प.वि.).")
+    REL = ("“सदर शासन निर्णयातील तरतुदीनुसार कर्मचाऱ्यांच्या पात्रतापात्रतेचे पुनर्विलोकन करून संपूर्ण सेवा कालावधीचे गोपनीय "
+           "अहवाल विचारात घेण्यात यावेत.”")
+    MISS = ("सदर प्रकरणी प्रमुख जिल्हा व सत्र न्यायाधीश, सोलापूर यांच्या दि. 14.08.2026 रोजीच्या प्रस्तावाचे अवलोकन केले असता, "
+            "त्यामध्ये खालील माहिती आढळून येत नाही:- {items}")
+
+    @classmethod
+    def setUpClass(cls):
+        cls.s122 = load_clean(CR122)
+        cls.base_w = set(L.lint_warnings(cls.s122))
+
+    def warns(self, s, needle):
+        return [w for w in L.lint_warnings(s) if needle in w and w not in self.base_w]
+
+    def rel_spec(self, body, rel):
+        s = copy.deepcopy(self.s122)
+        s["note"]["sub"]["3"] = s["note"]["sub"]["3"] + ["(9) " + body]
+        s["related"].append({"heading": "शासन निर्णय दि. 05.04.2025", "text": [rel], "source": "परिच्छेद 2(7)"})
+        return s
+
+    # (5) §1.1
+    def test_related_quote_differs(self):
+        w = self.warns(self.rel_spec(self.BODY, self.REL), "§1.1 संबंधित माहितीतील उतारा")
+        self.assertEqual(len(w), 1, w)
+        self.assertTrue(w[0].startswith("note.sub.3["), w)
+        self.assertIn(f"related[{len(self.s122['related'])}]", w[0])
+        self.assertIn("'तरतूदीनुसार' / 'तरतुदीनुसार'", w[0])
+        self.assertIn("'करुन' / 'करून'", w[0])
+        # related text without quote marks, inside a longer extract: still found
+        long_rel = "इतर मजकूर येथे आहे. " + self.REL.strip("“”") + " पुढील परिच्छेद वेगळा आहे."
+        self.assertTrue(self.warns(self.rel_spec(self.BODY, long_rel), "§1.1 संबंधित"))
+
+    def test_related_quote_ok(self):
+        same = self.BODY[self.BODY.index("“"):self.BODY.index("”") + 1]
+        for rel in (same, same.strip("“”"), "“पदोन्नतीसाठी किमान तीन वर्षांची नियमित सेवा पूर्ण झालेली असावी.”"):
+            self.assertFalse(self.warns(self.rel_spec(self.BODY, rel), "§1.1 संबंधित"), rel)
+        short = "असे नमूद आहे की, “तरतूदीनुसार पुनर्विलोकन करुन” (पृ.9/प.वि.)."   # under 40 characters: not checked
+        self.assertFalse(self.warns(self.rel_spec(short, "“तरतुदीनुसार पुनर्विलोकन करून”"), "§1.1 संबंधित"))
+        s = copy.deepcopy(self.s122)   # a table cell quote is not checked
+        s["note"]["paras"].insert(3, {"table": [["अ.क्र.", "रक्कम"], [self.BODY, "1"]]})
+        s["related"].append({"heading": "x", "text": [self.REL], "source": "y"})
+        self.assertFalse(self.warns(s, "§1.1 संबंधित"))
+
+    def miss_spec(self, items):
+        s = copy.deepcopy(self.s122)
+        s["note"]["paras"][5] = self.MISS.format(items=items)
+        return s
+
+    # (6) §4.15
+    def test_repeat_ask(self):
+        cr14 = ("(1) शासन निर्णयाच्या परिच्छेद 2(7) नुसार श्री. एस. एस. कुर्ले यांच्या संपूर्ण सेवा कालावधीचे गोपनीय अहवाल; "
+                "(2) परिच्छेद 2(6) नुसार अद्यावत गोपनीय अहवाल / कार्यमूल्यमापन अहवाल.")
+        w = self.warns(self.miss_spec(cr14), "§4.15 एकच माहिती पुन्हा मागवली")
+        self.assertEqual(len(w), 1, w)
+        self.assertIn("'गोपनीय अहवाल'", w[0]); self.assertTrue(w[0].startswith("note.paras[5]:"), w)
+        w = self.warns(self.miss_spec("(1) सेवानिवृत्तीचा दिनांक; (2) वेतन पडताळणी; (3) श्रीमती बारई यांचा सेवानिवृत्तीचा "
+                                      "दिनांक."), "§4.15 एकच")
+        self.assertEqual(len(w), 1, w)   # same item, the name removed
+        s = copy.deepcopy(self.s122)   # letter: two document points
+        s["letter"]["points"] += ["2)\tसंपूर्ण सेवा कालावधीचे गोपनीय अहवाल;", "3)\tअद्यावत गोपनीय अहवाल."]
+        self.assertTrue([x for x in self.warns(s, "§4.15 एकच") if x.startswith("letter.points[")])
+        s = copy.deepcopy(self.s122)   # letter: a table detail asked twice in the table
+        s["letter"]["points"][0]["table"].append(["8", "जन्मदिनांक व सेवानिवृत्तीचा दिनांक (कागदपत्रांनुसार)", ""])
+        self.assertTrue([x for x in self.warns(s, "§4.15 एकच") if "table[" in x])
+
+    def test_repeat_ask_ok(self):
+        for items in ("(1) जन्मदिनांक व सेवानिवृत्तीचा दिनांक; (2) वेतन पडताळणी झाली आहे किंवा कसे.",
+                      "(1) नियुक्ती आदेशाची प्रत; (2) पदोन्नती आदेशाची प्रत.",
+                      "(1) परिच्छेद 2(7) नुसार गोपनीय अहवाल; (2) अतिरिक्त कार्यभार संपुष्टात आल्याचा दिनांक."):
+            self.assertFalse(self.warns(self.miss_spec(items), "§4.15 एकच"), items)
+        s = copy.deepcopy(self.s122)   # §4.20 split: the datum in the table, the document in the list — not a repeat
+        s["letter"]["points"] += ["2)\tसेवापुस्तकाची वेतन पडताळणी झाल्याच्या नोंदीची प्रत."]
+        self.assertFalse(self.warns(s, "§4.15 एकच"))
+
+    def test_more_warns_only(self):
+        s = self.rel_spec(self.BODY, self.REL)
+        s["note"]["paras"][5] = self.MISS.format(items="(1) संपूर्ण सेवेचे गोपनीय अहवाल; (2) अद्यावत गोपनीय अहवाल.")
+        self.assertTrue(self.warns(s, "§4.15 एकच")); self.assertTrue(self.warns(s, "§1.1 संबंधित"))
+        self.assertEqual(L.lint_spec(s), L.lint_spec(self.s122))   # WARN only, never an error
 
 if __name__ == "__main__":
     unittest.main()

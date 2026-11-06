@@ -119,6 +119,10 @@ WARN level (spec.json; note body and letter, text outside quotes; related and si
     Q-F12 a letter to a "वकील" with a copy to the High Court Registry (§4.35; on_behalf_of: lint_parawise /
     lint_affidavit); Q-F19 no demand word in para 1–2 (court note: 1–3) when para 1 answers an incoming letter / petition
     (§4.30(3)); Q-F21 "पूर्वोदाहरण-ग्रंथालय" in a related heading / source
+  - CR 14/2026 live run (06.11.2026; A1/A3/A5/A7): a quote opening mid-sentence; "____ आहे" duplicating a missing-info
+    item; a reference letter's copy asked; one name in two forms; "§1.1 संबंधित माहितीतील उतारा मुख्य भागाशी जुळत नाही"
+    (a body quote of >= 40 characters found in "related" only with differing letters, ratio >= 0.90); "§4.15 एकच माहिती
+    पुन्हा मागवली" (two items of the missing-info para / of one letter's points asking the same thing)
 Output (audit S-F3): --details FILE (or env CASE_DETAILS_FILE) — full lines appended to FILE, stdout with every quoted
   segment replaced by its length (redact / out; the same switch in lint_parawise, lint_affidavit, verify_outputs,
   extract_check). Without it the output is unchanged.
@@ -128,6 +132,7 @@ Desk (C30, 03.11.2026): spec "desk" names the profile tools/desks/<id>.json (abs
 Rules (study.json): parts with headings भाग 0 … भाग 7 (--allow-missing-part1: भाग 1 may be absent); no internal ids;
   पृ. references as above ("“…”" skipped).
 The constants and check functions below are the ONE definition shared with tools/verify_outputs.py."""
+import difflib
 import json
 import re
 import sys
@@ -1692,6 +1697,163 @@ def name_form_warnings(spec):
     return W
 
 
+# (5) §1.1: a GR passage quoted both in the note body (“…” in note.first / paras / sub / closing; not tables) and in
+# "related" is one verbatim text — character-identical. CR14: body “… मधील तरतूदीनुसार … पात्रापात्रता … पुनर्विलोकन करुन …”
+# vs related “… मधील तरतुदीनुसार … पात्रतापात्रता … पुनर्विलोकन करून …” (spellings normalised inside an extract). A body
+# quote of >= 40 characters not found exactly in the related text is compared with the related window of the same length
+# (candidate starts by word votes, then SequenceMatcher); ratio >= 0.90 = the same passage with differing letters -> WARN.
+# Exact match or a lower ratio (a different passage) -> nothing.
+REL_MATCH_MIN = 40
+REL_MATCH_RATIO = 0.90
+BODY_QUOTE_RE = re.compile(r"“([^”]*)”")
+REL_MISMATCH_MSG = ("§1.1 संबंधित माहितीतील उतारा मुख्य भागाशी जुळत नाही — the same passage is quoted in the body and "
+                    "in 'related' with different letters; both are verbatim from the source page (§1.1)")
+
+
+def _rel_norm(t):
+    return ns(re.sub(r"[“”\"‘’]", " ", t or ""))
+
+
+def related_mismatch_warnings(spec):
+    if not isinstance(spec, dict) or not isinstance(spec.get("note"), dict):
+        return []
+    rel = spec.get("related") if isinstance(spec.get("related"), list) else []
+    words, owner = [], []   # related text as one word list; owner[j] = related item index of word j
+    for i, item in enumerate(rel):
+        if not isinstance(item, dict):
+            continue
+        for _, t in strings(item.get("text", []), "t"):
+            w = _rel_norm(t).split()
+            words += w; owner += [i] * len(w)
+    if not words:
+        return []
+    whole = " ".join(words)
+    pos = {}
+    for j, w in enumerate(words):
+        if len(w) >= 3:
+            pos.setdefault(w, []).append(j)
+    W = []
+    for lab, t, _ in note_seq(spec["note"]):
+        if re.search(r"\.table\[", lab):
+            continue
+        for m in BODY_QUOTE_RE.finditer(t or ""):
+            q = ns(m.group(1))
+            if len(q) < REL_MATCH_MIN or q in whole:
+                continue
+            qw = q.split(); n = len(qw)
+            votes = {}
+            for k, w in enumerate(qw):
+                for j in pos.get(w, ()):
+                    votes[j - k] = votes.get(j - k, 0) + 1
+            cands = sorted((v, s0) for s0, v in votes.items() if v >= max(2, 0.3 * n))[-3:]
+            best = (0.0, None, None)
+            for _, s0 in cands:
+                for a in (s0 - 1, s0, s0 + 1):
+                    for ln in (n - 1, n, n + 1):
+                        a0 = max(a, 0); win = words[a0:a0 + ln]
+                        if not win:
+                            continue
+                        sm = difflib.SequenceMatcher(None, q, " ".join(win), autojunk=False)
+                        if sm.real_quick_ratio() < REL_MATCH_RATIO or sm.quick_ratio() < REL_MATCH_RATIO:
+                            continue
+                        r = sm.ratio()
+                        if r > best[0]:
+                            best = (r, a0, win)
+            if best[0] < REL_MATCH_RATIO:
+                continue
+            pairs = []
+            for op, i1, i2, j1, j2 in difflib.SequenceMatcher(None, qw, best[2], autojunk=False).get_opcodes():
+                if op != "equal":
+                    pairs.append(f"'{' '.join(qw[i1:i2])}' / '{' '.join(best[2][j1:j2])}'")
+            W.append(f"{lab}: related[{owner[best[1]]}] {', '.join(pairs[:3])} — {REL_MISMATCH_MSG}")
+            break   # one finding per string
+    return W
+
+
+# (6) §4.15 / §4.31 (ई): the missing-info para and each letter's points ask every item once. Two items of one list
+# (inline "(1) …; (2) …" or sub-points of the missing-info para; one letter's point strings and its table's detail
+# column) of the same kind (both documents — DOC_RE: प्रत / प्रमाणपत्र / अहवाल — or both data; the §4.20 split of one
+# point into a table datum and a document is not a repeat) ask the same thing when, after the marker, names, digits,
+# references and filler words are removed, (a) the last two content words of one ("गोपनीय अहवाल") stand together in the
+# other, or (b) the smaller item's words are >= 75 % in the other. CR14: "(1) … संपूर्ण सेवा कालावधीचे गोपनीय अहवाल;
+# (2) … अद्यावत गोपनीय अहवाल / कार्यमूल्यमापन अहवाल;".
+REPEAT_STOP = frozenset("""व आणि किंवा तसेच यांचे यांच्या यांचा यांची यांनी यांना नुसार अनुसार परिच्छेद शासन निर्णय निर्णयाच्या
+निर्णयातील मधील मध्ये दि दिनांकाच्या रोजीच्या रोजी च्या चे ची चा कसे असल्यास त्या त्याचा त्याची त्याचे सदर संबंधित संबंधितास
+आहे आहेत होते होती होता झाली झाले केले केलेली केलेला करण्यात आले आली आलेल्या प्रत प्रती छायांकित साक्षांकित सत्यप्रत बाबत
+बाबतची बाबतचा बाबतचे संदर्भात उपलब्ध करून ही विनंती खालील तपशील माहिती श्री श्रीमती कु कै मा क्र क्रमांक""".split())
+REPEAT_OVERLAP = 0.75
+REPEAT_MARK_RE = re.compile(r"(?<![0-9०-९])\(\s*[0-9०-९]+\s*\)|^\s*[0-9०-९]+\)\s*|\([अ-ह]\)")
+REPEAT_SPLIT_RE = re.compile(r"(?:^|(?<=[\s;]))\(\s*[0-9०-९]+\s*\)")   # inline "(1) …; (2) …" item markers
+REPEAT_MSG = ("§4.15 एकच माहिती पुन्हा मागवली — two items ask the same thing; ask each essential item once (§4.15, "
+              "§4.31 (ई))")
+
+
+def _repeat_tokens(text):
+    t = unquoted(text or "")
+    names = {w for sur, given, _, _ in name_forms(t) for w in (sur,) + tuple(given)}
+    t = re.sub(r"(?:श्रीमती|श्री\.|कु\.|कै\.)\s*(?:[ऀ-ॿ]+\.\s*)*", " ", t)   # honorific + initials
+    t = REPEAT_MARK_RE.sub(" ", t)
+    t = re.sub(r"[0-9०-९]+(?:\([^)]*\))*", " ", t)   # digits, "2(7)" para refs
+    return [w for w in re.findall(r"[ऀ-ॿ]+(?:\.(?=[ऀ-ॿ]))?", t)
+            if w not in REPEAT_STOP and w not in names and len(w) >= 2 and not w.endswith(".")]
+
+
+def _repeat_pair(a, b):
+    ta, tb = _repeat_tokens(a), _repeat_tokens(b)
+    if len(ta) < 2 or len(tb) < 2:
+        return None
+    for x, y in ((ta, tb), (tb, ta)):
+        tail = tuple(x[-2:])
+        if any(tuple(y[k:k + 2]) == tail for k in range(len(y) - 1)):
+            return " ".join(tail)
+    sa, sb = set(ta), set(tb)
+    small = min(len(sa), len(sb))
+    if small >= 2 and len(sa & sb) / small >= REPEAT_OVERLAP:
+        return " ".join(sorted(sa & sb))
+    return None
+
+
+def _repeat_in(items):
+    """items [(path, text)] -> WARN strings for the first repeated pair."""
+    items = [(p, t) for p, t in items if t and t.strip() and not ns(t).endswith(":-")]
+    for a in range(len(items)):
+        for b in range(a + 1, len(items)):
+            (pa, xa), (pb, xb) = items[a], items[b]
+            if bool(DOC_RE.search(unquoted(xa))) != bool(DOC_RE.search(unquoted(xb))):
+                continue
+            hit = _repeat_pair(xa, xb)
+            if hit:
+                return [f"{pa}: '{ns(xa)[:50]}' / '{ns(xb)[:50]}' ({pb}; '{hit}') — {REPEAT_MSG}"]
+    return []
+
+
+def repeat_ask_warnings(spec, seq):
+    W = []
+    heads, owned = missing_owned(seq)
+    for h in heads[:1]:
+        lab, t, _ = seq[h]
+        u = unquoted(t)
+        tail = u.split(":-", 1)[1] if ":-" in u else ""
+        parts = [x for x in REPEAT_SPLIT_RE.split(tail) if x.strip()] if REPEAT_SPLIT_RE.search(tail) else []
+        items = [(lab, x) for x in parts]
+        items += [(seq[i][0], seq[i][1]) for i in sorted(owned) if i != h and not re.search(r"\.table\[", seq[i][0])]
+        W += _repeat_in(items)
+    for path, L in letters_of(spec):
+        pts = L.get("points") if isinstance(L, dict) and isinstance(L.get("points"), list) else []
+        items = []
+        for i, x in enumerate(pts):
+            if isinstance(x, str):
+                items.append((f"{path}.points[{i}]", x))
+            elif isinstance(x, dict) and isinstance(x.get("table"), list) and x["table"]:
+                rows = x["table"]
+                head = rows[0] if isinstance(rows[0], list) else []
+                if len(head) >= 2 and isinstance(head[0], str) and "अ.क्र" in head[0]:
+                    items += [(f"{path}.points[{i}].table[{r}][1]", row[1]) for r, row in enumerate(rows[1:], 1)
+                              if isinstance(row, list) and len(row) > 1 and isinstance(row[1], str)]
+        W += _repeat_in(items)
+    return W
+
+
 def lint_warnings(spec):
     """WARN-level findings "<JSON path>: <message>" (note body and letter outside quotes); never errors."""
     if not isinstance(spec, dict) or not isinstance(spec.get("note"), dict):
@@ -1735,6 +1897,9 @@ def lint_warnings(spec):
     W += blank_predicate_warnings(seq)
     W += letter_copy_warnings(spec, seq)
     W += name_form_warnings(spec)
+    # CR 14/2026 (06.11.2026): a related extract differing from the body quote; one item asked twice
+    W += related_mismatch_warnings(spec)
+    W += repeat_ask_warnings(spec, seq)
     return W
 
 
