@@ -1531,6 +1531,167 @@ def library_ref_warnings(spec):
     return W
 
 
+# ---------------- CR 14/2026 live run (06.11.2026): four WARN checks for defects existing rules forbid ----------------
+# (1) §4.34 (उ) / §1.1: a verbatim quote “…” in the note body (paras, sub-points, table cells; not "related") that opens
+# with a word that only continues an earlier sentence ("मात्र", "परंतु", "तथापि", "तसेच", "त्यानुसार", "तद्नंतर",
+# "म्हणजेच", "किंवा", "व") — the sentence before it was dropped (CR14: “मात्र पुनर्विलोकनाच्या विचाराधीन कालावधीतील …”).
+QUOTE_CONT_WORDS = ("मात्र", "परंतु", "तथापि", "तसेच", "त्यानुसार", "तद्नंतर", "म्हणजेच", "किंवा", "व")
+QUOTE_FIRST_WORD_RE = re.compile(r"“[\s\"'‘(\[]*([ऀ-ॿ]+)(?![ऀ-ॿ])")
+QUOTE_CONT_MSG = ("§4.34 (उ) उतारा मधूनच सुरू — the quote opens with a word that continues an earlier sentence; quote "
+                  "the passage from its own sentence start, in full (§1.1)")
+
+
+def quote_start_warnings(seq):
+    """seq = note body [(label, text, is_para)] -> WARN strings for quotes opening with QUOTE_CONT_WORDS."""
+    W = []
+    for lab, t, _ in seq:
+        for m in QUOTE_FIRST_WORD_RE.finditer(t or ""):
+            if m.group(1) in QUOTE_CONT_WORDS:
+                W.append(f"{lab}: '{m.group(1)}' — {QUOTE_CONT_MSG}")
+                break
+    return W
+
+
+def missing_owned(seq):
+    """(head indexes, owned indexes) of the §4.31 missing-info para(s) in seq: the para and the non-para blocks after it."""
+    heads = [i for i, (_, t, isp) in enumerate(seq) if isp and MISSING_HEAD_RE.match(ns(unquoted(t)))]
+    owned = set()
+    for h in heads:
+        owned.add(h); j = h + 1
+        while j < len(seq) and not seq[j][2]:
+            owned.add(j); j += 1
+    return heads, owned
+
+
+# (2) §4.31 (आ) / §4.34 (आ): outside the one missing-info para, outside “…” quotes and outside tables, an unknown value
+# given as the predicate of a sentence ("… दर्जा लागू झाल्याचा दिनांक ____ आहे.", CR14) while the missing-info para lists
+# the same item ("(2) … दर्जा लागू झाल्याचा दिनांक;") — the missing item is discussed twice; it belongs only in that para.
+# The two words before the blank must occur in the missing-info para. A "____" in a condition sub-point with no such
+# duplicate is the §4.31 (इ) form ("सदर प्रकरणात याबाबतची वस्तुस्थिती ____ आहे.") and is not flagged; "____" as a name /
+# number slot ("श्रीमती ____ यांनी", "प्र.क्र. ____", "पृ.____") is not matched (the blank must stand right before the verb).
+BLANK_PRED_RE = re.compile(r"_{3,}\s*(?:आहे|आहेत|होता|होती|होते|नाही|नाहीत)(?![ऀ-ॿ])")
+BLANK_PRED_MSG = ("§4.31 उपलब्ध नसलेली माहिती परिच्छेदाबाहेर — the missing-info para lists this unknown too; state it "
+                  "once, only in the '… त्यामध्ये खालील माहिती आढळून येत नाही:- (1) …' para (§4.31 (अ), (आ), §4.34 (आ))")
+
+
+def blank_predicate_warnings(seq):
+    W = []
+    heads, owned = missing_owned(seq)
+    if not heads:
+        return W
+    miss = ns(" ".join(unquoted(seq[i][1]) for i in owned))
+    for i, (lab, t, _) in enumerate(seq):
+        if i in owned or re.search(r"\.table\[", lab):
+            continue
+        u = unquoted(t)
+        for m in BLANK_PRED_RE.finditer(u):
+            words = re.findall(r"[ऀ-ॿ]+", u[:m.start()])[-2:]
+            if len(words) == 2 and " ".join(words) in miss:
+                W.append(f"{lab}: '{' '.join(words)} {ns(m.group(0))}' — {BLANK_PRED_MSG}")
+                break
+    return W
+
+
+# (3) §4.31 (ई) / §4.15: the missing-info para (and the letter's points) asks only for what is essential — not a copy of
+# a reference letter (the office has its own letters: "मा. उच्च न्यायालयाच्या दि. 21.04.2026 च्या पत्राची प्रत", CR14).
+# An appointment / joining / relieving letter ("नियुक्ती पत्राची प्रत") is a service document, not a reference letter.
+LETTER_COPY_RE = re.compile(r"(?<![ऀ-ॿ])पत्रा(?:ची|ंची|च्या|ंच्या)\s+(?:छायांकित\s+)?प्रती?(?![ऀ-ॿ])")
+SERVICE_LETTER_RE = re.compile(r"(?:नियुक्ती|नेमणूक|रुजू|कार्यमुक्ती|बदली|पदोन्नती|ओळख|आदेश)\s*$")
+LETTER_COPY_MSG = ("§4.31 (ई) संदर्भ-पत्राची प्रत — ask only the essential information (§4.15); copies of reference "
+                   "letters are not asked")
+
+
+def letter_copy_hits(text):
+    t = unquoted(text or "")
+    return [m.group(0) for m in LETTER_COPY_RE.finditer(t) if not SERVICE_LETTER_RE.search(t[:m.start()])]
+
+
+def letter_copy_warnings(spec, seq):
+    W = []
+    owned = missing_owned(seq)[1]
+    for i, (lab, t, _) in enumerate(seq):
+        if i in owned:
+            W += [f"{lab}: '{x}' — {LETTER_COPY_MSG}" for x in letter_copy_hits(t)][:1]
+    for path, t in letter_strings(spec):
+        if re.match(r"letters?(?:\[\d+\])?\.points\[", path):
+            W += [f"{path}: '{x}' — {LETTER_COPY_MSG}" for x in letter_copy_hits(t)][:1]
+    return W
+
+
+# (4) §4.30 (2): one person, one spelling across the note body, its tables and the letter (outside “…” quotes and
+# "related"). After श्री. / श्रीमती / कु. the name runs to a comma, bracket, ";" or a case word (यांनी, यांचे, हे …), at
+# most 5 words; the surname = its last word (>= 2 letters, no dot). One surname written both in an initials form ("एस. एस.
+# कुर्ले", "एस.एस.कुर्ले") and in a full form ("सिद्धेश्वर शरणप्पा कुर्ले"), or in two full forms with the same first name
+# but different middle words, is a WARN. A surname-only mention ("श्रीमती बारई"), two different initials (two people)
+# and two full forms with different first names (two people) are not. A name after "(" ("(श्री. वडनेरकर)" — a signer /
+# designation) and note.signers are skipped.
+HON_RE = re.compile(r"(?<![ऀ-ॿ(])(?<!\(\s)(?:श्रीमती|श्री\.|कु\.)\s*")
+NAME_STOP_RE = re.compile(r"[,;:()\[\]“”\n।]|(?<![ऀ-ॿ])(?:यां[ऀ-ॿ]*|हे|ह्यांनी|व|आणि|तसेच|लघुलेखक|सदर)(?![ऀ-ॿ])")
+NAME_TOKEN_RE = re.compile(r"[ऀ-ॿ]+\.?")
+NAME_FORMS_MSG = "§4.30 (2) नाव दोन रूपांत — one person, one spelling in the note and the letter"
+
+
+def name_forms(text):
+    """[(surname, given-name tuple, is_initials, shown form)] of the honorific names in one own-text string."""
+    t = unquoted(text or "")
+    out = []
+    for m in HON_RE.finditer(t):
+        rest = t[m.end():m.end() + 80]
+        st = NAME_STOP_RE.search(rest)
+        span = rest[:st.start()] if st else rest
+        if "_" in span or re.search(r"[0-9०-९A-Za-z]", span):
+            continue
+        toks = NAME_TOKEN_RE.findall(span)
+        k = 0
+        while k < len(toks) and toks[k].endswith("."):
+            k += 1
+        if k:   # initials form: the initials and the next word (the surname)
+            if k >= len(toks):
+                continue
+            given, sur, ini = tuple(x.rstrip(".") for x in toks[:k]), toks[k].rstrip("."), True
+        else:   # full form: words up to the case word / comma, or up to a word ending a sentence
+            name = []
+            for x in toks:
+                name.append(x.rstrip("."))
+                if x.endswith("."):
+                    break
+            else:
+                if not st:
+                    continue   # no clear end of the name: skipped (few false positives)
+            if len(name) > 4:
+                continue
+            given, sur, ini = tuple(name[:-1]), name[-1], False
+        if not given or len(sur) < 2:
+            continue   # surname only — a short reference, not a second form
+        out.append((sur, given, ini, " ".join([g + "." for g in given] if ini else list(given)) + " " + sur))
+    return out
+
+
+def name_form_warnings(spec):
+    n = spec.get("note") if isinstance(spec, dict) and isinstance(spec.get("note"), dict) else {}
+    items = [x for k in ("first", "paras", "sub", "closing") if k in n for x in strings(n[k], f"note.{k}")]
+    items += letter_strings(spec)
+    by = {}
+    for path, t in items:
+        for sur, given, ini, shown in name_forms(t):
+            by.setdefault(sur, {}).setdefault((given, ini), (path, shown))
+    W = []
+    for sur, forms in by.items():
+        keys = list(forms)
+        hit = None
+        for a in range(len(keys)):
+            for b in range(a + 1, len(keys)):
+                (ga, ia), (gb, ib) = keys[a], keys[b]
+                if ia != ib or (not ia and ga[0] == gb[0] and ga != gb):
+                    hit = (keys[a], keys[b]); break
+            if hit:
+                break
+        if hit:
+            (pa, sa), (pb, sb) = forms[hit[0]], forms[hit[1]]
+            W.append(f"{pa}: '{sa}' vs '{sb}' ({pb}) — {NAME_FORMS_MSG}")
+    return W
+
+
 def lint_warnings(spec):
     """WARN-level findings "<JSON path>: <message>" (note body and letter outside quotes); never errors."""
     if not isinstance(spec, dict) or not isinstance(spec.get("note"), dict):
@@ -1567,6 +1728,13 @@ def lint_warnings(spec):
     W += gp_letter_copy_warnings(spec)
     W += demand_warnings(spec)
     W += library_ref_warnings(spec)
+    # CR 14/2026 live run (06.11.2026): quote opening mid-sentence, '____ आहे' outside the missing-info para, a copy of a
+    # reference letter asked, one name in two forms
+    seq = note_seq(n)
+    W += quote_start_warnings(seq)
+    W += blank_predicate_warnings(seq)
+    W += letter_copy_warnings(spec, seq)
+    W += name_form_warnings(spec)
     return W
 
 

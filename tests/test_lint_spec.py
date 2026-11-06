@@ -45,12 +45,22 @@ AUDIT_KNOWN_WARNS = {
         'note.sub.9[1]: missing-info remark',
     },
     # WP35697: the §4.32 (अ) respondents sentence lists every respondent in petition order (one point, many names)
+    # WP35697: the §4.32 (अ) respondents sentence lists every respondent in petition order (one point, many names);
+    # 06.11.2026 (CR14 checks): the department's letter of 06.06.2025 is quoted from its "तथापि, …" sentence — a true
+    # §4.34 (उ) hit kept on the approved sample (the letter's earlier sentence is not in the repo)
     'WP35697_2026_old-pension_finance-opinion': {
         'note.paras[0]: sentence 2 has 43 words',
+        "note.sub.8[4]: 'तथापि'",
     },
     'WP35697_2026_parawise_GP-letter': {
         'note.paras[0]: sentence 2 has 43 words',
         'letter.intro: sentence 1 has 66 words',
+        "note.sub.8[4]: 'तथापि'",
+    },
+    # CR133: the condition sub-point "त्यांचा वेतनबँड व ग्रेड वेतन ____ आहे." while missing-info item (1) also asks the
+    # "वेतनश्रेणी व ग्रेड वेतन" — a true §4.31 duplicate (06.11.2026 CR14 check) kept on the approved sample (needs Abhi)
+    'CR133_2026_DLI-insurance_info-letter': {
+        "note.sub.5[1]: 'ग्रेड वेतन ____ आहे'",
     },
 }
 
@@ -1050,6 +1060,98 @@ class Flow437(unittest.TestCase):
         self.assertEqual(L.court_shape_warnings(sp), [])
         sp["note"]["sub"] = {}
         self.assertTrue(any("para 3" in w for w in L.court_shape_warnings(sp)))
+
+
+class LintCR14Warns(unittest.TestCase):
+    """06.11.2026 (live run CR 14/2026): four WARN checks — quote opening mid-sentence (§4.34 (उ)), '____ आहे' outside
+    the missing-info para (§4.31), a reference letter's copy asked (§4.31 (ई)), one name in two forms (§4.30 (2))."""
+    MISS = ("सदर प्रकरणी प्रमुख जिल्हा व सत्र न्यायाधीश, सोलापूर यांच्या दि. 14.08.2026 रोजीच्या प्रस्तावाचे अवलोकन केले असता, "
+            "त्यामध्ये खालील माहिती आढळून येत नाही:- (1) सदर कर्मचाऱ्यांना राजपत्रित (वर्ग-2) दर्जा लागू झाल्याचा दिनांक; "
+            "(2) सन 2017-18 चे गोपनीय अहवाल{extra}.")
+
+    @classmethod
+    def setUpClass(cls):
+        cls.s122 = load_clean(CR122)
+        cls.base_w = set(L.lint_warnings(cls.s122))
+
+    def warns(self, s, needle):
+        return [w for w in L.lint_warnings(s) if needle in w and w not in self.base_w]
+
+    def spec(self, sub3=None, miss_extra=None, para0=None, point=None):
+        s = copy.deepcopy(self.s122)
+        if sub3 is not None: s["note"]["sub"]["3"] = s["note"]["sub"]["3"] + [sub3]
+        if miss_extra is not None: s["note"]["paras"][5] = self.MISS.format(extra=miss_extra)
+        if para0 is not None: s["note"]["paras"][0] += para0
+        if point is not None: s["letter"]["points"].append(point)
+        return s
+
+    # (1) §4.34 (उ)
+    def test_quote_mid_sentence(self):
+        bad = self.spec(sub3="(9) तसेच, परिच्छेद 2(7) मध्ये असे नमूद करण्यात आले आहे की, “मात्र पुनर्विलोकनाच्या विचाराधीन "
+                             "कालावधीतील मागील ५ वर्षाच्या गोपनीय अहवालावर भर देऊन त्याआधारे पात्रापात्रतेचा निर्णय घ्यावा.”")
+        w = self.warns(bad, "§4.34 (उ) उतारा मधूनच सुरू")
+        self.assertEqual(len(w), 1); self.assertTrue(w[0].startswith("note.sub.3["), w)
+        for first in ("व ", "किंवा ", "तथापि, ", "म्हणजेच "):
+            self.assertTrue(self.warns(self.spec(para0=f" “{first}पुढील कार्यवाही करावी.” असे नमूद आहे."), "§4.34 (उ)"), first)
+        for ok in ("“पुनर्विलोकनाच्या विचाराधीन कालावधीतील अहवालावर भर द्यावा.”", "“वरील अटी लागू राहतील.”",
+                   "“वयाची 50 वर्षे पूर्ण झालेली असावी.”", "“मात्रा निश्चित करावी.”"):
+            self.assertFalse(self.warns(self.spec(para0=f" {ok} असे नमूद आहे."), "§4.34 (उ)"), ok)
+        s = copy.deepcopy(self.s122); s["related"][0]["text"] = ["“मात्र पुढील कार्यवाही करावी.”"]
+        self.assertFalse(self.warns(s, "§4.34 (उ)"))   # related extracts are not checked
+
+    # (2) §4.31 '____ आहे'
+    def test_blank_predicate_outside_missing_para(self):
+        bad = self.spec(sub3="(9) परंतु, त्यांना राजपत्रित (वर्ग-2) दर्जा लागू झाल्याचा दिनांक ____ आहे.", miss_extra="")
+        w = self.warns(bad, "§4.31 उपलब्ध नसलेली माहिती परिच्छेदाबाहेर")
+        self.assertEqual(len(w), 1); self.assertIn("झाल्याचा दिनांक ____ आहे", w[0])
+        for ok in ("(9) श्रीमती ____ यांनी अर्ज केला आहे.", "(9) प्र.क्र. ____ अन्वये प्रस्ताव आहे.", "(9) पृ.____/प.वि. पहावे.",
+                   "(9) सदर प्रकरणात याबाबतची वस्तुस्थिती ____ आहे.",   # §4.31 (इ): no duplicate in the missing-info para
+                   "(9) “दर्जा लागू झाल्याचा दिनांक ____ आहे.”"):
+            self.assertFalse(self.warns(self.spec(sub3=ok, miss_extra=""), "§4.31 उपलब्ध"), ok)
+        # inside the missing-info para itself: not flagged
+        self.assertFalse(self.warns(self.spec(miss_extra="; (3) दर्जा लागू झाल्याचा दिनांक ____ आहे"), "§4.31 उपलब्ध"))
+        # no missing-info para: the §4.31 (इ) "____" form is not a duplicate
+        sp = {"note": {"first": "सादर.", "paras": ["सदर प्रकरणी दर्जा लागू झाल्याचा दिनांक ____ आहे."]}}
+        self.assertEqual(L.blank_predicate_warnings(L.note_seq(sp["note"])), [])
+
+    # (3) §4.31 (ई)
+    def test_reference_letter_copy(self):
+        bad = self.spec(miss_extra="; (3) मा. उच्च न्यायालयाच्या दि. 21.04.2026 च्या पत्राची प्रत")
+        w = self.warns(bad, "§4.31 (ई) संदर्भ-पत्राची प्रत")
+        self.assertEqual(len(w), 1); self.assertTrue(w[0].startswith("note.paras[5]:"), w)
+        bad = self.spec(point="2)\tमा. उच्च न्यायालयाच्या दि. 21.04.2026 च्या पत्राची प्रत.")
+        self.assertTrue([x for x in self.warns(bad, "§4.31 (ई)") if x.startswith("letter.points[")])
+        self.assertTrue(self.warns(self.spec(miss_extra="; (3) संदर्भाधीन पत्रांच्या प्रती"), "§4.31 (ई)"))
+        for ok in ("; (3) नियुक्ती पत्राची प्रत", "; (3) पदोन्नती आदेशाची प्रत", "; (3) सेवापुस्तकाची छायांकित प्रत"):
+            self.assertFalse(self.warns(self.spec(miss_extra=ok), "§4.31 (ई)"), ok)
+        self.assertFalse(self.warns(self.spec(para0=" मा. उच्च न्यायालयाच्या पत्राची प्रत या विभागास प्राप्त आहे."),
+                                    "§4.31 (ई)"))   # outside the missing-info para / letter points: not this check
+
+    # (4) §4.30 (2)
+    def test_name_two_forms(self):
+        bad = self.spec(para0=" श्री. एस. एस. कुर्ले, लघुलेखक यांचा प्रस्ताव आहे.",
+                        point={"table": [["अ.क्र.", "नाव व पदनाम"], ["1", "श्री. सिद्धेश्वर शरणप्पा कुर्ले, लघुलेखक"]]})
+        w = self.warns(bad, "§4.30 (2) नाव दोन रूपांत")
+        self.assertEqual(len(w), 1); self.assertIn("एस. एस. कुर्ले", w[0]); self.assertIn("सिद्धेश्वर शरणप्पा कुर्ले", w[0])
+        bad = self.spec(para0=" श्री.एस.एस.कुर्ले यांचा प्रस्ताव आहे. श्री. सिद्धेश्वर शरणप्पा कुर्ले हे लघुलेखक आहेत.")
+        self.assertTrue(self.warns(bad, "§4.30 (2)"))   # no spaces in the initials form
+        bad = self.spec(para0=" श्री. सिद्धेश्वर कुर्ले यांचा प्रस्ताव आहे. श्री. सिद्धेश्वर शरणप्पा कुर्ले हे लघुलेखक आहेत.")
+        self.assertTrue(self.warns(bad, "§4.30 (2)"))   # two full forms, same first name
+        for ok in (" श्री. एस. एस. कुर्ले यांचा प्रस्ताव आहे. श्री. कुर्ले यांनी अर्ज केला.",   # surname-only reference
+                   " श्री. एस. एस. पाटील व श्री. आर. बी. पाटील यांनी अर्ज केला.",   # two people (initials)
+                   " श्री. राम पाटील यांनी व श्री. श्याम पाटील यांनी अर्ज केला.",   # two people (first names)
+                   " “श्री.एस.एस.सुरळकर यांचे” असे नमूद आहे.",   # quote exempt (sample: श्री. आर. एन. सुरळकर)
+                   " अ.स. (श्री. आर. नारायण सुरळकर) यांनी पाहिले."):   # bracketed designation / signer
+            self.assertFalse(self.warns(self.spec(para0=ok), "§4.30 (2)"), ok)
+        s = copy.deepcopy(self.s122)
+        s["note"]["signers"] = list(s["note"]["signers"]) + ["श्री. रघुनाथ नारायण सुरळकर"]
+        self.assertFalse(self.warns(s, "§4.30 (2)"))   # signers are not read
+
+    def test_cr14_warns_only(self):
+        s = self.spec(sub3="(9) परंतु, त्यांना राजपत्रित (वर्ग-2) दर्जा लागू झाल्याचा दिनांक ____ आहे.",
+                      miss_extra="; (3) मा. उच्च न्यायालयाच्या दि. 21.04.2026 च्या पत्राची प्रत")
+        self.assertEqual(L.lint_spec(s), L.lint_spec(self.s122))   # WARN only, never an error
+
 
 if __name__ == "__main__":
     unittest.main()

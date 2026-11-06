@@ -113,9 +113,82 @@ def add(body, sect, proto, doc, text, bold=None, left=None, first=None):
     return p
 
 
+TABLE_PT = 11   # table text size (pt)
+CELL_PAD_CM = 0.40   # Word's default left + right cell margins (0.19 cm each) + the border
+_ZERO = set(range(0x0900, 0x0903)) | {0x093A, 0x093C, 0x094D, 0x0962, 0x0963} | set(range(0x0941, 0x0949)) \
+    | set(range(0x0951, 0x0958))
+_HALF = {0x0903, 0x093E, 0x093F, 0x0940, 0x0949, 0x094A, 0x094B, 0x094C}
+
+
+def text_em(s):
+    """Approximate printed width of s in em (generous, so a token measured here fits in DVOT-SurekhMR / FreeSerif):
+    Devanagari letters 0.62, spacing vowel signs 0.3, non-spacing signs / virama 0, digits 0.55, '.' ',' etc. 0.3."""
+    w = 0.0
+    for ch in s:
+        o = ord(ch)
+        if o == 0x094D: w -= 0.27; continue   # virama: the consonant before it is a half form in a conjunct
+        if o in _ZERO or o in (0x200C, 0x200D): continue
+        if o in _HALF: w += 0.3
+        elif 0x0900 <= o <= 0x097F: w += 0.62
+        elif ch.isdigit(): w += 0.55
+        elif ch in ".,:;'!|()[]/-": w += 0.3
+        elif ch == " ": w += 0.25
+        elif ch.isupper(): w += 0.68
+        else: w += 0.52
+    return w
+
+
+def _em_cm(em, pt=TABLE_PT):
+    return em * pt * 2.54 / 72.0
+
+
+def text_width_cm(sect):
+    """Text width of the section (page width - left - right margins - gutter) in cm; 15 cm when unknown."""
+    try:
+        sz, mar = sect.find(qn("w:pgSz")), sect.find(qn("w:pgMar"))
+        tw = int(sz.get(qn("w:w"))) - int(mar.get(qn("w:left"))) - int(mar.get(qn("w:right"))) \
+            - int(mar.get(qn("w:gutter")) or 0)
+        return tw * 2.54 / 1440.0
+    except Exception:
+        return 15.0
+
+
+def col_widths(rows, total):
+    """Column widths (cm) summing to `total`: each column at least as wide as its longest unbreakable token of the data
+    rows (dates DD.MM.YYYY, numbers, amounts like 1,23,456, words — never split); then, smallest need first and within
+    60% of the spare width, as wide as its longest header word (header words split at "/" and "-"; long headers wrap);
+    the rest shared in proportion to the length of the column's longest cell text."""
+    ncol = max(len(r) for r in rows)
+    cell = lambda r, j: str(r[j]) if j < len(r) else ""
+    words = lambda t, hdr: re.split(r"[\s/-]+" if hdr else r"\s+", t)
+    tok = lambda rs, j, hdr: max([_em_cm(text_em(w) * 1.08) for r in rs for w in words(cell(r, j), hdr) if w] or [0.0])
+    data = rows[1:] or rows
+    mins = [max(tok(data, j, False), 0.35) + CELL_PAD_CM for j in range(ncol)]
+    if sum(mins) >= total:   # cannot fit even the data tokens: scale down (rare — very many columns)
+        return [w * total / sum(mins) for w in mins]
+    if len(rows) > 1:   # a column left empty to be filled in (letter's information table): room to write by hand
+        for j in range(ncol):
+            if not any(cell(r, j).strip() for r in data):
+                mins[j] = max(mins[j], min(3.0, total / ncol))
+        if sum(mins) >= total:
+            return [w * total / sum(mins) for w in mins]
+    budget = 0.6 * (total - sum(mins))
+    need = [max(0.0, tok(rows[:1], j, True) + CELL_PAD_CM - mins[j]) for j in range(ncol)]
+    for j in sorted(range(ncol), key=lambda j: need[j]):
+        if need[j] <= budget:
+            mins[j] += need[j]; budget -= need[j]
+    nat = [max(mins[j], max(_em_cm(text_em(cell(r, j))) for r in rows) + CELL_PAD_CM) for j in range(ncol)]
+    if sum(nat) <= total:   # everything fits on one line: share the spare width in proportion to the natural widths
+        return [w * total / sum(nat) for w in nat]
+    room, want = total - sum(mins), [nat[j] - mins[j] for j in range(ncol)]
+    return [mins[j] + room * want[j] / sum(want) for j in range(ncol)]
+
+
 def add_table(d, sect, rows, bold_last=False):
-    """rows: list of lists (first row = header, bold). Bordered grid, DVOT-SurekhMR."""
+    """rows: list of lists (first row = header, bold). Bordered grid, DVOT-SurekhMR. Fixed layout, table width = the
+    section's text width; column widths from content (col_widths) on the grid and on every cell."""
     from docx.oxml import OxmlElement
+    from docx.shared import Cm, Pt
     ncol = max(len(r) for r in rows)
     t = d.add_table(rows=len(rows), cols=ncol)
     tblPr = t._tbl.tblPr
@@ -123,24 +196,22 @@ def add_table(d, sect, rows, bold_last=False):
     for e in ("top", "left", "bottom", "right", "insideH", "insideV"):
         x = OxmlElement(f"w:{e}"); x.set(qn("w:val"), "single"); x.set(qn("w:sz"), "4"); x.set(qn("w:color"), "000000"); b.append(x)
     tblPr.append(b)
-    from docx.shared import Cm, Pt
-    # column widths: serial column narrow, rest proportional to longest text (min 2 cm), total 16 cm
-    lens = [max(len(str(r[j])) if j < len(r) else 0 for r in rows) for j in range(ncol)]
-    first = 1.5 if ncol > 2 else 0
-    rest = 16.0 - first
-    wts = [max(l, 10) ** 0.5 for l in (lens[1:] if first else lens)]
-    ws = ([first] if first else []) + [max(2.4, rest * w / sum(wts)) for w in wts]
-    k = 16.0 / sum(ws); ws = [w * k for w in ws]
-    t.autofit = False
-    for j in range(ncol): t.columns[j].width = Cm(ws[j])
+    total = text_width_cm(sect)
+    ws = col_widths(rows, total)
+    t.autofit = False   # w:tblLayout fixed
+    tw = tblPr.find(qn("w:tblW"))
+    if tw is None:
+        tw = OxmlElement("w:tblW"); tblPr.append(tw)
+    tw.set(qn("w:w"), str(int(round(Cm(total).twips)))); tw.set(qn("w:type"), "dxa")
+    for j in range(ncol): t.columns[j].width = Cm(ws[j])   # w:gridCol
     for i, r in enumerate(rows):
         for j in range(ncol):
-            c = t.cell(i, j); c.text = ""; c.width = Cm(ws[j])
+            c = t.cell(i, j); c.text = ""; c.width = Cm(ws[j])   # w:tcW
             para = c.paragraphs[0]
             pf = para.paragraph_format; pf.space_before = Pt(0); pf.space_after = Pt(0); pf.line_spacing = 1.0
             pf.left_indent = Cm(0); pf.first_line_indent = Cm(0)
             run = para.add_run(str(r[j]) if j < len(r) else "")
-            setfont(run); run.font.size = Pt(11)
+            setfont(run); run.font.size = Pt(TABLE_PT)
             if i == 0 or (bold_last and i == len(rows) - 1): run.bold = True
     sect.addprevious(t._tbl)
     return t
@@ -185,20 +256,27 @@ def build_note(spec, out):
     add(body, sect, first, d, " \t" + n["first"])
     k = 2
     subs = n.get("sub", {})
+    last = None   # the last body paragraph before the closing (None after a table)
     for i, t in enumerate(n["paras"]):
         if isinstance(t, dict):
-            add_table(d, sect, t["table"], t.get("bold_last", False)); continue
-        add(body, sect, numbered, d, f"{k}.\t{t}"); k += 1
+            add_table(d, sect, t["table"], t.get("bold_last", False)); last = None; continue
+        last = add(body, sect, numbered, d, f"{k}.\t{t}"); k += 1
         for s in subs.get(str(i), []):
             # INSTRUCTIONS §4.37 D1 (05.11.2026): a sub-point "(1) …" / "(अ) …" / "1) …" hangs like the office's Word
             # numbering — marker at 1 cm, text and its wrapped lines at 2 cm; an item without a marker stays as before
             m = SUB_MARK_RE.match(s)
             if m:
-                add(body, sect, numbered, d, f"{m.group(1)}\t{s[m.end():]}", left=Cm(2.0), first=Cm(-1.0))
+                last = add(body, sect, numbered, d, f"{m.group(1)}\t{s[m.end():]}", left=Cm(2.0), first=Cm(-1.0))
             else:
-                add(body, sect, numbered, d, f"\t{s}", left=Cm(1.0), first=Cm(-0.0))
-    add(body, sect, close, d, "\t " + n.get("closing", "मान्यतेस्तव सादर."))
-    add(body, sect, blank, d, " ")
+                last = add(body, sect, numbered, d, f"\t{s}", left=Cm(1.0), first=Cm(-0.0))
+    # The signatures never stand alone on a page: the last body para ("सबब, …"), the blank line and every signer line but
+    # the last keep with the next paragraph (Word / LibreOffice move them together; no page break is forced).
+    closing = n.get("closing", "मान्यतेस्तव सादर.")
+    if last is not None and "सबब" not in closing:   # a bare "मान्यतेस्तव सादर." closing: the "सबब, …" para is the one before
+        last.paragraph_format.keep_with_next = True; last.paragraph_format.keep_together = True
+    cp = add(body, sect, close, d, "\t " + closing)
+    cp.paragraph_format.keep_with_next = True; cp.paragraph_format.keep_together = True
+    add(body, sect, blank, d, " ").paragraph_format.keep_with_next = True
     # §4.6 (Abhi 05.11.2026, his own note page): the first `signers_right` lines of the desk chain — the preparer's name
     # "(अ.मा. वसू)" (not bold, `signers_plain`) and post "क. अ. (अ.का.)" — sit together on the right, centred on each other,
     # with no blank line between them; the rest of the chain stays on the left.
@@ -208,6 +286,7 @@ def build_note(spec, out):
     for i, s in enumerate(n["signers"]):
         sp = add(body, sect, sign, d, s, bold=False if i in plain else None)
         sp.paragraph_format.right_indent = Cm(0)
+        sp.paragraph_format.keep_with_next = i < len(n["signers"]) - 1
         if i < nright:
             sp.paragraph_format.left_indent = Cm(4); sp.alignment = 1   # right block, lines centred
             if i < nright - 1:
