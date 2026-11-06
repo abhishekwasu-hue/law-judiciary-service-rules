@@ -95,7 +95,7 @@ Cost: measured $3.0–3.9 per full run, Opus 90–96 % of it (docs/AUDIT_2026-11
    आढळून येत नाही:- …" (05.11.2026) just before the last para, items inline "(1) …; (2) …." (no table), essential items only, "____"
    in tables [I4.31]; no incoming letter no. anywhere in the note [I4.36]; only references needed
    to decide the demand, each fact once, office order with linking openers, one quote per sentence, पृ.N/प.वि. once
-   per document and no पृ. table column, no quote cut with "…" [I4.34]; accuracy checks A1–A8 of your definition (06.11.2026: quotes from the sentence start, rule + proviso together, "वरील …नुसार" only what the quote says, items asked per the provision's words, this Section's own earlier note / letter in the chronology, no "____ आहे" body sentence, table look-back only what the table shows, one name form); flow [I4.37]: one issue per numbered para
+   per document and no पृ. table column, no quote cut with "…" [I4.34]; accuracy checks A1–A8 of your definition (06.11.2026: quotes from the sentence start, rule + proviso together, "वरील …नुसार" only what the quote says, items asked per the provision's words, this Section's own earlier note / letter in the chronology, no "____ आहे" body sentence, table look-back only what the table shows, one name form, Marathi initials per [I4.18]); flow [I4.37]: one issue per numbered para
    with its facts as `note.sub` points (~5-8 numbered paras), para 2 "सदर पत्रान्वये …", each numbered para opened with
    an office linking word, tables only for figures and the service-detail table (conditions, duties, demands, prayers,
    chronology, objections, opinions point-wise; no "अट / प्रस्तावातील स्थिती" table), no separate "उपरोक्त वस्तुस्थिती
@@ -163,7 +163,7 @@ Cost: measured $3.0–3.9 per full run, Opus 90–96 % of it (docs/AUDIT_2026-11
    "सदर / उपरोक्त पत्रान्वये …" (not court notes), no descriptive table (condition / duties / demands / prayers /
    chronology / opinions -> linked sentences or sub-points; figures and the service-detail table stay tables), no
    separate fact-summary list (fold its decisive facts into the last para "उपरोक्त वस्तुस्थिती विचारात घेता, … सबब, …");
-   lint WARN lines "§4.37" are the checklist); accuracy checks A1–A8 of your definition (06.11.2026, CR 14 run: open the original page of every note-body quote — it starts at its sentence start, a "वरील …नुसार" sentence says only what the quote says; this Section's own earlier note / letter in the proposal stated in the chronology; no "____ आहे" body sentence; one name form); after your edits run `python3 tools/lint_spec.py /tmp/work/spec.json` until LINT OK, then write the
+   lint WARN lines "§4.37" are the checklist); accuracy checks A1–A8 of your definition (06.11.2026, CR 14 run: open the original page of every note-body quote — it starts at its sentence start, a "वरील …नुसार" sentence says only what the quote says; this Section's own earlier note / letter in the proposal stated in the chronology; no "____ आहे" body sentence; one name form, Marathi initials per [I4.18]); after your edits run `python3 tools/lint_spec.py /tmp/work/spec.json` until LINT OK, then write the
    hashes and /tmp/work/review.json." If `changes` > 0: copy the corrected part 0 / note / letter text into
    study.json (parts 0, 5, 6), then lint -> build -> extract_check -> verify again.
    Always (also with `changes` 0; INSTRUCTIONS §4.30, Abhi 03.11.2026): append to study.json part 7 the blocks

@@ -1320,8 +1320,10 @@ ACCURACY = (" Accuracy checks (A1-A8; each enforces an existing rule): A1 [I1.1,
             "para — never a body sentence like '… दिनांक ____ आहे' / '… तपशील ____ आहे'; '____' only in table cells and "
             "name / number slots. A6 [I4.37(इ)] the sentence after a table ('वरील तक्त्यात दर्शविल्यानुसार …') states only "
             "what the table shows; a fact from a heading or another page gets its own sentence with its पृ.N/प.वि. A7 "
-            "[I4.30(2), I4.18] one form of each person's name in the note, tables and letter: the form used in the "
-            "covering (forwarding) letter of the proposal; the other form at most once, in brackets, at first mention. "
+            "[I4.30(2), I4.18] one form of each person's name in the note, tables and letter: Marathi initials "
+            "(circular 07.05.2018: 'ह.ना. आपटे', not 'एच.एन.आपटे') formed from a Devanagari full name found anywhere in the "
+            "proposal ('एस. एस. कुर्ले' + 'सिद्धेश्वर शरणप्पा कुर्ले' -> 'श्री. सि. श. कुर्ले'); only when no Devanagari name "
+            "exists, the proposal's English-initials form; never invented. "
             "A8 [I4.34(आ)] a fact in a table is not repeated in a sentence (dates of birth / appointment etc.). lint WARN "
             "lines tagged §4.34 (उ), §4.31, §4.31 (ई), §4.30 (2) are the checklist for A1, A5, A3, A7.")
 REVIEW_ACC = (" Reviewer, for A1-A2: open the original page of EVERY note-body quote (package page image) and check "

@@ -84,7 +84,7 @@
 - 06.11.2026: skills/lj-prastav-desk6/SKILL.md — updated claude.ai skill (procedure + tools only; all drafting rules point to the repo files, stale rules removed) for Abhi to upload in place of his current skill.
 
 ## Pending
-28. **Open (Abhi, 06.11.2026):** (a) A7 name-form default = the form in the covering letter (provisional; Abhi to confirm);
+28. **Open (Abhi, 06.11.2026):** (a) CLOSED 06.11.2026 (Abhi: "अ मान्य"): names in Marathi initials (§4.18, circular 07.05.2018) formed from a Devanagari full name anywhere in the proposal ("सि. श. कुर्ले"); English-initials form only when no Devanagari name exists — §4.18, §4.39 A7, SOP, brief, ACCURACY, skill updated;
     (b) the CR133 sample carries the same "____ आहे" duplicate of a missing item — Abhi to decide whether to rewrite it.
 27. **Self-hosted runner on Abhi's VPS (05.11.2026, Abhi: "Ok go ahead", "दोन्ही मान्य आहे"; no money for GitHub Actions):**
     deploy/vps-runner/ (Dockerfile pinned by digest, entrypoint, cleanup hooks, vps-setup.sh), docs/VPS_RUNNER.md (Marathi owner
