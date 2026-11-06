@@ -1302,7 +1302,7 @@ REVIEW = (" You are the final approver. LOOK at the proposal page images (WORKDI
           "word, para 2 'सदर / उपरोक्त पत्रान्वये …' (not court notes), tables only for figures and the service-detail "
           "table (conditions, duties, demands, prayers, chronology, opinions point-wise), no separate fact-summary list "
           "— the last para opens 'उपरोक्त वस्तुस्थिती विचारात घेता, …' then 'सबब, …'; lint '§4.37' WARN lines = checklist.")
-# Accuracy checks A1-A8 (06.11.2026, owner on the CR 14/2026 run: "इंजिन मध्ये बदल करा सुधारणा करा जेणेकरून आपल्याला
+# Accuracy checks A1-A8 = INSTRUCTIONS §4.39 (06.11.2026, owner on the CR 14/2026 run: "इंजिन मध्ये बदल करा सुधारणा करा जेणेकरून आपल्याला
 # योग्य आऊट मिळेल"). Each one only enforces an existing rule (cited); both the drafter and the reviewer get them.
 ACCURACY = (" Accuracy checks (A1-A8; each enforces an existing rule): A1 [I1.1, I4.34(उ)] a quote starts where the "
             "provision's sentence starts — never at 'मात्र / परंतु / तथापि / तसेच / त्यानुसार …' with its main sentence "
