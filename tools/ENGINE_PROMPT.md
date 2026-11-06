@@ -82,7 +82,7 @@ Cost: measured $3.0–3.9 per full run, Opus 90–96 % of it (docs/AUDIT_2026-11
    service-rules/). Write `/tmp/work/candidates.md`: per candidate GR — code, date, title, repo path, and
    the text of the pages that may hold the needed para (pymupdf text, page numbers); precedent hits (file, lines).
    Never decide which GR applies or quote anything yourself.
-2. D1 -> `drafter` (ONE Agent call; give paths, not content): "Read TOOL_DOCS (the brief is in your agent definition). LOOK at every proposal
+2. D1 -> `drafter` (ONE Agent call with `"run_in_background": false`; give paths, not content): "Read TOOL_DOCS (the brief is in your agent definition). LOOK at every proposal
    page image WORKDIR/pages/p-NN.png (full 110 dpi; several Reads per message); reply PDFs likewise. Write
    /tmp/work/facts.json (format below) — every number/date/name/amount from the IMAGE, `clear:false` where not sure.
    RESEARCH FIRST (brief [I4.29]): from candidates.md, the GR PDFs, rules and judgments find every applicable para and
@@ -116,7 +116,7 @@ Cost: measured $3.0–3.9 per full run, Opus 90–96 % of it (docs/AUDIT_2026-11
    --reuse WORKDIR/pages` (OCR for extract_check; audit 05.11 T-C: the proposal pages re-use the workflow's OCR of
    WORKDIR/pages, only the other pages are OCR'd). Never OCR the package a second time in the run; after a package
    REBUILD run the same command again (the old OCR belongs to the old PDF and extract_check ignores it).
-4. In ONE message, two Agent calls — normal (foreground) calls, never `run_in_background`; they run in parallel and
+4. In ONE message, two Agent calls — foreground calls with `"run_in_background": false` written explicitly (the CLI default is background); they run in parallel and
    the message returns when both have finished. Never wait for, sleep on or poll their files (audit 05.11 T-A):
    - `related_writer`: "Read /tmp/work/related_plan.md, /tmp/work/spec.json and OUTDIR/<package> +
      its .map.json. Write /tmp/work/related.json = the spec `related` list (verbatim extracts in “…”, source, each
@@ -144,7 +144,7 @@ Cost: measured $3.0–3.9 per full run, Opus 90–96 % of it (docs/AUDIT_2026-11
    write a draft OUTDIR/status.json (rule 9, without `review`) -> verify (rule 6). Fix ladder: Escalation (b); its end
    state: rule 9. A PREFIX change (C R found later) -> delete the old-PREFIX files in OUTDIR before rebuilding.
 7. D-final (audit 05.11 T-D: the reviewer does not wait for the Study repairs; the part-1 wait + part1check were
-   done in step 5). Then ONE message with, in parallel (foreground Agent calls): the `reviewer` call below
+   done in step 5). Then ONE message with, in parallel (foreground Agent calls, each with `"run_in_background": false`): the `reviewer` call below
    AND, only when there is Study work left, ONE `fixer` call for it (Study part-3 MISMATCH units of step 5 and part-1
    pages that failed part1check: "correct those units / redo those pages from the page images; write
    /tmp/work/study_fix.json"). The reviewer reads only spec / part 0 / facts / images, never the Study, so the two do
@@ -237,7 +237,9 @@ the run variables. The reviewer's corrections go to status.json `review.correcti
 
 ### Cost rules (they never override a quality rule)
 - Few turns: independent tool calls in ONE message; shell steps combined in one Bash call; each JSON in one Write.
-- No waiting of your own (audit 05.11 T-A): subagents are normal Agent calls (never `run_in_background`), OCR and
+- No waiting of your own (audit 05.11 T-A): EVERY Agent call passes `"run_in_background": false` explicitly — this CLI starts
+  subagents in the background by default, and a background subagent is stopped when your turn ends (run #19, 06.11.2026:
+  the drafter was cut off, no status.json); never end your turn while a subagent is running; OCR and
   every tool run in the foreground; never write a `sleep` / `until` / `while` loop or re-check a file to see whether
   something has finished. The single exception is the part-1 wait command of section "Study part 1".
 - Context size on the cheap tier (audit 05.11 C-F): keep every MODEL_LIGHT request (you, study_writer, related_writer)

@@ -77,6 +77,11 @@
   para unnumbered, later "2.", "3."; "प्रत" once ("प्रत :-" + numbered lines ending "निवड नस्ती"); note unchanged. Rule text:
   INSTRUCTIONS §4.5/§4.10/§4.20/§4.22/§4.38, SOP Step 4/7, WORKFLOW §३/§४, ENGINE_BRIEF (size unchanged), PROPOSAL_PROMPT भाग 6.
 
+- 06.11.2026 run #19 (case 9) failed after 14 min / $3.60 with "status.json वाचता आले नाही": the orchestrator called the
+  drafter without `run_in_background: false` (CLI 2.1.300 starts subagents in the background by default) and ended its turn;
+  the CLI stopped the drafter 10 min later. Fix: ENGINE_PROMPT — every Agent call passes `"run_in_background": false`
+  explicitly; workflow — CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 in the engine env (the step timeout still bounds the run).
+
 ## Pending
 28. **Open (Abhi, 06.11.2026):** (a) A7 name-form default = the form in the covering letter (provisional; Abhi to confirm);
     (b) the CR133 sample carries the same "____ आहे" duplicate of a missing item — Abhi to decide whether to rewrite it.

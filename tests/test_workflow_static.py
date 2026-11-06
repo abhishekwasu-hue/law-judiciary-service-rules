@@ -278,7 +278,10 @@ class Audit0511TimeCost(unittest.TestCase):
 
     def test_engine_prompt_no_waits_and_parallel_review(self):
         p = self.p
-        self.assertIn("never `run_in_background`", p)
+        # run #19 (06.11.2026): the CLI starts subagents in the background by default -> explicit false, and the CLI waits
+        self.assertIn('EVERY Agent call passes `"run_in_background": false` explicitly', p)
+        self.assertGreaterEqual(p.count('`"run_in_background": false`'), 4)
+        self.assertIn("CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0", self.y)
         self.assertIn("The single exception is the part-1 wait command", p)
         self.assertEqual(p.count("until [ -e /tmp/work/study_part1.done ]"), 1)
         self.assertNotIn("ONE Bash loop", p)

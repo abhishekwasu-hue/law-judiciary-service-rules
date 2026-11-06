@@ -317,8 +317,11 @@ jobs:
           sudo chown -R engine:engine "${OWNED[@]}"
           AK=$(sec ANTHROPIC_API_KEY)
           # explicit env for `engine` (an array, so `timeout` can run it); extra VAR=VALUE words follow, then INDIR + command
+          # Run #19 (06.11.2026): the orchestrator started the drafter as a BACKGROUND subagent (the CLI default) and ended
+          # its turn; the CLI stopped the drafter 10 min later -> no status.json. CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 makes
+          # the CLI wait for background subagents (the step timeout still bounds the run).
           ERUN=(sudo -u engine -H env -i HOME=/home/engine PATH="$PATH" LANG=C.UTF-8 LC_ALL=C.UTF-8 TMPDIR=/tmp CI=true
-                FORCE_PROMPT_CACHING_5M=1 CASE_ID="$CASE_ID" RUN_ID="$RUN_ID" RUN_TOKEN="$RUN_TOKEN" WORKER="$WORKER"
+                FORCE_PROMPT_CACHING_5M=1 CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS=0 CASE_ID="$CASE_ID" RUN_ID="$RUN_ID" RUN_TOKEN="$RUN_TOKEN" WORKER="$WORKER"
                 MODEL="$MODEL" MODEL_LIGHT="$MODEL_LIGHT" MODEL_REVIEW="$MODEL_REVIEW" MODEL_STRONG="$MODEL_STRONG" MODEL_FIXER="$MODEL_FIXER"
                 BUDGET_USD="${BUDGET_USD:-0.75}" ENGINE_SECRETS=/nonexistent)
           INDIR=(bash -c 'cd /srv/engine && exec "$@"' _)
