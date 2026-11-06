@@ -1302,6 +1302,32 @@ REVIEW = (" You are the final approver. LOOK at the proposal page images (WORKDI
           "word, para 2 'सदर / उपरोक्त पत्रान्वये …' (not court notes), tables only for figures and the service-detail "
           "table (conditions, duties, demands, prayers, chronology, opinions point-wise), no separate fact-summary list "
           "— the last para opens 'उपरोक्त वस्तुस्थिती विचारात घेता, …' then 'सबब, …'; lint '§4.37' WARN lines = checklist.")
+# Accuracy checks A1-A8 (06.11.2026, owner on the CR 14/2026 run: "इंजिन मध्ये बदल करा सुधारणा करा जेणेकरून आपल्याला
+# योग्य आऊट मिळेल"). Each one only enforces an existing rule (cited); both the drafter and the reviewer get them.
+ACCURACY = (" Accuracy checks (A1-A8; each enforces an existing rule): A1 [I1.1, I4.34(उ)] a quote starts where the "
+            "provision's sentence starts — never at 'मात्र / परंतु / तथापि / तसेच / त्यानुसार …' with its main sentence "
+            "dropped; when a provision gives a rule and then a proviso, quote both (e.g. 'संपूर्ण सेवा कालावधीचे गोपनीय "
+            "अहवाल विचारात घेण्यात यावेत. मात्र … मागील ५ वर्षाच्या …'). A2 [I1.1] a sentence 'वरील तरतुदीनुसार / वरील "
+            "निकषानुसार / वरील अटीनुसार …' restates only what the quoted words say — no period, year, authority or "
+            "condition narrowed, widened or added; re-read the quoted page before writing it. A3 [I4.31] the information or "
+            "documents asked in the missing-info para and the letter follow the provision's own words (e.g. 'संपूर्ण सेवा "
+            "कालावधीचे' -> the reports of the whole service, not a period of your own); each item must be needed by a "
+            "quoted provision or condition; never a copy of a letter that the proposal only cites as a reference "
+            "(§4.31(ई)); unsure whether essential -> keep it and log a Study part 4 question. A4 [I4.29(8), SOP Step 4 "
+            "'earlier record'] this Section's own earlier note (a page headed 'विधि व न्याय विभाग/का.6' with signatures) "
+            "or letter inside the proposal is part of the chronology: state it with its date, पृ.N/प.वि. and what was "
+            "decided / asked; never skip it. A5 [I4.31] a value not in the record is written only in the missing-info "
+            "para — never a body sentence like '… दिनांक ____ आहे' / '… तपशील ____ आहे'; '____' only in table cells and "
+            "name / number slots. A6 [I4.37(इ)] the sentence after a table ('वरील तक्त्यात दर्शविल्यानुसार …') states only "
+            "what the table shows; a fact from a heading or another page gets its own sentence with its पृ.N/प.वि. A7 "
+            "[I4.30(2), I4.18] one form of each person's name in the note, tables and letter: the form used in the "
+            "covering (forwarding) letter of the proposal; the other form at most once, in brackets, at first mention. "
+            "A8 [I4.34(आ)] a fact in a table is not repeated in a sentence (dates of birth / appointment etc.). lint WARN "
+            "lines tagged §4.34 (उ), §4.31, §4.31 (ई), §4.30 (2) are the checklist for A1, A5, A3, A7.")
+REVIEW_ACC = (" Reviewer, for A1-A2: open the original page of EVERY note-body quote (package page image) and check "
+              "that the quote starts at its sentence start and that the next 'वरील …नुसार' sentence matches the quoted "
+              "words; for A4: look for this Section's own earlier notes / letters among the proposal pages. Correct "
+              "directly (minimal edits) and list each correction in review.json `corrections`.")
 DRAFTER = (" Never stop or refuse: write every output you can. Missing C R/file no. → PREFIX Case<id>_<year>, ref_no "
            "'संकिर्ण-<year>/____/प्र.क्र.____/का.6'; unclear → 'अस्पष्ट'. Each problem you cannot resolve → report it in "
            "one line starting 'पडताळणी अपूर्ण — <what, where>' for status.json `warnings`. On a redraft request, fix "
@@ -1365,12 +1391,12 @@ def agents_json(conf, brief="tools/ENGINE_BRIEF.md"):
                        "per the brief's court and order-draft rules; Study part 0; extracts and Study part 1 pages only "
                        "when the fixer reported them still failing; content fixes that lint/verify still reports after 2 "
                        "mechanical attempts.",
-        "prompt": base + DRAFTER, "model": dmodel}}
+        "prompt": base + DRAFTER + ACCURACY, "model": dmodel}}
     if conf.get("MODEL_STRONG") and conf["MODEL_STRONG"] != dmodel:
         out["drafter_strong"] = {
             "description": "Escalation tier (one-way up, only per the escalation rules): a page or a content problem "
                            "the main tier reported as still unclear / still failing.",
-            "prompt": base + DRAFTER, "model": conf["MODEL_STRONG"]}
+            "prompt": base + DRAFTER + ACCURACY, "model": conf["MODEL_STRONG"]}
     light = conf.get("MODEL_LIGHT") or DEFAULTS["model_light"]
     out["study_writer"] = {
         "description": "Cheap tier. Study parts 2, 3, 4, 7 from facts.json, the drafter's spec and the package pages; "
@@ -1400,7 +1426,7 @@ def agents_json(conf, brief="tools/ENGINE_BRIEF.md"):
                        "and the language; corrects spec/part-0 text with minimal edits, runs lint_spec, "
                        "then writes /tmp/work/review.json {approved, changes, corrections[], hashes; reason + redraft "
                        "when not approved}; called at most twice.",
-        "prompt": base + REVIEW, "model": conf.get("MODEL_REVIEW") or DEFAULTS["model_review"]}
+        "prompt": base + REVIEW + ACCURACY + REVIEW_ACC, "model": conf.get("MODEL_REVIEW") or DEFAULTS["model_review"]}
     return out
 
 

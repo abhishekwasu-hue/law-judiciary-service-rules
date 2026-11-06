@@ -571,6 +571,9 @@ check(r.returncode == 0 and run_row["cost_usd"] == 0 and any("openrouter:gemma-4
       f"claude_result via gateway: provider cost stored (free = $0), not the Claude estimate ({run_row.get('cost_usd')} {run_row['warnings']})")
 
 ag = es.agents_json({"MODEL": "claude-sonnet-5-5", "MODEL_LIGHT": "claude-haiku-5-5", "MODEL_REVIEW": "claude-opus-5-5", "MODEL_STRONG": ""})
+check(all("A1 [I1.1" in ag[k]["prompt"] and "A8 [I4.34" in ag[k]["prompt"] for k in ("drafter", "reviewer"))
+      and "open the original page of EVERY note-body quote" in ag["reviewer"]["prompt"]
+      and "A1 [I1.1" not in ag["related_writer"]["prompt"], "agents: accuracy checks A1-A8 (CR 14 run, 06.11.2026)")
 check(set(ag) == {"drafter", "study_writer", "related_writer", "fixer", "reviewer"} and ag["drafter"]["model"] == "claude-opus-5-5"
       and ag["drafter"]["description"] and "[I4.29]" in ag["drafter"]["prompt"] and "[I4.29]" in ag["reviewer"]["prompt"],
       "agents: drafter on MODEL_REVIEW (C30 03.11.2026: note drafted by Opus), detailed-note rule, no strong tier when not configured")
