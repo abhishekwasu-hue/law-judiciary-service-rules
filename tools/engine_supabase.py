@@ -1305,9 +1305,9 @@ REVIEW = (" You are the final approver. LOOK at the proposal page images (WORKDI
           "word, para 2 'सदर / उपरोक्त पत्रान्वये …' (not court notes), tables only for figures and the service-detail "
           "table (conditions, duties, demands, prayers, chronology, opinions point-wise), no separate fact-summary list "
           "— the last para opens 'उपरोक्त वस्तुस्थिती विचारात घेता, …' then 'सबब, …'; lint '§4.37' WARN lines = checklist.")
-# Accuracy checks A1-A8 = INSTRUCTIONS §4.39 (06.11.2026, owner on the CR 14/2026 run: "इंजिन मध्ये बदल करा सुधारणा करा जेणेकरून आपल्याला
+# Accuracy checks A1-A12 = INSTRUCTIONS §4.39 (06.11.2026, owner on the CR 14/2026 run: "इंजिन मध्ये बदल करा सुधारणा करा जेणेकरून आपल्याला
 # योग्य आऊट मिळेल"). Each one only enforces an existing rule (cited); both the drafter and the reviewer get them.
-ACCURACY = (" Accuracy checks (A1-A8; each enforces an existing rule): A1 [I1.1, I4.34(उ)] a quote starts where the "
+ACCURACY = (" Accuracy checks (A1-A12; each enforces an existing rule): A1 [I1.1, I4.34(उ)] a quote starts where the "
             "provision's sentence starts — never at 'मात्र / परंतु / तथापि / तसेच / त्यानुसार …' with its main sentence "
             "dropped; when a provision gives a rule and then a proviso, quote both (e.g. 'संपूर्ण सेवा कालावधीचे गोपनीय "
             "अहवाल विचारात घेण्यात यावेत. मात्र … मागील ५ वर्षाच्या …'). A2 [I1.1] a sentence 'वरील तरतुदीनुसार / वरील "
@@ -1328,7 +1328,8 @@ ACCURACY = (" Accuracy checks (A1-A8; each enforces an existing rule): A1 [I1.1,
             "proposal ('एस. एस. कुर्ले' + 'सिद्धेश्वर शरणप्पा कुर्ले' -> 'श्री. सि. श. कुर्ले'); only when no Devanagari name "
             "exists, the proposal's English-initials form; never invented. "
             "A8 [I4.34(आ)] a fact in a table is not repeated in a sentence (dates of birth / appointment / report periods); "
-            "no one-fact para that only repeats a table. A9 [I1.1, I4.39] `related` extracts are character-identical to "
+            "no one-fact para that only repeats a table; the same opinion / fact is written once, not again in several "
+            "sub-points (CR 50: one Finance opinion restated in four sub-points). A9 [I1.1, I4.39] `related` extracts are character-identical to "
             "the page: the §4.19 spelling forms never apply inside quotes ('करुन', 'तरतूदीनुसार' stay); a passage quoted "
             "in the body and in `related` is the same text in both. I4.40: (a) para 1 cites every letter the case started "
             "from, earlier rounds included; (b) a GR / rule already inside the proposal is not enclosed again, cite its "
@@ -1340,13 +1341,26 @@ ACCURACY = (" Accuracy checks (A1-A8; each enforces an existing rule): A1 [I1.1,
             "decide WHICH clause applies (e.g. from which date a status such as gazetted applies; whether an earlier "
             "review already took place when the GR says 'एकदाच'), (2) every column of the form the GR prescribes "
             "(परिशिष्ट / प्रपत्र) that the proposal's form lacks or leaves blank; record each item's basis (para) in "
-            "Study part 4; never leave the choice to the user.")
+            "Study part 4; never leave the choice to the user. A11 [I4.21, I4.28, I4.29(6), A4] the case stage comes "
+            "from the LAST dated document of the whole proposal (every part: noting pages and file pages, incoming and "
+            "this Section's outgoing): when the last one is this Section's own letter and nothing came in after it, the "
+            "incoming letter it answered is closed — never write it as pending or as the current request ('सदर पत्रान्वये "
+            "… मागविण्यात आले आहे' for a letter already answered); state in the chronology that this Section replied on "
+            "that date (पृ.N/प.वि.) and what it asked, and that the record holds no reply after it; the letter that fits "
+            "that stage is a reminder (§4.21: same file no., refs the earlier letter(s), asks what they asked), not a new "
+            "information request — new items only when a quoted provision makes them essential (A10); a closing "
+            "remark on the last note page (e.g. file classified 'क' वर्ग) is part of that chronology. A12 [I4.36 C1, "
+            "I4.29(1)] a U.O. reference no. (अनौ.सं.क्र.) of another department found anywhere in the record (on its "
+            "note page, a stamp, or quoted in a letter) is written with its date where that department's opinion is "
+            "cited; only what is legible, never invented.")
 REVIEW_ACC = (" Reviewer, for A1-A2: open the original page of EVERY note-body quote (package page image) and check "
               "that the quote starts at its sentence start and that the next 'वरील …नुसार' sentence matches the quoted "
               "words; for A4: look for this Section's own earlier notes / letters among the proposal pages; for A9: "
               "compare every `related` extract with the same passage in the body / on the page letter by letter; for "
               "I4.40: para 1 letters, no GR enclosed twice (enclosures.json vs the proposal pages), the letter subject "
-              "from the proposal's letter, no repeated items. Correct "
+              "from the proposal's letter, no repeated items; for A11: find the last dated document of the whole "
+              "proposal and check that the note and the draft match that stage; for A12: look for अनौ.सं.क्र. on the "
+              "other department's note pages and in the letters quoting them. Correct "
               "directly (minimal edits) and list each correction in review.json `corrections`.")
 DRAFTER = (" Never stop or refuse: write every output you can. Missing C R/file no. → PREFIX Case<id>_<year>, ref_no "
            "'संकिर्ण-<year>/____/प्र.क्र.____/का.6'; unclear → 'अस्पष्ट'. Each problem you cannot resolve → report it in "

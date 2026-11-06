@@ -85,6 +85,13 @@
 
 - 06.11.2026 CR 14 run 2 review (Abhi: "हो करा, आ हो, इ …, अ …, ई …"): INSTRUCTIONS §4.39 A8 widened + A9 (related extracts verbatim, no spelling normalisation, same text as the body quote); new §4.40 (para 1 all letters incl. earlier rounds; no GR re-enclosed when already in the proposal; letter subject from the proposal's letter; no repeated asks); engine ACCURACY / REVIEW_ACC / VERBATIM (related_writer) updated; lint WARNs "§1.1 संबंधित माहितीतील उतारा मुख्य भागाशी जुळत नाही" and "§4.15 एकच माहिती पुन्हा मागवली"; brief [I4.40]; SOP, skill.
 
+- 06.11.2026 CR 50/2020 run review (proposal: noting part 27 pp. + file part 69 pp.): the last document of the record is this
+  Section's letter dt. 23.04.2025 (answer to the PDJ letter dt. 03.03.2025), nothing after it — the engine wrote the 03.03.2025
+  letter as the pending request and drafted a new information letter (DPC meeting, pay, WP status). Engine: INSTRUCTIONS §4.39
+  A11 (stage from the last dated document; own letter last -> reminder §4.21), A12 (other department's U.O. no. on record, here
+  Finance 289/22/सेवा-3), A8 widened (one opinion once — Finance S-14 opinion was in four sub-points); tools/mkdocs.py: several
+  references numbered "1)" … without markers, date columns no longer wrap.
+
 ## Pending
 28. **06.11.2026:** (a) CLOSED 06.11.2026 (Abhi: "अ मान्य"): names in Marathi initials (§4.18, circular 07.05.2018) formed from a Devanagari full name anywhere in the proposal ("सि. श. कुर्ले"); English-initials form only when no Devanagari name exists — §4.18, §4.39 A7, SOP, brief, ACCURACY, skill updated;
     (b) CLOSED 06.11.2026 (decided from the record, §6 never-ask rule): CR133 sample "____ आहे" sentences removed (A5); WP35697 ×2 body quote of the 11.08.2017 order para 18(i) aligned with the source text in GR 17.05.2018 (pdf/gr/201805171732241512.pdf: "Judicial Officers"; "31 st" = superscript, written "31st") (A9).
