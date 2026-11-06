@@ -361,7 +361,7 @@ class LintSpec(unittest.TestCase):
             self.assertTrue(prev.tag.endswith("}tbl"), "document list must follow the letter table")
             self.assertIn("पद प्रथम रिक्त झाल्याचा दिनांक", text(prev))
             items = [text(el).strip() for el in body[i + 1:i + 6]]
-            self.assertTrue(items[0].startswith("1)") and items[4].startswith("5)"), items)
+            self.assertTrue(items[0].startswith("(1)") and items[4].startswith("(5)"), items)   # §4.38: "(n)" one sequence
         finally:
             shutil.rmtree(out, ignore_errors=True)
 

@@ -68,7 +68,18 @@
   tests/test_engine_brief.py size limit: 29436 -> 28576 bytes, duplicates/provenance quotes removed, lines reflowed;
   no rule dropped). Gap: tools/verify_outputs.py does not check the _Affidavit / _LQ_Answer files yet.
 
+- 06.11.2026 (CR 14/2026 run review): engine accuracy checks A1–A8 (tools/engine_supabase.py ACCURACY); four new lint WARNs
+  (a quote opening mid-sentence, "____ आहे" duplicating a missing-info item, a copy of a reference letter asked again, one name
+  in two forms); tools/mkdocs.py table widths from content + the signers kept with the closing para; runners pinned to
+  ubuntu-24.04 after run #17 (Install tools timeout); letter layout INSTRUCTIONS §4.38 (Abhi: "अ मान्य, आ एकाच क्रमाने, इ तसेच
+  ठेवा …"; basis the Department's letter dt. 30.03.2026 and the HC letter dt. 17.11.2025, CR 14 pp. 26, 4): विषय / संदर्भ
+  bold incl. labels, right-shifted block (not centred); requested points "(1)", "(2)" … one sequence, indented; first letter
+  para unnumbered, later "2.", "3."; "प्रत" once ("प्रत :-" + numbered lines ending "निवड नस्ती"); note unchanged. Rule text:
+  INSTRUCTIONS §4.5/§4.10/§4.20/§4.22/§4.38, SOP Step 4/7, WORKFLOW §३/§४, ENGINE_BRIEF (size unchanged), PROPOSAL_PROMPT भाग 6.
+
 ## Pending
+28. **Open (Abhi, 06.11.2026):** (a) A7 name-form default = the form in the covering letter (provisional; Abhi to confirm);
+    (b) the CR133 sample carries the same "____ आहे" duplicate of a missing item — Abhi to decide whether to rewrite it.
 27. **Self-hosted runner on Abhi's VPS (05.11.2026, Abhi: "Ok go ahead", "दोन्ही मान्य आहे"; no money for GitHub Actions):**
     deploy/vps-runner/ (Dockerfile pinned by digest, entrypoint, cleanup hooks, vps-setup.sh), docs/VPS_RUNNER.md (Marathi owner
     steps). All workflows: runs-on ${{ fromJSON(vars.RUNS_ON || '"ubuntu-latest"') }} — repo variable RUNS_ON =

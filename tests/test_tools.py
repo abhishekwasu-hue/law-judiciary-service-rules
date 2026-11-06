@@ -90,7 +90,13 @@ class TestBuildNoteLetter(TmpCase):
                     self.assertNotIn("प्रत : निवड नस्ती", text)
                 elif has_letter:
                     self.assertIn("आपला,", text)
-                    self.assertIn("प्रत : निवड नस्ती", text)
+                    # §4.38 (06.11.2026): only the file copy -> "प्रत : निवड नस्ती"; other copies -> "प्रत :-" once, numbered
+                    if jload(sp)["letter"].get("copies"):
+                        self.assertNotIn("प्रत : निवड नस्ती", text)
+                        self.assertEqual(text.count("प्रत :-"), 1)
+                        self.assertRegex(text, r"\n\t\d+\)\tनिवड नस्ती")
+                    else:
+                        self.assertIn("प्रत : निवड नस्ती", text)
                 if has_letter:
                     self.assertEqual(len(d.sections), 2)
                     self.assertEqual(page_setup(d.sections[0]), note_m)

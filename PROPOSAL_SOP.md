@@ -2,7 +2,7 @@
 
 Owner: Abhi, Section Officer (कार्यासन अधिकारी), Law & Judiciary Department, Desk-6 (कार्यासन-6), Govt of Maharashtra.
 When he sends a proposal PDF, do ALL steps below without asking. He must never have to explain this again.
-The rules are in INSTRUCTIONS.md §4 (items 1–36); this file is the order of work + the tools. If anything here conflicts with
+The rules are in INSTRUCTIONS.md §4 (items 1–38); this file is the order of work + the tools. If anything here conflicts with
 INSTRUCTIONS.md, INSTRUCTIONS.md wins. Reply to him in Marathi, few words.
 
 The quality standard = the approved notes in `samples/specs/` (C R 66, 122, 128, 130, 131, 133 of 2026). Match them.
@@ -108,11 +108,15 @@ Copy the structure of the nearest sample in `samples/specs/` and fill your facts
   - `to`; `subject`; `refs` ("आपले पत्र क्र. …, दि. …").
   - `intro`: "उपरोक्त विषयाबाबत संदर्भाधीन पत्रास अनुसरून आपणांस कळविण्यात येते की, सदर प्रकरणी पुढील कार्यवाहीसाठी खालील माहिती … उपलब्ध करून देण्यात यावी, ही विनंती:-"
   - `points`: an empty table or a few short points.
-  - **Table = data only (INSTRUCTIONS §4.20, 02.11.2026):** the table asks only for data to fill in (dates, figures, periods, yes/no, numbers). Documents (copy of an order, report, certificate — "प्रत", "प्रमाणपत्र", "अहवाल") go after the table: a point "	तसेच, खालील कागदपत्रे उपलब्ध करून देण्यात यावीत, ही विनंती:-" then numbered points "1)	… आदेशाची प्रत;". A row mixing both is split (data in the table, the document in the list). Model: CR131 sample. lint_spec.py checks this.
+  - **Table = data only (INSTRUCTIONS §4.20, 02.11.2026):** the table asks only for data to fill in (dates, figures, periods, yes/no, numbers). Documents (copy of an order, report, certificate — "प्रत", "प्रमाणपत्र", "अहवाल") go after the table: a point "	तसेच, खालील कागदपत्रे उपलब्ध करून देण्यात यावीत, ही विनंती:-" then the documents as points (the tool numbers them; the lead-in line stays unnumbered). A row mixing both is split (data in the table, the document in the list). Model: CR131 sample. lint_spec.py checks this.
   - **Reminder (INSTRUCTIONS §4.21, 02.11.2026):** `letter.reminder: N` prints "स्मरणपत्र-N" above the क्रमांक line; same file no.; refs[0] "या कार्यासनाचे समक्रमांकाचे पत्र दि. __"; intro "… संदर्भाधीन पत्रान्वये मागविण्यात आलेली माहिती अद्याप अप्राप्त आहे. सदर माहिती लवकरात लवकर शासनास उपलब्ध करून देण्यात यावी, ही विनंती."
-  - **Copy line (§4.22):** letter to the High Court asking information "प्रमुख जिल्हा व सत्र न्यायाधीश, <place> यांच्याकडून प्राप्त करून" → `letter.copies: ["प्रमुख जिल्हा व सत्र न्यायाधीश, जिल्हा व सत्र न्यायालय, <place> यांना आवश्यक कार्यवाहीसाठी"]` (printed above "प्रत : निवड नस्ती"). Models: CR122, CR130.
+  - **Copy line (§4.22, §4.38 (ई)):** letter to the High Court asking information "प्रमुख जिल्हा व सत्र न्यायाधीश, <place> यांच्याकडून प्राप्त करून" → `letter.copies: ["प्रमुख जिल्हा व सत्र न्यायाधीश, जिल्हा व सत्र न्यायालय, <place> यांना आवश्यक कार्यवाहीसाठी"]`; the tool prints "प्रत" once: "प्रत :-", "1) <copy>", "2) निवड नस्ती" (only the file copy → "प्रत : निवड नस्ती"). Models: CR122, CR130.
   - **"मा." (§4.23):** own text of note and letter: "मा. उच्च न्यायालय…", "मा. मुंबई उच्च न्यायालय", "मा. मुख्य न्यायमूर्ती / मा. न्यायमूर्ती / मा. प्रशासकीय न्यायाधीश"; not in the addressee block, not in an office designation "उच्च न्यायालय (… शाखा)", not in quotes or related. **"शुद्धिपत्रक" (§4.24).**
-  - The tool adds the subject/reference block (bold, centred), "आपला," + signature and "प्रत : निवड नस्ती".
+  - **Layout (INSTRUCTIONS §4.38, Abhi 06.11.2026 on the CR 14 letter: "अ मान्य, आ एकाच क्रमाने, इ तसेच ठेवा"; basis: the Department's letter dt. 30.03.2026 and the HC letter dt. 17.11.2025):** the tool prints it all, the drafter writes no layout characters or point markers:
+    - विषय / संदर्भ bold (labels "विषय :-" / "संदर्भ :-" too), not centred: a block shifted right (label 2.5 cm, text 4.4 cm, wrapped lines under the text); each reference on its own line ("1)" at 4.4 cm, text 5.2 cm). D.O. letter unchanged.
+    - requested points "(1)", "(2)" … in ONE sequence through the letter (table point and documents list continue it), indented (number 1.27 cm, text 2.2 cm); any marker in the spec is renumbered; a lead-in ending ":-" stays unnumbered.
+    - first para ("उपरोक्त विषयाबाबत …") unnumbered; every later body para (separate request para, closing) "2.", "3." … at the margin.
+    - "आपला," + signature, then the copy line (above). The note is unchanged (its sub-points and the inline "(1) …; (2) …." missing-info items stay).
 - **Build:** `python3 tools/build_note_letter.py spec.json <outdir> <PREFIX>`. This writes `<PREFIX>_Note_and_Letter.docx` + a PDF preview. LOOK at the preview pages.
 
 ## Step 4b — Court cases and order drafts (02.11.2026; research + decisions B1–B10: docs/COURT_AND_ORDERS_RESEARCH.md)
@@ -198,7 +202,7 @@ Both are optional keys of the same spec.json; engine detail: tools/ENGINE_PROMPT
 - every "पृ.N/प.वि." (also lists 5,7, ranges 5-7 / 5 ते 7, Devanagari digits) in note, letter and Study and "पॅकेज PDF पृ. N" in the Study is within 1..package pages;
 - no "पॅकेज PDF" and no warning word (§4.27 list) anywhere in the note (body + related) or the letter; no banned word (Step 4 list) in the note body or the letter;
 - note signer chain = INSTRUCTIONS §4.6 in order; "अ.मु.स. (वित्त)" present only when the last para sends the file to Finance ("वित्त विभागाच्या मान्यतेस्तव / अभिप्रायास्तव / सहमतीस्तव …", "वित्त विभागास विनंती …") or to the Public Health Department;
-- letter: new page/section; ref no. `संकिर्ण-<year>/<file no>/प्र.क्र.<n>/का.6`; e-mail; विषय/संदर्भ bold + centre; "आपला," (no "आपली,"); "( राजेश वडनेरकर )", "अवर सचिव ,महाराष्ट्र शासन", "प्रत : निवड नस्ती";
+- letter: new page/section; ref no. `संकिर्ण-<year>/<file no>/प्र.क्र.<n>/का.6`; e-mail; विषय/संदर्भ bold, shifted-right block (§4.38); "आपला," (no "आपली,"); "( राजेश वडनेरकर )", "अवर सचिव ,महाराष्ट्र शासन", "प्रत : निवड नस्ती" (or "प्रत :-" + numbered lines ending "निवड नस्ती", §4.38);
 - Study headings भाग 0 … भाग 7;
 - package: original file name (not `*_Proposal_with_GRs.pdf`); exactly "पृ. i / N" in the bottom strip of every page; bookmarks; page count = proposal + enclosure pages of `<pdf>.map.json` (no separator pages); no mark "TEXT NOT FOUND"/0 hits; no annotation on proposal pages; only Highlight annotations; docx core properties and PDF metadata blank, no AI/tool names (§4.27).
 - facts (WARN only, audit Q-F1): `python3 tools/fact_check.py "<package pdf>" --spec spec.json [--ocr-dir DIR] --details FILE` — every date / amount / letter no. / name of the note and letter (outside “…”) must occur on the पृ.N/प.वि. page it cites (no ref in the para: the proposal pages); NOT FOUND / ELSEWHERE lines = check that fact against the page image.

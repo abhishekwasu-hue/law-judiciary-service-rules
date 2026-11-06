@@ -413,6 +413,14 @@ def build_do_letter(spec, out, L):
     nomirror(d); d.save(out); clean_docx(out, spec.get("doc_author"))
 
 
+# Letter layout (INSTRUCTIONS §4.38, Abhi 06.11.2026), cm from the left margin
+SUBJ_LBL, SUBJ_TXT, REF_TXT = 2.5, 4.4, 5.2     # विषय / संदर्भ label, text, reference text after its number
+PT_NO, PT_TXT = 1.27, 2.2                         # requested point "(n)" and its text
+COPY_NO, COPY_TXT = 1.5, 2.2                      # copy list "n)" and its text
+REF_NO_RE = re.compile(r"^\(?([0-9०-९]+)\)\s*")
+POINT_RE = re.compile(r"^\(?([0-9०-९]+|[अआइईउऊएऐओऔ])\)\s*")
+
+
 def build_letter(spec, out, L=None):
     from docx.shared import Cm
     L = spec["letter"] if L is None else L
@@ -448,34 +456,66 @@ def build_letter(spec, out, L=None):
     add(body, sect, P[7], d, "प्रति,")
     for line in L["to"]: add(body, sect, P[8], d, "\t" + line)
     add(body, sect, P[10], d, "")
-    # विषय व संदर्भ: bold + centre (Abhi's standing rule)
+    # विषय व संदर्भ (INSTRUCTIONS §4.38, Abhi 06.11.2026 "अ मान्य … विषय आणि संदर्भ हे दोन शब्द बोल्ड करा"): bold, the block
+    # shifted right like the office's own letters (CR 14 proposal pp. 4, 26): label at SUBJ_LBL, text and its wrapped lines
+    # at SUBJ_TXT; each reference on its own line, number at SUBJ_TXT, text at REF_TXT; left-aligned.
     from docx.enum.text import WD_ALIGN_PARAGRAPH as WA
-    def ctr(p):
-        p.alignment = WA.CENTER
-        pf = p.paragraph_format; pf.left_indent = Cm(0); pf.right_indent = Cm(0); pf.first_line_indent = Cm(0)
+    def blk(p, left, first, tabs):
+        p.alignment = WA.LEFT
+        pf = p.paragraph_format; pf.left_indent = Cm(left); pf.right_indent = Cm(0); pf.first_line_indent = Cm(first)
+        for t in tabs: pf.tab_stops.add_tab_stop(Cm(t))
         for r in p.runs: r.bold = True; setfont(r)
         return p
-    ctr(add(body, sect, P[11], d, "विषय :- " + L["subject"].strip(), bold=True))
-    refs = L["refs"]
-    if refs:
-        ctr(add(body, sect, P[13], d, "संदर्भ :- " + refs[0].strip(), bold=True))
-        for r in refs[1:]: ctr(add(body, sect, P[13], d, r.strip(), bold=True))
+    blk(add(body, sect, P[11], d, "विषय :-\t" + L["subject"].strip(), bold=True), SUBJ_TXT, SUBJ_LBL - SUBJ_TXT, [SUBJ_TXT])
+    refs = [r for r in (L["refs"] or []) if str(r).strip()]
+    for k, r in enumerate(refs):
+        m = REF_NO_RE.match(r.strip())
+        no, txt = (m.group(1) + ")", r.strip()[m.end():].strip()) if m else ("", r.strip())
+        if len(refs) == 1 and not m:   # one reference without a number: label + text
+            blk(add(body, sect, P[13], d, "संदर्भ :-\t" + txt, bold=True), SUBJ_TXT, SUBJ_LBL - SUBJ_TXT, [SUBJ_TXT])
+        elif k == 0:
+            blk(add(body, sect, P[13], d, f"संदर्भ :-\t{no}\t{txt}", bold=True), REF_TXT, SUBJ_LBL - REF_TXT, [SUBJ_TXT, REF_TXT])
+        else:
+            blk(add(body, sect, P[13], d, f"{no}\t{txt}", bold=True), REF_TXT, SUBJ_TXT - REF_TXT, [REF_TXT])
     add(body, sect, P[15], d, "")
     add(body, sect, P[16], d, "महोदय,")
     add(body, sect, P[17], d, "\t" + L["intro"])
+    # Requested points (§4.38, "आ एकाच क्रमाने"): "(1)", "(2)" … one sequence through the letter, inside the paragraph
+    # (number at PT_NO, text at PT_TXT) so they never look like paragraph numbers. A line ending ":-" without a marker
+    # (lead-in to a list) is a plain line; any other line without a marker is a new paragraph "2.", "3." … like the note.
+    n_pt, n_para = 0, 2
     for pt in L["points"]:
         if isinstance(pt, dict):
             add_table(d, sect, pt["table"], pt.get("bold_last", False)); continue
-        add(body, sect, P[17], d, pt, left=Cm(1.0), first=Cm(-1.0))
-    if L.get("closing"): add(body, sect, P[17], d, "\t" + L["closing"])
+        t = str(pt).strip()
+        m = POINT_RE.match(t)
+        if m:
+            n_pt += 1
+            p = add(body, sect, P[17], d, f"({n_pt})\t" + t[m.end():].strip(), left=Cm(PT_TXT), first=Cm(PT_NO - PT_TXT))
+            p.paragraph_format.tab_stops.add_tab_stop(Cm(PT_TXT))
+        elif t.endswith(":-"):
+            add(body, sect, P[17], d, "\t" + t, left=Cm(0), first=Cm(0))
+        else:
+            add(body, sect, P[17], d, f"{n_para}.\t" + t, left=Cm(0), first=Cm(0)); n_para += 1
+    if L.get("closing"):
+        add(body, sect, P[17], d, f"{n_para}.\t" + L["closing"].strip(), left=Cm(0), first=Cm(0))
     add(body, sect, P[18], d, "\t\t\t\t\t\t\t      \t     आपला,")
     add(body, sect, P[19], d, "")
     add(body, sect, P[20], d, "\t\t\t\t\t\t\t         " + _sign_name(dk.get("sign_name")))
     add(body, sect, P[21], d, "\t\t\t\t\t\t       " + _blank(dk.get("sign_post")))
     if L.get("enclosure"): add(body, sect, P[17], d, L["enclosure"])
-    for cp in L.get("copies") or []:  # §4.22
-        if isinstance(cp, str) and cp.strip(): add(body, sect, P[17], d, "प्रत : " + cp.strip())
-    add(body, sect, P[17], d, "प्रत : " + dk["copy_file"])
+    # Copy line (§4.38, "प्रत … एकदाच करून पुढे क्रमांक"): only the file copy -> "प्रत : निवड नस्ती"; with other copies
+    # (§4.22) "प्रत :-" once, then "1) …", "2) …", the file copy last.
+    cps = [c.strip() for c in (L.get("copies") or []) if isinstance(c, str) and c.strip()] + [dk["copy_file"]]
+    if len(cps) == 1:
+        add(body, sect, P[17], d, "प्रत : " + cps[0])
+    else:
+        for k, c in enumerate(cps, 1):
+            p = add(body, sect, P[17], d, (f"प्रत :-\t{k})\t" if k == 1 else f"\t{k})\t") + c,
+                    left=Cm(COPY_TXT), first=Cm(-COPY_TXT))
+            for tpos in (COPY_NO, COPY_TXT): p.paragraph_format.tab_stops.add_tab_stop(Cm(tpos))
+            p.paragraph_format.keep_together = True
+            if k < len(cps): p.paragraph_format.keep_with_next = True   # the copy list never splits across pages
     nomirror(d); d.save(out); clean_docx(out, spec.get("doc_author"))
 
 if __name__ == "__main__":

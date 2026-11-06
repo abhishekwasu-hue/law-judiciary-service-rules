@@ -89,3 +89,32 @@ class TestNoteLayout(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_letter_layout_438(tmp_path):
+    """INSTRUCTIONS §4.38 (Abhi 06.11.2026): विषय/संदर्भ bold block shifted right with hanging lines; requested points
+    "(1)" … one sequence, inside the paragraph; later paragraphs "2."; "प्रत :-" once with numbered copies."""
+    import json, docx
+    sp = json.load(open(os.path.join(ROOT, "samples", "specs", "CR131_2026_special-pay_info-letter.json"), encoding="utf-8"))
+    L = sp["letter"]
+    L["refs"] = ["1) आपले पत्र दि. 25.03.2026.", "2) या विभागाचे पत्र दि. 30.03.2026."]
+    L["points"] = ["1)\tपहिली माहिती:-", {"table": [["अ.क्र.", "दिनांक"], ["1", ""]]},
+                   "\tतसेच, खालील कागदपत्रे उपलब्ध करून देण्यात यावीत, ही विनंती:-", "1)\tआदेशाची प्रत;", "(2)\tअहवाल.",
+                   "\tतसेच, एकत्रित प्रस्ताव सादर करण्यात यावा, ही विनंती."]
+    L["copies"] = ["प्रमुख जिल्हा व सत्र न्यायाधीश, जिल्हा व सत्र न्यायालय, भंडारा यांना आवश्यक कार्यवाहीसाठी"]
+    out = str(tmp_path / "L.docx")
+    import mkdocs as M
+    M.build_letter(sp, out, L)
+    ps = [p for p in docx.Document(out).paragraphs if p.text.strip()]
+    tx = [p.text for p in ps]
+    sub = next(p for p in ps if p.text.startswith("विषय :-\t"))
+    assert sub.paragraph_format.left_indent.cm > 4 and sub.paragraph_format.first_line_indent.cm < 0
+    assert all(r.bold for r in sub.runs if r.text.strip())
+    assert any(t.startswith("संदर्भ :-\t1)\t") for t in tx) and "2)\tया विभागाचे पत्र दि. 30.03.2026." in tx
+    pts = [t for t in tx if t.startswith("(")]
+    assert [t.split("\t")[0] for t in pts] == ["(1)", "(2)", "(3)"]          # one sequence through the letter
+    p1 = next(p for p in ps if p.text.startswith("(1)\t"))
+    assert p1.paragraph_format.left_indent.cm > 2 and p1.paragraph_format.first_line_indent.cm < 0
+    assert any(t.startswith("2.\tतसेच, एकत्रित प्रस्ताव") for t in tx)
+    assert sum(t.startswith("प्रत ") for t in tx) == 1 and tx[-1] == "\t2)\tनिवड नस्ती"
+    assert tx[-2].startswith("प्रत :-\t1)\tप्रमुख जिल्हा")

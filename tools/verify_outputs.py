@@ -59,10 +59,10 @@ Checks
  Letter (when present: a "प्रति," or "क्रमांक :-" paragraph):
   - starts on a new page / new section (page break or section break before the letterhead)
   - ref no. संकिर्ण-<year>/<file no>/प्र.क्र.<n>/का.6 ; e-mail lnjd.desk6-mh@mah.gov.in on the letterhead
-  - विषय and संदर्भ paragraphs: centred, every run bold
+  - विषय and संदर्भ paragraphs: every run bold; block shifted right (left indent >= 2 cm, §4.38) or centred (older drafts)
   - intro paragraph (starting "उपरोक्त विषयाबाबत") contains "ही विनंती" outside quotes (§4.18) when the letter asks for
     information (lint_spec.requests_info: a table / numbered points, a reminder, or "… उपलब्ध करून देण्यात यावी")
-  - "आपला," present, signature "आपली," absent ("आपली पत्रे" in संदर्भ is allowed); lines "( राजेश वडनेरकर )", "अवर सचिव ,महाराष्ट्र शासन", "प्रत : निवड नस्ती"
+  - "आपला," present, signature "आपली," absent ("आपली पत्रे" in संदर्भ is allowed); lines "( राजेश वडनेरकर )", "अवर सचिव ,महाराष्ट्र शासन", "प्रत : निवड नस्ती" (or, with other copies, "प्रत :- 1) …" … "n) निवड नस्ती", §4.38)
  अर्धशासकीय पत्र (spec letter "kind": "do"; found by its "अ.शा.पत्र क्र." line; docs/FORMS_RESEARCH_DO_UO.md): new page /
   section; number line = "अ.शा.पत्र क्र. <desk ref no.>" + "दिनांक" line; विषय bold + centre; "प्रिय …,"; body in the first
   person; "शुभेच्छा", "आपला स्नेहांकित,", "(<sender>)" and the addressee lines after it. The ordinary-letter checks above
@@ -702,9 +702,12 @@ def main(argv):
             if vi is not None:
                 for p in lp[vi:(mi if mi is not None and mi > vi else vi + 1)]:
                     if not p.text.strip(): continue
-                    if not p_centred(p): vb.append(f"not centred: '{ns(p.text)[:40]}'")
+                    # §4.38 (06.11.2026): bold block shifted right (left indent >= 2 cm) — or centred (§4.10, older drafts)
+                    li = p.paragraph_format.left_indent
+                    if not (p_centred(p) or (li is not None and li >= 2 * 360000)):
+                        vb.append(f"not centred / not shifted right: '{ns(p.text)[:40]}'")
                     if not p_bold(p): vb.append(f"not bold: '{ns(p.text)[:40]}'")
-            check("letter विषय/संदर्भ bold + centre", vb)
+            check("letter विषय/संदर्भ bold + block (§4.38)", vb)
             intro = next((t for t in lt if t.startswith(INTRO_HEAD)), None)
             rq = []
             if intro is None: rq.append("intro paragraph 'उपरोक्त विषयाबाबत …' missing")
@@ -715,7 +718,12 @@ def main(argv):
             if any(re.fullmatch(r"आपली\s*,?", t) for t in lt) or re.search(r"आपली\s*,", std_txt):
                 en.append("signature 'आपली,' present (must be 'आपला,')")  # "आपली पत्रे" in संदर्भ is grammatical
             for line in _desk.letter_end_lines(dk):   # C30: signature / post / copy line of the desk profile
-                if ns(line) not in lt: en.append(f"line '{ns(line)}' missing")
+                if ns(line) in lt: continue
+                cf = ns(dk["letter"]["copy_file"])   # §4.38 (06.11.2026): "प्रत :- 1) …" once, the file copy last "n) निवड नस्ती"
+                if ns(line) == ns("प्रत : " + cf) and any(t.startswith("प्रत :-") for t in lt) \
+                        and any(re.fullmatch(r"\d+\)\s*" + re.escape(cf), t) for t in lt):
+                    continue
+                en.append(f"line '{ns(line)}' missing")
             check("letter ending (§4.5)", en)
         if meta and has_letter:   # audit Q-F14: every letter's number line against the case row (--case-meta)
             lines = [ns(b["text"]) for b in bl[lstart:] if b["kind"] == "p"

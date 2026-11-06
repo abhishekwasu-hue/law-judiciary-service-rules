@@ -217,7 +217,7 @@ class Build(unittest.TestCase):
         self.assertEqual(xa, xb)
         t = "\n".join(paras(a))
         for line in ("विधि व न्याय विभाग/का.6", "Email ID :- lnjd.desk6-mh@mah.gov.in", "( राजेश वडनेरकर )",
-                     "अवर सचिव ,महाराष्ट्र शासन", "प्रत : निवड नस्ती", "हुतात्मा राजगुरु चौक, मादाम कामा मार्ग"):
+                     "अवर सचिव ,महाराष्ट्र शासन", "प्रत :-", "निवड नस्ती", "हुतात्मा राजगुरु चौक, मादाम कामा मार्ग"):   # §4.38 copies numbered
             self.assertIn(line, t)
 
     def test_hte_note_letter(self):
@@ -226,7 +226,7 @@ class Build(unittest.TestCase):
         t = "\n".join(ps)
         self.assertEqual(next(p for p in ps if p), "उ.व तं.शि.वि. / मशि-5")
         for line in ("उच्च व तंत्र शिक्षण विभाग,", "मंत्रालय विस्तार भवन, मुंबई 400 032.", "दूरध्वनी क्र. :- ____",
-                     "Email ID :- ____", "(          )", "अवर सचिव, महाराष्ट्र शासन", "प्रत : निवड नस्ती (मशि-5)",
+                     "Email ID :- ____", "(          )", "अवर सचिव, महाराष्ट्र शासन", "निवड नस्ती (मशि-5)",
                      HTE_REF, "महाराष्ट्र शासन", "आपला,"):
             self.assertIn(line, t)
         for s in HTE_SIGNERS:
