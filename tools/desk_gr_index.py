@@ -17,8 +17,9 @@ from urllib.parse import urlparse
 import pymupdf
 
 GR_URL = "https://gr.maharashtra.gov.in/Site/Upload/Government%20Resolutions/Marathi/{}.pdf"
-CODE_RE = re.compile(r"^(\d{16,20})(?!\d)")
+CODE_RE = re.compile(r"^(\d{16,20})(?![0-9A-Za-z])")   # not a hex hash like 1005…dd63…
 GARBAGE_RE = re.compile(r"[\u0080-˿ -⁯-]{3,}")   # Latin-1/ext/modifier/punct/PUA runs
+SUBJ_LABEL = re.compile(r"(?<![\u0900-\u097F])विषय\s*[:ः\-–—]+")   # the "विषय :-" label, not विषयक / विषयी
 SUBJ_END = re.compile(r"(संदर्भ|प्रस्तावना|वाचा\s*[:-]|शासन\s+निर्णय\s*[:-])")
 
 
@@ -49,11 +50,11 @@ def is_readable(text):
 
 
 def subject_from_text(text):
-    """Text after 'विषय' (one line, <=200 chars) if readable, else ''."""
-    i = text.find("विषय")
-    if i < 0:
+    """Text after the 'विषय :-' label (one line, <=200 chars) if readable, else ''."""
+    m = SUBJ_LABEL.search(text)
+    if not m:
         return ""
-    s = " ".join(text[i + len("विषय"):].split())
+    s = " ".join(text[m.end():].split())
     s = s.lstrip(" :-–—.ः")
     m = SUBJ_END.search(s)
     if m and m.start() > 10:
