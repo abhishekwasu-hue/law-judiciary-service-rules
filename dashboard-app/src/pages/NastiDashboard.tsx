@@ -81,7 +81,7 @@ export default function NastiDashboard() {
       {mounted !== null && (
         <iframe
           key={mounted}
-          src="/nasti/index.html"
+          src={import.meta.env.VITE_BACKEND === 'artifact' ? 'nasti/index.html' : '/nasti/index.html'}
           title="नस्ती अद्ययावत स्थिती"
           className="block h-[calc(100dvh-2.8125rem)] w-full border-0"
           allow="microphone; clipboard-write; web-share"

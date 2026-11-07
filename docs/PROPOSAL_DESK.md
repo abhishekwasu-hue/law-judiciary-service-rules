@@ -1,5 +1,12 @@
 # PROPOSAL_DESK.md — "प्रस्ताव कक्ष" claude.ai page (App A)
 
+**Version 4 (08.11.2026; Abhi: "app B mdhe jasa ui hota to as it is घ्या"): the page IS App B's UI.** Source = dashboard-app/
+built with `npm run build:artifact` (vite.artifact.config.ts + scripts/artifact-postbuild.mjs) -> dashboard-app/dist-artifact/
+index.html, published with files icon.svg, icon-192.png, manifest.webmanifest, nasti/index.html. Data layer:
+dashboard-app/src/lib/artifact (contract README there: collections = the Supabase tables). Worker: docs/DESK_WORKER.md
+(App B model) via the scheduled task. Live data migrated: case 1 = WP35697_2026 (state cases/desk-1/). The sections below
+(v2/v3 simple page, desk/proposal-desk.html) are the previous version, kept for reference.
+
 - Page: https://claude.ai/artifact/8cJP8wz6j5tYM5kRHK1rVx (private to Abhi). Source: `desk/proposal-desk.html`.
   Republish from this file with the Artifact tool (`url` = page link; read it first in a new session). Version 2 (07.11.2026)
   replaced the old v1 page another session had published there (its db was empty).
