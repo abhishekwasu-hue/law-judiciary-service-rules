@@ -94,6 +94,11 @@ python3 tools/consistency_check.py spec.json --study study.json --details <FILE>
   5. फक्त बदललेली फाइल + नवीन preview पाठवा; commit + push; उत्तर 1–2 ओळी — काय बदलले.
 - सूचना पुढील सर्व प्रकरणांना लागू होणारी (नियम) असल्यास §8.4 प्रमाणे `INSTRUCTIONS.md` मध्ये.
 
+
+## 10. प्रस्ताव कक्ष पान (App B UI, claude.ai) — दुसरे खाते
+- पानावरून आलेले काम ("▶ काम सुरू करा" / सुधारणा-चॅट / GR मागणी) = docs/DESK_WORKER.md प्रमाणे (scheduled task "प्रस्ताव कक्ष — काम").
+- चॅटमध्ये तयार केलेले प्रकरण पानावर हवे असल्यास: dashboard-app/src/lib/artifact/README.md च्या रचनेत (cases / case_files / runs).
+- दुसऱ्या खात्यातून काम: docs/NEW_ACCOUNT_SETUP.md (skills, scheduled task, पान — सर्व रेपोमधून).
 ## धडे
 - स्कॅन PDF चा मजकूर-स्तर रिकामा — अंदाज नाही; OCR + पान-प्रतिमा.
 - नमुना spec बदलताना रेपोतील नवी आवृत्ती घेऊन त्यावरच बदल; नमुना व नियम यांत फरक → INSTRUCTIONS.md जिंकते.

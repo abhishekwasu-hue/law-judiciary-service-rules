@@ -78,7 +78,12 @@ async function setStage(c: Row, stage: string) {
 async function fireWorker(): Promise<string | null> {
   try {
     const db = await needDb();
-    const id = (await db.doc('meta/config').get()).data()?.trigger_id;
+    // a scheduled task can be fired only by its own account: meta/config.triggers {<viewer id>: trig_…} per account
+    // (second account working on a shared page — docs/NEW_ACCOUNT_SETUP.md), else the owner's trigger_id
+    const cfg = (await db.doc('meta/config').get()).data() as { trigger_id?: unknown; triggers?: Record<string, unknown> } | undefined;
+    const vid = (await viewer()).id;
+    const own = vid && cfg?.triggers && typeof cfg.triggers === 'object' ? cfg.triggers[vid] : undefined;
+    const id = typeof own === 'string' && own ? own : cfg?.trigger_id;
     if (typeof id !== 'string' || !id) return 'meta/config.trigger_id missing';
     const mcp = await cap('mcp');
     if (!mcp) return 'mcp capability unavailable';

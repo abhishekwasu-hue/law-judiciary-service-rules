@@ -6,5 +6,7 @@
 @PROPOSAL_SOP.md
 @PROPOSAL_WORKFLOW.md
 
+# Another claude.ai account / the प्रस्ताव कक्ष page: docs/NEW_ACCOUNT_SETUP.md, docs/PROPOSAL_DESK.md, docs/DESK_WORKER.md
+
 # Current state / pending work (read after the files above)
 @HANDOVER.md
