@@ -3,7 +3,12 @@
 - Page: https://claude.ai/artifact/8cJP8wz6j5tYM5kRHK1rVx (private to Abhi). Source: `desk/proposal-desk.html`.
   Republish from this file with the Artifact tool (`url` = page link; read it first in a new session). Version 2 (07.11.2026)
   replaced the old v1 page another session had published there (its db was empty).
-- Capabilities: `{"assets": {}, "db": {}, "downloads": true, "user": {"scopes": ["profile"]}}` (carried forward; omit on republish).
+- Capabilities (v3): `{"assets": {}, "db": {}, "downloads": true, "user": {"scopes": ["profile"]}, "mcp": {"servers": [{"server": "Claude Code Remote", "tools": ["fire_trigger"]}]}}` (omit on republish to keep).
+- "▶ काम सुरू करा" (v3, 07.11.2026; Abhi: "मला सर्व ऑपरेट त्या पानावरूनच करायची आहे"): the page calls `fire_trigger` for the
+  scheduled task "प्रस्ताव कक्ष — काम" (id in `meta/config.trigger_id`); a fresh cloud session follows docs/DESK_WORKER.md and
+  writes `meta/worker` {state running|idle, step, note, at}. First press asks the viewer to allow the connector.
+- GR ग्रंथालय view: list = asset JSON from `tools/desk_gr_index.py` (pointer `meta/gr_library.asset`); "पानावर मागवा" writes
+  `gr_requests/<key>` (pending), the worker uploads the PDF and writes `gr_files/<key>` {store, ref, name}.
 - Work happens in chat (INSTRUCTIONS §4.41, PROPOSAL_SOP Step 0b / Step 9); the page shows it and collects corrections.
   The प्रस्ताव कक्ष app (App B, dashboard-app) and its engine are unchanged.
 
@@ -36,4 +41,6 @@
   no script errors, no horizontal scroll; Note_and_Letter PDF (12 pages) and package PDF (349 pages, 8 bookmarks) render;
   a correction is stored as `edits` pending. Live page: WP35697_2026 written (case + 1 Word chunk + 4 assets; uploaded
   sha256 = local sha256).
+- 07.11.2026 (v3): mocked run of GR view + start button (desktop / phone, no errors); live worker test: GR request
+  59da26ab2297826f fired via the task -> run finished in ~2 min, `gr_files` + request done + `meta/worker` note written.
 - Not verified by Claude: the live page's buttons in a browser (the in-app browser is not signed in to claude.ai).
