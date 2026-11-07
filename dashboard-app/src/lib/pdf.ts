@@ -4,10 +4,22 @@ import type { PDFDocumentProxy } from 'pdfjs-dist';
 let lib: Promise<typeof import('pdfjs-dist')> | null = null;
 export function pdfjs() {
   if (!lib) {
-    lib = Promise.all([import('pdfjs-dist'), import('pdfjs-dist/build/pdf.worker.min.mjs?url')]).then(([m, w]) => {
-      m.GlobalWorkerOptions.workerSrc = w.default;
-      return m;
-    });
+    lib = import.meta.env.VITE_BACKEND === 'artifact'
+      ? import('pdfjs-dist').then(async m => {
+          // artifact page: one inlined bundle; the worker comes from the pinned CDN copy of the same pdf.js version
+          const src = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${m.version}/build/pdf.worker.min.mjs`;
+          try {
+            const code = await (await fetch(src)).text();
+            m.GlobalWorkerOptions.workerPort = new Worker(URL.createObjectURL(new Blob([code], { type: 'text/javascript' })), { type: 'module' });
+          } catch {
+            m.GlobalWorkerOptions.workerSrc = src;
+          }
+          return m;
+        })
+      : Promise.all([import('pdfjs-dist'), import('pdfjs-dist/build/pdf.worker.min.mjs?url')]).then(([m, w]) => {
+          m.GlobalWorkerOptions.workerSrc = w.default;
+          return m;
+        });
     // do not cache a failed import (e.g. old file names after a redeploy) — the next call retries
     lib.catch(() => { lib = null; });
   }

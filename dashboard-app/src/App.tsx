@@ -1,5 +1,7 @@
 import { lazy, Suspense, useEffect, type ComponentType } from 'react';
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, HashRouter, Navigate, Route, Routes } from 'react-router-dom';
+// artifact build (claude.ai page): the page URL is fixed, so routes live in the hash
+const Router = import.meta.env.VITE_BACKEND === 'artifact' ? HashRouter : BrowserRouter;
 import { AuthProvider, useAuth } from './lib/auth';
 import { DataProvider } from './lib/data';
 import { humanError } from './lib/api';
@@ -94,7 +96,7 @@ function Ready() {
   }, []);
   return (
     <DataProvider>
-      <BrowserRouter>
+      <Router>
         <Routes>
           <Route element={<Layout />}>
             <Route index element={<Suspense fallback={<PageFallback />}><Home /></Suspense>} />
@@ -108,7 +110,7 @@ function Ready() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>
         </Routes>
-      </BrowserRouter>
+      </Router>
     </DataProvider>
   );
 }
