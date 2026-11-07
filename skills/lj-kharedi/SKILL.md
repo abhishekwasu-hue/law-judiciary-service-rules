@@ -81,6 +81,19 @@ python3 tools/consistency_check.py spec.json --study study.json --details <FILE>
 3. मंजूर spec `samples/specs/<CR>_<वर्ष>_<प्रकार>.json`, नवे GR `pdf/gr/` — commit + push (scratch फाइल्स नाहीत).
 4. **Abhi ची नवी सुधारणा:** आधी grep (दुसऱ्या सत्राने जोडली असल्यास पुन्हा नाही); `INSTRUCTIONS.md` §4 मध्ये नवा क्रमांक (दिनांक व त्याचे शब्द), `PROPOSAL_SOP.md`, `tools/ENGINE_BRIEF.md` (आकार-मर्यादा `tests/test_engine_brief.py`), गरजेनुसार lint / verify / samples; `pytest` चालवूनच push; Project मधील `claude/00-STANDING-INSTRUCTIONS.md` ला `INSTRUCTIONS.md` ची प्रत लिहा. नियम या skill मध्ये नव्हे, रेपोत.
 
+## 9. स्थिती-फाइल व सुधारणा-फेरी (INSTRUCTIONS §4.41)
+- एक प्रस्ताव = एक चॅट. प्रकरण-ओळख `<CR/WP>_<वर्ष>` (उदा. `CR131_2026`) = PREFIX.
+- **पहिल्या फेरीत खर्च कमी:** सर्व पानांचा OCR मजकूर आधी वाचा; पान-प्रतिमा फक्त टिप्पणी / पत्र / भाग 0 मध्ये उद्धृत होणाऱ्या पानांच्या, मजकूर नसलेल्या आवश्यक पानांच्या व मागणी / टप्प्यावर परिणाम करणाऱ्या शिक्के-हस्तलिखिताच्या (§4.41).
+- **पहिली फेरी पूर्ण झाल्यावर:** `python3 tools/case_state.py save <id> --work <कामाचा फोल्डर> --proposal <प्रस्ताव.pdf> --package-name "<मूळ फाइलनाव>.pdf" --prefix <PREFIX> --note "<टप्पा>"` (spec, study, enclosures, marks व प्रस्ताव `cases/<id>/` मध्ये) → commit + push.
+- **Preview:** `python3 tools/case_state.py rebuild <id> <out> --package` टिप्पणी व पत्राची पाने `<out>/preview/*.png` मध्ये देते — फाइल्ससोबत ती SendUserFile (render) ने पाठवा; Abhi पाहून सूचना देतो.
+- **सुधारणा-फेरी (Abhi ची सूचना आली की):** प्रस्ताव पुन्हा वाचू नका, OCR व संशोधन पुन्हा नाही (सूचनेत नवीन GR / कागद असेल तेवढेच).
+  1. नवी चॅट असल्यास `python3 tools/case_state.py load <id> <work>`; जुनी असल्यास तोच फोल्डर.
+  2. सूचना फक्त spec.json / study.json / enclosures.json मध्ये लागू करा; एखादे तथ्य तपासायचे असल्यास फक्त त्या उद्धृत पानाची प्रतिमा.
+  3. `python3 tools/case_state.py save <id> … --note "सुधारणा: <थोडक्यात>"`.
+  4. `python3 tools/case_state.py rebuild <id> <out>` (GR सह PDF बदलले असल्यास `--package`) — LINT OK, verify ALL OK.
+  5. फक्त बदललेली फाइल + नवीन preview पाठवा; commit + push; उत्तर 1–2 ओळी — काय बदलले.
+- सूचना पुढील सर्व प्रकरणांना लागू होणारी (नियम) असल्यास §8.4 प्रमाणे `INSTRUCTIONS.md` मध्ये.
+
 ## धडे
 - स्कॅन PDF चा मजकूर-स्तर रिकामा — अंदाज नाही; OCR + पान-प्रतिमा.
 - नमुना spec बदलताना रेपोतील नवी आवृत्ती घेऊन त्यावरच बदल; नमुना व नियम यांत फरक → INSTRUCTIONS.md जिंकते.

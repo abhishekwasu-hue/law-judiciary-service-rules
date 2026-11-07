@@ -2,7 +2,7 @@
 
 Owner: Abhi, Section Officer (कार्यासन अधिकारी), Law & Judiciary Department, Desk-6 (कार्यासन-6), Govt of Maharashtra.
 When he sends a proposal PDF, do ALL steps below without asking. He must never have to explain this again.
-The rules are in INSTRUCTIONS.md §4 (items 1–40); this file is the order of work + the tools. If anything here conflicts with
+The rules are in INSTRUCTIONS.md §4 (items 1–41); this file is the order of work + the tools. If anything here conflicts with
 INSTRUCTIONS.md, INSTRUCTIONS.md wins. Reply to him in Marathi, few words.
 
 The quality standard = the approved notes in `samples/specs/` (C R 66, 122, 128, 130, 131, 133 of 2026). Match them.
@@ -221,3 +221,11 @@ Then a second read of every number and date against the page images.
    - only if still missing: the GR dates whose सांकेतांक is needed.
 3. Save the approved spec as `samples/specs/<CR>_<year>_<type>.json`. Save downloaded GRs in `pdf/gr/` with an `INDEX.tsv` line. Commit and push. **Never commit a session's scratch files.**
 4. If Abhi corrects the style, add the correction to INSTRUCTIONS.md §4 (a new numbered item, dated). Also update this SOP and the samples, so the correction is permanent.
+
+## Step 9 — Saved case state and correction rounds (INSTRUCTIONS §4.41, Abhi 07.11.2026)
+One proposal = one chat (the main path; the प्रस्ताव कक्ष engine stays as it is). After the first round:
+`python3 tools/case_state.py save <id> --work <dir> --proposal <pdf> --package-name "<original name>.pdf" --prefix <PREFIX> --note "<stage>"`
+(state in `cases/<id>/`, commit + push) and send the preview pages from `python3 tools/case_state.py rebuild <id> <out> --package`
+(`<out>/preview/*.png`). A correction never re-reads the proposal: `load` (new chat) -> edit spec / study / enclosures only ->
+`save --note "सुधारणा: …"` -> `rebuild` (`--package` only when the PDF changes) -> LINT OK + verify ALL OK -> send only the
+changed file + new preview. First round: OCR text of all pages first; page images only of cited / text-less / stamp pages.
