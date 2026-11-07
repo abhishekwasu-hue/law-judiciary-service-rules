@@ -173,7 +173,11 @@ footer{color:var(--muted);font-size:.84rem;border-top:1px solid var(--line);padd
       <h1>प्रस्ताव कक्ष</h1>
       <p>विधि व न्याय विभाग · कार्यासन-6</p>
     </div>
-    <button class="accent" id="btnNew" type="button" hidden>+ नवीन प्रस्ताव</button>
+    <div class="row" style="justify-content:flex-end">
+      <span class="pill" id="wkState" hidden></span>
+      <button class="primary" id="btnRun" type="button" hidden>▶ काम सुरू करा</button>
+      <button class="accent" id="btnNew" type="button" hidden>+ नवीन प्रस्ताव</button>
+    </div>
   </header>
 
   <nav class="views" role="tablist" aria-label="विभाग">
@@ -238,7 +242,7 @@ footer{color:var(--muted);font-size:.84rem;border-top:1px solid var(--line);padd
   </div>
   </div>
 
-  <footer>नवीन प्रस्ताव नोंदल्यावर चॅटमध्ये सांगा: “प्रस्ताव कक्षातील नवीन प्रस्ताव तयार कर”. सुधारणा जमा केल्यावर सांगा: “प्रस्ताव कक्षातील सुधारणा कर” — Claude बदल करून नवे मसुदे येथेच जमा करेल.</footer>
+  <footer>प्रस्ताव नोंदवा, सुधारणा लिहा किंवा GR मागवा — नंतर वरील “▶ काम सुरू करा” दाबा. Claude स्वतंत्रपणे काम करून निकाल येथेच जमा करेल; काम पूर्ण झाल्यावर सूचना येईल.</footer>
 </div>
 <div class="toast" id="toast" role="status" hidden></div>
 
@@ -347,7 +351,7 @@ function caseBody(c){
     const outs=["study","note_letter","package_pdf"].map(k=>{const o=(c.outputs||[]).find(x=>x.kind===k);
       return h("button",{class:k==="package_pdf"?"":"primary",type:"button",disabled:!o||!downloads,onclick:e=>download(o,e.currentTarget)},"⤓ "+KIND[k])});
     kids.push(h("div",{class:"dl"},outs));
-  }else kids.push(h("p",{class:"muted",style:"margin:0"},c.status==="processing"?"Claude काम करत आहे…":c.status==="failed"?"प्रक्रिया अयशस्वी — सूचना लिहून पुन्हा तयार करा.":"Claude ची प्रतीक्षा — सांगा: “प्रस्ताव कक्षातील नवीन प्रस्ताव तयार कर”"));
+  }else kids.push(h("p",{class:"muted",style:"margin:0"},c.status==="processing"?"Claude काम करत आहे…":c.status==="failed"?"प्रक्रिया अयशस्वी — सूचना लिहून पुन्हा तयार करा.":"Claude ची प्रतीक्षा — “▶ काम सुरू करा” दाबा"));
   if((c.inputs||[]).length)kids.push(h("div",{class:"sec"},h("span",{},"जमा केलेल्या फाइल"),h("ul",{},c.inputs.map(f=>h("li",{},f.name+(f.kind==="reply"?" (उत्तर)":f.kind==="extra"?" (इतर)":"")+(f.size?` · ${(f.size/1048576).toFixed(1)} MB`:""))))));
   if(canEdit){
     const sel=h("select",{"aria-label":"टप्पा"},STAGES.map(st=>h("option",{value:st,selected:c.stage===st},st)));
@@ -495,7 +499,7 @@ function editPanel(c){
   const mine=edits.filter(e=>e.case===c.id).sort((a,b)=>String(a.at).localeCompare(String(b.at)));
   const list=h("div",{class:"chat"},mine.length?mine.flatMap(e=>[
       h("div",{class:"bub me"},h("small",{},[fmtDate(e.at),tLabel(e.target),e.para_label].filter(Boolean).join(" · ")),e.message,(e.attachments||[]).length?h("div",{class:"muted"},"📎 "+e.attachments.map(a=>a.name).join(", ")):null),
-      e.status==="pending"?h("div",{class:"bub wait"},"प्रतीक्षेत — चॅटमध्ये सांगा: “प्रस्ताव कक्षातील सुधारणा कर”"):
+      e.status==="pending"?h("div",{class:"bub wait"},"प्रतीक्षेत — “▶ काम सुरू करा” दाबा"):
       h("div",{class:"bub cl"},h("small",{},(e.status==="done"?"बदल केला":"बदल झाला नाही")+(e.done_at?" · "+fmtDate(e.done_at):"")),e.reply||"")]):
     [h("p",{class:"muted",style:"margin:0"},"अजून सुधारणा नाही. खाली बदल लिहा; मसुद्यात फक्त तोच बदल केला जाईल.")]);
   if(!canEdit)return list;
@@ -523,7 +527,7 @@ async function submitEdit(c,tgt,para,msg,fi,btn){
     const at=nowIso(),id=c.id+"__"+Date.now().toString(36),p=(c.paras||[]).find(x=>x.id===para.value);
     var kept=ws.draft;ws.draft=null;
     await db.doc("edits/"+id).set({case:c.id,target:tgt.value,para:para.value||null,para_label:p?p.label:null,message:m,attachments:att,status:"pending",reply:"",at,done_at:null});
-    msg.value="";fi.value="";ws.draft=null;toast("सुधारणा जमा. चॅटमध्ये सांगा: प्रस्ताव कक्षातील सुधारणा कर")}
+    msg.value="";fi.value="";ws.draft=null;toast("सुधारणा जमा. “▶ काम सुरू करा” दाबा")}
   catch(e){if(kept)ws.draft=kept;toast("सुधारणा जमा झाली नाही ("+(e&&e.code||"त्रुटी")+")")}finally{btn.disabled=false;btn.textContent="सुधारणा जमा करा"}
 }
 function renderYears(){const ys=[...new Set(cases.map(c=>String(c.year)).filter(Boolean))].sort().reverse();const v=$("fYear").value;setOpts($("fYear"),"सर्व वर्षे",ys);$("fYear").value=ys.includes(v)?v:""}
@@ -545,7 +549,7 @@ async function changeStage(c,stage,due,btn){
 async function rerun(c,ta,btn){
   const t=ta.value.trim();if(!t){toast("आधी सुधारणा लिहा");ta.focus();return}
   btn.disabled=true;
-  try{await db.doc("cases/"+c.id).update({instruction:t,status:"queued",updated_at:nowIso(),history:hist(c,c.stage,"पुन्हा तयार — "+t)});toast("रांगेत टाकले. Claude ला सांगा: प्रस्ताव कक्षातील नवीन प्रस्ताव तयार कर")}
+  try{await db.doc("cases/"+c.id).update({instruction:t,status:"queued",updated_at:nowIso(),history:hist(c,c.stage,"पुन्हा तयार — "+t)});toast("रांगेत टाकले. “▶ काम सुरू करा” दाबा")}
   catch(e){toast("जमा झाले नाही ("+(e&&e.code||"त्रुटी")+")")}finally{btn.disabled=false}
 }
 async function addReply(c,fi,btn){
@@ -553,7 +557,7 @@ async function addReply(c,fi,btn){
   btn.disabled=true;btn.textContent="अपलोड होत आहे…";
   try{const added=[];for(const f of fi.files){const r=await assets.upload(f);added.push({asset_id:r.id,name:f.name,size:f.size,kind:"reply"})}
     await db.doc("cases/"+c.id).update({inputs:[...(c.inputs||[]),...added],stage:"माहिती प्राप्त",status:"queued",updated_at:nowIso(),history:hist(c,"माहिती प्राप्त","उत्तर जोडले ("+toMr(added.length)+" फाइल)")});
-    toast("उत्तर जोडले. Claude ला सांगा: प्रस्ताव कक्षातील नवीन प्रस्ताव तयार कर")}
+    toast("उत्तर जोडले. “▶ काम सुरू करा” दाबा")}
   catch(e){toast("उत्तर जोडले नाही ("+(e&&e.code||"त्रुटी")+")")}finally{btn.disabled=false;btn.textContent="उत्तर जोडा"}
 }
 
@@ -617,7 +621,7 @@ $("fNew").addEventListener("submit",async e=>{
       stage:"प्राप्त",status:"queued",reply_due:null,inputs,outputs:[],summary:"",letter_needed:null,essential_points:[],grs:[],missing_grs:[],
       instruction:ins,created_at:t,updated_at:t,history:[{at:t,stage:"प्राप्त",note:"प्रकरण नोंदले"+(ins?" — सूचना: "+ins:"")}]});
     e.target.reset();$("nYear").value=new Date().getFullYear();picked.main=[];picked.extra=[];$("listMain").replaceChildren();$("listExtra").replaceChildren();
-    msg.textContent="प्रकरण नोंदले. Claude ला सांगा: 'प्रस्ताव कक्षातील नवीन प्रस्ताव तयार कर'";
+    msg.textContent="प्रकरण नोंदले. “▶ काम सुरू करा” दाबा";
     openId=id;
   }catch(err){msg.textContent="प्रकरण नोंदले नाही ("+(err&&err.code||"त्रुटी")+"). पुन्हा प्रयत्न करा."}
   finally{btn.disabled=false}
@@ -660,14 +664,14 @@ function grRow(g){
   const f=grFiles[g.key],rq=grReq[g.key];
   const acts=[];
   if(f)acts.push(h("button",{class:"primary",type:"button",onclick:()=>openGr(g,f)},"पानावर उघडा"));
-  else if(canEdit)acts.push(rq?h("span",{class:"pill st-queued"},"मागवले — चॅटमध्ये सांगा"):h("button",{type:"button",onclick:e=>requestGr(g,e.currentTarget)},"पानावर मागवा"));
+  else if(canEdit)acts.push(rq?h("span",{class:"pill st-queued"},"मागवले — ▶ काम सुरू करा"):h("button",{type:"button",onclick:e=>requestGr(g,e.currentTarget)},"पानावर मागवा"));
   if(g.url)acts.push(h("a",{class:"btn",href:g.url,target:"_blank",rel:"noopener noreferrer"},"अधिकृत दुवा ↗"));
   return h("article",{class:"gr"},h("div",{},h("div",{class:"t"},g.title||g.file),
     h("div",{class:"m"},g.date&&h("span",{},g.date),g.code&&h("span",{},g.code),h("span",{},g.topic),g.pages?h("span",{},toMr(g.pages)+" पाने"):null,g.title?h("span",{},g.file):null)),h("div",{class:"a"},acts));
 }
 async function requestGr(g,btn){
   btn.disabled=true;
-  try{await db.doc("gr_requests/"+g.key).set({key:g.key,path:g.path,file:g.file,status:"pending",at:nowIso()});toast("मागवले. चॅटमध्ये सांगा: प्रस्ताव कक्षातील GR मागण्या पूर्ण कर")}
+  try{await db.doc("gr_requests/"+g.key).set({key:g.key,path:g.path,file:g.file,status:"pending",at:nowIso()});toast("मागवले. “▶ काम सुरू करा” दाबा")}
   catch(e){btn.disabled=false;toast("मागणी जमा झाली नाही ("+(e&&e.code||"त्रुटी")+")")}
 }
 function openGr(g,f){
@@ -680,6 +684,34 @@ $("gq").addEventListener("input",e=>{gf.q=e.target.value.trim().toLowerCase();gr
 $("gTopic").addEventListener("change",e=>{gf.topic=e.target.value;grShown=50;renderGr()});
 $("gYear").addEventListener("change",e=>{gf.year=e.target.value;grShown=50;renderGr()});
 $("gMore").addEventListener("click",()=>{grShown+=50;renderGr()});
+
+/* ---------- Claude worker: the page starts the scheduled task "प्रस्ताव कक्ष — काम" (docs/DESK_WORKER.md) ---------- */
+let mcp=null,worker=null,cfg=null;
+const RUN_FRESH_MS=3*3600*1000;
+const workerBusy=()=>worker&&(worker.state==="running"||worker.state==="started")&&Date.now()-Date.parse(worker.at||0)<RUN_FRESH_MS;
+const pendingAll=()=>cases.filter(c=>c.status==="queued").length+edits.filter(e=>e.status==="pending").length+Object.keys(grReq).length;
+function renderWorker(){
+  const b=$("btnRun"),st=$("wkState");
+  if(!mcp||!cfg||!cfg.trigger_id||!canEdit){b.hidden=true}
+  else{b.hidden=false;const n=pendingAll(),busy=workerBusy();
+    b.disabled=busy||!n;b.textContent=busy?"Claude काम करत आहे…":"▶ काम सुरू करा"+(n?" ("+toMr(n)+")":"")}
+  if(worker){st.hidden=false;
+    if(workerBusy()){st.className="pill st-processing";st.textContent=worker.step||"काम सुरू झाले"}
+    else{st.className="pill st-done";st.textContent=(worker.note||"तयार")+(worker.at?" · "+fmtDate(worker.at):"")}}
+}
+$("btnRun").addEventListener("click",async()=>{
+  const b=$("btnRun");b.disabled=true;
+  try{await mcp.callTool("Claude Code Remote","fire_trigger",{trigger_id:cfg.trigger_id});
+    try{await db.doc("meta/worker").set({state:"started",at:nowIso(),step:"काम सुरू होत आहे…",note:""})}catch(e){}
+    toast("Claude ने काम सुरू केले. पूर्ण झाल्यावर निकाल येथे दिसेल.")}
+  catch(e){const c=e&&e.code;
+    toast(c==="approval_required"||c==="consent_required"||c==="not_granted"?"काम सुरू करण्यासाठी परवानगी द्यावी लागेल — पुन्हा दाबा व “Allow” निवडा.":
+      c==="server_not_connected"||c==="needs_reauth"?"Claude Code Remote जोडणी पुन्हा करावी लागेल (claude.ai → Settings → Connectors).":
+      c==="blocked_by_policy"?"या खात्यावर हे बटण चालू शकत नाही.":
+      c==="server_unavailable"||c==="upstream_error"?"काम सुरू झाले की नाही हे निश्चित नाही — थोड्या वेळाने स्थिती पाहा, नंतरच पुन्हा दाबा.":
+      "काम सुरू झाले नाही ("+(c||"त्रुटी")+").");
+    renderWorker()}
+});
 
 /* ---------- boot ---------- */
 render();
@@ -694,10 +726,13 @@ render();
   db.collection("cases").onSnapshot(snap=>{clearTimeout(timer);
     const o={queued:0,processing:1,failed:2,done:3};
     cases=snap.docs.map(x=>({id:x.id,...x.data()})).sort((a,b)=>(o[a.status]??4)-(o[b.status]??4)||String(b.created_at||"").localeCompare(String(a.created_at||"")));
-    render();if(ws.id)renderWs(false);
+    render();if(ws.id)renderWs(false);renderWorker();
   },err=>{clearTimeout(timer);$("list").replaceChildren(h("div",{class:"empty"},"प्रकरणे उघडता आली नाहीत ("+(err&&err.code||"त्रुटी")+")."))});
+  db.doc("meta/worker").onSnapshot(d=>{worker=d.exists?d.data():null;renderWorker()},()=>{});
+  db.doc("meta/config").onSnapshot(d=>{cfg=d.exists?d.data():null;renderWorker()},()=>{});
+  use("mcp").then(m=>{mcp=m;renderWorker()});
   db.collection("gr_files").onSnapshot(snap=>{grFiles=Object.fromEntries(snap.docs.map(x=>[x.id,x.data()]));renderGr()},()=>{});
-  db.collection("gr_requests").onSnapshot(snap=>{grReq=Object.fromEntries(snap.docs.filter(x=>x.data().status==="pending").map(x=>[x.id,x.data()]));renderGr()},()=>{});
-  db.collection("edits").onSnapshot(snap=>{edits=snap.docs.map(x=>({id:x.id,...x.data()}));renderList();if(ws.id)renderWs(false)},()=>{});
+  db.collection("gr_requests").onSnapshot(snap=>{grReq=Object.fromEntries(snap.docs.filter(x=>x.data().status==="pending").map(x=>[x.id,x.data()]));renderGr();renderWorker()},()=>{});
+  db.collection("edits").onSnapshot(snap=>{edits=snap.docs.map(x=>({id:x.id,...x.data()}));renderList();renderWorker();if(ws.id)renderWs(false)},()=>{});
 })();
 </script>
