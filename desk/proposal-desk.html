@@ -27,6 +27,7 @@
   --ok:#5ec690; --ok-soft:#153226; --warn:#e7b158; --warn-soft:#382c14; --info:#87aef0; --info-soft:#192949; --bad:#ef8b8b; --bad-soft:#3c1b1e;
   color-scheme:dark}
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.55;
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 32px}
 .wrap{max-width:1240px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
@@ -108,6 +109,45 @@ details.more>summary{cursor:pointer;color:var(--navy);font-weight:600;min-height
 .legend{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;font-size:.8rem}
 .legend li{display:flex;gap:6px;align-items:center;min-width:0}
 .legend i{width:10px;height:10px;border-radius:2px;flex:none}
+/* workspace (one case open): stage track, tabs, viewers, correction chat — ported from प्रस्ताव कक्ष app (dashboard-app CaseTabs / PdfViewer / DocxView / EditChat) */
+.ws{background:var(--surface);border:1px solid var(--line);border-top:4px solid var(--saffron);border-radius:var(--r);padding:14px;display:flex;flex-direction:column;gap:12px;scroll-margin-top:8px}
+.ws-head{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:flex-start;justify-content:space-between}
+.ws-head h2{margin:0;font-family:var(--f-display);font-weight:400;font-size:1.4rem;color:var(--navy)}
+.track{display:flex;gap:0;overflow-x:auto;padding-bottom:4px;scrollbar-width:thin}
+.track li{list-style:none;flex:1 0 92px;display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;font-size:.72rem;color:var(--muted);position:relative;padding:0 2px}
+.track li::before{content:"";position:absolute;top:9px;left:-50%;width:100%;height:3px;background:var(--line);z-index:0}
+.track li:first-child::before{display:none}
+.track li i{width:20px;height:20px;border-radius:50%;background:var(--sunk);border:2px solid var(--line);z-index:1;display:grid;place-items:center;font-style:normal;font-size:.7rem;font-weight:700}
+.track li.done i{background:var(--ok);border-color:var(--ok);color:#fff}.track li.done::before,.track li.cur::before{background:var(--ok)}
+.track li.cur i{background:var(--saffron);border-color:var(--saffron);color:#fff;box-shadow:0 0 0 4px var(--saffron-soft)}
+.track li.cur{color:var(--fg);font-weight:700}
+.tabs{display:flex;gap:4px;overflow-x:auto;border-bottom:2px solid var(--line);scrollbar-width:thin}
+.tabs button{border:0;border-radius:8px 8px 0 0;background:transparent;color:var(--muted);white-space:nowrap;margin-bottom:-2px;border-bottom:3px solid transparent}
+.tabs button[aria-selected="true"]{color:var(--navy);border-bottom-color:var(--saffron);background:var(--sunk)}
+.tabs .cnt{background:var(--saffron);color:#fff;border-radius:999px;font-size:.72rem;padding:0 7px}
+.viewer{display:flex;flex-direction:column;gap:8px}
+.vbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.vbar input{width:84px}
+.vbody{display:flex;gap:8px;min-width:0}
+.pages{height:72vh;overflow:auto;flex:1;min-width:0;background:var(--sunk);border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:10px;align-items:center}
+.pages canvas,.pages .pg{max-width:100%;height:auto;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.25);border-radius:2px}
+.pages .pg{display:grid;place-items:center;color:#56627c;font-size:.85rem}
+.outline{width:250px;flex:none;max-height:72vh;overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:6px;font-size:.84rem}
+.outline button{min-height:34px;width:100%;justify-content:flex-start;text-align:left;border:0;padding:4px 8px;font-weight:500}
+.outline ul{list-style:none;margin:0;padding-left:12px}
+@media (max-width:767px){.outline{position:fixed;left:12px;right:12px;bottom:76px;width:auto;max-height:50vh;z-index:15;box-shadow:0 6px 24px rgba(0,0,0,.3)}}
+.docx-host{height:72vh;overflow:auto;background:var(--sunk);border-radius:8px;padding:8px}
+.docx-host .docx-wrapper{background:transparent!important;padding:0!important}
+.docx-host section.docx{box-shadow:0 1px 4px rgba(0,0,0,.25);margin:0 auto 10px!important;font-family:"DVOT-SurekhMR","Tiro Devanagari Marathi","Mukta",serif}
+.chat{display:flex;flex-direction:column;gap:10px}
+.bub{max-width:min(640px,92%);border-radius:12px;padding:10px 12px;font-size:.92rem;white-space:pre-wrap;overflow-wrap:anywhere}
+.bub.me{align-self:flex-end;background:var(--info-soft);border:1px solid var(--line)}
+.bub.cl{align-self:flex-start;background:var(--ok-soft);border:1px solid var(--line)}
+.bub.wait{align-self:flex-start;background:var(--warn-soft);color:var(--warn);font-weight:600}
+.bub small{display:block;color:var(--muted);font-size:.75rem;margin-bottom:2px}
+.compose{border:2px solid var(--saffron);border-radius:var(--r);padding:12px;display:flex;flex-direction:column;gap:8px;background:var(--saffron-soft)}
+.compose>strong{color:var(--saffron)}
+.badge-chat{background:var(--navy);color:var(--navy-ink)}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));background:var(--navy);color:var(--navy-ink);padding:10px 16px;border-radius:8px;font-weight:600;z-index:20;max-width:calc(100% - 32px)}
 footer{color:var(--muted);font-size:.84rem;border-top:1px solid var(--line);padding-top:10px}
 @media (max-width:520px){.grid2,.filters{grid-template-columns:1fr}.brand h1{font-size:1.65rem}}
@@ -132,6 +172,7 @@ footer{color:var(--muted);font-size:.84rem;border-top:1px solid var(--line);padd
         <select id="fCat" aria-label="प्रवर्ग"></select>
         <select id="fYear" aria-label="वर्ष"></select>
       </div>
+      <section class="ws" id="ws" hidden aria-label="प्रकरण"></section>
       <div id="list"><div class="empty">प्रकरणे उघडत आहे…</div></div>
     </main>
 
@@ -165,7 +206,7 @@ footer{color:var(--muted);font-size:.84rem;border-top:1px solid var(--line);padd
     </aside>
   </div>
 
-  <footer>प्रस्ताव नोंदल्यावर Claude ला सांगा: “प्रस्ताव कक्षातील नवीन प्रस्ताव तयार कर” — Claude अभ्यास, टिप्पणी-पत्र व GR सह प्रस्ताव येथेच जमा करेल.</footer>
+  <footer>नवीन प्रस्ताव नोंदल्यावर चॅटमध्ये सांगा: “प्रस्ताव कक्षातील नवीन प्रस्ताव तयार कर”. सुधारणा जमा केल्यावर सांगा: “प्रस्ताव कक्षातील सुधारणा कर” — Claude बदल करून नवे मसुदे येथेच जमा करेल.</footer>
 </div>
 <div class="toast" id="toast" role="status" hidden></div>
 
@@ -199,7 +240,7 @@ const today=()=>new Date().toISOString().slice(0,10);
 const nowIso=()=>new Date().toISOString();
 const isOverdue=c=>c.stage===WAIT_STAGE&&c.reply_due&&c.reply_due<today();
 
-let db=null,assets=null,downloads=null,canEdit=false,cases=[],openId=null;
+let db=null,assets=null,downloads=null,canEdit=false,cases=[],edits=[],openId=null;
 const filt={stage:"",cat:"",year:"",q:"",overdue:false};
 function toast(m){const t=$("toast");t.textContent=m;t.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(()=>t.hidden=true,3600)}
 function setOpts(sel,first,vals){sel.replaceChildren(h("option",{value:""},first),...vals.map(v=>h("option",{value:v},v)))}
@@ -270,7 +311,7 @@ function caseBody(c){
   if(grs.length||miss.length)kids.push(h("div",{class:"sec"},h("span",{},"GR"),h("ul",{},
     grs.map(g=>h("li",{},[g.code,g.date&&fmtDate(g.date)||g.date,g.title].filter(Boolean).join(" · ")+(g.pages?` (पृ. ${g.pages})`:""))),
     miss.map(m=>h("li",{},h("span",{class:"pill bad"},"सांकेतांक हवा")," ",typeof m==="string"?m:[m.date,m.title].filter(Boolean).join(" · "))))));
-  if(c.status==="done"){
+  if(c.status==="done"||(c.outputs||[]).length){
     const outs=["study","note_letter","package_pdf"].map(k=>{const o=(c.outputs||[]).find(x=>x.kind===k);
       return h("button",{class:k==="package_pdf"?"":"primary",type:"button",disabled:!o||!downloads,onclick:e=>download(o,e.currentTarget)},"⤓ "+KIND[k])});
     kids.push(h("div",{class:"dl"},outs));
@@ -292,27 +333,166 @@ function caseBody(c){
   return h("div",{class:"body"},kids);
 }
 
+const crLabel=c=>c.cr?`C R ${c.cr}/${c.year}`:(c.case_id||c.id);
+const pendingEdits=c=>edits.filter(e=>e.case===c.id&&e.status==="pending").length;
 function renderList(){
   const L=$("list");
-  if(!cases.length){L.replaceChildren(h("div",{class:"empty"},h("strong",{},"अजून प्रकरण नोंदलेले नाही."),h("br"),canEdit?"“+ नवीन प्रस्ताव” ने प्रस्ताव PDF जमा करा; Claude तीन फाइल येथे तयार करेल.":"प्रकरणे नोंदल्यावर येथे दिसतील."));return}
+  if(!cases.length){L.replaceChildren(h("div",{class:"empty"},h("strong",{},"अजून प्रकरण नोंदलेले नाही."),h("br"),canEdit?"“+ नवीन प्रस्ताव” ने प्रस्ताव PDF जमा करा, किंवा चॅटमध्ये प्रस्ताव द्या; मसुदे येथे दिसतील.":"प्रकरणे नोंदल्यावर येथे दिसतील."));return}
   const rows=cases.filter(match);
   if(!rows.length){L.replaceChildren(h("div",{class:"empty"},"या निवडीत प्रकरण नाही."));return}
-  const cards=h("div",{class:"cards mob-only"},rows.map(c=>{
-    const d=h("details",{class:"more",open:openId===c.id},h("summary",{},"तपशील व कार्यवाही"),caseBody(c));
-    d.addEventListener("toggle",()=>{if(d.open)openId=c.id;else if(openId===c.id)openId=null});
-    return h("article",{class:"card s-"+c.status},h("div",{style:"display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline;justify-content:space-between"},h("span",{class:"cr"},`C R ${c.cr}/${c.year}`),h("span",{class:"fileno"},c.file_no||"")),
-      h("p",{class:"subj"},c.subject||""),pills(c),d)}));
+  const openBtn=c=>h("button",{class:ws.id===c.id?"primary":"",type:"button",onclick:()=>openCase(c.id)},ws.id===c.id?"उघडले":"उघडा");
+  const extra=c=>[c.path==="chat"&&h("span",{class:"pill badge-chat"},"चॅट"),pendingEdits(c)&&h("span",{class:"pill st-queued"},"सुधारणा "+toMr(pendingEdits(c)))];
+  const cards=h("div",{class:"cards mob-only"},rows.map(c=>h("article",{class:"card s-"+c.status},
+    h("div",{style:"display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline;justify-content:space-between"},h("span",{class:"cr"},crLabel(c)),h("span",{class:"fileno"},c.file_no||"")),
+    h("p",{class:"subj"},c.subject||""),h("div",{class:"pills"},pills(c),extra(c)),h("div",{class:"row"},openBtn(c)))));
   const tb=h("tbody",{});
-  for(const c of rows){
-    const open=openId===c.id;
-    tb.append(h("tr",{},h("td",{class:"num"},h("span",{class:"cr"},`${c.cr}/${c.year}`)),h("td",{},h("div",{},c.subject||""),h("div",{class:"fileno"},c.file_no||"")),
+  for(const c of rows)
+    tb.append(h("tr",{},h("td",{class:"num"},h("span",{class:"cr"},c.cr?`${c.cr}/${c.year}`:crLabel(c))),h("td",{},h("div",{},c.subject||""),h("div",{class:"fileno"},c.file_no||""),h("div",{class:"pills"},extra(c))),
       h("td",{},c.category||""),h("td",{},h("span",{class:"pill stage"},c.stage||"—")),h("td",{},statusPill(c)),
-      h("td",{class:"num"},c.reply_due?h("span",{class:isOverdue(c)?"pill bad":""},fmtDate(c.reply_due)):"—"),
-      h("td",{},h("button",{type:"button","aria-expanded":String(open),onclick:()=>{openId=open?null:c.id;renderList()}},open?"बंद करा":"उघडा"))));
-    if(open)tb.append(h("tr",{class:"detail"},h("td",{colspan:7},caseBody(c))));
-  }
+      h("td",{class:"num"},c.reply_due?h("span",{class:isOverdue(c)?"pill bad":""},fmtDate(c.reply_due)):"—"),h("td",{},openBtn(c))));
   const table=h("div",{class:"tablewrap desk-only"},h("table",{},h("thead",{},h("tr",{},["C R","विषय","प्रवर्ग","टप्पा","स्थिती","उत्तर-मुदत",""].map(t=>h("th",{},t)))),tb));
   L.replaceChildren(cards,table);
+}
+
+/* ---------- workspace: one open case ---------- */
+const EDIT_TARGETS=[["note","टिप्पणी"],["letter","पत्र"],["order","शासन निर्णय-प्रारूप"],["parawise","परिच्छेदनिहाय उत्तर"],["affidavit","शपथपत्र"],["lq","विधानमंडळ उत्तर"],["package","GR सह प्रस्ताव (PDF)"],["study","अभ्यास"]];
+const tLabel=id=>(EDIT_TARGETS.find(t=>t[0]===id)||[,""])[1];
+const TABS=[["draft","टिप्पणी व पत्र"],["package","GR सह प्रस्ताव"],["study","अभ्यास"],["edit","सुधारणा"],["info","माहिती व कार्यवाही"]];
+const ws={id:null,tab:"draft",outKey:"",viewer:null};
+const outOf=(c,k)=>(c.outputs||[]).find(o=>o.kind===k);
+function openCase(id){if(ws.id!==id)ws.draft=null;ws.id=id;ws.tab="draft";ws.outKey="";renderWs(true);renderList();$("ws").scrollIntoView({behavior:"smooth",block:"start"})}
+function closeCase(){ws.id=null;ws.viewer&&ws.viewer.destroy&&ws.viewer.destroy();ws.viewer=null;$("ws").hidden=true;$("ws").replaceChildren();renderList()}
+function track(c){const i=STAGES.indexOf(c.stage);
+  return h("ol",{class:"track","aria-label":"टप्पे"},STAGES.map((st,j)=>h("li",{class:j<i?"done":j===i?"cur":""},h("i",{},j<i?"✓":toMr(j+1)),st)))}
+function renderWs(full){
+  const box=$("ws"),c=cases.find(x=>x.id===ws.id);
+  if(!c){if(ws.id)closeCase();return}
+  box.hidden=false;
+  const head=h("div",{class:"ws-head"},h("div",{},h("h2",{},crLabel(c)),h("p",{class:"subj",style:"margin:2px 0 6px"},c.subject||""),h("div",{class:"pills"},pills(c),c.path==="chat"&&h("span",{class:"pill badge-chat"},"चॅट"))),
+    h("button",{type:"button",onclick:closeCase},"← यादी"));
+  const n=pendingEdits(c);
+  const tabs=h("div",{class:"tabs",role:"tablist"},TABS.map(([k,l])=>h("button",{type:"button",role:"tab","aria-selected":String(ws.tab===k),onclick:()=>{if(ws.tab===k)return;ws.tab=k;renderWs(true)}},l,k==="edit"&&n?h("span",{class:"cnt"},toMr(n)):null)));
+  const key=ws.tab+"|"+JSON.stringify(ws.tab==="info"?c:ws.tab==="edit"?[edits.filter(e=>e.case===c.id),c.paras]:c.outputs||[]);
+  if(full||key!==ws.outKey){
+    ws.outKey=key;ws.viewer&&ws.viewer.destroy&&ws.viewer.destroy();ws.viewer=null;
+    const body=h("div",{role:"tabpanel"});
+    box.replaceChildren(head,track(c),tabs,body);
+    const tr=box.children[1],cur=tr.querySelector(".cur");if(cur)tr.scrollLeft=Math.max(0,cur.offsetLeft-tr.offsetLeft-tr.clientWidth/2+cur.clientWidth/2);
+    fillTab(c,body);
+  }else{box.replaceChild(head,box.children[0]);box.replaceChild(track(c),box.children[1]);box.replaceChild(tabs,box.children[2])}
+}
+function fillTab(c,body){
+  const none=t=>body.replaceChildren(h("div",{class:"empty"},t));
+  if(ws.tab==="draft"){const p=outOf(c,"note_letter_pdf"),d=outOf(c,"note_letter");
+    if(p)ws.viewer=pdfView(body,p);else if(d)ws.viewer=docxView(body,d);else none("टिप्पणी व पत्र अजून तयार नाही.")}
+  else if(ws.tab==="package"){const p=outOf(c,"package_pdf");p?ws.viewer=pdfView(body,p):none("GR सह प्रस्ताव अजून तयार नाही.")}
+  else if(ws.tab==="study"){const d=outOf(c,"study");d?ws.viewer=docxView(body,d):none("अभ्यास-फाइल अजून तयार नाही.")}
+  else if(ws.tab==="edit")body.replaceChildren(editPanel(c));
+  else body.replaceChildren(caseBody(c));
+}
+
+/* PDF viewer (pdf.js 4.8.69, as in the app's PdfViewer: bookmarks, go to page, lazy page render) */
+const PDFJS="https://cdn.jsdelivr.net/npm/pdfjs-dist@4.8.69/build/pdf.min.mjs",PDFW="https://cdn.jsdelivr.net/npm/pdfjs-dist@4.8.69/build/pdf.worker.min.mjs";
+function pdfLib(){
+  return pdfLib.p||=import(PDFJS).then(async m=>{
+    try{const src=await (await fetch(PDFW)).text();m.GlobalWorkerOptions.workerPort=new Worker(URL.createObjectURL(new Blob([src],{type:"text/javascript"})),{type:"module"})}
+    catch(e){m.GlobalWorkerOptions.workerSrc=PDFW}
+    return m}).catch(e=>{pdfLib.p=null;throw e});
+}
+function pdfView(host,o){
+  let doc=null,io=null,alive=true;
+  const pages=h("div",{class:"pages"},h("div",{class:"pg",style:"width:100%;height:60vh"},"PDF उघडत आहे…"));
+  const info=h("span",{class:"muted"}),pin=h("input",{inputMode:"numeric",placeholder:"पृ.","aria-label":"पृष्ठ क्रमांक"});
+  const olBox=h("nav",{class:"outline","aria-label":"खूणपट्ट्या",hidden:true});
+  const olBtn=h("button",{type:"button",hidden:true,onclick:()=>{olBox.hidden=!olBox.hidden}},"☰ खूणपट्ट्या");
+  const go=p=>{const el=pages.querySelector(`[data-page="${p}"]`);if(el)pages.scrollTo({top:el.offsetTop-pages.offsetTop-8,behavior:"smooth"})};
+  const form=h("form",{class:"row",style:"margin-left:auto",onsubmit:e=>{e.preventDefault();const n=+pin.value;if(doc&&n>=1&&n<=doc.numPages)go(n)}},pin,h("button",{},"जा"));
+  const dl=h("button",{type:"button",disabled:!downloads,onclick:e=>download(o,e.currentTarget)},"⤓ डाउनलोड");
+  host.replaceChildren(h("div",{class:"viewer"},h("div",{class:"vbar"},olBtn,info,dl,form),h("div",{class:"vbody"},olBox,pages)));
+  (async()=>{
+    try{
+      const [blob,lib]=await Promise.all([getBlob(o),pdfLib()]);
+      doc=await lib.getDocument({data:new Uint8Array(await blob.arrayBuffer())}).promise;
+      if(!alive){doc.destroy();return}
+      info.textContent="एकूण "+toMr(doc.numPages)+" पाने";
+      const p1=await doc.getPage(1),vp=p1.getViewport({scale:1}),ratio=vp.height/vp.width;
+      const W=()=>Math.min(pages.clientWidth-16,1000);
+      const slots=[];
+      for(let i=1;i<=doc.numPages;i++){const d=h("div",{class:"pg","data-page":i,style:`width:${W()}px;height:${Math.round(W()*ratio)}px`},"पृ. "+toMr(i));slots.push(d)}
+      pages.replaceChildren(...slots);
+      io=new IntersectionObserver(es=>{for(const e of es)if(e.isIntersecting&&!e.target._done){e.target._done=true;draw(+e.target.dataset.page,e.target)}},{root:pages,rootMargin:"600px 0px"});
+      slots.forEach(s=>io.observe(s));
+      async function draw(n,slot){
+        try{const pg=await doc.getPage(n),w=W(),sc=w/pg.getViewport({scale:1}).width,dpr=Math.min(2,window.devicePixelRatio||1),v=pg.getViewport({scale:sc*dpr});
+          const cv=h("canvas",{width:Math.floor(v.width),height:Math.floor(v.height),"data-page":n,"aria-label":"पृ. "+n});cv.style.width=w+"px";
+          await pg.render({canvasContext:cv.getContext("2d"),viewport:v}).promise;if(alive)slot.replaceWith(cv)}catch(e){slot.textContent="पृ. "+toMr(n)+" उघडता आले नाही"}}
+      const ol=await doc.getOutline();
+      if(ol&&ol.length){
+        const dest=async d=>{try{const x=typeof d==="string"?await doc.getDestination(d):d;return x?await doc.getPageIndex(x[0])+1:null}catch(e){return null}};
+        const tree=items=>h("ul",{},items.map(it=>{const li=h("li",{},h("button",{type:"button",onclick:async()=>{const p=await dest(it.dest);if(p){go(p);if(innerWidth<768)olBox.hidden=true}}},it.title||"—"));if(it.items&&it.items.length)li.append(tree(it.items));return li}));
+        olBox.replaceChildren(tree(ol));olBtn.hidden=false;olBox.hidden=innerWidth<768;
+      }
+    }catch(e){if(alive)pages.replaceChildren(h("div",{class:"empty"},"फाइल उघडता आली नाही. डाउनलोड करून पाहावी."))}
+  })();
+  return {destroy(){alive=false;io&&io.disconnect();doc&&doc.destroy()}};
+}
+
+/* Word viewer (docx-preview 0.3.3, cleaned as in the app's DocxView) */
+function loadScript(src){return new Promise((ok,no)=>{const s=document.createElement("script");s.src=src;s.onload=ok;s.onerror=no;document.head.append(s)})}
+function docxLib(){return docxLib.p||=(async()=>{if(!window.JSZip)await loadScript("https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js");if(!window.docx)await loadScript("https://cdn.jsdelivr.net/npm/docx-preview@0.3.3/dist/docx-preview.min.js");return window.docx})().catch(e=>{docxLib.p=null;throw e})}
+function sanitizeDocx(root){
+  root.querySelectorAll("script,iframe,frame,object,embed,base,meta,link,form,input,button,textarea,select").forEach(el=>el.remove());
+  root.querySelectorAll("*").forEach(el=>{for(const a of [...el.attributes]){const n=a.name.toLowerCase();
+    if(n.startsWith("on"))el.removeAttribute(a.name);
+    else if(["href","xlink:href","src","action","formaction","srcdoc"].includes(n)&&/^\s*(javascript|data|vbscript):/i.test(a.value)&&!(/^\s*data:image\//i.test(a.value)&&(el.tagName==="IMG"||el.tagName.toLowerCase()==="image")))el.removeAttribute(a.name)}
+    if(el.tagName==="A"){el.setAttribute("rel","noopener noreferrer");el.setAttribute("target","_blank")}});
+}
+function docxView(host,o){
+  let alive=true;
+  const box=h("div",{class:"docx-host"},h("div",{class:"empty"},"फाइल उघडत आहे…"));
+  host.replaceChildren(h("div",{class:"viewer"},h("div",{class:"vbar"},h("span",{class:"muted"},o.name||""),h("button",{type:"button",style:"margin-left:auto",disabled:!downloads,onclick:e=>download(o,e.currentTarget)},"⤓ डाउनलोड")),box));
+  (async()=>{try{const [blob,lib]=await Promise.all([getBlob(o),docxLib()]);const tmp=document.createElement("div");
+      await lib.renderAsync(blob,tmp,undefined,{className:"docx",inWrapper:true,breakPages:true,ignoreLastRenderedPageBreak:true,experimental:false,useBase64URL:true});
+      sanitizeDocx(tmp);if(alive)box.replaceChildren(...tmp.childNodes)}
+    catch(e){if(alive)box.replaceChildren(h("div",{class:"empty"},"फाइल उघडता आली नाही. डाउनलोड करून पाहावी."))}})();
+  return {destroy(){alive=false}};
+}
+
+/* correction chat (as the app's EditChat: choose draft, optional paragraph, message, files) */
+function editPanel(c){
+  const mine=edits.filter(e=>e.case===c.id).sort((a,b)=>String(a.at).localeCompare(String(b.at)));
+  const list=h("div",{class:"chat"},mine.length?mine.flatMap(e=>[
+      h("div",{class:"bub me"},h("small",{},[fmtDate(e.at),tLabel(e.target),e.para_label].filter(Boolean).join(" · ")),e.message,(e.attachments||[]).length?h("div",{class:"muted"},"📎 "+e.attachments.map(a=>a.name).join(", ")):null),
+      e.status==="pending"?h("div",{class:"bub wait"},"प्रतीक्षेत — चॅटमध्ये सांगा: “प्रस्ताव कक्षातील सुधारणा कर”"):
+      h("div",{class:"bub cl"},h("small",{},(e.status==="done"?"बदल केला":"बदल झाला नाही")+(e.done_at?" · "+fmtDate(e.done_at):"")),e.reply||"")]):
+    [h("p",{class:"muted",style:"margin:0"},"अजून सुधारणा नाही. खाली बदल लिहा; मसुद्यात फक्त तोच बदल केला जाईल.")]);
+  if(!canEdit)return list;
+  const tgt=h("select",{"aria-label":"कोणत्या मसुद्यात बदल"},EDIT_TARGETS.map(([k,l])=>h("option",{value:k},l)));
+  const para=h("select",{"aria-label":"परिच्छेद"});
+  const fillPara=()=>{const pre=tgt.value==="note"?"note.":tgt.value==="letter"?"letter.":null;const ps=pre?(c.paras||[]).filter(p=>p.id.startsWith(pre)):[];
+    para.replaceChildren(h("option",{value:""},"संपूर्ण मसुदा"),...ps.map(p=>h("option",{value:p.id},p.label+" — "+(p.text||"").slice(0,60))));para.disabled=!ps.length};
+  const dr=ws.draft||{};if(dr.t)tgt.value=dr.t;
+  tgt.addEventListener("change",()=>{fillPara();keep()});fillPara();if(dr.p)para.value=dr.p;
+  const msg=h("textarea",{id:"edit-msg",maxlength:2000,placeholder:"उदा. परि. 3 मधील दिनांक 15.07.2025 असा दुरुस्त करावा."});
+  msg.value=dr.m||"";
+  const keep=()=>{ws.draft={t:tgt.value,p:para.value,m:msg.value}};
+  msg.addEventListener("input",keep);para.addEventListener("change",keep);
+  const fi=h("input",{type:"file",accept:".pdf,.jpg,.jpeg,.png,.doc,.docx",multiple:true,hidden:!assets});
+  const send=h("button",{class:"accent",type:"button",onclick:()=>submitEdit(c,tgt,para,msg,fi,send)},"सुधारणा जमा करा");
+  return h("div",{class:"chat"},list,h("div",{class:"compose"},h("strong",{},"✍️ कृपया येथे आपला बदल लिहावा"),
+    h("div",{class:"grid2"},h("label",{},"मसुदा",tgt),h("label",{},"परिच्छेद (ऐच्छिक)",para)),h("label",{},"बदल",msg),
+    assets?h("label",{},"📎 कागदपत्र / GR जोडा (ऐच्छिक, ५ पर्यंत)",fi):null,h("div",{class:"row"},send)));
+}
+async function submitEdit(c,tgt,para,msg,fi,btn){
+  const m=msg.value.trim();if(!m){toast("आधी बदल लिहा");msg.focus();return}
+  const files=[...(fi.files||[])].slice(0,5);
+  btn.disabled=true;btn.textContent="जमा होत आहे…";
+  try{const att=[];for(const f of files){const r=await assets.upload(f);att.push({asset_id:r.id,name:f.name,size:f.size})}
+    const at=nowIso(),id=c.id+"__"+Date.now().toString(36),p=(c.paras||[]).find(x=>x.id===para.value);
+    var kept=ws.draft;ws.draft=null;
+    await db.doc("edits/"+id).set({case:c.id,target:tgt.value,para:para.value||null,para_label:p?p.label:null,message:m,attachments:att,status:"pending",reply:"",at,done_at:null});
+    msg.value="";fi.value="";ws.draft=null;toast("सुधारणा जमा. चॅटमध्ये सांगा: प्रस्ताव कक्षातील सुधारणा कर")}
+  catch(e){if(kept)ws.draft=kept;toast("सुधारणा जमा झाली नाही ("+(e&&e.code||"त्रुटी")+")")}finally{btn.disabled=false;btn.textContent="सुधारणा जमा करा"}
 }
 function renderYears(){const ys=[...new Set(cases.map(c=>String(c.year)).filter(Boolean))].sort().reverse();const v=$("fYear").value;setOpts($("fYear"),"सर्व वर्षे",ys);$("fYear").value=ys.includes(v)?v:""}
 function render(){renderYears();renderStrip();renderCharts();renderList()}
@@ -347,15 +527,23 @@ async function addReply(c,fi,btn){
 
 /* ---------- downloads ---------- */
 function b64ToBytes(b){const bin=atob(b),u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return u}
+const blobCache=new Map();
+async function getBlob(o){
+  const k=o.store+":"+o.ref;if(blobCache.has(k))return blobCache.get(k);
+  let blob;
+  if(o.store==="asset"){const r=await fetch("/_blob/"+o.ref);if(!r.ok)throw {code:"not_found"};blob=await r.blob()}
+  else if(o.store==="asset_parts"){const parts=[];for(const id of o.ref){const r=await fetch("/_blob/"+id);if(!r.ok)throw {code:"not_found"};parts.push(b64ToBytes((await r.text()).trim()))}
+    blob=new Blob(parts,{type:"application/pdf"})}
+  else{const first=await db.doc(`outputs/${o.ref}__0`).get();if(!first.exists)throw {code:"not_found"};
+    const total=first.data().total||1,parts=[b64ToBytes(first.data().b64)];
+    for(let n=1;n<total;n++){const d=await db.doc(`outputs/${o.ref}__${n}`).get();if(!d.exists)throw {code:"missing_chunk"};parts.push(b64ToBytes(d.data().b64))}
+    blob=new Blob(parts,{type:"application/vnd.openxmlformats-officedocument.wordprocessingml.document"})}
+  blobCache.set(k,blob);return blob;
+}
 async function download(o,btn){
   if(!o)return;btn.disabled=true;
   try{
-    let blob;
-    if(o.store==="asset"){const r=await fetch("/_blob/"+o.ref);if(!r.ok)throw {code:"not_found"};blob=await r.blob()}
-    else{const first=await db.doc(`outputs/${o.ref}__0`).get();if(!first.exists)throw {code:"not_found"};
-      const total=first.data().total||1,parts=[b64ToBytes(first.data().b64)];
-      for(let n=1;n<total;n++){const d=await db.doc(`outputs/${o.ref}__${n}`).get();if(!d.exists)throw {code:"missing_chunk"};parts.push(b64ToBytes(d.data().b64))}
-      blob=new Blob(parts,{type:"application/vnd.openxmlformats-officedocument.wordprocessingml.document"})}
+    const blob=await getBlob(o);
     await downloads.save({filename:o.name,data:blob});
   }catch(e){toast(e&&e.code==="declined"?"डाउनलोड रद्द केले":"फाइल मिळाली नाही ("+(e&&e.code||"त्रुटी")+")")}
   finally{btn.disabled=false}
@@ -416,7 +604,8 @@ render();
   db.collection("cases").onSnapshot(snap=>{clearTimeout(timer);
     const o={queued:0,processing:1,failed:2,done:3};
     cases=snap.docs.map(x=>({id:x.id,...x.data()})).sort((a,b)=>(o[a.status]??4)-(o[b.status]??4)||String(b.created_at||"").localeCompare(String(a.created_at||"")));
-    render();
+    render();if(ws.id)renderWs(false);
   },err=>{clearTimeout(timer);$("list").replaceChildren(h("div",{class:"empty"},"प्रकरणे उघडता आली नाहीत ("+(err&&err.code||"त्रुटी")+")."))});
+  db.collection("edits").onSnapshot(snap=>{edits=snap.docs.map(x=>({id:x.id,...x.data()}));renderList();if(ws.id)renderWs(false)},()=>{});
 })();
 </script>

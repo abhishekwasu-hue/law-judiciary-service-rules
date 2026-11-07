@@ -229,3 +229,9 @@ One proposal = one chat (the main path; the प्रस्ताव कक्�
 (`<out>/preview/*.png`). A correction never re-reads the proposal: `load` (new chat) -> edit spec / study / enclosures only ->
 `save --note "सुधारणा: …"` -> `rebuild` (`--package` only when the PDF changes) -> LINT OK + verify ALL OK -> send only the
 changed file + new preview. First round: OCR text of all pages first; page images only of cited / text-less / stamp pages.
+प्रस्ताव कक्ष page (docs/PROPOSAL_DESK.md, §4.41 (उ)) after each round: `python3 tools/desk_sync.py <id> <out> <sync>` ->
+upload every path in `<sync>/assets.txt` (Artifact publish, `asset: true`, url = page) -> put the returned ids in place of
+`__ASSET__<name>` in `case_patch.json` outputs -> ArtifactData batch: `outputs` = `<sync>/chunks/*.json` (set), `cases/<id>`
+= case fields + patch (path "chat", stage, history). "प्रस्ताव कक्षातील सुधारणा कर": ArtifactData query `edits` where
+status == "pending" -> each one (target, para id = spec position, message, attachments `/_blob/<id>`) done as a correction
+round -> sync again -> update the edit {status "done" | "failed", reply (one Marathi line: what changed), done_at}.

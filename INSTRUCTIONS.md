@@ -185,7 +185,8 @@
    - (आ) पहिल्या फेरीनंतर प्रकरणाची स्थिती `tools/case_state.py save` ने `cases/<id>/` मध्ये (spec, study, enclosures, marks, प्रस्ताव PDF; रेपोबाहेरचे enclosure-स्रोत `cases/<id>/src/`), commit + push; टिप्पणी व पत्राचे preview (`case_state.py rebuild` → `<out>/preview/*.png`) फाइल्ससोबत.
    - (इ) सुधारणा-फेरी: प्रस्ताव पुन्हा वाचणे, OCR, नवे संशोधन नाही (सूचनेत नवा GR / कागद असेल तेवढेच); सूचना फक्त spec / study / enclosures मध्ये; `case_state.py save … --note "सुधारणा: …"` व `case_state.py rebuild` (PDF बदलल्यास `--package`), LINT OK व verify ALL OK; फक्त बदललेली फाइल + नवे preview; नवी चॅट असल्यास `case_state.py load`.
    - (ई) सूचना पुढील सर्व प्रकरणांना लागू होणारी असल्यास ती या §4 मध्ये नवा क्रमांक म्हणून (§6).
-   - साधने: tools/case_state.py (save / load / rebuild / list), tests/test_case_state.py; `cases/README.md`.
+   - (उ) प्रस्ताव कक्ष पान (वापरकर्ता, 07.11.2026: "प्रस्ताव कक्षामध्ये जसा … इंटरॅक्टिव्ह युजर इंटरफेस … त्याच धर्तीवर"; "भरपूर फीचर रिपो मध्ये आहेत तिथूनच … घेता येतील"): प्रत्येक फेरीनंतर `tools/desk_sync.py <id> <out> <sync>` व PROPOSAL_SOP Step 9 प्रमाणे टिप्पणी-पत्र, GR सह प्रस्ताव व परिच्छेद-यादी पानावर जमा; पानावरील सुधारणा (`edits`, status pending) "प्रस्ताव कक्षातील सुधारणा कर" सांगितल्यावर (इ) प्रमाणे करून त्या नोंदीत उत्तर व status done.
+   - साधने: tools/case_state.py (save / load / rebuild / list), tools/desk_sync.py, tests/test_case_state.py, tests/test_desk_sync.py; `cases/README.md`; docs/PROPOSAL_DESK.md.
 
 ## ५. विषयनिहाय पूर्वोदाहरण-ग्रंथालय
 - 131 जुन्या प्रकरणांतून (zip) विषयवार फोल्डर: वैद्यकीय प्रतिपूर्ती, वेतननिश्चिती/पदोन्नती, वेतनश्रेणी-संवर्ग, ACP/वेतनवाढ, जुनी पेन्शन/NPS, निवृत्तीवेतन/उपदान/GPF, सेवा-बाबी, भत्ते. प्रत्येकात: प्रकरणे, **वित्त/सा.प्र.वि./इतर विभागांचे अभिप्राय (संदर्भ क्र./दि.सह, जसेच्या तसे)**, मार्गदर्शक GR, प्रमाणित मसुदा-परिच्छेद, वारंवार त्रुटी, तपासणी-सूची. मुख्य इंडेक्स `00-INDEX.docx`.
