@@ -121,6 +121,8 @@
   Defaults changed to the replacements (engine_supabase PROVIDERS / GEMINI_MODEL, part1_vision, Settings table text — the
   Settings text needs "Deploy app"). Owner: clear or change the Gemini model fields in Settings; Gemini only with a paid key.
 
+- 07.11.2026 (Abhi: "वेगवेगळ्या स्किल … सेवा प्रकरणे न्यायालयीन प्रकरणे खरेदी विषयक बाबी विधिमंडळ कामकाज" → "1 मंजूर; इतर नमुने मी नंतर देणार"): four claude.ai skills by work type, same ids as tools/work_types/: skills/lj-seva (replaces lj-prastav-desk6, removed), skills/lj-nyayalayin, skills/lj-vidhimandal and skills/lj-kharedi (both rules_pending: general note + pending_warning; samples later into samples/work/<id>/, then fill tools/work_rules/<id>.md and update the skill). Rules stay in the repo; skills hold procedure only.
+
 ## Pending
 28. **06.11.2026:** (a) CLOSED 06.11.2026 (Abhi: "अ मान्य"): names in Marathi initials (§4.18, circular 07.05.2018) formed from a Devanagari full name anywhere in the proposal ("सि. श. कुर्ले"); English-initials form only when no Devanagari name exists — §4.18, §4.39 A7, SOP, brief, ACCURACY, skill updated;
     (b) CLOSED 06.11.2026 (decided from the record, §6 never-ask rule): CR133 sample "____ आहे" sentences removed (A5); WP35697 ×2 body quote of the 11.08.2017 order para 18(i) aligned with the source text in GR 17.05.2018 (pdf/gr/201805171732241512.pdf: "Judicial Officers"; "31 st" = superscript, written "31st") (A9).
