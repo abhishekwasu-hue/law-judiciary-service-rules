@@ -148,6 +148,20 @@ details.more>summary{cursor:pointer;color:var(--navy);font-weight:600;min-height
 .compose{border:2px solid var(--saffron);border-radius:var(--r);padding:12px;display:flex;flex-direction:column;gap:8px;background:var(--saffron-soft)}
 .compose>strong{color:var(--saffron)}
 .badge-chat{background:var(--navy);color:var(--navy-ink)}
+.views{display:flex;gap:6px;border-bottom:2px solid var(--line)}
+.views button{border:0;border-radius:8px 8px 0 0;background:transparent;color:var(--muted);margin-bottom:-2px;border-bottom:3px solid transparent;font-size:1rem}
+.views button[aria-selected="true"]{color:var(--navy);border-bottom-color:var(--saffron);background:var(--surface)}
+.gr-tools{display:grid;grid-template-columns:2fr 1.4fr 1fr;gap:8px}
+@media (max-width:640px){.gr-tools{grid-template-columns:1fr}}
+.gr-list{display:flex;flex-direction:column;gap:8px}
+.gr{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--navy);border-radius:var(--r);padding:10px 12px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 12px;align-items:center}
+.gr .t{font-weight:600;overflow-wrap:anywhere}
+.gr .m{font-size:.8rem;color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 10px;font-variant-numeric:tabular-nums}
+.gr .a{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end}
+.gr a.btn{text-decoration:none}
+@media (max-width:640px){.gr{grid-template-columns:1fr}.gr .a{justify-content:flex-start}}
+.grview{position:fixed;inset:0;z-index:30;background:rgba(10,16,32,.55);display:flex;align-items:stretch;justify-content:center;padding:12px}
+.grview>div{background:var(--surface);border-radius:var(--r);padding:12px;width:min(1100px,100%);display:flex;flex-direction:column;gap:8px;overflow:auto}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));background:var(--navy);color:var(--navy-ink);padding:10px 16px;border-radius:8px;font-weight:600;z-index:20;max-width:calc(100% - 32px)}
 footer{color:var(--muted);font-size:.84rem;border-top:1px solid var(--line);padding-top:10px}
 @media (max-width:520px){.grid2,.filters{grid-template-columns:1fr}.brand h1{font-size:1.65rem}}
@@ -162,6 +176,23 @@ footer{color:var(--muted);font-size:.84rem;border-top:1px solid var(--line);padd
     <button class="accent" id="btnNew" type="button" hidden>+ नवीन प्रस्ताव</button>
   </header>
 
+  <nav class="views" role="tablist" aria-label="विभाग">
+    <button type="button" role="tab" id="vCases" aria-selected="true">प्रकरणे</button>
+    <button type="button" role="tab" id="vGr" aria-selected="false">GR ग्रंथालय</button>
+  </nav>
+
+  <section id="grLib" hidden aria-label="GR ग्रंथालय" style="display:flex;flex-direction:column;gap:10px">
+    <div class="gr-tools">
+      <input id="gq" type="search" placeholder="शोधा: सांकेतांक, विषय, फाइल-नाव" aria-label="GR शोध">
+      <select id="gTopic" aria-label="विषय-गट"></select>
+      <select id="gYear" aria-label="वर्ष"></select>
+    </div>
+    <p class="muted" id="gInfo" style="margin:0"></p>
+    <div class="gr-list" id="gList"><div class="empty">GR यादी उघडत आहे…</div></div>
+    <div class="row" id="gMoreRow" hidden><button type="button" id="gMore">आणखी दाखवा</button></div>
+  </section>
+
+  <div id="casesView" style="display:flex;flex-direction:column;gap:14px">
   <div class="strip" id="strip" aria-label="टप्प्यानुसार गणना"></div>
 
   <div class="layout">
@@ -204,6 +235,7 @@ footer{color:var(--muted);font-size:.84rem;border-top:1px solid var(--line);padd
       <section class="panel chart"><h2>टप्प्यानुसार प्रकरणे</h2><div id="chStage"></div></section>
       <section class="panel chart"><h2>प्रवर्गानुसार प्रकरणे</h2><div id="chCat"></div></section>
     </aside>
+  </div>
   </div>
 
   <footer>नवीन प्रस्ताव नोंदल्यावर चॅटमध्ये सांगा: “प्रस्ताव कक्षातील नवीन प्रस्ताव तयार कर”. सुधारणा जमा केल्यावर सांगा: “प्रस्ताव कक्षातील सुधारणा कर” — Claude बदल करून नवे मसुदे येथेच जमा करेल.</footer>
@@ -591,6 +623,64 @@ $("fNew").addEventListener("submit",async e=>{
   finally{btn.disabled=false}
 });
 
+/* ---------- GR ग्रंथालय (repo pdf/ index, built by tools/desk_gr_index.py; PDFs put on the page on request) ---------- */
+let grAll=null,grFiles={},grReq={},grShown=50;
+const gf={q:"",topic:"",year:""};
+function showView(v){const g=v==="gr";$("vCases").setAttribute("aria-selected",String(!g));$("vGr").setAttribute("aria-selected",String(g));
+  $("casesView").hidden=g;$("grLib").hidden=!g;$("btnNew").hidden=g||!(canEdit&&assets);if(g)loadGr()}
+$("vCases").addEventListener("click",()=>showView("cases"));
+$("vGr").addEventListener("click",()=>showView("gr"));
+async function loadGr(){
+  if(grAll||!db)return;
+  try{const m=await db.doc("meta/gr_library").get();
+    if(!m.exists){$("gList").replaceChildren(h("div",{class:"empty"},"GR यादी अजून पानावर जमा केलेली नाही."));return}
+    const r=await fetch("/_blob/"+m.data().asset);if(!r.ok)throw {code:"not_found"};
+    grAll=await r.json();
+    const topics=[...new Set(grAll.map(g=>g.topic))].sort((a,b)=>a.localeCompare(b));
+    setOpts($("gTopic"),"सर्व विषय-गट",topics);
+    const ys=[...new Set(grAll.map(g=>g.date.slice(-4)).filter(Boolean))].sort().reverse();
+    setOpts($("gYear"),"सर्व वर्षे",ys);
+    renderGr();
+  }catch(e){$("gList").replaceChildren(h("div",{class:"empty"},"GR यादी उघडता आली नाही ("+(e&&e.code||"त्रुटी")+")."))}
+}
+function grMatch(g){
+  if(gf.topic&&g.topic!==gf.topic)return false;
+  if(gf.year&&!g.date.endsWith(gf.year))return false;
+  if(gf.q){const t=[g.code,g.title,g.file,g.topic,g.date].join(" ").toLowerCase();return gf.q.split(/\s+/).every(w=>t.includes(w))}
+  return true;
+}
+function renderGr(){
+  if(!grAll)return;
+  const rows=grAll.filter(grMatch);
+  $("gInfo").textContent=`एकूण ${toMr(grAll.length)} पैकी ${toMr(rows.length)} फाइल`;
+  $("gList").replaceChildren(...(rows.length?rows.slice(0,grShown).map(grRow):[h("div",{class:"empty"},"या निवडीत फाइल नाही.")]));
+  $("gMoreRow").hidden=rows.length<=grShown;
+}
+function grRow(g){
+  const f=grFiles[g.key],rq=grReq[g.key];
+  const acts=[];
+  if(f)acts.push(h("button",{class:"primary",type:"button",onclick:()=>openGr(g,f)},"पानावर उघडा"));
+  else if(canEdit)acts.push(rq?h("span",{class:"pill st-queued"},"मागवले — चॅटमध्ये सांगा"):h("button",{type:"button",onclick:e=>requestGr(g,e.currentTarget)},"पानावर मागवा"));
+  if(g.url)acts.push(h("a",{class:"btn",href:g.url,target:"_blank",rel:"noopener noreferrer"},"अधिकृत दुवा ↗"));
+  return h("article",{class:"gr"},h("div",{},h("div",{class:"t"},g.title||g.file),
+    h("div",{class:"m"},g.date&&h("span",{},g.date),g.code&&h("span",{},g.code),h("span",{},g.topic),g.pages?h("span",{},toMr(g.pages)+" पाने"):null,g.title?h("span",{},g.file):null)),h("div",{class:"a"},acts));
+}
+async function requestGr(g,btn){
+  btn.disabled=true;
+  try{await db.doc("gr_requests/"+g.key).set({key:g.key,path:g.path,file:g.file,status:"pending",at:nowIso()});toast("मागवले. चॅटमध्ये सांगा: प्रस्ताव कक्षातील GR मागण्या पूर्ण कर")}
+  catch(e){btn.disabled=false;toast("मागणी जमा झाली नाही ("+(e&&e.code||"त्रुटी")+")")}
+}
+function openGr(g,f){
+  const host=h("div",{});
+  const box=h("div",{class:"grview",role:"dialog","aria-label":g.title||g.file},h("div",{},h("div",{class:"row",style:"justify-content:space-between"},h("strong",{},g.title||g.file),h("button",{type:"button",onclick:()=>{v.destroy();box.remove()}},"✕ बंद")),host));
+  document.body.append(box);
+  const v=pdfView(host,{kind:"gr",name:g.file,store:f.store||"asset",ref:f.ref});
+}
+$("gq").addEventListener("input",e=>{gf.q=e.target.value.trim().toLowerCase();grShown=50;renderGr()});
+$("gTopic").addEventListener("change",e=>{gf.topic=e.target.value;grShown=50;renderGr()});
+$("gYear").addEventListener("change",e=>{gf.year=e.target.value;grShown=50;renderGr()});
+$("gMore").addEventListener("click",()=>{grShown+=50;renderGr()});
+
 /* ---------- boot ---------- */
 render();
 (async()=>{
@@ -606,6 +696,8 @@ render();
     cases=snap.docs.map(x=>({id:x.id,...x.data()})).sort((a,b)=>(o[a.status]??4)-(o[b.status]??4)||String(b.created_at||"").localeCompare(String(a.created_at||"")));
     render();if(ws.id)renderWs(false);
   },err=>{clearTimeout(timer);$("list").replaceChildren(h("div",{class:"empty"},"प्रकरणे उघडता आली नाहीत ("+(err&&err.code||"त्रुटी")+")."))});
+  db.collection("gr_files").onSnapshot(snap=>{grFiles=Object.fromEntries(snap.docs.map(x=>[x.id,x.data()]));renderGr()},()=>{});
+  db.collection("gr_requests").onSnapshot(snap=>{grReq=Object.fromEntries(snap.docs.filter(x=>x.data().status==="pending").map(x=>[x.id,x.data()]));renderGr()},()=>{});
   db.collection("edits").onSnapshot(snap=>{edits=snap.docs.map(x=>({id:x.id,...x.data()}));renderList();if(ws.id)renderWs(false)},()=>{});
 })();
 </script>
