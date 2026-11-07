@@ -2,6 +2,7 @@
 import { hasSupabase, sb } from './supabase';
 import type { InputKind } from './constants';
 import type { Me, Profile } from './types';
+import { artifactApi, artifactDownload, artifactFileBytes, artifactFileUrl, artifactUpload } from './artifact/api';
 import { OWNER_DISPATCH_TEXT, RUN_START_FAIL_TEXT, TECH_TROUBLE_TEXT, DEV_WORDS, looksMarathi, ownerDetail, viewerOwner } from './format';
 
 export class ApiError extends Error {
@@ -160,7 +161,11 @@ export async function saveProfile(p: Partial<Profile>): Promise<Me> {
   return m;
 }
 
+/** claude.ai artifact build: /api/* answered in the page (lib/artifact/api.ts). */
+const ARTIFACT = import.meta.env.VITE_BACKEND === 'artifact';
+
 export async function api<T = unknown>(path: string, opt: { method?: string; body?: unknown } = {}): Promise<T> {
+  if (ARTIFACT) return artifactApi<T>(path, opt);
   const t = await token();
   const headers: Record<string, string> = {};
   if (t) headers.Authorization = `Bearer ${t}`;
@@ -186,6 +191,7 @@ export async function api<T = unknown>(path: string, opt: { method?: string; bod
 
 /** Raw-body upload with progress (XHR so upload.onprogress works). */
 export async function uploadFile(caseId: number, kind: InputKind | 'gr', file: File, onProgress?: (pct: number) => void): Promise<{ id: number }> {
+  if (ARTIFACT) return artifactUpload(caseId, kind, file, onProgress);
   const t = await token();
   return new Promise((resolve, reject) => {
     const x = new XMLHttpRequest();
@@ -212,9 +218,10 @@ export async function uploadFile(caseId: number, kind: InputKind | 'gr', file: F
 }
 
 export const fileUrl = (id: number, download = false) =>
-  api<{ url: string; name: string }>(`/api/files/${id}${download ? '?download=1' : ''}`);
+  ARTIFACT ? artifactFileUrl(id) : api<{ url: string; name: string }>(`/api/files/${id}${download ? '?download=1' : ''}`);
 
 export async function fileBytes(id: number): Promise<{ data: ArrayBuffer; name: string }> {
+  if (ARTIFACT) return artifactFileBytes(id);
   const { url, name } = await fileUrl(id);
   const r = await fetch(url);
   if (!r.ok) throw new ApiError(r.status, `sign ${r.status}`); // → 'फाइल उघडता आली नाही …' (+ code for the owner)
@@ -223,6 +230,7 @@ export async function fileBytes(id: number): Promise<{ data: ArrayBuffer; name: 
 
 /** Download with the original file name (the Worker adds &download=<original name> to the signed URL). */
 export async function downloadFile(id: number): Promise<void> {
+  if (ARTIFACT) return artifactDownload(id);
   const { url, name } = await fileUrl(id, true);
   const a = document.createElement('a');
   a.href = url;

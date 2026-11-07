@@ -132,7 +132,7 @@ export default function GrLibrary() {
             {list.map(r => (
               <li key={r.code} className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">
-                  {r.title ? <div className="font-semibold">{r.title}</div> : <div className="font-semibold text-slate-500 dark:text-slate-400">शीर्षक उपलब्ध नाही</div>}
+                  {r.title ? <div className="font-semibold [overflow-wrap:anywhere]">{r.title}</div> : <div className="font-semibold text-slate-500 dark:text-slate-400">शीर्षक उपलब्ध नाही</div>}
                   <div className="text-sm text-slate-500">
                     <span className="break-all font-mono">{r.code}</span> • {fmtDate(r.date)}{r.department ? ` • ${r.department}` : ''}
                   </div>
