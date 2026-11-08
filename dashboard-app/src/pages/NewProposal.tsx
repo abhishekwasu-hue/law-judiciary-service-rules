@@ -6,7 +6,7 @@ import { useEffect, useRef, useState, type DragEvent, type FormEvent } from 'rea
 import { Link, useSearchParams } from 'react-router-dom';
 import { ApiError, api, budgetReachedText, fmtUsd, getSpend, spendBlocked, uploadFile, type RunStart, type Spend } from '../lib/api';
 import { useAuth, useCanWrite } from '../lib/auth';
-import { CATEGORIES, DEFAULT_DESK, DEFAULT_WORK_TYPE, DESKS, INPUT_KINDS, INPUT_KIND_LABEL, PRIORITIES, WORK_TYPES, isStale, isWaiting, type DraftKey, type InputKind } from '../lib/constants';
+import { CATEGORIES, DEFAULT_DESK, DEFAULT_WORK_TYPE, DESKS, INPUT_KINDS, INPUT_KIND_LABEL, PRIORITIES, WORK_TYPES, isStale, isWaiting, runNeedsFire, type DraftKey, type InputKind } from '../lib/constants';
 import { draftLabels, sameDrafts, suggestDrafts } from '../lib/drafts';
 import { fmtBytes } from '../lib/format';
 import { guessSubject } from '../lib/pdf';
@@ -19,6 +19,8 @@ import DraftPicker, { CompactDraftPicker } from '../components/DraftPicker';
 import BulkUpload, { BULK_MAX, startText, userError } from '../components/BulkUpload';
 
 const MAX = 50 * 1024 * 1024;
+/** claude.ai artifact build: no Worker queue — a run left queued means its firing failed (FIX_CONTRACT §2). */
+const ARTIFACT = import.meta.env.VITE_BACKEND === 'artifact';
 /** Types for the other files (the proposal has its own drop zone). */
 const EXTRA_KINDS = INPUT_KINDS.filter(k => k !== 'proposal');
 interface Extra { file: File; kind: InputKind }
@@ -71,7 +73,8 @@ export default function NewProposal() {
     if (canWrite) void getSpend().then(setSpend, () => setSpend(null));
   }, [canWrite]);
   // same test as the Worker: spend + active runs at their estimate (reserved_usd)
-  const overBudget = !!spend && spendBlocked(spend);
+  // artifact: the page has no monthly limit (its /api/spend placeholder limit is never shown) — E-F4
+  const overBudget = !ARTIFACT && !!spend && spendBlocked(spend);
   const [proposal, setProposal] = useState<File | null>(null);
   const [mainErr, setMainErr] = useState('');
   const [extras, setExtras] = useState<Extra[]>([]);
@@ -182,7 +185,7 @@ export default function NewProposal() {
     try {
       const sp = await getSpend();
       setSpend(sp);
-      if (spendBlocked(sp)) {
+      if (!ARTIFACT && spendBlocked(sp)) {
         toast(isOwner ? budgetReachedText(sp.limit_usd) : STAFF_BUDGET, 'err');
         setBusy(false);
         return; // nothing uploaded
@@ -294,7 +297,9 @@ export default function NewProposal() {
     );
 
   const caseTitle = created ? (created.cr_no ? `C R ${created.cr_no}/${created.cr_year ?? '____'}` : `प्रकरण क्र. ${created.id}`) : '';
-  const waiting = !!run && isWaiting(run);
+  // artifact: a run whose firing failed is not "waiting in the queue" — RunProgress shows why + "▶ पुन्हा सुरू करा"
+  const needFire = ARTIFACT && !!run && runNeedsFire(run);
+  const waiting = !ARTIFACT && !!run && isWaiting(run);
   const openCase = created && (
     <Link className="inline-flex min-h-tap items-center font-semibold text-navy-700 underline dark:text-navy-200" to={`/cases/${created.id}`}>प्रकरण उघडा →</Link>
   );
@@ -331,7 +336,7 @@ export default function NewProposal() {
                 {canRetry && <div className="mt-1"><CompactDraftPicker value={chosen} onChange={setDrafts} disabled={busy} /></div>}
               </div>
 
-              {runErr && (
+              {runErr && !needFire && (
                 <div className="space-y-2 rounded-lg bg-red-100 px-3 py-2 text-red-900 dark:bg-red-900/40 dark:text-red-100" role="alert">
                   <div><span className="font-semibold">प्रक्रिया सुरू होऊ शकली नाही.</span> {runErr}</div>
                   {canRetry && retryBtn}
@@ -369,7 +374,7 @@ export default function NewProposal() {
               {done ? (
                 <Link className="btn-accent flex w-full items-center justify-center py-3 text-xl" to={`/cases/${created.id}?tab=note`}>तयार फाइल पाहा →</Link>
               ) : canRetry && !runErr ? retryBtn : null}
-              {(running || waiting) && (
+              {(running || waiting) && !needFire && (
                 <p className="text-sm text-slate-600 dark:text-slate-300">हे पान बंद केले तरी काम चालू राहील. तयार झाल्यावर फाइल ‘प्रकरणे’ मध्ये या प्रकरणात मिळतील.</p>
               )}
               {/* N2: other files go to the created case on its own page */}

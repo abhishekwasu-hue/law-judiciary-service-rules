@@ -10,6 +10,12 @@ import { Empty, Field, Modal, SkeletonRows, Spinner } from '../components/ui';
 import { useToast } from '../components/Toast';
 import PdfViewer from '../components/PdfViewer';
 
+/** claude.ai artifact build: a GR without a file is requested from the page (POST /api/gr/request → the worker fetches it). */
+const ARTIFACT = import.meta.env.VITE_BACKEND === 'artifact';
+interface GrReq { key: string; code: string | null; status: string; at: string | null; reply: unknown }
+interface GrReqAnswer { status: 'pending' | 'processing' | 'done'; fired: boolean; reason?: string }
+const REQUESTED_TEXT = 'मागवले — थोड्या वेळाने उपलब्ध होईल';
+
 export default function GrLibrary() {
   const canWrite = useCanWrite();
   const toast = useToast();
@@ -24,6 +30,21 @@ export default function GrLibrary() {
   const [view, setView] = useState<{ code: string; url: string; title: string } | null>(null);
   const [opening, setOpening] = useState('');
   const [addErr, setAddErr] = useState('');
+  // artifact: GR requests by code (GET /api/gr/requests) and the one being sent
+  const [reqs, setReqs] = useState<Map<string, GrReq>>(new Map());
+  const [asking, setAsking] = useState('');
+  const loadReqs = async () => {
+    if (!ARTIFACT) return;
+    try {
+      const list = await api<GrReq[]>('/api/gr/requests');
+      const m = new Map<string, GrReq>();
+      // newest first → the first one per code / key wins
+      for (const x of list || []) for (const k of [x.code, x.key]) if (k && !m.has(String(k))) m.set(String(k), x);
+      setReqs(m);
+    } catch {
+      /* no list: every row offers the request button */
+    }
+  };
 
   const load = () => sb().from('gr_library').select('*').order('date', { ascending: false, nullsFirst: false }).then(({ data, error }) => {
     if (error) toast(humanError(error.message), 'err');
@@ -31,6 +52,7 @@ export default function GrLibrary() {
   });
   useEffect(() => {
     void load();
+    if (ARTIFACT) void loadReqs();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -62,6 +84,22 @@ export default function GrLibrary() {
       setAddErr(x instanceof ApiError && x.status === 404 ? 'हा सांकेतांक gr.maharashtra.gov.in वर मिळाला नाही. कृपया सांकेतांक तपासावा.' : humanError(x));
     } finally {
       setAdding(false);
+    }
+  }
+  async function request(r: GrRow) {
+    setAsking(r.code);
+    try {
+      const a = await api<GrReqAnswer>('/api/gr/request', { body: { code: r.code } });
+      if (a?.status === 'done') {
+        toast('हा GR उपलब्ध आहे.');
+        await load();
+      } else if (a && !a.fired && a.reason) toast(a.reason, 'err');
+      else toast('GR मागवला आहे — थोड्या वेळाने उपलब्ध होईल.');
+      await loadReqs();
+    } catch (x) {
+      toast(humanError(x), 'err');
+    } finally {
+      setAsking('');
     }
   }
   async function open(r: GrRow) {
@@ -146,12 +184,36 @@ export default function GrLibrary() {
                     </div>
                   )}
                 </div>
+                {ARTIFACT && !r.storage_path ? (() => {
+                  const rq = reqs.get(r.code);
+                  const st = rq?.status;
+                  const waiting = st === 'pending' || st === 'processing';
+                  const reply = rq && typeof rq.reply === 'string' ? rq.reply : '';
+                  return (
+                    <div className="flex shrink-0 flex-col items-start gap-1 sm:max-w-xs sm:items-end">
+                      {waiting ? (
+                        <span className="text-sm font-semibold text-amber-800 dark:text-amber-200" role="status">⏳ {REQUESTED_TEXT}</span>
+                      ) : (
+                        <>
+                          {st === 'failed' && <span className="break-words text-sm text-red-700 [overflow-wrap:anywhere] dark:text-red-400">{reply || 'GR आणता आला नाही.'}</span>}
+                          {st === 'done' && <span className="text-sm text-slate-500 dark:text-slate-400">GR आणला आहे — कृपया पान पुन्हा उघडावे.</span>}
+                          {canWrite ? (
+                            <button className="btn-ghost" disabled={asking === r.code} onClick={() => void request(r)}>
+                              {asking === r.code ? <Spinner /> : '📥'} पानावर मागवा
+                            </button>
+                          ) : <span className="text-sm text-slate-500 dark:text-slate-400">PDF अजून आणलेली नाही</span>}
+                        </>
+                      )}
+                    </div>
+                  );
+                })() : (
                 <div className="flex shrink-0 flex-col items-start gap-1 sm:items-end">
                   <button className="btn-ghost" disabled={!r.storage_path || opening === r.code} onClick={() => void open(r)}>
                     {opening === r.code ? <Spinner /> : '📄'} उघडा
                   </button>
                   {!r.storage_path && <span className="text-sm text-slate-500 dark:text-slate-400">PDF अजून आणलेली नाही</span>}
                 </div>
+                )}
               </li>
             ))}
           </ul>

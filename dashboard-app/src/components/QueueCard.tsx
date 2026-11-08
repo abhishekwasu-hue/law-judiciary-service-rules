@@ -6,11 +6,14 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getSpend } from '../lib/api';
 import { useData, useLatestRuns } from '../lib/data';
-import { isStale, isWaiting, type Tone } from '../lib/constants';
+import { isStale, isWaiting, runNeedsFire, type Tone } from '../lib/constants';
 import { crLabel } from '../lib/format';
 import type { Run } from '../lib/types';
 import { Chip, Spinner } from './ui';
 import { fmtDuration, useTypicalRunSeconds } from './RunProgress';
+
+/** claude.ai artifact build: a queued run whose firing failed has no place in a queue (FIX_CONTRACT §2). */
+const ARTIFACT = import.meta.env.VITE_BACKEND === 'artifact';
 
 const sameDay = (iso: string | null | undefined, d: Date) => {
   if (!iso) return false;
@@ -81,7 +84,8 @@ export default function QueueCard({ className = '' }: { className?: string }) {
   const rows = useMemo(() => queueRows(runs, typical?.sec ?? null, now, parallel), [runs, typical, now, parallel]);
   const today = new Date(now);
   const ready = runs.filter(r => r.state === 'done' && sameDay(r.finished_at, today)).length;
-  const nRun = rows.filter(r => r.kind === 'running').length;
+  // artifact: "सुरू झाले नाही" counts the runs whose firing failed / is unsure (no queue on the page)
+  const nRun = ARTIFACT ? rows.filter(r => !runNeedsFire(r.run)).length : rows.filter(r => r.kind === 'running').length;
   const nWait = rows.length - nRun;
   if (!rows.length && !ready) return null;
   const allLeft = rows.length ? Math.max(...rows.map(r => r.leftSec ?? 0)) : 0;
@@ -100,7 +104,7 @@ export default function QueueCard({ className = '' }: { className?: string }) {
       <div className="grid grid-cols-3 gap-2">
         <Num label="तयार (आज)" value={ready} tone="green" />
         <Num label="चालू" value={nRun} tone="blue" />
-        <Num label="प्रतीक्षेत" value={nWait} tone="amber" />
+        <Num label={ARTIFACT ? 'सुरू झाले नाही' : 'प्रतीक्षेत'} value={nWait} tone="amber" />
       </div>
       {rows.length > 0 && (
         <ol className="mt-3 divide-y divide-slate-100 dark:divide-navy-800">
@@ -108,14 +112,16 @@ export default function QueueCard({ className = '' }: { className?: string }) {
             <li key={x.run.id}>
               <Link to={`/cases/${x.run.case_id}`} className="flex min-h-tap items-center justify-between gap-2 py-1.5">
                 <span className="flex min-w-0 items-center gap-2">
-                  {x.kind === 'running' ? (
+                  {ARTIFACT && runNeedsFire(x.run) ? (
+                    <span className="shrink-0 whitespace-nowrap"><Chip tone="amber">⚠ सुरू झाले नाही</Chip></span>
+                  ) : x.kind === 'running' ? (
                     <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-sm font-bold text-blue-900 dark:bg-blue-900/40 dark:text-blue-100"><Spinner className="h-3.5 w-3.5" /> चालू</span>
                   ) : (
                     <span className="shrink-0 whitespace-nowrap"><Chip tone="amber">क्रमांक {x.position}</Chip></span>
                   )}
                   <span className="truncate font-semibold">{label(x.run)}</span>
                 </span>
-                <span className="shrink-0 text-sm text-slate-600 dark:text-slate-300">{x.leftSec != null ? `~${fmtDuration(x.leftSec)}` : '—'}</span>
+                <span className="shrink-0 text-sm text-slate-600 dark:text-slate-300">{ARTIFACT && runNeedsFire(x.run) ? 'उघडा →' : x.leftSec != null ? `~${fmtDuration(x.leftSec)}` : '—'}</span>
               </Link>
             </li>
           ))}

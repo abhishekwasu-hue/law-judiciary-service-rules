@@ -7,7 +7,7 @@ import { ApiError, api, downloadFile, humanError, uploadFile } from '../lib/api'
 import { useAuth } from '../lib/auth';
 import {
   EDIT_ATTACH_ACCEPT, EDIT_ATTACH_DEFAULT, EDIT_ATTACH_KINDS, EDIT_MAX_CHARS, EDIT_MAX_FILES, EDIT_TARGETS, FILE_KIND_LABEL,
-  editTargetLabel, isStale, runActive, type EditAttachKind, type EditTarget,
+  editTargetLabel, isStale, runActive, runNeedsFire, type EditAttachKind, type EditTarget,
 } from '../lib/constants';
 import { cleanReason as cleanReasonLib, fmtBytes, fmtDateTime, textOf } from '../lib/format';
 import type { CaseFile, EditChange, Run } from '../lib/types';
@@ -16,6 +16,10 @@ import { Chip, Modal, Spinner } from './ui';
 import CasePicker from './CasePicker';
 import { useToast } from './Toast';
 import DocxView from './DocxView';
+import { FireButton, RunNotStarted } from './RunProgress';
+
+/** claude.ai artifact build: an edit run whose firing failed shows "▶ पुन्हा सुरू करा" (FIX_CONTRACT §2). */
+const ARTIFACT = import.meta.env.VITE_BACKEND === 'artifact';
 
 const MAX_BYTES = 50 * 1024 * 1024;
 /** Failure reason via the lib helper (C13): the owner flag is passed for the isOwner-aware version; the older one-argument
@@ -78,7 +82,8 @@ function Turn({ r, ctx, names, onOpen }: { r: Run; ctx: CaseCtx; names: string[]
   const res = r.edit_result || {};
   const stale = isStale(r);
   const refused = r.state === 'done' && !!res.refused;
-  const active = !stale && (r.state === 'queued' || r.state === 'running');
+  const needFire = ARTIFACT && !stale && runNeedsFire(r);
+  const active = !stale && !needFire && (r.state === 'queued' || r.state === 'running');
   const changes = Array.isArray(res.changes) ? res.changes : [];
   const attached = Array.isArray(res.attached) ? res.attached : [];
   const kinds = r.state === 'done' && !refused && Array.isArray(res.files) ? res.files.filter(k => k !== 'spec') : [];
@@ -102,12 +107,14 @@ function Turn({ r, ctx, names, onOpen }: { r: Run; ctx: CaseCtx; names: string[]
             <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-100 px-2.5 py-0.5 text-sm font-bold text-blue-900 dark:bg-blue-900/40 dark:text-blue-100">
               <Spinner className="h-3.5 w-3.5" /> {r.state === 'queued' ? 'प्रतीक्षेत' : 'चालू'}
             </span>
-          ) : stale ? <Chip tone="red">वेळ संपली</Chip>
+          ) : needFire ? <Chip tone="amber">⚠ सुरू झाले नाही</Chip>
+            : stale ? <Chip tone="red">वेळ संपली</Chip>
             : refused ? <Chip tone="amber">नाकारले</Chip>
               : r.state === 'done' ? <Chip tone="green">✓ तयार</Chip> : <Chip tone="red">अयशस्वी</Chip>}
           {active && r.step && <span className="min-w-0 break-words text-sm text-slate-600 dark:text-slate-300">{r.step}</span>}
           {me?.role === 'owner' && cost != null && <span className="ml-auto text-xs text-slate-500 dark:text-slate-400">खर्च ${cost.toFixed(2)}</span>}
         </div>
+        {needFire && <RunNotStarted run={r} />}
         {refused && <div className="break-words text-sm text-amber-900 [overflow-wrap:anywhere] dark:text-amber-100">{textOf(res.refused)}</div>}
         {(r.state === 'failed' || stale) && (
           <div className="break-words text-sm text-red-900 [overflow-wrap:anywhere] dark:text-red-200">{stale ? 'वेळ संपली — कृपया सुधारणा पुन्हा पाठवावी, ही विनंती.' : reasonText(r.step, me?.role === 'owner') || 'कारण उपलब्ध नाही'}</div>
@@ -164,6 +171,8 @@ export default function EditChat({ ctx }: { ctx: CaseCtx }) {
   const [seen, setSeen] = useState(() => { try { return localStorage.getItem('edit_chat_seen') === '1'; } catch { return false; } });
   const markSeen = () => { if (seen) return; setSeen(true); try { localStorage.setItem('edit_chat_seen', '1'); } catch { /* storage blocked */ } };
   const [confirm, setConfirm] = useState(false);
+  // artifact: POST /api/edit answered 409 run_waiting — the earlier run of the case never started (its id → retry button)
+  const [waitingRun, setWaitingRun] = useState<number | null>(null);
   const [sp] = useSearchParams();
   const boxRef = useRef<HTMLElement>(null);
   useEffect(() => {
@@ -240,6 +249,10 @@ export default function EditChat({ ctx }: { ctx: CaseCtx }) {
       if (ids.length) void ctx.reloadFiles();
     } catch (x) {
       setAtts(s => s.map(a => ({ ...a, pct: null })));
+      if (ARTIFACT && x instanceof ApiError && x.message === 'run_waiting') {
+        const wid = Number((x.data as { run_id?: unknown } | undefined)?.run_id);
+        if (Number.isFinite(wid) && wid > 0) setWaitingRun(wid);
+      }
       toast(humanError(x), 'err');
       if (x instanceof ApiError && x.message === 'no_spec') void ctx.reloadFiles();
     } finally {
@@ -358,7 +371,14 @@ export default function EditChat({ ctx }: { ctx: CaseCtx }) {
                 </div>
               </div>
             )}
-            <p className="text-xs text-slate-500 dark:text-slate-400">आपण एका संदेशात अनेक सुधारणा नमूद करू शकता • आपण सांगितलेलाच बदल करण्यात येईल{active ? ' • प्रक्रिया चालू आहे — ती पूर्ण झाल्यावर कृपया संदेश पाठवावा' : ''}</p>
+            {ARTIFACT && waitingRun !== null && ![ctx.runs?.[0], ...turns].some(r => !!r && r.id === waitingRun && runNeedsFire(r)) && (
+              <div className="space-y-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-100" role="status">
+                <div className="font-bold">⚠ या प्रकरणाचे आधीचे काम सुरू झाले नाही</div>
+                <div>ते आधी सुरू करावे; ते पूर्ण झाल्यावर हा संदेश पाठवता येईल.</div>
+                <FireButton runId={waitingRun} onDone={() => setWaitingRun(null)} />
+              </div>
+            )}
+            <p className="text-xs text-slate-500 dark:text-slate-400">आपण एका संदेशात अनेक सुधारणा नमूद करू शकता • आपण सांगितलेलाच बदल करण्यात येईल{active ? (ARTIFACT && [ctx.runs?.[0], ...turns].some(r => runNeedsFire(r)) ? ' • आधीचे काम सुरू झालेले नाही — कृपया वरील “▶ पुन्हा सुरू करा” वापरावे' : ' • प्रक्रिया चालू आहे — ती पूर्ण झाल्यावर कृपया संदेश पाठवावा') : ''}</p>
           </form>
         )}
       </div>

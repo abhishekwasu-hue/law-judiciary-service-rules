@@ -114,7 +114,7 @@ export default function BulkUpload({ overBudget }: { overBudget: boolean }) {
     setBusy(true);
     try {
       const sp = await getSpend();
-      if (spendBlocked(sp)) { toast(isOwner ? budgetReachedText(sp.limit_usd) : 'या महिन्याची खर्च-मर्यादा संपली आहे. कृपया मालकांना कळवावे.', 'err'); setBusy(false); return; }
+      if (import.meta.env.VITE_BACKEND !== 'artifact' && spendBlocked(sp)) { toast(isOwner ? budgetReachedText(sp.limit_usd) : 'या महिन्याची खर्च-मर्यादा संपली आहे. कृपया मालकांना कळवावे.', 'err'); setBusy(false); return; }
     } catch { /* the Worker still enforces the limit on /api/run */ }
     let stop = '';
     for (const r0 of todo.map(r => r.key)) {

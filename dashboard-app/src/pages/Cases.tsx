@@ -7,6 +7,7 @@ import WorkTypeChips from '../components/WorkTypeChips';
 import { crLabel, fmtDate } from '../lib/format';
 import { RUN_COL, RUN_COL_HINT, RunStateBadge } from '../components/RunProgress';
 import { humanError } from '../lib/api';
+import { artifactSaveFile } from '../lib/artifact/api';
 import type { Case, Run } from '../lib/types';
 import { Chip, Empty, SkeletonRows } from '../components/ui';
 import { useToast } from '../components/Toast';
@@ -71,7 +72,10 @@ function useWide(): boolean {
 
 const FILTER_KEYS = ['q', 'work', 'category', 'stage', 'office', 'year', 'overdue'] as const;
 
-function exportCsv(rows: Case[], overdue: Set<number>) {
+/** claude.ai artifact build: files are saved through the page's downloads capability (E-F7). */
+const ARTIFACT = import.meta.env.VITE_BACKEND === 'artifact';
+
+function exportCsv(rows: Case[], overdue: Set<number>, onErr?: (e: unknown) => void) {
   const head = ['C R क्र.', 'वर्ष', 'नस्ती क्र.', 'विषय', 'कामाचा प्रकार', 'प्रवर्ग', 'नस्तीचा टप्पा', 'प्राधान्य', 'कर्मचारी', 'पद', 'कार्यालय', 'आवक दिनांक', 'मुदत', 'मुदत संपली', 'नोंद दिनांक'];
   const esc = (v: unknown) => {
     const s = v == null ? '' : String(v);
@@ -80,6 +84,10 @@ function exportCsv(rows: Case[], overdue: Set<number>) {
   const lines = [head, ...rows.map(c => [c.cr_no, c.cr_year, c.file_no, c.subject, workTypeLabel(c.work_type), c.category, c.stage, c.priority, c.employee_name, c.post, c.office, fmtDate(c.inward_date), fmtDate(c.due_date), overdue.has(c.id) ? 'होय' : '', fmtDate(c.created_at)])];
   // UTF-8 BOM so Excel opens Devanagari correctly.
   const blob = new Blob(['﻿' + lines.map(r => r.map(esc).join(',')).join('\r\n')], { type: 'text/csv;charset=utf-8' });
+  if (ARTIFACT) {
+    void artifactSaveFile(`prakarane-${new Date().toISOString().slice(0, 10)}.csv`, blob).catch(e => onErr?.(e));
+    return;
+  }
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = `prakarane-${new Date().toISOString().slice(0, 10)}.csv`;
@@ -171,7 +179,7 @@ export default function Cases() {
 
   const overdueOn = !!sp.get('overdue');
   const csvBtn = (cls: string) => (
-    <button className={`btn-ghost ${cls}`} onClick={() => exportCsv(rows, overdue)} disabled={!rows.length}>⬇ Excel (CSV)</button>
+    <button className={`btn-ghost ${cls}`} onClick={() => exportCsv(rows, overdue, e => toast(humanError(e), 'err'))} disabled={!rows.length}>⬇ Excel (CSV)</button>
   );
 
   return (

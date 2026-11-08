@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { sb } from '../lib/supabase';
 import { fmtUsd, getSpend, humanError, type Spend } from '../lib/api';
-import { useAuth } from '../lib/auth';
+import { useAuth, useCanWrite } from '../lib/auth';
 import { dueSoon, isPendingLetter, useData } from '../lib/data';
 import { ACTION_LABEL, CATEGORIES, STAGES, stageTone, type Tone } from '../lib/constants';
 import { crLabel, daysBetween, fmtDateTime, monthLabel, textOf, todayISO } from '../lib/format';
@@ -13,6 +13,8 @@ import QueueCard from '../components/QueueCard';
 import WorkTypeChips from '../components/WorkTypeChips';
 
 // Recharts is loaded only when the आलेख section is opened.
+/** claude.ai artifact build: no monthly limit on the page (the $ line is the Worker's) — E-F4. */
+const ARTIFACT = import.meta.env.VITE_BACKEND === 'artifact';
 const HomeCharts = lazy(() => import('../components/Charts').then(m => ({ default: m.HomeCharts })));
 
 // Number colours with a dark-mode variant (UI audit S17: the fixed TONE_HEX colours were 2.4–3.3:1 on the dark cards).
@@ -76,9 +78,10 @@ export default function Home() {
   const [monthActs, setMonthActs] = useState<Activity[] | null>(null);
   const [chartActs, setChartActs] = useState<Activity[] | null>(null);
   const isOwner = useAuth().me?.role === 'owner';
+  const canWrite = useCanWrite();
   const [spend, setSpend] = useState<Spend | null | 'err'>(null);
   useEffect(() => {
-    if (isOwner) void getSpend().then(setSpend, () => setSpend('err'));
+    if (isOwner && !ARTIFACT) void getSpend().then(setSpend, () => setSpend('err'));
   }, [isOwner, actTry]);
   // charts folded by default on every width (UI audit S23: open, they took ~60 % of the desktop page); one tap opens them
   const [chartsOpen, setChartsOpen] = useState(false);
@@ -138,8 +141,9 @@ export default function Home() {
   const errCard = anyErr ? (
     <div className="card flex flex-wrap items-center justify-between gap-3 border-red-300 bg-red-50 p-4 text-red-900 dark:border-red-800 dark:bg-red-900/30 dark:text-red-100" role="alert">
       <div className="min-w-0">
-        <div className="font-bold">⚠️ माहिती आणता आली नाही. कृपया पुन्हा प्रयत्न करावा.</div>
-        <div className="mt-1 break-words text-sm">{isOwner ? humanError(anyErr) : 'अडचण कायम राहिल्यास कृपया मालकांना कळवावे.'}</div>
+        <div className="font-bold">⚠️ माहिती आणता आली नाही.{ARTIFACT ? '' : ' कृपया पुन्हा प्रयत्न करावा.'}</div>
+        {/* artifact (E-F9): the data layer's Marathi reason (store not available in this view / temporary) for everyone */}
+        <div className="mt-1 break-words text-sm">{isOwner || ARTIFACT ? humanError(anyErr) : 'अडचण कायम राहिल्यास कृपया मालकांना कळवावे.'}</div>
       </div>
       <button className="btn-primary" disabled={reloading} onClick={() => void reloadAll()}>{reloading && <Spinner />} ↻ पुन्हा प्रयत्न</button>
     </div>
@@ -237,7 +241,7 @@ export default function Home() {
             <li><b>2.</b> प्रक्रिया पूर्ण झाल्यावर टिप्पणी, पत्राचा मसुदा, अभ्यास-फाइल व GR सह प्रस्ताव (PDF) तयार होतात.</li>
             <li><b>3.</b> प्रकरणाच्या पानावर त्या तपासून डाउनलोड करता येतात.</li>
           </ol>
-          <Link className="btn-accent" to="/new">+ नवीन प्रस्ताव</Link>
+          {(!ARTIFACT || canWrite) && <Link className="btn-accent" to="/new">+ नवीन प्रस्ताव</Link>}
         </Empty>
       </div>
     );
@@ -249,7 +253,7 @@ export default function Home() {
     <div className="grid gap-5 lg:grid-cols-2">
       <div className="order-first flex flex-wrap items-center justify-between gap-2 lg:col-span-2">
         <h1 className="text-2xl font-bold">मुख्य पृष्ठ</h1>
-        <Link to="/new" className="btn-accent">+ नवीन प्रस्ताव</Link>
+        {(!ARTIFACT || canWrite) && <Link to="/new" className="btn-accent">+ नवीन प्रस्ताव</Link>}
       </div>
       {errCard && <div className="order-first lg:col-span-2">{errCard}</div>}
 
@@ -295,7 +299,7 @@ export default function Home() {
         <Kpi label="उत्तर प्रतीक्षेत" value={loading ? null : kpi.waiting} tone="amber" to={`/cases?stage=${encodeURIComponent('पत्र पाठवले (माहिती प्रतीक्षेत)')}`} />
         <Kpi label="वित्त/सा.प्र.वि. कडे" value={loading ? null : kpi.finance} tone="amber" to={`/cases?stage=${encodeURIComponent('वित्त/सा.प्र.वि. कडे')}`} />
         <Kpi label="या महिन्यात बंद" value={loading ? null : kpi.closed} tone="green" to="/cases?stage=बंद" />
-        {isOwner && <SpendLine spend={spend} />}
+        {isOwner && !ARTIFACT && <SpendLine spend={spend} />}
       </div>
 
       <QueueCard className="order-3 lg:order-2 lg:col-span-2" />

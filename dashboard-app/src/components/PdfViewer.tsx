@@ -5,6 +5,9 @@ import { openPdf, preparePdf } from '../lib/pdf';
 import { Skeleton } from './ui';
 import { isChunkError, reloadOnceForNewBuild } from './ErrorBoundary';
 
+/** claude.ai artifact build: E-F8 go-to-page fix (the normal App B build keeps its earlier behaviour). */
+const ARTIFACT = import.meta.env.VITE_BACKEND === 'artifact';
+
 const NEW_BUILD_MSG = 'नवीन आवृत्ती उपलब्ध झाली आहे — पान पुन्हा उघडत आहे.';
 
 interface OutlineNode { title: string; page: number | null; items: OutlineNode[] }
@@ -127,6 +130,10 @@ export default function PdfViewer({ fileId, url, jumpTo }: { fileId?: number; ur
     setScrollEl(el);
   }, []);
   const rootRef = useRef<HTMLDivElement>(null);
+  const pagesRef = useRef<HTMLDivElement>(null);
+  // E-F8: page heights are placeholders (A4 ratio) until a page renders; pages rendered during / after a jump change height
+  // and pushed the target down (landed a page early on long PDFs). The target stays pinned while the layout settles.
+  const pin = useRef<{ p: number; until: number } | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -171,10 +178,38 @@ export default function PdfViewer({ fileId, url, jumpTo }: { fileId?: number; ur
     return () => ro.disconnect();
   }, [doc]);
 
-  const go = useCallback((p: number) => {
+  const align = useCallback((p: number) => {
     const el = scroller.current?.querySelector<HTMLElement>(`[data-page="${p}"]`);
-    if (el && scroller.current) scroller.current.scrollTo({ top: el.offsetTop - 8, behavior: 'smooth' });
+    // instant: a smooth scroll passes (and renders) every page on the way, each changing the layout under it
+    if (el && scroller.current) scroller.current.scrollTo({ top: el.offsetTop - 8, behavior: ARTIFACT ? 'auto' : 'smooth' });
   }, []);
+  const go = useCallback((p: number) => {
+    if (ARTIFACT) pin.current = { p, until: Date.now() + 2500 };
+    align(p);
+  }, [align]);
+  // re-align the pinned page whenever the pages' total height changes (a page above it rendered); the user scrolling
+  // (wheel / touch / keys) ends the pin
+  useEffect(() => {
+    const box = pagesRef.current, sc = scrollEl;
+    if (!ARTIFACT || !box || !sc) return;
+    const ro = new ResizeObserver(() => {
+      const t = pin.current;
+      if (!t) return;
+      if (Date.now() > t.until) pin.current = null;
+      else align(t.p);
+    });
+    ro.observe(box);
+    const stop = () => { pin.current = null; };
+    sc.addEventListener('wheel', stop, { passive: true });
+    sc.addEventListener('touchstart', stop, { passive: true });
+    sc.addEventListener('keydown', stop);
+    return () => {
+      ro.disconnect();
+      sc.removeEventListener('wheel', stop);
+      sc.removeEventListener('touchstart', stop);
+      sc.removeEventListener('keydown', stop);
+    };
+  }, [doc, scrollEl, align]);
   useEffect(() => {
     if (!jumpTo || !doc) return;
     // on narrow layouts the viewer may be off-screen (list below it): bring it into view first, then jump
@@ -208,7 +243,7 @@ export default function PdfViewer({ fileId, url, jumpTo }: { fileId?: number; ur
           </nav>
         )}
         <div ref={setScroller} className="relative h-[75vh] min-w-0 flex-1 overflow-auto rounded-lg bg-slate-200 p-2 dark:bg-navy-950">
-          <div className="flex flex-col gap-3">
+          <div ref={pagesRef} className="flex flex-col gap-3">
             {width > 0 && Array.from({ length: doc.numPages }, (_, i) => <Page key={i} doc={doc} n={i + 1} width={width} root={scrollEl} />)}
           </div>
         </div>

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { ApiError, api, downloadFile, humanError, runStartText, uploadFile, type RunStart } from '../lib/api';
-import { ACTION_LABEL, DRAFT_KEYS, EXTRA_OUTPUT_KINDS, FIELD_LABEL, FILE_KIND_LABEL, INPUT_KINDS, INPUT_KIND_LABEL, LETTER_STATUSES, RUN_STATE_LABEL, TONE_HEX, draftsText, editTargetLabel, runActive, runTone, type DraftKey, type InputKind } from '../lib/constants';
+import { ACTION_LABEL, DRAFT_KEYS, EXTRA_OUTPUT_KINDS, FIELD_LABEL, FILE_KIND_LABEL, INPUT_KINDS, INPUT_KIND_LABEL, LETTER_STATUSES, RUN_STATE_LABEL, TONE_HEX, draftsText, editTargetLabel, runActive, runNeedsFire, runTone, type DraftKey, type InputKind } from '../lib/constants';
 import { sameDrafts, suggestDrafts } from '../lib/drafts';
 import { CompactDraftPicker } from '../components/DraftPicker';
 import { useAuth } from '../lib/auth';
@@ -11,10 +11,33 @@ import { barPercents } from '../lib/perf';
 import type { Activity, CaseFile, Letter, Run } from '../lib/types';
 import { Chip, Empty, Field, Modal, Section, SkeletonRows, Spinner } from '../components/ui';
 import { useToast } from '../components/Toast';
-import RunProgress, { OwnerRunLines, RunCost } from '../components/RunProgress';
+import RunProgress, { FireButton, OwnerRunLines, RunCost } from '../components/RunProgress';
 import PdfViewer from '../components/PdfViewer';
 import DocxView, { docxParagraphs } from '../components/DocxView';
 import type { CaseCtx } from './CaseDetail';
+
+/** claude.ai artifact build (lib/artifact): runs whose firing failed, page link for WhatsApp (FIX_CONTRACT §2, E-F6). */
+const ARTIFACT = import.meta.env.VITE_BACKEND === 'artifact';
+/** Artifact build: the published page's own link (vite.artifact.config.ts define); the frame's origin is not shareable. */
+declare global {
+  interface ImportMetaEnv { readonly VITE_PAGE_URL?: string }
+}
+const PAGE_URL: string = ARTIFACT ? import.meta.env.VITE_PAGE_URL || 'https://claude.ai/artifact/8cJP8wz6j5tYM5kRHK1rVx' : '';
+/** Artifact build: a run of the case (full or edit) waits for "▶ पुन्हा सुरू करा". */
+const fireRunOf = (ctx: CaseCtx): Run | undefined => (ARTIFACT ? [latestRun(ctx.runs), ...(ctx.editRuns ?? [])].find(r => runNeedsFire(r)) : undefined);
+const needsFire = (ctx: CaseCtx) => !!fireRunOf(ctx);
+const NOT_STARTED_WAIT = 'आधीचे काम सुरू झालेले नाही — ते आधी सुरू करावे, ही विनंती.';
+/** Artifact build: where a control is blocked by a run that never started — the reason + "▶ पुन्हा सुरू करा" (never a dead end). */
+function NeedFireNote({ ctx }: { ctx: CaseCtx }) {
+  const r = fireRunOf(ctx);
+  if (!r) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-sm text-amber-900 dark:text-amber-100">
+      <span>⚠ {NOT_STARTED_WAIT}</span>
+      {ctx.canWrite && <FireButton runId={r.id} className="btn-ghost" />}
+    </div>
+  );
+}
 
 // Recharts loads only with this chart (not with the case page).
 /** P3: the case page's one small chart as plain bars (the Recharts file, 112 KB gz, is no longer loaded for it). */
@@ -106,7 +129,10 @@ export function DownloadStrip({ ctx, after }: { ctx: CaseCtx; after?: ReactNode 
  *  chooses the contact and presses send. */
 function WhatsAppShare({ ctx }: { ctx: CaseCtx }) {
   const subj = (ctx.c.subject || '').trim();
-  const text = `${ctx.title}${subj ? ` — ${subj.length > 90 ? `${subj.slice(0, 90)}…` : subj}` : ''}\nटिप्पणी व मसुदे तयार आहेत. कृपया प्रस्ताव कक्षात पाहावे:\n${window.location.origin}/cases/${ctx.c.id}`;
+  const head = `${ctx.title}${subj ? ` — ${subj.length > 90 ? `${subj.slice(0, 90)}…` : subj}` : ''}\nटिप्पणी व मसुदे तयार आहेत.`;
+  const text = ARTIFACT
+    ? `${head}\nप्रस्ताव कक्ष पानावर प्रकरण क्र. ${ctx.c.id} पाहावे: ${PAGE_URL}`
+    : `${head} कृपया प्रस्ताव कक्षात पाहावे:\n${window.location.origin}/cases/${ctx.c.id}`;
   return (
     <a href={`https://wa.me/?text=${encodeURIComponent(text)}`} target="_blank" rel="noopener noreferrer"
       className="btn-ghost min-w-0 px-2 leading-tight text-green-800 sm:px-4 dark:text-green-300" aria-label="WhatsApp वर पाठवा (संदेश आपण स्वतः पाठवायचा)">
@@ -171,7 +197,7 @@ function RunBanner({ ctx }: { ctx: CaseCtx }) {
   const failed = latestFailed(ctx);
   const canRetry = failed && ctx.canWrite;
   return (
-    <Section title={runActive(r) ? 'टिप्पणी तयार होत आहे' : 'प्रक्रियेची स्थिती'} className="mb-4">
+    <Section title={runActive(r) && !(ARTIFACT && runNeedsFire(r)) ? 'टिप्पणी तयार होत आहे' : 'प्रक्रियेची स्थिती'} className="mb-4">
       <RunProgress run={r} retryHint={canRetry ? 'कृपया खालील "पुन्हा तयार करावे" हे बटण वापरावे.' : failed ? 'पुन्हा तयार करण्याची परवानगी फक्त कार्यासनाला आहे.' : undefined} />
       {canRetry && <div className="no-print mt-4 border-t border-slate-200 pt-4 dark:border-navy-800"><ReRun ctx={ctx} /></div>}
     </Section>
@@ -191,13 +217,14 @@ function useStartRun(ctx: CaseCtx) {
   const [pending, setPending] = useState<number | null>(null);
   const r = latestRun(ctx.runs);
   const running = runActive(r) || editBusy(ctx) || (pending !== null && !(ctx.runs ?? []).some(x => x.id === pending)); // a failed or stale (> 3.5 h) latest run does not block
-  const waitText = editBusy(ctx) && !runActive(r) ? 'सुधारणा चालू आहे — ती पूर्ण झाल्यावर कृपया वापरावे.' : 'प्रक्रिया चालू आहे — ती पूर्ण झाल्यावर कृपया वापरावे.';
-  async function start(instructions: string, outputs: DraftKey[]): Promise<boolean> {
+  const waitText = needsFire(ctx) ? NOT_STARTED_WAIT
+    : editBusy(ctx) && !runActive(r) ? 'सुधारणा चालू आहे — ती पूर्ण झाल्यावर कृपया वापरावे.' : 'प्रक्रिया चालू आहे — ती पूर्ण झाल्यावर कृपया वापरावे.';
+  async function start(instructions: string, outputs: DraftKey[], startedText = 'प्रक्रिया पुन्हा सुरू झाली'): Promise<boolean> {
     setBusy(true);
     try {
       const started = await api<RunStart>('/api/run', { body: { case_id: ctx.c.id, instructions: instructions.trim() || undefined, outputs } });
       setPending(started.id);
-      toast(runStartText(started, 'प्रक्रिया पुन्हा सुरू झाली'));
+      toast(runStartText(started, startedText));
       return true;
     } catch (x) {
       if (x instanceof ApiError && x.message === 'run_active') setPending(Number((x.data as { run_id?: number } | undefined)?.run_id) || null);
@@ -238,8 +265,8 @@ export function ReRun({ ctx, preset = '', presetDrafts }: { ctx: CaseCtx; preset
       <Field label="काय बदलावे? (ऐच्छिक)">
         <textarea className="input min-h-[64px]" placeholder="उदा. पत्रात फक्त सेवापुस्तकाची प्रत मागवावी" value={text} onChange={e => setText(e.target.value)} />
       </Field>
-      <button className="btn-primary" disabled={busy || running}>{busy && <Spinner />} {running ? 'प्रक्रिया चालू…' : 'पुन्हा तयार करावे'}</button>
-      {running ? <p className="text-sm text-slate-500 dark:text-slate-400">{waitText}</p>
+      <button className="btn-primary" disabled={busy || running}>{busy && <Spinner />} {running ? (needsFire(ctx) ? 'आधीचे काम सुरू झालेले नाही' : 'प्रक्रिया चालू…') : 'पुन्हा तयार करावे'}</button>
+      {running ? (needsFire(ctx) ? <NeedFireNote ctx={ctx} /> : <p className="text-sm text-slate-500 dark:text-slate-400">{waitText}</p>)
         : ctx.hasSpec && <p className="text-sm text-slate-500 dark:text-slate-400">लहान बदलासाठी 'AI सुधारणा' पुरेशी आहे.</p>}
     </form>
   );
@@ -617,10 +644,10 @@ function ReminderForm({ ctx, l, onDone }: { ctx: CaseCtx; l: Letter; onDone: () 
       <p className="break-words [overflow-wrap:anywhere]">
         {letterLine(l)} — उत्तर अप्राप्त{l.reply_due ? ` (उत्तराची मुदत ${fmtDate(l.reply_due)})` : ''}.
       </p>
-      <button type="button" className="btn-primary w-full sm:w-auto" disabled={busy || running} onClick={async () => { if (await start(preset, ['reminder'])) onDone(); }}>
+      <button type="button" className="btn-primary w-full sm:w-auto" disabled={busy || running} onClick={async () => { if (await start(preset, ['reminder'], ARTIFACT ? `स्मरणपत्र-${n} चा मसुदा तयार होत आहे` : undefined)) onDone(); }}>
         {busy && <Spinner />} होय, स्मरणपत्र-{n} चा मसुदा तयार करावा
       </button>
-      {running && <p className="text-sm text-slate-500 dark:text-slate-400">{waitText}</p>}
+      {running && (needsFire(ctx) ? <NeedFireNote ctx={ctx} /> : <p className="text-sm text-slate-500 dark:text-slate-400">{waitText}</p>)}
       <button type="button" className="flex min-h-tap items-center gap-1 font-semibold text-navy-700 underline dark:text-navy-200" aria-expanded={more} onClick={() => setMore(v => !v)}>
         इतर मसुदे / सूचना {more ? '▲' : '▼'}
       </button>
@@ -754,7 +781,7 @@ export function LettersTab({ ctx }: { ctx: CaseCtx }) {
                         <button className="btn-ghost" disabled={busyRun} title={busyRun ? 'प्रक्रिया चालू आहे — ती पूर्ण झाल्यावर कृपया वापरावे' : undefined} onClick={() => setReminderFor(l)}>स्मरणपत्र</button>
                         <button className="btn-primary" onClick={() => setReplyFor(l)}>उत्तर प्राप्त — फाइल जोडावी</button>
                       </div>
-                      {busyRun && <span className="text-sm text-slate-500 dark:text-slate-400">स्मरणपत्र: प्रक्रिया चालू आहे — ती पूर्ण झाल्यावर कृपया वापरावे</span>}
+                      {busyRun && (needsFire(ctx) ? <NeedFireNote ctx={ctx} /> : <span className="text-sm text-slate-500 dark:text-slate-400">स्मरणपत्र: प्रक्रिया चालू आहे — ती पूर्ण झाल्यावर कृपया वापरावे</span>)}
                     </div>
                   )}
                 </li>

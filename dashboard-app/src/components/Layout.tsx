@@ -3,7 +3,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth, useCanWrite } from '../lib/auth';
 import CommandPalette, { type PaletteMode } from './CommandPalette';
 import { useData, useLatestRuns } from '../lib/data';
-import { isStale, isWaiting } from '../lib/constants';
+import { isStale, isWaiting, runNeedsFire } from '../lib/constants';
 import { crLabel } from '../lib/format';
 import type { Run } from '../lib/types';
 import { Modal, Spinner } from './ui';
@@ -11,6 +11,9 @@ import ProfileForm from './ProfileForm';
 import CasePicker from './CasePicker';
 import AiAssistant, { aiFabShown } from './AiAssistant';
 import ErrorBoundary from './ErrorBoundary';
+
+/** claude.ai artifact build (lib/artifact): no logout (claude.ai sign-in), no Settings, runs whose firing failed. */
+const ARTIFACT = import.meta.env.VITE_BACKEND === 'artifact';
 
 /** Runs still processing (queued or running, not stale). */
 export function useActiveRuns(): Run[] {
@@ -20,6 +23,12 @@ export function useActiveRuns(): Run[] {
 
 /** "1 प्रक्रिया चालू, 2 प्रतीक्षेत" */
 export function activeRunsText(active: Run[]): string {
+  if (ARTIFACT) {
+    // artifact: no queue — a run left queued did not start (its case page offers "▶ पुन्हा सुरू करा")
+    const nf = active.filter(x => runNeedsFire(x)).length;
+    const rn = active.length - nf;
+    return [rn ? `${rn} प्रक्रिया चालू` : '', nf ? `${nf} काम सुरू झाले नाही` : ''].filter(Boolean).join(', ');
+  }
   const w = active.filter(isWaiting).length;
   const r = active.length - w;
   return [r ? `${r} प्रक्रिया चालू` : '', w ? `${w} प्रतीक्षेत` : ''].filter(Boolean).join(', ');
@@ -72,7 +81,7 @@ function ActiveRunsBar({ className = '' }: { className?: string }) {
           const c = cases.find(x => x.id === r.case_id);
           return (
             <NavLink key={r.id} to={`/cases/${r.case_id}`} className="inline-flex min-h-tap shrink-0 items-center whitespace-nowrap rounded-md bg-white px-2.5 py-1 text-sm font-semibold text-blue-800 underline-offset-2 hover:underline dark:bg-navy-800 dark:text-blue-200">
-              {c ? crLabel(c) : `प्रकरण क्र. ${r.case_id}`} → उघडा
+              {ARTIFACT && runNeedsFire(r) ? '⚠ ' : ''}{c ? crLabel(c) : `प्रकरण क्र. ${r.case_id}`} → उघडा
             </NavLink>
           );
         })}
@@ -154,7 +163,7 @@ function LogoutConfirm({ open, onClose }: { open: boolean; onClose: () => void }
 }
 
 /** Phone header: सुधारणा, माझी माहिती, theme, settings (owner) and logout behind one "⋯" button so the header fits 360 px. */
-function MoreMenu({ isOwner, onProfile, onEdit, onLogout }: { isOwner: boolean; onProfile: () => void; onEdit: () => void; onLogout: () => void }) {
+function MoreMenu({ isOwner, onProfile, onEdit, onLogout }: { isOwner: boolean; onProfile?: () => void; onEdit: () => void; onLogout: () => void }) {
   const [open, setOpen] = useState(false);
   const [dark, toggleTheme] = useTheme();
   const btn = useRef<HTMLButtonElement>(null);
@@ -207,9 +216,11 @@ function MoreMenu({ isOwner, onProfile, onEdit, onLogout }: { isOwner: boolean; 
           <button role="menuitem" className={item} onClick={() => { setOpen(false); onEdit(); }}>
             <span aria-hidden="true">✏️</span> मसुद्यात सुधारणा
           </button>
-          <button role="menuitem" className={item} onClick={() => { setOpen(false); onProfile(); }}>
-            <span aria-hidden="true">👤</span> माझी माहिती
-          </button>
+          {onProfile && (
+            <button role="menuitem" className={item} onClick={() => { setOpen(false); onProfile(); }}>
+              <span aria-hidden="true">👤</span> माझी माहिती
+            </button>
+          )}
           <button role="menuitem" className={item} onClick={toggleTheme}>
             <span aria-hidden="true">{dark ? '☀️' : '🌙'}</span> {dark ? 'हलका मोड' : 'गडद मोड'}
           </button>
@@ -218,9 +229,11 @@ function MoreMenu({ isOwner, onProfile, onEdit, onLogout }: { isOwner: boolean; 
               <span aria-hidden="true">⚙️</span> सेटिंग्ज
             </NavLink>
           )}
-          <button role="menuitem" className={item} onClick={() => { setOpen(false); onLogout(); }}>
-            <span aria-hidden="true">🚪</span> बाहेर पडा
-          </button>
+          {!ARTIFACT && (
+            <button role="menuitem" className={item} onClick={() => { setOpen(false); onLogout(); }}>
+              <span aria-hidden="true">🚪</span> बाहेर पडा
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -267,7 +280,9 @@ export default function Layout() {
     return () => window.removeEventListener('keydown', k);
   }, [nav]);
 
-  const items = me?.role === 'owner' ? [...NAV, { to: '/settings', label: 'सेटिंग्ज', short: 'सेटिंग्ज', icon: '⚙️' }] : NAV;
+  // artifact: a read-only viewer (role senior) gets no "नवीन प्रस्ताव" entry (A-M1)
+  const nav0 = ARTIFACT && !canWrite ? NAV.filter(i => i.to !== '/new') : NAV;
+  const items = me?.role === 'owner' ? [...nav0, { to: '/settings', label: 'सेटिंग्ज', short: 'सेटिंग्ज', icon: '⚙️' }] : nav0;
   const linkCls = ({ isActive }: { isActive: boolean }) =>
     `flex min-h-tap items-center gap-3 rounded-lg px-3 py-2 font-semibold ${
       isActive ? 'bg-navy-700 text-white dark:bg-navy-600' : 'text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-navy-800'
@@ -297,9 +312,11 @@ export default function Layout() {
           <button className="btn-ghost w-full justify-start" onClick={() => setPick(true)}>
             <span aria-hidden="true">✏️</span> मसुद्यात सुधारणा
           </button>
-          <button className="btn-ghost w-full justify-start" onClick={() => setProfile(true)}>
-            <span aria-hidden="true">👤</span> माझी माहिती
-          </button>
+          {(!ARTIFACT || canWrite) && (
+            <button className="btn-ghost w-full justify-start" onClick={() => setProfile(true)}>
+              <span aria-hidden="true">👤</span> माझी माहिती
+            </button>
+          )}
           <div className="pt-1">
             {me?.profile?.display_name && <div className="font-semibold">{me.profile.display_name}{me.profile.designation ? `, ${me.profile.designation}` : ''}</div>}
             {me?.role && <div className="text-slate-600 dark:text-slate-300">{ROLE_LABEL[me.role] || me.role}</div>}
@@ -307,7 +324,7 @@ export default function Layout() {
           </div>
           <div className="flex gap-2">
             <ThemeToggle />
-            <button className="btn-ghost min-h-tap flex-1" onClick={() => setLogout(true)}><span aria-hidden="true">🚪</span> बाहेर पडा</button>
+            {!ARTIFACT && <button className="btn-ghost min-h-tap flex-1" onClick={() => setLogout(true)}><span aria-hidden="true">🚪</span> बाहेर पडा</button>}
           </div>
         </div>
       </aside>
@@ -322,15 +339,15 @@ export default function Layout() {
             <button className="btn-ghost min-h-tap px-2.5 text-sm font-semibold" onClick={() => setPalette('cases')}>
               <span aria-hidden="true">🔎</span> प्रकरण शोध
             </button>
-            <MoreMenu isOwner={me?.role === 'owner'} onProfile={() => setProfile(true)} onEdit={() => setPick(true)} onLogout={() => setLogout(true)} />
+            <MoreMenu isOwner={me?.role === 'owner'} onProfile={!ARTIFACT || canWrite ? () => setProfile(true) : undefined} onEdit={() => setPick(true)} onLogout={() => setLogout(true)} />
           </div>
         </header>
         <main className={`mx-auto w-full max-w-7xl px-4 ${mainPad}`}>
           {pathname !== '/' && !nasti && <ActiveRunsBar />}
           <RouteBoundary />
         </main>
-        <nav className={`no-print fixed inset-x-0 bottom-0 z-30 grid grid-cols-6 border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)] dark:border-navy-800 dark:bg-navy-900 md:hidden ${nasti ? 'hidden' : ''}`} aria-label="मुख्य">
-          {NAV.map(i => (
+        <nav className={`no-print fixed inset-x-0 bottom-0 z-30 grid ${nav0.length === 5 ? 'grid-cols-5' : 'grid-cols-6'} border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)] dark:border-navy-800 dark:bg-navy-900 md:hidden ${nasti ? 'hidden' : ''}`} aria-label="मुख्य">
+          {nav0.map(i => (
             <NavLink
               key={i.to}
               to={i.to}
@@ -346,10 +363,10 @@ export default function Layout() {
           ))}
         </nav>
       </div>
-      <CommandPalette open={palette !== null} mode={palette || 'all'} onClose={() => setPalette(null)} onEdit={() => setPick(true)} onProfile={() => setProfile(true)} />
+      <CommandPalette open={palette !== null} mode={palette || 'all'} onClose={() => setPalette(null)} onEdit={() => setPick(true)} onProfile={!ARTIFACT || canWrite ? () => setProfile(true) : undefined} />
       <CasePicker open={pick} onClose={() => setPick(false)} />
       <AiAssistant />
-      <LogoutConfirm open={logout} onClose={closeLogout} />
+      {!ARTIFACT && <LogoutConfirm open={logout} onClose={closeLogout} />}
       <Modal open={profile} onClose={closeProfile} title="माझी माहिती">
         <p className="mb-3 text-sm text-slate-600 dark:text-slate-300">नस्ती अद्ययावत स्थिती पानात हीच माहिती वापरली जाते.</p>
         <ProfileForm onDone={closeProfile} onSkip={closeProfile} skipLabel="रद्द" />

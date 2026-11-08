@@ -32,6 +32,10 @@ export interface Run {
   outputs?: string[] | null;
   // migration 20261104000011_work_type_queue.sql: when the Worker sent this run to the engine; null = waiting in the queue
   dispatched_at?: string | null;
+  // artifact build only (lib/artifact/api.ts): last failed firing code, ambiguous firing, number of firings
+  dispatch_error?: string | null;
+  dispatch_unsure?: boolean | null;
+  dispatch_tries?: number | null;
   // migration 20261104000013_draft_edits.sql (docs/DRAFT_EDIT_DESIGN.md): 'edit' = a सुधारणा-चॅट run; absent / null = 'full'
   kind?: 'full' | 'edit' | null;
   edit_target?: string | null;

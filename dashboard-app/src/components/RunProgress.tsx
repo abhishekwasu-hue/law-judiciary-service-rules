@@ -2,11 +2,58 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { sb } from '../lib/supabase';
 import type { Run } from '../lib/types';
-import { RUN_STATE_LABEL, RUN_STEPS, STALE_REASON, isEditRun, isStale, isWaiting, runTone } from '../lib/constants';
+import { RUN_STATE_LABEL, RUN_STEPS, STALE_REASON, isEditRun, isStale, isWaiting, runNeedsFire, runTone, RUNS_RELOAD_EVENT } from '../lib/constants';
 import { asArray, cleanReason, cleanStep, criticalWarnings, fmtDateTime, isOwnerOnlyLine, studyWarningTexts, textOf } from '../lib/format';
-import { useAuth } from '../lib/auth';
+import { useAuth, useCanWrite } from '../lib/auth';
+import { api, humanError } from '../lib/api';
+import { fireFailText } from '../lib/artifact/api';
 import { Chip, Progress, Spinner } from './ui';
+import { useToast } from './Toast';
 import { studyPointsText } from '../lib/perf';
+
+/** claude.ai artifact build (lib/artifact): a run whose firing failed is offered "▶ पुन्हा सुरू करा" (FIX_CONTRACT §2). */
+const ARTIFACT = import.meta.env.VITE_BACKEND === 'artifact';
+export const NOT_STARTED_TEXT = 'काम सुरू झाले नाही';
+export const NOT_SURE_TEXT = 'काम सुरू झाले की नाही हे निश्चित नाही';
+const NOT_SURE_HINT = "काम सुरू करण्याची विनंती पाठवली होती, पण 10 मिनिटांत प्रगती दिसली नाही. कृपया '▶ पुन्हा सुरू करा' दाबावे, ही विनंती.";
+const READ_ONLY_HINT = 'काम पुन्हा सुरू करण्याची परवानगी फक्त कार्यासनाला आहे.';
+
+/** Artifact build: POST /api/run/<id>/fire (full or edit run still queued). Errors → humanError toast. */
+export function FireButton({ runId, onDone, className = 'btn-primary' }: { runId: number; onDone?: (r: Run) => void; className?: string }) {
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  async function fire() {
+    setBusy(true);
+    try {
+      const r = await api<Run>(`/api/run/${runId}/fire`, { method: 'POST', body: {} });
+      toast(r?.dispatch_unsure ? 'काम सुरू करण्याची विनंती पाठवली आहे.' : 'काम सुरू झाले.');
+      onDone?.(r);
+    } catch (e) {
+      toast(humanError(e), 'err');
+    } finally {
+      setBusy(false);
+      window.dispatchEvent(new Event(RUNS_RELOAD_EVENT));
+    }
+  }
+  return (
+    <button type="button" className={className} disabled={busy} onClick={() => void fire()}>
+      {busy ? <Spinner className="h-4 w-4" /> : <span aria-hidden="true">▶</span>} पुन्हा सुरू करा
+    </button>
+  );
+}
+
+/** Artifact build: amber box under a run with runNeedsFire(run) — why it did not start + "▶ पुन्हा सुरू करा" (writers). */
+export function RunNotStarted({ run, className = '' }: { run: Run; className?: string }) {
+  const canWrite = useCanWrite();
+  const unsure = run.dispatched_at != null && run.dispatch_unsure === true;
+  return (
+    <div className={`no-print space-y-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-amber-950 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-100 ${className}`} role="status">
+      <div className="font-bold">⚠ {unsure ? NOT_SURE_TEXT : NOT_STARTED_TEXT}</div>
+      <div className="break-words text-sm [overflow-wrap:anywhere]">{!canWrite ? READ_ONLY_HINT : unsure ? NOT_SURE_HINT : fireFailText(run.dispatch_error)}</div>
+      {canWrite && <FireButton runId={run.id} />}
+    </div>
+  );
+}
 
 /** Glossary wording for a run state (प्रक्रिया प्रतीक्षेत / चालू / पूर्ण / अयशस्वी). */
 const STATE_TEXT: Record<string, string> = { queued: 'प्रक्रिया प्रतीक्षेत', running: 'प्रक्रिया चालू', done: 'प्रक्रिया पूर्ण', failed: 'प्रक्रिया अयशस्वी' };
@@ -35,6 +82,7 @@ export function useRuns(caseId: number | null) {
     const onOnline = () => void load();
     document.addEventListener('visibilitychange', onVisible);
     window.addEventListener('online', onOnline);
+    if (ARTIFACT) window.addEventListener(RUNS_RELOAD_EVENT, onOnline);
     const ch = sb()
       .channel(`runs-${caseId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'runs', filter: `case_id=eq.${caseId}` }, p => {
@@ -52,6 +100,7 @@ export function useRuns(caseId: number | null) {
       alive = false;
       document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('online', onOnline);
+      if (ARTIFACT) window.removeEventListener(RUNS_RELOAD_EVENT, onOnline);
       void sb().removeChannel(ch);
     };
   }, [caseId]);
@@ -227,7 +276,9 @@ export default function RunProgress({ run, retryHint }: { run: Run; retryHint?: 
   const idx = stepIndex(run);
   const stale = isStale(run);
   const failed = run.state === 'failed' || stale;
-  const active = !failed && (run.state === 'queued' || run.state === 'running');
+  // artifact: the firing failed / is unsure → not "in progress" (no spinner, no ETA) but the retry box
+  const needFire = ARTIFACT && !failed && runNeedsFire(run);
+  const active = !failed && !needFire && (run.state === 'queued' || run.state === 'running');
   // while active, the bar also fills with elapsed time vs the typical run time (capped at 95 %)
   const typical = useTypicalRunSeconds();
   const [now, setNow] = useState(() => Date.now());
@@ -251,6 +302,8 @@ export default function RunProgress({ run, retryHint }: { run: Run; retryHint?: 
             <span className="inline-flex items-center gap-2 rounded-full bg-blue-100 px-3 py-1 text-sm font-bold text-blue-900 dark:bg-blue-900/40 dark:text-blue-100">
               <Spinner className="h-4 w-4" /> {waiting ? 'प्रतीक्षेत — आधीच्या प्रक्रियांपैकी एक पूर्ण झाल्यावर क्रमाने आपोआप सुरू होईल' : preparing ? 'तयारी चालू — सर्व्हर सुरू होत आहे' : 'प्रक्रिया चालू'}
             </span>
+          ) : needFire ? (
+            <Chip tone="amber">⚠ {run.dispatched_at != null && run.dispatch_unsure ? NOT_SURE_TEXT : NOT_STARTED_TEXT}</Chip>
           ) : (
             <Chip tone={stale ? 'red' : runTone(run.state)}>{stale ? 'वेळ संपली' : stateText(run.state)}</Chip>
           )}
@@ -281,7 +334,8 @@ export default function RunProgress({ run, retryHint }: { run: Run; retryHint?: 
         })}
       </ol>
       {!failed && cleanStep(run.step, isOwner) && <div className="text-sm text-slate-600 dark:text-slate-300 break-words [overflow-wrap:anywhere]">सद्य: {cleanStep(run.step, isOwner)}</div>}
-      {!failed && (run.state === 'queued' || run.state === 'running') && <RunEta run={run} />}
+      {!failed && !needFire && (run.state === 'queued' || run.state === 'running') && <RunEta run={run} />}
+      {needFire && <RunNotStarted run={run} />}
       {failed && (
         <div className="rounded-lg bg-red-100 px-3 py-2 text-red-900 dark:bg-red-900/40 dark:text-red-100" role="alert">
           <div className="font-semibold">प्रक्रिया अयशस्वी{!stale && idx >= 0 && run.state === 'failed' ? ` — टप्पा: ${RUN_STEPS[idx].label}` : ''}</div>
@@ -303,6 +357,8 @@ export const RUN_COL_HINT = 'टिप्पणी, पत्र व इतर �
 export function RunStateBadge({ run }: { run: Run | undefined }) {
   if (!run) return <span className="text-sm text-slate-500 dark:text-slate-400" title="या प्रकरणी अद्याप प्रक्रिया सुरू केलेली नाही.">—</span>;
   const stale = isStale(run);
+  if (ARTIFACT && !stale && runNeedsFire(run))
+    return <Chip tone="amber" title="काम सुरू झाले नाही. कृपया प्रकरण उघडून '▶ पुन्हा सुरू करा' वापरावे, ही विनंती.">⚠ सुरू झाले नाही</Chip>;
   if (!stale && isWaiting(run))
     return <Chip tone="amber" title="आधीची प्रक्रिया पूर्ण झाल्यावर ही प्रक्रिया क्रमाने आपोआप सुरू होईल.">⏳ प्रतीक्षेत</Chip>;
   if (!stale && (run.state === 'queued' || run.state === 'running'))

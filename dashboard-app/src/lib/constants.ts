@@ -84,6 +84,14 @@ export const isStale = (r: { state: string; created_at: string; dispatched_at?: 
   && Date.now() - new Date(r.dispatched_at || r.created_at).getTime() > STALE_MS;
 /** C33 queue: queued and not yet sent to the engine (dispatched_at null). Legacy rows (column absent) = dispatched. */
 export const isWaiting = (r: { state: string; dispatched_at?: string | null }) => r.state === 'queued' && r.dispatched_at === null;
+/** Artifact build only (FIX_CONTRACT §2): a queued run whose firing failed (dispatched_at null) or was ambiguous with no
+ *  progress for 10 min → the UI offers "▶ पुन्हा सुरू करा". Never used by the normal build (there dispatched_at null = the
+ *  Worker's queue, which starts the run by itself). Full and edit runs alike. */
+export const runNeedsFire = (r: { state: string; step?: string | null; dispatched_at?: string | null; dispatch_unsure?: boolean | null } | null | undefined) =>
+  !!r && r.state === 'queued' && (r.dispatched_at == null
+    || (r.dispatch_unsure === true && !r.step && Date.now() - Date.parse(r.dispatched_at) > 10 * 60 * 1000));
+/** Artifact build: window event after "▶ पुन्हा सुरू करा" → the run lists re-read (realtime also brings the row). */
+export const RUNS_RELOAD_EVENT = 'pk-runs-reload';
 /** Run in progress (blocks a new run). A stale run does not block. */
 export const runActive = (r: { state: string; created_at: string; dispatched_at?: string | null } | null | undefined) =>
   !!r && (r.state === 'queued' || r.state === 'running') && !isStale(r);

@@ -139,6 +139,11 @@ export function humanError(e: unknown, isOwner = viewerOwner()): string {
     return isOwner ? 'माहिती जतन झाली नाही — सर्व्हर अद्ययावत नाही (Worker deploy बाकी).' : 'माहिती जतन झाली नाही (तांत्रिक अडचण). कृपया मालकांना कळवावे, ही विनंती.';
   if (msg === 'no_spec')
     return reason ? fromReason(reason) : "हे प्रकरण या सुविधेपूर्वीचे असल्याने सुधारणा-फाइल उपलब्ध नाही. कृपया 'पुन्हा तयार करा' हा पर्याय वापरावा, ही विनंती.";
+  // artifact page api (lib/artifact/api.ts): firing refusals carry their Marathi reason (+ technical detail for the owner)
+  if (ARTIFACT && (msg === 'trigger_failed' || msg === 'run_waiting' || msg === 'run_not_waiting'))
+    return (reason || (msg === 'trigger_failed' ? 'काम आत्ता सुरू करता आले नाही. कृपया थोड्या वेळाने पुन्हा प्रयत्न करावा, ही विनंती.'
+      : msg === 'run_waiting' ? "या प्रकरणाचे आधीचे काम सुरू झालेले नाही — कृपया '▶ पुन्हा सुरू करा' वापरावे, ही विनंती."
+        : 'हे काम आधीच सुरू झाले आहे किंवा पूर्ण झाले आहे.')) + tech(detail);
   if (msg === 'run_active') return 'या प्रकरणाची प्रक्रिया आधीच चालू आहे. कृपया ती पूर्ण होईपर्यंत थांबावे, ही विनंती.';
   if (msg === 'dispatch_failed') return isOwner ? OWNER_DISPATCH_TEXT + tech(detail) : RUN_START_FAIL_TEXT;
   if (msg === 'duplicate_cr') {

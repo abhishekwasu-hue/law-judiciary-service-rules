@@ -77,7 +77,8 @@ export function NotMember() {
         <div className="text-4xl" aria-hidden="true">🔒</div>
         <h1 className="text-xl font-bold">आपण या कक्षाचे सदस्य नाही</h1>
         <p className="break-words text-slate-600 dark:text-slate-300"><span className="break-all font-semibold">{session?.user.email}</span> हा ई-मेल या कक्षाचा सदस्य म्हणून नोंदलेला नाही. कृपया कार्यासनाच्या प्रमुखांकडून (मालक) आमंत्रण घ्यावे.</p>
-        <button className="btn-ghost w-full" onClick={() => void signOut()}>बाहेर पडा</button>
+        {/* claude.ai artifact build: sign-in is claude.ai's — no logout (E-F12) */}
+        {import.meta.env.VITE_BACKEND !== 'artifact' && <button className="btn-ghost w-full" onClick={() => void signOut()}>बाहेर पडा</button>}
       </div>
     </div>
   );

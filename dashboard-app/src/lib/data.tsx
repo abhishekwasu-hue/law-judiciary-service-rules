@@ -4,10 +4,13 @@ import { sb } from './supabase';
 import { api, humanError } from './api';
 import { useAuth, useCanWrite } from './auth';
 import type { Case, Letter, Run } from './types';
-import { isEditRun } from './constants';
+import { isEditRun, RUNS_RELOAD_EVENT } from './constants';
 import { addDaysISO, crLabel, ownerDetail, setViewerIsOwner, todayISO } from './format';
 import { isMissingColumn, latestRunPerCase, RUN_LIST_COLUMNS } from './perf';
 import { useToast } from '../components/Toast';
+
+/** claude.ai artifact build: re-read after "▶ पुन्हा सुरू करा" (RUNS_RELOAD_EVENT). */
+const ARTIFACT = import.meta.env.VITE_BACKEND === 'artifact';
 
 type Res<T> = { data: T[] | null; error: { message: string; code?: string } | null };
 type Reads = [Res<Case>, Res<Letter>, Res<Run>];
@@ -137,6 +140,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     const onOnline = () => void refresh();
     document.addEventListener('visibilitychange', onVisible);
     window.addEventListener('online', onOnline);
+    if (ARTIFACT) window.addEventListener(RUNS_RELOAD_EVENT, onOnline);
     // (re)subscribed: events between the last read and now were not delivered → re-read (coalesced with the first read)
     const onStatus = (status: string) => status === 'SUBSCRIBED' && void refresh();
     const ch = sb()
@@ -180,6 +184,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
     return () => {
       document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('online', onOnline);
+      if (ARTIFACT) window.removeEventListener(RUNS_RELOAD_EVENT, onOnline);
       void sb().removeChannel(ch);
       void sb().removeChannel(chr);
     };

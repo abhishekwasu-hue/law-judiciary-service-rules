@@ -1,7 +1,8 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { SETTING_LABEL, api, fmtUsd, getSpend, humanError, type Spend } from '../lib/api';
-import { useAuth } from '../lib/auth';
+import { useAuth, useCanWrite } from '../lib/auth';
+import ProfileForm from '../components/ProfileForm';
 import { sb } from '../lib/supabase';
 import type { Member } from '../lib/types';
 import { fmtDate } from '../lib/format';
@@ -110,7 +111,34 @@ function Fold({ title, sub, children }: { title: string; sub?: string; children:
   );
 }
 
-export default function Settings() {
+/** claude.ai artifact build (E-F4): nothing here is set on the page — a short honest card instead of the Worker settings. */
+const ARTIFACT = import.meta.env.VITE_BACKEND === 'artifact';
+
+function ArtifactSettings() {
+  const canWrite = useCanWrite();
+  return (
+    <div className="max-w-2xl space-y-5">
+      <h1 className="text-2xl font-bold">सेटिंग्ज</h1>
+      <Section title="हे पान">
+        <ul className="list-disc space-y-1.5 pl-5">
+          <li>हे पान क्लॉडच्या संकेतस्थळावर चालते.</li>
+          <li>प्रस्तावांचे काम मालकांच्या खात्यातील नियोजित कार्य <b>“प्रस्ताव कक्ष — काम”</b> करते.</li>
+          <li>AI की, मॉडेल, मासिक खर्च-मर्यादा, भांडार व माहिती-साठ्याची सेटिंग्ज येथे लागू नाहीत.</li>
+          <li>सदस्य पानाच्या <b>“शेअर”</b> पर्यायातून जोडावेत.</li>
+        </ul>
+      </Section>
+      {canWrite && (
+        <Section title="माझी माहिती">
+          <ProfileForm />
+        </Section>
+      )}
+    </div>
+  );
+}
+
+export default ARTIFACT ? ArtifactSettings : WorkerSettings;
+
+function WorkerSettings() {
   const { me } = useAuth();
   const toast = useToast();
   const [cur, setCur] = useState<Record<string, string> | null>(null);
