@@ -10,8 +10,8 @@
 //   monthly budget gate (402) and the GitHub/AI-key "Settings" gate (412) → never refused.
 import { ApiError } from '../api';
 import { DESKS, WORK_TYPES } from '../constants';
-import { cap, needDb, nowIso } from './runtime';
-import { getRow, grFiles, grStoragePath, insertRow, listRows, patchRow, setActor, viewer, type GrFile, type Row } from './db';
+import { cap, isDbFail, needDb, nowIso, type McpErr } from './runtime';
+import { getRow, grFiles, grStoragePath, insertRow, listRows, patchRow, queryRows, setActor, viewer, type GrFile, type Row } from './db';
 
 // ---------- texts (same as worker.js) ----------
 const CASE_FIELDS = ['cr_no', 'cr_year', 'file_no', 'subject', 'category', 'priority', 'employee_name', 'post', 'office', 'received_from', 'received_via', 'inward_date', 'due_date', 'desk', 'work_type', 'nasti_no'];
@@ -48,12 +48,41 @@ const BAD_ATTACH = `जोडलेल्या फाइल चुकीच्�
 const STALE_MS = 3.5 * 3600 * 1000;
 // artifact-only texts
 const FIRE_FAILED = 'प्रक्रिया प्रतीक्षा-यादीत नोंदवली आहे; मात्र काम सुरू करणारी सेवा आत्ता सुरू करता आली नाही. ती सुरू झाल्यावर ही प्रक्रिया क्रमाने होईल. कृपया थोड्या वेळाने पुन्हा प्रयत्न करावा, ही विनंती.';
+// No Latin product names in these texts: lib/api.ts humanError hides reasons with developer words from staff.
+const FIRE_TEXT: Record<string, string> = {
+  approval_required: "प्रक्रिया प्रतीक्षा-यादीत नोंदवली आहे; मात्र काम सुरू करण्यासाठी आपली परवानगी आवश्यक आहे. पान 'क्लॉड कोड रिमोट' जोडणी वापरण्याची परवानगी विचारेल तेव्हा ती द्यावी व नंतर '▶ पुन्हा सुरू करा' दाबावे, ही विनंती.",
+  no_trigger: 'प्रक्रिया प्रतीक्षा-यादीत नोंदवली आहे. या खात्यातून काम सुरू करता येत नाही — काम पानाच्या मालकांच्या खात्यातून, किंवा मालकांनी या खात्यासाठी काम-व्यवस्था जोडल्यानंतरच सुरू होते. कृपया मालकांना कळवावे, ही विनंती.',
+  connection: "प्रक्रिया प्रतीक्षा-यादीत नोंदवली आहे; मात्र काम सुरू करणारी जोडणी या दृश्यात उपलब्ध नाही. कृपया हे पान क्लॉडच्या संकेतस्थळावर (मूळ दुव्यावरून) उघडून जोडणीची परवानगी द्यावी व '▶ पुन्हा सुरू करा' दाबावे, ही विनंती.",
+};
+const CONNECTION_CODES = ['server_not_connected', 'not_in_manifest', 'needs_reauth', 'blocked_by_policy', 'mcp_unavailable'];
+/** Marathi text for a failed firing code (runs.dispatch_error), for the UI under a waiting run. */
+export function fireFailText(code: string | null | undefined): string {
+  const c = String(code || '');
+  if (FIRE_TEXT[c]) return FIRE_TEXT[c];
+  if (CONNECTION_CODES.includes(c)) return FIRE_TEXT.connection;
+  return FIRE_FAILED;
+}
+const RUN_WAITING = "पूर्वीची प्रक्रिया सुरू झालेली नाही — 'पुन्हा सुरू करा' वापरावे, ही विनंती.";
+const RUN_NOT_WAITING = 'ही प्रक्रिया आधीच सुरू झाली आहे किंवा पूर्ण झाली आहे; ती पुन्हा सुरू करण्याची आवश्यकता नाही.';
+const READ_ONLY = 'आपल्याला या पानावर फक्त पाहण्याची परवानगी आहे; माहिती बदलता येत नाही. आवश्यक असल्यास कृपया मालकांना कळवावे, ही विनंती.';
+const DL_BUSY = 'फाइल जतन करण्याची आधीची विनंती अजून उघडी आहे. कृपया ती पूर्ण करून थोड्या वेळाने पुन्हा प्रयत्न करावा, ही विनंती.';
+const GR_STALE_MS = 30 * 60 * 1000;
 const GR_REQUESTED = 'हा GR या पानावर अजून उपलब्ध नाही. तो मागविण्याची नोंद केली आहे; थोड्या वेळाने पुन्हा उघडावा, ही विनंती.';
 const GR_BAD_CODE = 'सांकेतांक 16 ते 20 अंकी असावा. कृपया योग्य सांकेतांक नमूद करावा, ही विनंती.';
+// E-F9: two meanings only — the store is not available in this view (runtime NO_DB_TEXT / NO_ASSETS: open the page from
+// its own link), or an index has not been added to the page yet (tell the owner).
 const SEARCH_MISSING = 'नियम-उतारे शोधाची सूची या पानावर अजून जोडलेली नाही. कृपया मालकांना कळवावे, ही विनंती.';
+const NO_ASSETS = 'या दृश्यात फाइल-साठा उपलब्ध नाही. कृपया हे पान त्याच्या मूळ दुव्यावरून (शेअर केलेल्या लिंकवरून) उघडावे, ही विनंती.';
 const MEMBERS_HERE = 'या पानावर सदस्य पानाच्या "शेअर" पर्यायातून जोडावेत, ही विनंती.';
 
 const fail = (status: number, error: string, extra: Row = {}): never => { throw new ApiError(status, error, { error, ...extra }); };
+/** A db rejection (Marathi DbFail) as an ApiError: message db_<code>, data.reason the Marathi text (A-M5). */
+function asApi(e: unknown): unknown {
+  if (!isDbFail(e)) return e;
+  const status = e.dbCode === 'invalid_argument' ? 403 : e.dbCode === 'quota_exceeded' ? 507 : 503;
+  return new ApiError(status, e.code, { error: e.code, reason: e.message });
+}
+const guard = <A extends unknown[], R>(fn: (...a: A) => Promise<R>) => (...a: A): Promise<R> => fn(...a).catch((e: unknown) => { throw asApi(e); });
 const bad = (msg: string, s = 400): never => fail(s, msg);
 const isId = (v: unknown) => /^\d+$/.test(String(v ?? ''));
 const istToday = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
@@ -74,42 +103,69 @@ async function setStage(c: Row, stage: string) {
 }
 
 // ---------- worker trigger (cloud worker processes queued runs / GR requests) ----------
-/** mcp fire_trigger with meta/config.trigger_id. Resolves null on success, else a short technical reason. */
-async function fireWorker(): Promise<string | null> {
+/** Outcome of one firing. ok: fired. unsure: the answer was ambiguous (the task may have started). code: short code. */
+export interface Fire { ok: boolean; unsure: boolean; code: string | null; detail: string }
+const AMBIGUOUS = ['cancelled', 'server_unavailable'];
+const LIFECYCLE = ['not_granted', 'capability_disabled', 'capability_removed'];
+const KNOWN_MCP = ['needs_reauth', 'server_not_connected', 'selection_required', 'server_not_found', 'server_unavailable', 'not_in_manifest',
+  'blocked_by_policy', 'self_only', 'approval_required', 'tool_error', 'bad_request', 'cancelled', 'rate_limited', 'upstream_error',
+  'not_granted', 'capability_disabled', 'capability_removed', 'transform_error', 'consent_required', 'user_changed'];
+/** mcp rejection → definite / ambiguous (contract §1; mcp.d.ts: unknown codes = upstream_error). */
+export function classifyMcp(e: unknown): Fire {
+  const x = (e || {}) as McpErr;
+  const raw = typeof x.code === 'string' ? x.code : '';
+  const code = KNOWN_MCP.includes(raw) ? raw : 'upstream_error';
+  const detail = `${raw || 'error'}: ${String(x.message ?? e).slice(0, 200)}`;
+  if (AMBIGUOUS.includes(code) || (code === 'upstream_error' && x.retryable !== true)) return { ok: false, unsure: true, code, detail };
+  if (LIFECYCLE.includes(code)) return { ok: false, unsure: false, code: 'mcp_unavailable', detail };
+  if (code === 'consent_required') return { ok: false, unsure: false, code: 'approval_required', detail };
+  if (code === 'upstream_error') return { ok: false, unsure: false, code: 'error', detail }; // retryable: never reached the connector
+  return { ok: false, unsure: false, code, detail };
+}
+/** mcp fire_trigger. A scheduled task fires only from its own account: the owner (or a page without the `user`
+ *  capability) uses meta/config.triggers[<id>] || trigger_id; any other viewer only meta/config.triggers[<own id>],
+ *  else `no_trigger` (the owner's trigger is never called for them). */
+async function fireWorker(): Promise<Fire> {
   try {
     const db = await needDb();
-    // a scheduled task can be fired only by its own account: meta/config.triggers {<viewer id>: trig_…} per account
-    // (second account working on a shared page — docs/NEW_ACCOUNT_SETUP.md), else the owner's trigger_id
     const cfg = (await db.doc('meta/config').get()).data() as { trigger_id?: unknown; triggers?: Record<string, unknown> } | undefined;
-    const vid = (await viewer()).id;
-    const own = vid && cfg?.triggers && typeof cfg.triggers === 'object' ? cfg.triggers[vid] : undefined;
-    const id = typeof own === 'string' && own ? own : cfg?.trigger_id;
-    if (typeof id !== 'string' || !id) return 'meta/config.trigger_id missing';
+    const v = await viewer();
+    const own = v.id && cfg?.triggers && typeof cfg.triggers === 'object' ? cfg.triggers[v.id] : undefined;
+    const id = typeof own === 'string' && own ? own : v.isOwner ? cfg?.trigger_id : undefined;
+    if (typeof id !== 'string' || !id)
+      return v.isOwner ? { ok: false, unsure: false, code: 'error', detail: 'meta/config.trigger_id missing' }
+        : { ok: false, unsure: false, code: 'no_trigger', detail: `no trigger for viewer ${v.id}` };
     const mcp = await cap('mcp');
-    if (!mcp) return 'mcp capability unavailable';
-    await mcp.callTool('Claude Code Remote', 'fire_trigger', { trigger_id: id });
-    return null;
+    if (!mcp) return { ok: false, unsure: false, code: 'mcp_unavailable', detail: 'mcp capability unavailable' };
+    try {
+      await mcp.callTool('Claude Code Remote', 'fire_trigger', { trigger_id: id });
+    } catch (e) {
+      return classifyMcp(e);
+    }
+    return { ok: true, unsure: false, code: null, detail: '' };
   } catch (e) {
-    const x = e as { code?: string; message?: string };
-    return `${x?.code || 'error'}: ${String(x?.message || e).slice(0, 200)}`;
+    return { ok: false, unsure: false, code: 'error', detail: String((e as Error)?.message || e).slice(0, 200) };
   }
 }
 
 // ---------- /api/me ----------
 const profileOf = (r: Row | null) => Object.fromEntries(PROFILE_KEYS.map(k => [k, r && r[k] != null ? String(r[k]) : ''])) as Record<(typeof PROFILE_KEYS)[number], string>;
-async function ownerRow(): Promise<Row> {
+/** The viewer's members row: written only when the viewer may write; role = the computed role (an old non-owner
+ *  row with role 'owner' is corrected); a read-only viewer's row is only read. */
+async function ownerRow(): Promise<Row | null> {
   const v = await viewer();
   setActor(v.id);
   let m = await getRow('members', v.id);
-  if (!m) m = await insertRow('members', { user_id: v.id, email: v.email || 'owner', role: 'owner', display_name: v.name || null });
-  else if (m.role !== 'owner') m = await patchRow('members', m, { role: 'owner' });
+  if (!v.canWrite) return m;
+  if (!m) m = await insertRow('members', { user_id: v.id, email: v.email || (v.isOwner ? 'owner' : ''), role: v.role, display_name: v.name || null });
+  else if (m.role !== v.role) m = await patchRow('members', m, { role: v.role });
   return m;
 }
 async function getMe() {
   const v = await viewer();
   let m: Row | null = null;
-  try { m = await ownerRow(); } catch { /* db unavailable: the page still opens as the owner */ }
-  return { id: v.id, email: v.email, role: 'owner' as const, profile: profileOf(m) };
+  try { m = await ownerRow(); } catch { /* db unavailable / refused: the page still opens with the computed role */ }
+  return { id: v.id, email: v.email, role: v.role, profile: profileOf(m) };
 }
 async function patchMe(b: unknown) {
   if (!b || typeof b !== 'object' || Array.isArray(b)) bad('माहिती पाठवली नाही');
@@ -123,9 +179,11 @@ async function patchMe(b: unknown) {
     row[k] = t || null;
   }
   if (!Object.keys(row).length) bad('बदलण्यासाठी माहिती नाही');
-  const m = await patchRow('members', await ownerRow(), row);
   const v = await viewer();
-  return { id: v.id, email: v.email, role: 'owner', profile: profileOf(m) };
+  if (!v.canWrite) fail(403, 'read-only', { reason: READ_ONLY });
+  const cur = await ownerRow();
+  const m = cur ? await patchRow('members', cur, row) : null;
+  return { id: v.id, email: v.email, role: v.role, profile: profileOf(m) };
 }
 
 // ---------- cases ----------
@@ -196,21 +254,46 @@ async function activeRun(caseId: number): Promise<Row | null> {
   const act = (await listRows('runs')).filter(r => Number(r.case_id) === caseId && isActive(r)).sort((a, b) => Number(b.id) - Number(a.id));
   return act[0] || null;
 }
-/** Fire the worker for a queued run: success → dispatched_at set (+ full run: case stage, run_started), else the row
- *  stays queued (dispatched_at null; the worker takes it on its next firing) and a Marathi error is thrown. */
-async function dispatch(run: Row, c: Row, started: Row | null): Promise<Row> {
-  const why = await fireWorker();
-  if (why) {
-    await log(run.case_id, 'run_dispatch_failed', { run_id: run.id, error: why });
-    fail(502, 'trigger_failed', { reason: FIRE_FAILED, detail: why, run_id: run.id });
-  }
+const isWaiting = (r: Row) => r.state === 'queued' && r.dispatched_at == null;
+/** run_started logged for this full run already? (activity of the case, server-side filter) */
+async function startedLogged(run: Row): Promise<boolean> {
+  const db = await needDb();
+  const rows = await queryRows('activity', db.collection('activity').where('case_id', '==', Number(run.case_id)).where('action', '==', 'run_started').limit(200));
+  return rows.some(a => Number((a.detail as Row | null)?.run_id) === Number(run.id));
+}
+/** Fire the worker for a queued run (contract §1), bookkeeping on every firing: dispatch_tries + 1;
+ *  success → dispatched_at now, dispatch_error / dispatch_unsure null; ambiguous → dispatched_at now, dispatch_unsure
+ *  true; definite failure → dispatched_at null, dispatch_error = code, and ApiError 502 trigger_failed
+ *  {reason, detail, run_id, code}. A full run's first dispatch also sets case stage + activity run_started. */
+async function dispatch(run: Row, c: Row | null, started: Row | null): Promise<Row> {
+  const f = await fireWorker();
   const fresh = (await getRow('runs', run.id)) || run;
-  const next = await patchRow('runs', fresh, { dispatched_at: nowIso() });
+  const tries = (Number(fresh.dispatch_tries) || 0) + 1;
+  if (!f.ok && !f.unsure) {
+    await patchRow('runs', fresh, { dispatched_at: null, dispatch_error: f.code, dispatch_unsure: null, dispatch_tries: tries });
+    await log(run.case_id, 'run_dispatch_failed', { run_id: run.id, code: f.code, error: f.detail });
+    fail(502, 'trigger_failed', { reason: fireFailText(f.code), detail: f.detail, run_id: run.id, code: f.code });
+  }
+  const next = await patchRow('runs', fresh, { dispatched_at: nowIso(), dispatch_error: null, dispatch_unsure: f.unsure ? true : null, dispatch_tries: tries });
+  if (f.unsure) await log(run.case_id, 'run_dispatch_unsure', { run_id: run.id, code: f.code, error: f.detail });
   if (started) {
-    await setStage(c, 'अभ्यास चालू');
-    await log(run.case_id, 'run_started', started);
+    const first = started.__new === true || !(await startedLogged(run));
+    delete started.__new;
+    if (first) {
+      if (c) await setStage(c, 'अभ्यास चालू');
+      await log(run.case_id, 'run_started', started);
+    }
   }
   return next;
+}
+const startedOf = (r: Row, isNew: boolean): Row => ({ run_id: r.id, instructions: r.instructions || '', outputs: r.outputs ?? null, ...(isNew ? { __new: true } : {}) });
+/** POST /api/run/<id>/fire — re-fire a run that is still queued (full or edit). */
+async function fireRun(id: number) {
+  const run = await getRow('runs', id);
+  if (!run) return bad('not found', 404);
+  if (run.state !== 'queued') return fail(409, 'run_not_waiting', { reason: RUN_NOT_WAITING, run_id: id });
+  const c = await caseRow(run.case_id);
+  return dispatch(run, c, run.kind === 'edit' ? null : startedOf(run, false));
 }
 async function startRun(b: Row) {
   const { case_id, instructions, outputs } = b;
@@ -229,14 +312,15 @@ async function startRun(b: Row) {
   const active = await activeRun(caseId);
   if (active) {
     // a run left waiting by a failed firing: fire again instead of refusing (the user's retry)
-    if (active.state === 'queued' && active.dispatched_at == null && active.kind !== 'edit') {
-      const r = await dispatch(active, c, { run_id: active.id, instructions: active.instructions || '', outputs: active.outputs ?? null });
+    if (isWaiting(active) && active.kind !== 'edit') {
+      const r = await dispatch(active, c, startedOf(active, false));
       return { ...r, queued: false };
     }
+    if (isWaiting(active)) fail(409, 'run_waiting', { run_id: active.id, reason: RUN_WAITING });
     fail(409, 'run_active', { run_id: active.id });
   }
-  const run = await insertRow('runs', { case_id: caseId, instructions: instructions || null, created_by: await me(), outputs: outs, kind: 'full' });
-  const r = await dispatch(run, c, { run_id: run.id, instructions: instructions || '', outputs: outs });
+  const run = await insertRow('runs', { case_id: caseId, instructions: instructions || null, created_by: await me(), outputs: outs, kind: 'full', dispatch_tries: 0 });
+  const r = await dispatch(run, c, startedOf(run, true));
   return { ...r, queued: false };
 }
 async function startEdit(b: unknown) {
@@ -262,10 +346,11 @@ async function startEdit(b: unknown) {
   if (!files.some(f => f.kind === 'spec' && f.original_name === 'spec.json')) fail(409, 'no_spec', { reason: NO_SPEC });
   if (!c) return bad('case not found', 404);
   const active = await activeRun(caseId);
+  if (active && isWaiting(active)) fail(409, 'run_waiting', { run_id: active.id, reason: RUN_WAITING });
   if (active) fail(409, 'run_active', { run_id: active.id });
-  const run = await insertRow('runs', { case_id: caseId, kind: 'edit', edit_target: body.target, edit_message: message, edit_attachments: attachments, created_by: await me() });
-  const r = await dispatch(run, c, null);
+  const run = await insertRow('runs', { case_id: caseId, kind: 'edit', edit_target: body.target, edit_message: message, edit_attachments: attachments, created_by: await me(), dispatch_tries: 0 });
   await log(caseId, 'edit_requested', { run_id: run.id, target: body.target, message, attachments });
+  const r = await dispatch(run, c, null);
   return { ...r, kind: 'edit' };
 }
 async function spend() {
@@ -333,7 +418,7 @@ function bytesOfB64(s: string): Uint8Array {
 /** Stores a blob: {asset_id} for an accepted type ≤ 19 MiB, else {asset_parts: [ids]} (base64 text/plain parts). */
 export async function storeBlob(blob: Blob, ctype: string, onProgress?: (pct: number) => void): Promise<{ asset_id: string | null; asset_parts: string[] | null; storage_path: string }> {
   const assets = await cap('assets');
-  if (!assets) throw new Error('storage 503 assets unavailable');
+  if (!assets) return fail(503, 'storage_unavailable', { reason: NO_ASSETS });
   onProgress?.(1);
   if (ASSET_TYPES.includes(ctype) && blob.size <= DIRECT_MAX) {
     const r = await assets.upload(blob, { type: ctype }).catch((e: { code?: string; message?: string }) => { throw new Error(`storage 500 ${e?.code || ''} ${e?.message || ''}`); });
@@ -370,9 +455,20 @@ function pointer(r: Row): { id?: string; parts?: string[] } | null {
   return m ? { id: m[1] } : null;
 }
 const ctypeOfName = (name: string) => UPLOAD_TYPES[(/\.[A-Za-z0-9]{1,8}$/.exec(name) || [''])[0].toLowerCase()] || 'application/octet-stream';
-const objectUrls = new Map<string, string>();
+const objectUrls = new Map<string, { url: string; ref: string }>();
+/** Cached object URL of joined parts; a changed pointer (new parts) revokes the old URL (A-L5). */
+async function partsUrl(key: string, parts: string[], type: string): Promise<string> {
+  const ref = parts.join(',');
+  const cur = objectUrls.get(key);
+  if (cur && cur.ref === ref) return cur.url;
+  const url = URL.createObjectURL(new Blob([await partsBytes(parts)], { type }));
+  if (cur) URL.revokeObjectURL(cur.url);
+  objectUrls.set(key, { url, ref });
+  return url;
+}
 
-export async function artifactUpload(caseId: number, kind: string, file: File, onProgress?: (pct: number) => void): Promise<{ id: number }> {
+export const artifactUpload = guard(artifactUploadRaw);
+async function artifactUploadRaw(caseId: number, kind: string, file: File, onProgress?: (pct: number) => void): Promise<{ id: number }> {
   const name = file.name;
   if (!caseId || !FILE_KINDS.includes(kind) || !name || /[\\/]/.test(name)) bad('case_id, kind, x-file-name required');
   if (file.size > MAX_UPLOAD) bad('file over 50 MB', 413);
@@ -406,21 +502,18 @@ export async function artifactUpload(caseId: number, kind: string, file: File, o
 }
 
 /** {url, name} of a case file: "/_blob/<id>" for one asset; an object URL of the joined parts otherwise. */
-export async function artifactFileUrl(id: number): Promise<{ url: string; name: string }> {
+export const artifactFileUrl = guard(artifactFileUrlRaw);
+async function artifactFileUrlRaw(id: number): Promise<{ url: string; name: string }> {
   const f = await getRow('case_files', id);
   if (!f) return bad('not found', 404);
   const name = String(f.original_name || `file-${id}`);
   const p = pointer(f);
   if (!p) throw new ApiError(404, 'sign 404');
   if (p.id) return { url: `/_blob/${p.id}`, name };
-  const key = `f${id}`;
-  if (!objectUrls.has(key)) {
-    const bytes = await partsBytes(p.parts!);
-    objectUrls.set(key, URL.createObjectURL(new Blob([bytes], { type: String(f.content_type || ctypeOfName(name)) })));
-  }
-  return { url: objectUrls.get(key)!, name };
+  return { url: await partsUrl(`f${id}`, p.parts!, String(f.content_type || ctypeOfName(name))), name };
 }
-export async function artifactFileBytes(id: number): Promise<{ data: ArrayBuffer; name: string }> {
+export const artifactFileBytes = guard(artifactFileBytesRaw);
+async function artifactFileBytesRaw(id: number): Promise<{ data: ArrayBuffer; name: string }> {
   const f = await getRow('case_files', id);
   if (!f) return bad('not found', 404);
   const name = String(f.original_name || `file-${id}`);
@@ -431,11 +524,10 @@ export async function artifactFileBytes(id: number): Promise<{ data: ArrayBuffer
   if (!r.ok) throw new ApiError(r.status, `sign ${r.status}`);
   return { data: await r.arrayBuffer(), name };
 }
-/** Save with the original name through the `downloads` capability (viewer confirms); a plain link when it is absent
- *  or refuses the extension (e.g. .tif). Declined = nothing. */
-export async function artifactDownload(id: number): Promise<void> {
-  const { data, name } = await artifactFileBytes(id);
-  const blob = new Blob([data], { type: ctypeOfName(name) });
+/** Save a blob under `name` through the `downloads` capability (viewer confirms); a plain link when the capability
+ *  is absent or refuses the file (e.g. .tif). declined = nothing; rate_limited (a save prompt already open) →
+ *  ApiError 429 with a short Marathi reason (A-L4). */
+export async function artifactSaveFile(name: string, blob: Blob): Promise<void> {
   const dl = await cap('downloads');
   if (dl) {
     try {
@@ -443,7 +535,8 @@ export async function artifactDownload(id: number): Promise<void> {
       return;
     } catch (e) {
       const code = (e as { code?: string })?.code;
-      if (code === 'declined' || code === 'rate_limited') return;
+      if (code === 'declined') return;
+      if (code === 'rate_limited') fail(429, 'download_busy', { reason: DL_BUSY });
     }
   }
   const url = URL.createObjectURL(blob);
@@ -456,33 +549,67 @@ export async function artifactDownload(id: number): Promise<void> {
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
+/** Save a case file with its original name (artifactSaveFile). */
+export async function artifactDownload(id: number): Promise<void> {
+  const { data, name } = await artifactFileBytes(id);
+  await artifactSaveFile(name, new Blob([data], { type: ctypeOfName(name) }));
+}
 
 // ---------- GR library ----------
-async function grRequest(key: string, path: unknown, file: unknown, code: string | null) {
+type GrStatus = 'pending' | 'processing' | 'done';
+/** Write gr_requests/<key> pending (new, failed, or processing older than 30 min re-opened) and fire the worker. */
+async function grRequest(key: string, path: unknown, file: unknown, code: string | null): Promise<{ status: GrStatus; fired: boolean; fire: Fire | null }> {
   const db = await needDb();
   const ref = db.doc(`gr_requests/${key}`);
   const cur = (await ref.get()).data();
-  if (!cur || (cur.status !== 'pending' && cur.status !== 'processing'))
-    await ref.set({ key, code, path: path ?? null, file: file ?? null, status: 'pending', at: nowIso(), by: await me() });
-  return fireWorker();
+  if (cur?.status === 'done') return { status: 'done', fired: false, fire: null };
+  const since = Date.parse(String(cur?.processing_at ?? cur?.at ?? ''));
+  const live = cur?.status === 'pending' || (cur?.status === 'processing' && Number.isFinite(since) && Date.now() - since < GR_STALE_MS);
+  let status: GrStatus = cur?.status === 'processing' && live ? 'processing' : 'pending';
+  if (!live) {
+    await ref.set({ key, code: code ?? cur?.code ?? null, path: path ?? cur?.path ?? null, file: file ?? cur?.file ?? null, status: 'pending', at: nowIso(), by: await me(),
+      ...(cur ? { reopened_from: String(cur.status ?? '') } : {}) });
+    status = 'pending';
+  }
+  const fire = await fireWorker();
+  return { status, fired: fire.ok || fire.unsure, fire };
+}
+const grReply = (r: { status: GrStatus; fired: boolean; fire: Fire | null }) =>
+  ({ status: r.status, fired: r.fired, ...(r.fire && !r.fired ? { reason: fireFailText(r.fire.code), code: r.fire.code } : {}) });
+/** GR row + key for a code or key from the library. */
+async function grLookup(codeOrKey: string) {
+  const [rows, files] = await Promise.all([listRows('gr_library'), grFiles()]);
+  const row = rows.find(r => String(r.code) === codeOrKey) || rows.find(r => String(r.key) === codeOrKey) || null;
+  return { row, files, key: String(row?.key || codeOrKey) };
+}
+/** POST /api/gr/request {code} | {key} → {status, fired, reason?}. */
+async function grRequestApi(b: Row) {
+  const raw = String(b.code ?? b.key ?? '').trim();
+  if (b.code != null && !/^\d{16,20}$/.test(raw)) bad(GR_BAD_CODE);
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(raw)) bad(GR_BAD_CODE);
+  const { row, files, key } = await grLookup(raw);
+  if (fileOfGr(files.get(key)) || (row && pointer(row))) return { status: 'done' as const, fired: false };
+  const code = /^\d{16,20}$/.test(raw) ? raw : row && /^\d{16,20}$/.test(String(row.code)) ? String(row.code) : null;
+  return grReply(await grRequest(key, row?.path, row?.file, code));
+}
+/** GET /api/gr/requests → [{key, code, status, at, reply}], newest first. */
+async function grRequests() {
+  const db = await needDb();
+  const snap = await db.collection('gr_requests').get();
+  return snap.docs.map(d => { const x = d.data() || {}; return { key: String(x.key ?? d.id), code: x.code ?? null, status: String(x.status ?? 'pending'), at: x.at ?? null, reply: x.reply ?? null }; })
+    .sort((a, c) => String(c.at ?? '').localeCompare(String(a.at ?? '')));
 }
 function fileOfGr(f: GrFile | undefined): { id?: string; parts?: string[] } | null {
   if (!f || !f.ref) return null;
   return Array.isArray(f.ref) ? { parts: f.ref.map(String) } : { id: String(f.ref) };
 }
 async function grUrl(code: string) {
-  const [rows, files] = await Promise.all([listRows('gr_library'), grFiles()]);
-  const row = rows.find(r => String(r.code) === code) || rows.find(r => String(r.key) === code) || null;
-  const key = String(row?.key || code);
+  const { row, files, key } = await grLookup(code);
   const p = fileOfGr(files.get(key)) || (row ? pointer(row) : null);
   if (p?.id) return { url: `/_blob/${p.id}` };
-  if (p?.parts) {
-    const k = `g${key}`;
-    if (!objectUrls.has(k)) objectUrls.set(k, URL.createObjectURL(new Blob([await partsBytes(p.parts)], { type: 'application/pdf' })));
-    return { url: objectUrls.get(k)! };
-  }
-  const why = await grRequest(key, row?.path, row?.file, /^\d{16,20}$/.test(code) ? code : null);
-  return fail(409, 'gr_requested', { reason: GR_REQUESTED, ...(why ? { detail: why } : {}) });
+  if (p?.parts) return { url: await partsUrl(`g${key}`, p.parts, 'application/pdf') };
+  const r = await grRequest(key, row?.path, row?.file, /^\d{16,20}$/.test(code) ? code : null);
+  return fail(409, 'gr_requested', { reason: GR_REQUESTED, status: r.status, fired: r.fired, ...(r.fire && !r.fired ? { detail: r.fire.detail, code: r.fire.code } : {}) });
 }
 async function addGr(b: Row) {
   const code = String(b.code ?? '');
@@ -490,8 +617,8 @@ async function addGr(b: Row) {
   const [rows, files] = await Promise.all([listRows('gr_library'), grFiles()]);
   const row = rows.find(r => String(r.code) === code);
   if (row && (grStoragePath(files.get(String(row.key || code))) || pointer(row))) return { ok: true, code, source_url: row.source_url ?? null };
-  const why = await grRequest(String(row?.key || code), row?.path, row?.file, code);
-  return fail(409, 'gr_requested', { reason: GR_REQUESTED, ...(why ? { detail: why } : {}) });
+  const r = await grRequest(String(row?.key || code), row?.path, row?.file, code);
+  return fail(409, 'gr_requested', { reason: GR_REQUESTED, status: r.status, fired: r.fired, ...(r.fire && !r.fired ? { detail: r.fire.detail, code: r.fire.code } : {}) });
 }
 
 // ---------- register search over meta/register_index {asset} → [{path, title, text}] ----------
@@ -512,9 +639,24 @@ function registerIndex(): Promise<RegDoc[] | null> {
   }
   return regIdx;
 }
-/** Every term must occur (case-insensitive); score = occurrences; ≤ 2 fragments (the lines around a hit); ≤ 15 hits. */
+const searchTerms = (q: string) => q.slice(0, 100).split(/\s+/).filter(t => t && !/[A-Za-z_]+:/.test(t)).map(t => t.toLowerCase());
+const stripHash = (t: string) => t.replace(/^#+\s*/, '').trim();
+/** Offset where a file's body starts: after a YAML front matter `---…---` at the start and a first `# ` title line
+ *  equal to the title (E-F10: snippets never show the file header). */
+export function bodyStart(text: string, title?: string): number {
+  let at = 0;
+  const fm = /^---[ \t]*\r?\n[\s\S]*?\r?\n---[ \t]*(\r?\n|$)/.exec(text);
+  if (fm) at = fm[0].length;
+  while (at < text.length && /\s/.test(text[at])) at++;
+  const nl = text.indexOf('\n', at);
+  const line = text.slice(at, nl < 0 ? text.length : nl).trim();
+  if (/^# /.test(line) && (!title || stripHash(line) === stripHash(title))) at = nl < 0 ? text.length : nl + 1;
+  return at;
+}
+/** Every term must occur (case-insensitive); score = occurrences; ≤ 2 fragments (the lines around a hit, never the
+ *  file header); ≤ 15 hits. */
 export function searchDocs(docs: RegDoc[], q: string) {
-  const terms = q.slice(0, 100).split(/\s+/).filter(t => t && !/[A-Za-z_]+:/.test(t)).map(t => t.toLowerCase());
+  const terms = searchTerms(q);
   if (!terms.length) return [];
   const hits: { path: string; title?: string; frags: string[]; score: number }[] = [];
   for (const d of docs) {
@@ -523,12 +665,13 @@ export function searchDocs(docs: RegDoc[], q: string) {
     let score = 0;
     for (const t of terms) for (let i = low.indexOf(t); i >= 0; i = low.indexOf(t, i + t.length)) score++;
     const frags: string[] = [];
-    let from = 0;
+    const head = bodyStart(d.text, d.title);
+    let from = head;
     while (frags.length < 2) {
       let at = -1;
       for (const t of terms) { const i = low.indexOf(t, from); if (i >= 0 && (at < 0 || i < at)) at = i; }
       if (at < 0) break;
-      const s = Math.max(0, d.text.lastIndexOf('\n', Math.max(0, at - 120)) + 1);
+      const s = Math.max(head, d.text.lastIndexOf('\n', Math.max(0, at - 120)) + 1);
       let e = d.text.indexOf('\n', Math.min(d.text.length, at + 200));
       if (e < 0) e = d.text.length;
       frags.push(d.text.slice(s, Math.min(e, s + 600)));
@@ -539,6 +682,7 @@ export function searchDocs(docs: RegDoc[], q: string) {
   return hits.sort((a, b) => b.score - a.score).slice(0, 15).map(({ score: _s, ...h }) => h);
 }
 async function search(q: string) {
+  if (!searchTerms(q).length) return []; // A-L7: an empty query needs no index
   const docs = await registerIndex();
   if (!docs) fail(503, 'search_unavailable', { reason: SEARCH_MISSING });
   return searchDocs(docs!, q);
@@ -552,6 +696,9 @@ export async function artifactApi<T>(path: string, opt: { method?: string; body?
   const b = (opt.body ?? {}) as Row;
   let m: RegExpExecArray | null;
   const out = await (async (): Promise<unknown> => {
+    if ((m = /^\/api\/run\/(\d+)\/fire$/.exec(p)) && M === 'POST') return fireRun(Number(m[1]));
+    if (p === '/api/gr/request' && M === 'POST') return grRequestApi(b);
+    if (p === '/api/gr/requests' && M === 'GET') return grRequests();
     if (p === '/api/public-config') return { configured: true, supabase_url: 'artifact:', supabase_anon_key: 'artifact' };
     if (p === '/api/setup') return M === 'GET' ? { configured: true } : bad('already configured', 409);
     if (p === '/api/me') return M === 'PATCH' ? patchMe(opt.body) : getMe();
@@ -570,6 +717,6 @@ export async function artifactApi<T>(path: string, opt: { method?: string; body?
     if (p === '/api/letters' && M === 'POST') return createLetter(b);
     if ((m = /^\/api\/letters\/(\d+)$/.exec(p)) && M === 'PATCH') return updateLetter(Number(m[1]), b);
     return bad('not found', 404);
-  })();
+  })().catch((e: unknown) => { throw asApi(e); });
   return out as T;
 }

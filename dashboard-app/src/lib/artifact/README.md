@@ -16,15 +16,17 @@ This file is the contract the cloud worker (the session the trigger starts) read
 |--------------|--------------------|-------|
 | `cases`      | `String(id)`       | columns of `cases` (+ `desk`, `work_type`, `nasti_no`). Defaults: category `इतर`, stage `प्राप्त`, priority `सामान्य`. |
 | `case_files` | `String(id)`       | `case_id, kind, storage_path, original_name, version, uploaded_by, created_at` + file fields below. `kind` = the `file_kind` enum values (`proposal, extra_doc, reply, approval, court_notice, gr` uploads; outputs `study, note_letter, package_pdf, order_draft, parawise, affidavit, lq_answer, spec`). |
-| `runs`       | `String(id)`       | all `runs` columns: `state, step, last_step, step_at, started_at, finished_at, dispatched_at, instructions, outputs, kind ('full' / 'edit'), edit_target, edit_message, edit_attachments, edit_result, summary, letter_needed, essential_points, grs_attached, grs_missing, warnings, cost_usd, num_turns, duration_s, log_url, created_by, created_at`. |
+| `runs`       | `String(id)`       | all `runs` columns: `state, step, last_step, step_at, started_at, finished_at, dispatched_at, instructions, outputs, kind ('full' / 'edit'), edit_target, edit_message, edit_attachments, edit_result, summary, letter_needed, essential_points, grs_attached, grs_missing, warnings, cost_usd, num_turns, duration_s, log_url, created_by, created_at`; page-only (the worker ignores them): `dispatch_error, dispatch_unsure, dispatch_tries` (see Run lifecycle). |
 | `letters`    | `String(id)`       | `case_id, ref_no, addressed_to, sent_date, reply_due, reply_received_date, status, created_at`. |
-| `activity`   | `String(id)`       | `case_id, actor, action, detail, at` — one doc per row (25,000-doc artifact cap: prune old rows when it grows). |
-| `members`    | `user_id`          | the viewer (claude.ai user id, or `owner` when the `user` capability is absent) as `role: 'owner'` + profile (`display_name, designation, office, mine`). |
-| `gr_requests`| GR index `key` (or the 16–20 digit code) | written by the page: `{key, code, path, file, status: 'pending', at, by}`. Worker: set `status` `processing` → `done` / `failed`, and on success write `gr_files/<key>`. |
+| `activity`   | `String(id)`       | `case_id, actor, action, detail, at` — one doc per row. Limited reads go to the store newest-first (`orderBy(<col>, dir).limit(n)`, + `where` for simple filters such as `case_id == <number>`); the realtime channel watches `orderBy('at','desc').limit(200)`. Pruning old rows (25,000-doc cap) is still pending. |
+| `members`    | `user_id`          | the viewer (claude.ai user id, or `owner` when the `user` capability is absent) + profile (`display_name, designation, office, mine`). `role` = `owner` (user.isOwner(), or no `user` capability), `staff` (can('data.write') true / null), `senior` (read-only). Written only by a viewer who may write; never `owner` for a non-owner (an old such row is corrected). |
+| `gr_requests`| GR index `key` (or the 16–20 digit code) | written by the page (`POST /api/gr/request`, opening an unstored GR, `POST /api/gr`): `{key, code, path, file, status: 'pending', at, by}` — new, `failed`, or `processing` older than 30 min re-opened as `pending`. Worker: set `status` `processing` (+ `processing_at`) → `done` / `failed` (+ `reply`), and on success write `gr_files/<key>`. |
+| `locks`      | `seq_<table>`      | lease docs of the page's id allocation (`acquire`, 5 s); no data. |
 | `gr_files`   | GR index `key`     | `{store: 'asset', ref: <asset id> \| [<part ids>], name}` — the GR PDF on the page (`ref` array = base64 parts, see below). |
 
 Values are plain JSON: timestamps ISO-8601 UTC strings (`new Date().toISOString()`), dates `YYYY-MM-DD`, numbers as JSON
-numbers, jsonb columns as JSON, `null` for empty. The page reads whole collections and filters/sorts client-side.
+numbers, jsonb columns as JSON, `null` for empty. The page reads whole collections and filters/sorts client-side, except
+limited `activity` reads (above). db rejections reach the UI as Marathi text with code `db_<code>` (runtime.ts).
 
 `gr_library` is NOT a collection the page needs: `from('gr_library')` is served from the GR index asset
 (`meta/gr_library {asset}` → `[{key, path, folder, topic, file, code, date "DD.MM.YYYY" | "", title, pages, size, url}]`,
@@ -37,17 +39,24 @@ file, source_url: url || null, storage_path: "asset:<ref>" when gr_files/<key> e
 | doc                    | written by | content |
 |------------------------|------------|---------|
 | `meta/config`          | lead / owner | `{trigger_id: "trig_…"}` — the scheduled task the page fires (`mcp.callTool("Claude Code Remote", "fire_trigger", {trigger_id})`). |
-| `meta/seq_<table>`     | page + worker | `{next: <int>, table, updated_at}` — id counter per numeric table. |
+| `meta/config` `triggers` | owner | `{<viewer id>: "trig_…"}` — a second account's own scheduled task (a task fires only from its own account; a non-owner without an entry gets `no_trigger`, the owner's `trigger_id` is never called for them). |
+| `meta/seq_<table>`     | (legacy) | old id counters — read only (`next - 1` is a floor for new ids); nobody writes them any more. |
 | `meta/gr_library`      | lead | `{asset: <id>}` — GR index JSON. |
 | `meta/register_index`  | lead | `{asset: <id>}` — `[{path, title, text}]` of `register/*.md` for नियम-उतारे शोध. |
 
 ## Numeric ids
 
-`allocId(table)`: take a short lease on `meta/seq_<table>` (`acquire`, 5 s, same holder per tab), read `next`, use
-`n = max(next, highest id seen in the collection + 1)`, skip forward while `<table>/<n>` already exists, write
-`next = n + 1`. **Worker:** when you create a row (output `case_files`, `activity`), read `meta/seq_<table>.next`, check
-that `<table>/<next>` does not exist (else +1 until free), write the row, then write `next + 1`. One user, one worker
-at a time: the existence check makes a collision impossible to overwrite a row.
+Page and worker take disjoint ids: the page EVEN ids only, the worker ODD ids only, so a page write and a worker write
+can never take the same id; "highest id = newest" still holds (both take ids above every existing id). Nobody writes
+under `meta/` for ids (`meta` is owner-only).
+
+* **Page** `allocId(table)`: lease `locks/seq_<table>` (`acquire`, holder = tab id, 5 s; a throwing acquire is retried,
+  not taken as granted; not granted after ~7 s → ApiError 503 with a Marathi "busy, try again" reason). Then `n` = the
+  smallest even number above max(highest id from a fresh `orderBy('id','desc').limit(1)` read, the highest id this tab
+  has seen, legacy `meta/seq_<table>.next - 1` if that doc exists); `n += 2` while `<table>/<n>` exists.
+* **Worker**: `n` = the smallest odd number above the highest id (ArtifactData query order_by id desc limit 1); several
+  rows → n, n+2, n+4 …; rows are created without `if_version` (the server refuses a create on an existing doc: re-read,
+  renumber, redo); no `meta/seq_*` writes.
 
 ## File storage (case_files rows and gr_files)
 
@@ -63,10 +72,17 @@ with `original_name: "spec.json"`) use the same fields; the edit chat needs the 
 
 ## Run lifecycle (what the worker must set)
 
-The page creates `runs` docs with `state: 'queued'`, `dispatched_at: null`, then fires the trigger; on a successful
-fire it sets `dispatched_at` (a failed fire leaves it queued with `dispatched_at: null` — the page shows "प्रतीक्षेत";
-a later retry of "प्रक्रिया सुरू करा" fires again for that same run). Full run: also case `stage` `अभ्यास चालू` and an
-activity `run_started`. Edit run (`kind: 'edit'`, `edit_target`, `edit_message`, `edit_attachments` [case_files ids]).
+The page creates `runs` docs with `state: 'queued'`, `dispatched_at: null`, then fires the trigger. Every firing
+(new run, `POST /api/run/<id>/fire`, the re-fire of a waiting full run by `POST /api/run`) adds 1 to `dispatch_tries`:
+* success → `dispatched_at` = now, `dispatch_error` null, `dispatch_unsure` null;
+* definite failure → `dispatched_at` stays null, `dispatch_error` = code (`approval_required`, `no_trigger`,
+  `mcp_unavailable`, `server_not_connected`, `not_in_manifest`, `blocked_by_policy`, `needs_reauth`, `tool_error`,
+  `error` …), answer ApiError 502 `trigger_failed` {reason (Marathi, `fireFailText(code)`), detail, run_id, code};
+* ambiguous (`upstream_error` without `retryable`, `cancelled`, `server_unavailable`: the task may have started) →
+  `dispatched_at` = now, `dispatch_unsure` true.
+A full run's first successful firing also sets case `stage` `अभ्यास चालू` and an activity `run_started` (once per run).
+A new edit while a run of the case is still waiting (`queued`, `dispatched_at` null) → 409 `run_waiting` {run_id,
+reason}. Edit run (`kind: 'edit'`, `edit_target`, `edit_message`, `edit_attachments` [case_files ids]).
 
 The worker, for each `queued` run (oldest first):
 1. `state: 'running'`, `started_at`, then progress in `step` (Marathi text containing a `RUN_STEPS` key, see
@@ -87,7 +103,15 @@ The worker, for each `queued` run (oldest first):
 
 Settings (API keys, models, budgets, GitHub, Supabase) GET `{}` / PUT `{ok:true}`; member invites refused (use the
 page's share menu); setup; stuck-run sweep; monthly budget / settings gates; `/api/spend` = this month's
-`runs.cost_usd`, limit $1000, `max_parallel` 1; login (always the owner); Supabase storage buckets.
+`runs.cost_usd`, limit $1000, `max_parallel` 1; login (the claude.ai viewer, role per `members` above); Supabase storage buckets.
+
+## Page endpoints added for the artifact build
+
+* `POST /api/run/<id>/fire` {} → the updated run row (re-fire of a `queued` full or edit run); 502 `trigger_failed`
+  {reason, detail, run_id, code}; 409 `run_not_waiting` {reason}.
+* `POST /api/gr/request` {code} | {key} → `{status: 'pending' | 'processing' | 'done', fired, reason?, code?}`.
+* `GET /api/gr/requests` → `[{key, code, status, at, reply}]`, newest first.
+* `/api/search?q=` with no search term → `[]` (no index needed).
 
 ## Test
 
