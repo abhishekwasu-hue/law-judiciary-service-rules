@@ -40,3 +40,37 @@ button overlaps two fields, नस्ती header cut).
 All pages/tabs, Word + 349-page PDF viewers, bookmarks, all downloads byte-exact, single + bulk new proposal (rows + fire),
 live run progress, edit chat end-to-end incl. version 2 + diff, stage/letters/reply/eOffice no., Ctrl K, dark mode, AI
 assistant, GR add by code, register search, नस्ती iframe; phone: no sideways scroll on any page.
+
+## Fix round 08.11.2026 — status (commits 4294651 worker, 3c8311c data layer, b3cb233 UI; every finding re-verified in code first)
+Checks: data-layer selftest 19/19 (local); worker tests (desk_publish, case_state, lint_compare) 16 passed (local); CI
+"Tests" (full pytest + `tsc --noEmit`) green on 4294651 and 3c8311c. Not run here (no npm packages, installs blocked):
+`npm run build`, `npm run build:artifact`, local `tsc`, pytest with pymupdf/docx. E2E: approximate esbuild harness (React 19,
+router/recharts/docx shims, tailwind 4) with a fake `window.claude`, 1366x900 + 390x844: BEFORE 7 PASS / 12 FAIL, AFTER
+17 PASS / 2 "FAIL" (the Settings check matches the words "खर्च-मर्यादा" / "सदस्य" inside the new info card — screenshot shows
+no setting fields).
+
+| ID | Status | Where |
+|---|---|---|
+| A-H1 = E-F1/F2 | fixed | runs `dispatch_error` / `dispatch_unsure` / `dispatch_tries`; `POST /api/run/<id>/fire` (full + edit); `run_waiting` 409; UI `runNeedsFire` + "▶ पुन्हा सुरू करा" (RunProgress, EditChat, CaseTabs, NewProposal, QueueCard, Layout) |
+| A-H2 | fixed (a860317) + `no_trigger` message; the owner's trigger is never fired for another account | lib/artifact/api.ts fireWorker |
+| W-H1 | fixed | DESK_WORKER §6 re-query after idle |
+| W-H2 | fixed — no unattended deletes, `run_failed.orphan_assets` | DESK_WORKER §3.4 / §5 / §7 |
+| E-F3 | fixed | GrLibrary "पानावर मागवा", `POST /api/gr/request`, `GET /api/gr/requests` |
+| E-F4 | fixed (+ E-F12 logout hidden) | Settings info card; Layout, Home, NewProposal, BulkUpload |
+| A-M1 | fixed — owner / staff (can data.write) / senior (read-only) | db.ts viewer, api.ts getMe / ownerRow / patchMe; UI hides write entries |
+| A-M2 | fixed — db rules in the capabilities JSON (docs/PROPOSAL_DESK.md); page writes nothing under `meta/` | publish pending (owner account) |
+| A-M3 | fixed — page even ids (lease `locks/seq_<table>`), worker odd ids; no `meta/seq_*` writes | db.ts allocId, README, DESK_WORKER §1, desk_publish `rows --first-id` |
+| A-M4 | fixed (reads + realtime window); pruning pending | db.ts |
+| A-M5 | fixed | runtime.ts db errors → Marathi `db_<code>` |
+| A-M6 | fixed | api.ts classifyMcp |
+| W-M1..W-M9 | fixed | DESK_WORKER, desk_publish.py, case_state.py, tools/lint_compare.py |
+| W-M10 | fixed (SOP Step 0b / Step 9 page part, PROPOSAL_DESK v2/v3 marked superseded) | |
+| E-F5 | fixed | fireFailText + humanError |
+| E-F6 | fixed — page link (VITE_PAGE_URL) + case no. | CaseTabs |
+| E-F7 | fixed | Cases CSV via artifactSaveFile |
+| E-F8 | fixed, artifact build only (normal build unchanged) | PdfViewer pin while pages render |
+| E-F9 | fixed (data layer texts) / partly (UI: Home card) | runtime.ts NO_DB_TEXT, Home |
+| E-F10 | fixed | searchDocs bodyStart |
+| Low fixed | A-L4, A-L5, A-L7, W-L1, W-L5, E-F12, E-F17 | |
+| Low pending | A-L1, L2, L3, L6, L8; W-L2–L4, L6–L8; E-F11, E-F13–E-F16, E-F18 | HANDOVER Pending 29 |
+| Not confirmed | none | |

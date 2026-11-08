@@ -1,4 +1,4 @@
-# HANDOVER — state as of 04.11.2026 (App B live; eight new draft types added) (read after CLAUDE.md files)
+# HANDOVER — state as of 08.11.2026 (page v4 fix round done; page publish pending from the owner account) (read after CLAUDE.md files)
 
 ## Done (all in this repo)
 - Procedure: INSTRUCTIONS.md §4 items 1–18 (§4.18, 01.11.2026: sentence flow + respectful language), PROPOSAL_SOP.md, PROPOSAL_WORKFLOW.md, samples/specs/ (approved notes), tools/ (mkdocs, build_note_letter, build_study, pkg3, highlight, lint_spec, verify_outputs, gr_request, oldcases_text, prep_pages).
@@ -129,7 +129,26 @@
 
 - 08.11.2026 (Abhi: "app B mdhe jasa ui hota to as it is घ्या"): page version 4 = App B UI unchanged (dashboard-app artifact build; data layer src/lib/artifact over the page db/assets, selftest 10/10; worker docs/DESK_WORKER.md + tools/desk_publish.py for the App B model; register search index asset meta/register_index; WP35697 migrated as case 1). Not yet: a full run and an edit run by the worker on the live page; Abhi's first press = the test.
 
+- 08.11.2026 fix round of docs/AUDIT_2026-11-08_DESK.md (Abhi's order; parallel agents: data layer, UI, worker docs/tools,
+  e2e harness; lead reviewed every diff). Commits 4294651 (worker), 3c8311c (data layer), b3cb233 (UI); status per finding
+  at the end of the audit doc. All High and Medium fixed, none "not confirmed". Key decisions (provisional defaults, Abhi
+  may change): ids — page even, worker odd (collision-safe, no meta/seq writes); db rules root read view / write admin,
+  meta owner, meta/worker admin (so a Contributor is read-only and a second account must be an Editor; meta/config.triggers
+  written by the owner's session); unattended worker never deletes assets (orphans listed in run_failed); edit lint gate
+  tools/lint_compare.py; WhatsApp text links the page (VITE_PAGE_URL), not a deep link; E-F8 fix only in the artifact build.
+  **Page NOT published:** this session's account cannot open https://claude.ai/artifact/8cJP8wz6j5tYM5kRHK1rVx and
+  `npm ci` is blocked here (no build). Owner account: `cd dashboard-app && npm ci && npm run build:artifact`, read the page,
+  publish dist-artifact/index.html to that url with files icon.svg, icon-192.png, manifest.webmanifest, nasti/index.html
+  and capabilities (once, for the db rules):
+  {"assets":{},"db":{"rules":[{"path":"","read":"view","write":"admin"},{"path":"meta","write":"owner"},{"path":"meta/worker","write":"admin"}]},"downloads":true,"user":{"scopes":["profile"]},"mcp":{"servers":[{"server":"Claude Code Remote","tools":["fire_trigger"]}]}}
+  Not run here: npm run build / build:artifact, local tsc (CI tsc green), pytest needing pymupdf/docx (CI pytest green).
+  E2E evidence: approximate esbuild harness (React 19 + shims) — before/after screenshots sent in chat.
+
 ## Pending
+29. **08.11.2026 page fix round leftovers:** publish the page from the owner account (above); then one live full run +
+    one edit run + one GR request (first real test of the retry, roles and odd/even ids); prune old `activity` rows
+    (25,000-doc cap, A-M4); Low: A-L1, L2, L3, L6, L8; W-L2–L4, W-L6–L8; E-F11, E-F13–E-F16, E-F18 (phone CSS needs the
+    audit screenshots); `/api/spend` still returns limit 1000 (unused in the page UI).
 28. **06.11.2026:** (a) CLOSED 06.11.2026 (Abhi: "अ मान्य"): names in Marathi initials (§4.18, circular 07.05.2018) formed from a Devanagari full name anywhere in the proposal ("सि. श. कुर्ले"); English-initials form only when no Devanagari name exists — §4.18, §4.39 A7, SOP, brief, ACCURACY, skill updated;
     (b) CLOSED 06.11.2026 (decided from the record, §6 never-ask rule): CR133 sample "____ आहे" sentences removed (A5); WP35697 ×2 body quote of the 11.08.2017 order para 18(i) aligned with the source text in GR 17.05.2018 (pdf/gr/201805171732241512.pdf: "Judicial Officers"; "31 st" = superscript, written "31st") (A9).
 27. **Self-hosted runner on Abhi's VPS (05.11.2026, Abhi: "Ok go ahead", "दोन्ही मान्य आहे"; no money for GitHub Actions):**
