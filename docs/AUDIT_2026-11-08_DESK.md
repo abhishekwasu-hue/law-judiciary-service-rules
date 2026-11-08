@@ -58,7 +58,7 @@ no setting fields).
 | E-F3 | fixed | GrLibrary "पानावर मागवा", `POST /api/gr/request`, `GET /api/gr/requests` |
 | E-F4 | fixed (+ E-F12 logout hidden) | Settings info card; Layout, Home, NewProposal, BulkUpload |
 | A-M1 | fixed — owner / staff (can data.write) / senior (read-only) | db.ts viewer, api.ts getMe / ownerRow / patchMe; UI hides write entries |
-| A-M2 | fixed — db rules in the capabilities JSON (docs/PROPOSAL_DESK.md); page writes nothing under `meta/` | publish pending (owner account) |
+| A-M2 | fixed — db rules in the capabilities JSON (docs/PROPOSAL_DESK.md); page writes nothing under `meta/` | published 08.11.2026 (v6 1794111209-e670), db rules stored; ArtifactData read check refused cross-org — verify from owner account |
 | A-M3 | fixed — page even ids (lease `locks/seq_<table>`), worker odd ids; no `meta/seq_*` writes | db.ts allocId, README, DESK_WORKER §1, desk_publish `rows --first-id` |
 | A-M4 | fixed (reads + realtime window); pruning pending | db.ts |
 | A-M5 | fixed | runtime.ts db errors → Marathi `db_<code>` |
