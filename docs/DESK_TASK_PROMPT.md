@@ -11,3 +11,4 @@ At the end send ONE short Marathi line with SendUserMessage (what was done, or t
 ```
 
 Account 1 (abhi.wasu): task id trig_0146QjNWutrPw5SpNk5nLREJ, page https://claude.ai/artifact/8cJP8wz6j5tYM5kRHK1rVx.
+Account 2 (abhiwasu007, 08.11.2026): task id trig_01YBZmHYbBax7nFYxzyduV4K, same page (Option 1: needs Editor access on the page and the owner-written meta/config.triggers[<account-2 members id>]; runs in auto approval mode).
