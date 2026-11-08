@@ -18,6 +18,8 @@ The quality standard = the approved notes in `samples/specs/` (C R 66, 122, 128,
 6. Proposals uploaded in the "प्रस्ताव कक्ष" page: see Step 0b.
 
 ## Step 0b — intake from प्रस्ताव कक्ष
+> **Superseded for page version 4 (App B UI, 08.11.2026):** the page's work is done by the scheduled task per
+> docs/DESK_WORKER.md. The text below describes the old v2 / v3 page and is kept for reference only.
 Page: https://claude.ai/artifact/8cJP8wz6j5tYM5kRHK1rVx (source `desk/proposal-desk.html`; data model `docs/PROPOSAL_DESK.md`).
 Trigger: Abhi says "प्रस्ताव कक्षातील नवीन प्रस्ताव तयार कर". Pin every write with `if_version`.
 1. **Find queued cases:** `ArtifactData` `query` collection `cases` where `status == "queued"`; set `status = "processing"`, `stage = "अभ्यास चालू"`.
@@ -229,6 +231,8 @@ One proposal = one chat (the main path; the प्रस्ताव कक्�
 (`<out>/preview/*.png`). A correction never re-reads the proposal: `load` (new chat) -> edit spec / study / enclosures only ->
 `save --note "सुधारणा: …"` -> `rebuild` (`--package` only when the PDF changes) -> LINT OK + verify ALL OK -> send only the
 changed file + new preview. First round: OCR text of all pages first; page images only of cited / text-less / stamp pages.
+> **The page part below is superseded for page version 4 (App B UI, 08.11.2026):** page runs and corrections follow
+> docs/DESK_WORKER.md; the old v2 / v3 text is kept for reference only.
 प्रस्ताव कक्ष page (docs/PROPOSAL_DESK.md, §4.41 (उ)) after each round: `python3 tools/desk_sync.py <id> <out> <sync>` ->
 upload every path in `<sync>/assets.txt` (Artifact publish, `asset: true`, url = page) -> put the returned ids in place of
 `__ASSET__<name>` in `case_patch.json` outputs -> ArtifactData batch: `outputs` = `<sync>/chunks/*.json` (set), `cases/<id>`

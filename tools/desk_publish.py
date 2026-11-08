@@ -4,31 +4,36 @@ artifact mode (docs/DESK_WORKER.md). Same rules as tools/engine_supabase.py fini
 package FIRST, then Study, Note_and_Letter, optional drafts, spec.json + enclosures.json LAST (one version for both);
 every row gets the next version of its kind and a new id; rows only after every upload succeeded.
 
-  plan <case_id> <outdir> <run_id> <syncdir> --files FILES.json --next-id N [--work DIR] [--kinds k1,k2]
+  plan <case_id> <outdir> <run_id> <syncdir> --files FILES.json [--work DIR] [--kinds k1,k2]
        [--package-name NAME] [--add KIND=PATH[::NAME]] ... [--no-spec]
        FILES.json  = this case's case_files rows as read from the page (list, or {doc_id: row}); used for versions and
                      the package's original name (newest package_pdf row, else the newest proposal row, §4.16).
-       N           = first free case_files id: max(meta/seq_case_files.next, highest id + 1), skipping existing docs
-                     (dashboard-app/src/lib/artifact/db.ts allocId); the worker sets meta/seq_case_files.next = the
-                     last id + 1 in the same batch (pinned).
+       --package-name = the package's original name (full run: case.json `package_file`); a name ending in
+                     "_Proposal_with_GRs.pdf" is refused (§4.16).
+       --next-id   = accepted and ignored (ids are assigned by `rows --first-id`; a warning on stderr).
        --work      = the dir holding spec.json / enclosures.json (default <outdir>/..; absent -> no spec rows).
-       --kinds     = only these output kinds (edit run: the rebuilt kinds); default = a full run: package_pdf, study,
-                     note_letter (all three required -> exit 1) + every optional draft present.
+       --kinds     = only these output kinds (edit run: the rebuilt kinds; known kinds only, else exit 1); default = a
+                     full run: package_pdf, study, note_letter (all three required -> exit 1) + every optional draft present.
        --add       = an extra row, e.g. gr=/tmp/w/201805171732241512.pdf::201805171732241512.pdf (edit run GR).
        Writes <syncdir>/uploads.json [{path, kind, name, type}] (upload order; type = the asset content type) and
-       <syncdir>/uploads.txt (paths only), <syncdir>/plan.json (rows waiting for asset ids), and for a full run with
-       <outdir>/status.json <syncdir>/run_patch.json (run fields as engine_supabase finish sets them; `warnings` = the
-       status.json lines only — the worker appends them to the run's current list).
+       <syncdir>/uploads.txt (paths only), <syncdir>/plan.json (rows waiting for ids and asset ids), and for a full run
+       with <outdir>/status.json <syncdir>/run_patch.json (run fields as engine_supabase finish sets them; `warnings` =
+       the status.json lines only — the worker appends them to the run's current list).
        Store (dashboard-app/src/lib/artifact/README.md "File storage"): a PDF <= 19 MiB -> one asset
        (application/pdf); everything else (.docx — page assets refuse Word files —, spec.json / enclosures.json, a PDF
-       > 19 MiB) -> base64 text parts <syncdir>/parts/*.b64.<n>.txt (text/plain, desk_sync.split_b64; every part
-       decodes on its own), row field asset_parts = [ids] in order. Rows also carry content_type and size_bytes.
-  rows <syncdir> --assets ASSETS.json [--now ISO]
+       > 19 MiB) -> base64 text parts <syncdir>/parts/<case>__r<run>_<n>_<kind>_v<version>.b64.<k>.txt (text/plain,
+       desk_sync.split_b64; every part decodes on its own; no row id in the name, so a renumber needs no re-upload),
+       row field asset_parts = [ids] in order. Rows also carry content_type and size_bytes.
+  rows <syncdir> --assets ASSETS.json --first-id N [--now ISO]
        ASSETS.json = {"<uploaded path or its basename>": "<asset id>", ...} (from the Artifact publish results).
+       N           = the first case_files id, ODD (the worker's half of the id space, contract §6 / DESK_WORKER §1): the
+                     smallest odd number above the highest case_files id; the rows get N, N+2, N+4 …; an even N -> exit 1.
+                     A create refused because the doc exists -> re-read the highest id and run `rows` again with the new
+                     N (same assets, no re-upload).
        Writes <syncdir>/writes.json = ArtifactData batch entries (op set, collection case_files, doc_id = String(id),
        inline data; new documents -> no if_version; storage_path "asset:<id>" + asset_id, or "asset-parts:<n>" +
-       asset_parts, as the page's storeBlob writes them) and prints the uploaded list [{kind, name, version}] for the
-       activity row. Exit 1 when an asset id is missing (nothing must be written then).
+       asset_parts, as the page's storeBlob writes them), prints the uploaded list [{kind, name, version}] for the
+       activity row on stdout and the ids used on stderr. Exit 1 when an asset id is missing (nothing must be written then).
 """
 import json
 import os
@@ -45,6 +50,8 @@ EXTRA = (("order_draft", "_Order_Draft.docx"), ("parawise", "_Parawise.docx"), (
 PREVIEW_RE = ("_Study.pdf", "_Note_and_Letter.pdf", "_Note.pdf", "_Letter.pdf", "_Order_Draft.pdf", "_Parawise.pdf",
               "_Affidavit.pdf", "_LQ_Answer.pdf")
 SPEC_FILES = ("spec.json", "enclosures.json")
+KINDS = {k for k, _ in MAIN3} | {k for k, _ in EXTRA}
+BAD_PKG = "_Proposal_with_GRs.pdf"
 
 
 def _rows(v):
@@ -149,44 +156,49 @@ def plan(argv):
             i = argv.index(name); vals.append(argv[i + 1]); del argv[i:i + 2]
         return vals if many else (vals[-1] if vals else default)
     files_p, next_id = opt("--files"), opt("--next-id")
+    if next_id is not None:
+        print("desk_publish plan: --next-id is ignored (ids are assigned by `rows --first-id`)", file=sys.stderr)
     work, kinds, pkg = opt("--work"), opt("--kinds"), opt("--package-name")
     adds = opt("--add", many=True)
     no_spec = "--no-spec" in argv
     if no_spec:
         argv.remove("--no-spec")
-    if len(argv) != 4 or not files_p or not str(next_id or "").isdigit():
+    if len(argv) != 4 or not files_p:
         sys.exit(__doc__)
+    if pkg and pkg.endswith(BAD_PKG):
+        sys.exit(f"desk_publish: package name must be the original proposal name, not *{BAD_PKG} (§4.16)")
     cid, out, run_id, sync = argv[0], os.path.abspath(argv[1]), argv[2], os.path.abspath(argv[3])
     files = [r for r in _rows(json.load(open(files_p, encoding="utf-8"))) if str(r.get("case_id")) == str(cid)]
     work = os.path.abspath(work) if work else os.path.dirname(out)
     st_p = os.path.join(out, "status.json")
     status = json.load(open(st_p, encoding="utf-8")) if os.path.isfile(st_p) else {}
     status = status if isinstance(status, dict) else {}
-    kinds = [k for k in (kinds or "").split(",") if k] or None
+    kinds = [k.strip() for k in (kinds or "").split(",") if k.strip()] or None
+    bad = [k for k in (kinds or []) if k not in KINDS]
+    if bad:
+        sys.exit(f"desk_publish: unknown --kinds {','.join(bad)} (known: {','.join(sorted(KINDS))})")
     items = collect(cid, out, files, work, kinds, pkg, adds, no_spec, status)
     os.makedirs(sync, exist_ok=True)
-    uploads, rows, nid, vers = [], [], int(next_id), {}
-    for kind, path, name in items:
+    uploads, rows, vers = [], [], {}
+    for pos, (kind, path, name) in enumerate(items):
         if kind not in vers:
             vers[kind] = next_version(files, kind)   # spec.json + enclosures.json share one version
         big = os.path.getsize(path) > ASSET_MAX
         meta = {"content_type": ctype(name), "size_bytes": os.path.getsize(path)}
         if not path.lower().endswith(".pdf") or big:   # contract: only a PDF <= 19 MiB is one asset
-            parts = split_b64(path, cid, f"r{run_id}_{kind}_{nid}", os.path.join(sync, "parts"))
+            parts = split_b64(path, cid, f"r{run_id}_{pos:02d}_{kind}_v{vers[kind]}", os.path.join(sync, "parts"))
             for q in parts:
                 uploads.append({"path": q, "kind": kind, "name": name, "type": "text/plain"})
-            rows.append({"id": nid, "kind": kind, "name": name, "version": vers[kind], "store": "asset_parts",
+            rows.append({"kind": kind, "name": name, "version": vers[kind], "store": "asset_parts",
                          "paths": parts, **meta})
         else:
             uploads.append({"path": path, "kind": kind, "name": name, "type": "application/pdf"})
-            rows.append({"id": nid, "kind": kind, "name": name, "version": vers[kind], "store": "asset", "paths": [path],
+            rows.append({"kind": kind, "name": name, "version": vers[kind], "store": "asset", "paths": [path],
                          **meta})
-        nid += 1
     json.dump(uploads, open(os.path.join(sync, "uploads.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     with open(os.path.join(sync, "uploads.txt"), "w", encoding="utf-8") as f:
         f.write("".join(u["path"] + "\n" for u in uploads))
-    json.dump({"case_id": int(cid) if str(cid).isdigit() else cid, "run_id": run_id, "rows": rows,
-               "seq_next": nid},
+    json.dump({"case_id": int(cid) if str(cid).isdigit() else cid, "run_id": run_id, "rows": rows},
               open(os.path.join(sync, "plan.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     if status and not kinds:
         lst = lambda k: status.get(k) if isinstance(status.get(k), list) else []
@@ -201,13 +213,18 @@ def plan(argv):
 
 
 def rows_cmd(argv):
-    assets_p = now = None
+    assets_p = now = first = None
+    if "--first-id" in argv:
+        i = argv.index("--first-id"); first = argv[i + 1]; del argv[i:i + 2]
     if "--assets" in argv:
         i = argv.index("--assets"); assets_p = argv[i + 1]; del argv[i:i + 2]
     if "--now" in argv:
         i = argv.index("--now"); now = argv[i + 1]; del argv[i:i + 2]
-    if len(argv) != 1 or not assets_p:
+    if len(argv) != 1 or not assets_p or not str(first or "").isdigit():
         sys.exit(__doc__)
+    nid = int(first)
+    if nid % 2 == 0:
+        sys.exit(f"desk_publish rows: --first-id {nid} is even — the worker takes odd ids only (the page takes even ones)")
     sync = os.path.abspath(argv[0])
     pl = json.load(open(os.path.join(sync, "plan.json"), encoding="utf-8"))
     ids = json.load(open(assets_p, encoding="utf-8"))
@@ -220,20 +237,22 @@ def rows_cmd(argv):
         if not v:
             sys.exit(f"desk_publish rows: no asset id for {os.path.basename(p)} — write nothing")
         return str(v)
-    writes, done = [], []
+    writes, done, used = [], [], []
     for r in pl["rows"]:
         got = [aid(p) for p in r["paths"]]
-        data = {"id": r["id"], "case_id": pl["case_id"], "kind": r["kind"], "original_name": r["name"],
+        data = {"id": nid, "case_id": pl["case_id"], "kind": r["kind"], "original_name": r["name"],
                 "version": r["version"], "uploaded_by": None, "created_at": now,
                 "content_type": r.get("content_type"), "size_bytes": r.get("size_bytes")}
         if r["store"] == "asset":
             data.update(storage_path=f"asset:{got[0]}", asset_id=got[0], asset_parts=None)
         else:
             data.update(storage_path=f"asset-parts:{len(got)}", asset_id=None, asset_parts=got)
-        writes.append({"op": "set", "collection": "case_files", "doc_id": str(r["id"]), "data": data})
+        writes.append({"op": "set", "collection": "case_files", "doc_id": str(nid), "data": data})
         done.append({"kind": r["kind"], "name": r["name"], "version": r["version"]})
+        used.append(nid); nid += 2
     json.dump(writes, open(os.path.join(sync, "writes.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     print(json.dumps(done, ensure_ascii=False))
+    print("desk_publish rows: case_files ids " + ",".join(map(str, used)), file=sys.stderr)
     return 0
 
 

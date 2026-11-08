@@ -6,21 +6,27 @@ private repo under cases/, chat is the main path, engine stopped).
   save    <case_id> --work DIR --proposal PDF --package-name NAME --prefix PREFIX [--note TEXT]
           copies DIR/{spec,study,enclosures,marks}.json (those present) + the proposal PDF into cases/<case_id>/;
           enclosure / proposal_parts sources outside the repo are copied to cases/<case_id>/src/ and their paths
-          rewritten (repo-relative); writes case.json and appends one line to history.tsv.
+          rewritten (repo-relative; a different file with a basename already in src/ gets <stem>~<8 hex of its
+          sha256><ext>, the same content reuses the existing copy); writes case.json and appends one line to history.tsv.
   load    <case_id> <workdir>
           copies the saved files into <workdir> (paths in enclosures.json stay repo-relative; run from the repo root)
           and prints case.json.
-  rebuild <case_id> <outdir> [--package] [--no-study]
+  rebuild <case_id> <outdir> [--package] [--no-study] [--original-name NAME] [--desk ID] [--case-meta FILE]
+          [--lint-baseline SPEC_BEFORE.json]
           rebuilds from the saved state only: (--package: pkg3 + highlight marks.json) -> lint -> every builder whose
           spec key is present (note/letter always; order(s), parawise, affidavit, lq) -> Study -> verify_outputs ->
           preview PNGs of the Note_and_Letter PDF in <outdir>/preview/. Exit code = verify's exit code (or the first
           failing step). Without --package the package PDF of the last rebuild in <outdir> (or cases/<id>/package.pdf
           if saved there) is reused, so a note-only correction costs one build.
+          --original-name / --desk / --case-meta are passed to verify_outputs.py as they are (package name = the
+          original proposal name §4.16, desk profile id, case row {file_no, cr_no, cr_year} for the letter number).
+          --lint-baseline: a correction round — the lint gate is tools/lint_compare.py <baseline> <saved spec> (fails
+          only on an error the baseline spec did not have) instead of the plain lint.
   list    print saved cases (id, prefix, saved_at, last history note).
 
 Run from the repo root. The proposal PDF is confidential: cases/ lives only in this private repo (Abhi 07.11.2026).
 """
-import sys, os, json, shutil, subprocess, datetime
+import sys, os, json, shutil, subprocess, datetime, hashlib
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CASES = os.path.join(ROOT, "cases")
@@ -59,8 +65,20 @@ def _localise(path, cdir):
         sys.exit(f"case_state: enclosure source not found: {path}")
     os.makedirs(os.path.join(cdir, "src"), exist_ok=True)
     dst = os.path.join(cdir, "src", os.path.basename(ap))
-    shutil.copy2(ap, dst)
+    if os.path.exists(dst) and _sha(dst) != _sha(ap):
+        stem, ext = os.path.splitext(os.path.basename(ap))
+        dst = os.path.join(cdir, "src", f"{stem}~{_sha(ap)[:8]}{ext}")   # two different files, one basename
+    if not (os.path.exists(dst) and _sha(dst) == _sha(ap)):
+        shutil.copy2(ap, dst)
     return os.path.relpath(dst, ROOT)
+
+
+def _sha(p):
+    h = hashlib.sha256()
+    with open(p, "rb") as f:
+        for b in iter(lambda: f.read(1 << 20), b""):
+            h.update(b)
+    return h.hexdigest()
 
 
 def _rewrite_enclosures(enc, cdir):
@@ -136,6 +154,12 @@ def _run(cmd):
 def rebuild(args):
     cid, out = args.pop(0), os.path.abspath(args.pop(0))
     do_pkg = _flag(args, "--package"); no_study = _flag(args, "--no-study")
+    vx = []
+    for k in ("--original-name", "--desk", "--case-meta"):
+        v = _arg(args, k)
+        if v:
+            vx += [k, v]
+    baseline = _arg(args, "--lint-baseline")
     cdir = os.path.join(CASES, cid)
     meta = json.load(open(os.path.join(cdir, "case.json"), encoding="utf-8"))
     os.makedirs(out, exist_ok=True)
@@ -165,7 +189,11 @@ def rebuild(args):
         total = pymupdf.open(pkg).page_count
     except Exception:
         pass
-    lint = [py, T("lint_spec.py"), spec] + (["--pages", str(total)] if total else [])
+    if baseline:   # correction round: only errors the edit added block it (DESK_WORKER §4.3)
+        lint = [py, T("lint_compare.py"), os.path.abspath(baseline), spec]
+    else:
+        lint = [py, T("lint_spec.py"), spec]
+    lint += ["--pages", str(total)] if total else []
     if _run(lint):
         return 1
     s = json.load(open(spec, encoding="utf-8"))
@@ -179,7 +207,7 @@ def rebuild(args):
     if not no_study and os.path.exists(study):
         if _run([py, T("build_study.py"), study, os.path.join(out, prefix + "_Study.docx")]):
             return 1
-    rc = _run([py, T("verify_outputs.py"), out, prefix, pkg, str(meta.get("proposal_pages") or 0)])
+    rc = _run([py, T("verify_outputs.py"), out, prefix, pkg, str(meta.get("proposal_pages") or 0)] + vx)
     prev = os.path.join(out, prefix + "_Note_and_Letter.pdf")
     if os.path.exists(prev):
         import pymupdf

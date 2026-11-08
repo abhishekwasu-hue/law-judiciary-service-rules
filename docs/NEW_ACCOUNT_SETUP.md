@@ -15,19 +15,23 @@ the skills, the scheduled task, the प्रस्ताव कक्ष page (
 | GR index / register index for the page | tools/desk_gr_index.py, tools/desk_register_index.py | built per page |
 
 ## Option 1 — same page, second account (recommended: one set of cases)
-1. Account 1 opens the page → Share → invite account 2's e-mail with **edit** access.
+1. Account 1 (the owner) opens the page → Share → invite account 2's e-mail as **Editor** (the page's db rules give write
+   access to Editors only; a Contributor or Viewer can read but not start work or change anything).
 2. Account 2 session (any chat/code session with this repo): create the scheduled task from docs/DESK_TASK_PROMPT.md
    (PAGE_URL = the shared page); note its id `trig_…`.
-3. In the page db, `meta/config.triggers[<account-2 viewer id>] = <its trig id>` (ArtifactData update on `meta/config`;
-   the viewer id = `members` doc id written when account 2 first opens the page). The page fires the viewer's own task
-   (a task can be fired only by its own account; src/lib/artifact/api.ts fireWorker).
+3. `meta/config` is owner-only (db rule `{"path":"meta","write":"owner"}`), so account 2 cannot write it: account 2 opens
+   the page once (this writes its `members/<viewer id>` doc) and gives its `trig_…` id to the owner. The owner's session
+   (account 1) then writes `meta/config.triggers[<account-2 viewer id>] = "<its trig id>"` (ArtifactData update on
+   `meta/config`, pinned; viewer id = account 2's `members` doc id). The page fires the viewer's own task (a task can be
+   fired only by its own account; src/lib/artifact/api.ts fireWorker); without that entry account 2 sees the
+   "work can be started only from the owner's account" message.
 4. Upload the four skills (step S below).
 
 ## Option 2 — own page in the second account
 1. `cd dashboard-app && npm ci && npm run build:artifact`.
 2. Publish `dashboard-app/dist-artifact/index.html` as a NEW artifact with files `icon.svg`, `icon-192.png`,
    `manifest.webmanifest`, `nasti/index.html` (from dist-artifact/) and capabilities
-   `{"assets":{},"db":{},"downloads":true,"user":{"scopes":["profile"]},"mcp":{"servers":[{"server":"Claude Code Remote","tools":["fire_trigger"]}]}}`.
+   `{"assets":{},"db":{"rules":[{"path":"","read":"view","write":"admin"},{"path":"meta","write":"owner"},{"path":"meta/worker","write":"admin"}]},"downloads":true,"user":{"scopes":["profile"]},"mcp":{"servers":[{"server":"Claude Code Remote","tools":["fire_trigger"]}]}}`.
 3. Seed: `python tools/desk_gr_index.py gr.json` and `python tools/desk_register_index.py reg.json` → upload both as
    assets → `meta/gr_library {asset}`, `meta/register_index {asset}`.
 4. Create the scheduled task (docs/DESK_TASK_PROMPT.md with the new PAGE_URL) → `meta/config {trigger_id}`.

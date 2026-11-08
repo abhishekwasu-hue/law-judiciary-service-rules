@@ -7,10 +7,21 @@ dashboard-app/src/lib/artifact (contract README there: collections = the Supabas
 (App B model) via the scheduled task. Live data migrated: case 1 = WP35697_2026 (state cases/desk-1/). The sections below
 (v2/v3 simple page, desk/proposal-desk.html) are the previous version, kept for reference.
 
+- Capabilities (v4, 08.11.2026 fix round; declared at publish, omit on a republish to keep):
+  `{"assets":{},"db":{"rules":[{"path":"","read":"view","write":"admin"},{"path":"meta","write":"owner"},{"path":"meta/worker","write":"admin"}]},"downloads":true,"user":{"scopes":["profile"]},"mcp":{"servers":[{"server":"Claude Code Remote","tools":["fire_trigger"]}]}}`
+  — everyone with access reads; writes need Editor ("admin") access, so a Contributor / Viewer is read-only; `meta/*`
+  (config, gr_library, register_index) only the owner; `meta/worker` (the worker lock) any Editor. Ids: page even, worker
+  odd (contract README "Numeric ids"); no `meta/seq_*` writes any more.
+- Per-account task ids: `meta/config.triggers[<viewer id>] = "trig_…"` (owner-written; docs/NEW_ACCOUNT_SETUP.md Option 1).
+
+> **Superseded for page version 4 (App B UI).** Everything below (v2 / v3 page, its `cases` / `outputs` / `edits` data model,
+> capabilities `"db": {}`) describes the old simple page and is kept for reference only. The working procedure for v4 is
+> docs/DESK_WORKER.md; the data contract is dashboard-app/src/lib/artifact/README.md.
+
 - Page: https://claude.ai/artifact/8cJP8wz6j5tYM5kRHK1rVx (private to Abhi). Source: `desk/proposal-desk.html`.
   Republish from this file with the Artifact tool (`url` = page link; read it first in a new session). Version 2 (07.11.2026)
   replaced the old v1 page another session had published there (its db was empty).
-- Capabilities (v3): `{"assets": {}, "db": {}, "downloads": true, "user": {"scopes": ["profile"]}, "mcp": {"servers": [{"server": "Claude Code Remote", "tools": ["fire_trigger"]}]}}` (omit on republish to keep).
+- Capabilities (v3, superseded — see v4 above): `{"assets": {}, "db": {}, "downloads": true, "user": {"scopes": ["profile"]}, "mcp": {"servers": [{"server": "Claude Code Remote", "tools": ["fire_trigger"]}]}}` (omit on republish to keep).
 - "▶ काम सुरू करा" (v3, 07.11.2026; Abhi: "मला सर्व ऑपरेट त्या पानावरूनच करायची आहे"): the page calls `fire_trigger` for the
   scheduled task "प्रस्ताव कक्ष — काम" (id in `meta/config.trigger_id`); a fresh cloud session follows docs/DESK_WORKER.md and
   writes `meta/worker` {state running|idle, step, note, at}. First press asks the viewer to allow the connector.
