@@ -22,7 +22,7 @@ const ARTIFACT = import.meta.env.VITE_BACKEND === 'artifact';
 declare global {
   interface ImportMetaEnv { readonly VITE_PAGE_URL?: string }
 }
-const PAGE_URL: string = ARTIFACT ? import.meta.env.VITE_PAGE_URL || 'https://claude.ai/artifact/8cJP8wz6j5tYM5kRHK1rVx' : '';
+const PAGE_URL: string = ARTIFACT ? import.meta.env.VITE_PAGE_URL || 'https://claude.ai/artifact/Hqf9Y7iKkDzNntsVCxXcB4' : '';
 /** Artifact build: a run of the case (full or edit) waits for "▶ पुन्हा सुरू करा". */
 const fireRunOf = (ctx: CaseCtx): Run | undefined => (ARTIFACT ? [latestRun(ctx.runs), ...(ctx.editRuns ?? [])].find(r => runNeedsFire(r)) : undefined);
 const needsFire = (ctx: CaseCtx) => !!fireRunOf(ctx);

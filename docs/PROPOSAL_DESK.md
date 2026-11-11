@@ -18,7 +18,7 @@ dashboard-app/src/lib/artifact (contract README there: collections = the Supabas
 > capabilities `"db": {}`) describes the old simple page and is kept for reference only. The working procedure for v4 is
 > docs/DESK_WORKER.md; the data contract is dashboard-app/src/lib/artifact/README.md.
 
-- Page: https://claude.ai/artifact/8cJP8wz6j5tYM5kRHK1rVx (private to Abhi). Source: `desk/proposal-desk.html`.
+- Page: https://claude.ai/artifact/Hqf9Y7iKkDzNntsVCxXcB4 (private to Abhi). Source: `desk/proposal-desk.html`.
   Republish from this file with the Artifact tool (`url` = page link; read it first in a new session). Version 2 (07.11.2026)
   replaced the old v1 page another session had published there (its db was empty).
 - Capabilities (v3, superseded — see v4 above): `{"assets": {}, "db": {}, "downloads": true, "user": {"scopes": ["profile"]}, "mcp": {"servers": [{"server": "Claude Code Remote", "tools": ["fire_trigger"]}]}}` (omit on republish to keep).

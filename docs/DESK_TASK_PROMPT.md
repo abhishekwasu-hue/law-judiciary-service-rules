@@ -10,5 +10,5 @@ Repo: abhishekwasu-hue/law-judiciary-service-rules, pre-cloned at /home/claude/l
 At the end send ONE short Marathi line with SendUserMessage (what was done, or that nothing was pending).
 ```
 
-Account 1 (abhi.wasu): task id trig_0146QjNWutrPw5SpNk5nLREJ, page https://claude.ai/artifact/8cJP8wz6j5tYM5kRHK1rVx.
-Account 2 (abhiwasu007, 08.11.2026): task id trig_01YBZmHYbBax7nFYxzyduV4K, same page (Option 1: needs Editor access on the page and the owner-written meta/config.triggers[<account-2 members id>]; runs in auto approval mode).
+Account 1 (abhi.wasu): task id trig_0146QjNWutrPw5SpNk5nLREJ — its page 8cJP8wz6j5tYM5kRHK1rVx was deleted (found 11.11.2026; that account's plan ended); not in use.
+Account 2 (abhiwasu007): task id trig_01YBZmHYbBax7nFYxzyduV4K (auto approval mode); since 11.11.2026 this account OWNS the page https://claude.ai/artifact/Hqf9Y7iKkDzNntsVCxXcB4 (Option 2), meta/config.trigger_id = this task.

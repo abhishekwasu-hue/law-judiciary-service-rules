@@ -8,7 +8,7 @@ export default defineConfig({
   define: {
     'import.meta.env.VITE_BACKEND': JSON.stringify('artifact'),
     // the published page's own link (WhatsApp share text, E-F6); override with VITE_PAGE_URL=… for another page
-    'import.meta.env.VITE_PAGE_URL': JSON.stringify(process.env.VITE_PAGE_URL || 'https://claude.ai/artifact/8cJP8wz6j5tYM5kRHK1rVx'),
+    'import.meta.env.VITE_PAGE_URL': JSON.stringify(process.env.VITE_PAGE_URL || 'https://claude.ai/artifact/Hqf9Y7iKkDzNntsVCxXcB4'),
   },
   build: { target: 'es2022', outDir: 'dist-artifact', assetsInlineLimit: 100_000_000, cssCodeSplit: false, chunkSizeWarningLimit: 20000 },
 });

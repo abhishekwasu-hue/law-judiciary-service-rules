@@ -1,4 +1,4 @@
-# HANDOVER — state as of 08.11.2026 (page v4 fix round done; page published 08.11.2026, version 6) (read after CLAUDE.md files)
+# HANDOVER — state as of 08.11.2026 (page v4; NEW page Hqf9Y7iKkDzNntsVCxXcB4 in account abhiwasu007 since 11.11.2026) (read after CLAUDE.md files)
 
 ## Done (all in this repo)
 - Procedure: INSTRUCTIONS.md §4 items 1–18 (§4.18, 01.11.2026: sentence flow + respectful language), PROPOSAL_SOP.md, PROPOSAL_WORKFLOW.md, samples/specs/ (approved notes), tools/ (mkdocs, build_note_letter, build_study, pkg3, highlight, lint_spec, verify_outputs, gr_request, oldcases_text, prep_pages).
@@ -146,8 +146,10 @@
 
 - 08.11.2026 page published: main a0be196 -> https://claude.ai/artifact/8cJP8wz6j5tYM5kRHK1rVx version 6 (id 1794111209-e670), files icon.svg, icon-192.png, manifest.webmanifest, nasti/index.html, db rules stored (root read view/write admin, meta owner, meta/worker admin). Checks: npm ci, tsc, selftest 19/19, build, build:artifact all pass; live source has "पुन्हा सुरू करा" and "locks/seq_". NOT verified: ArtifactData reads (cases/meta) refused from this session — the artifact is shared from another organization and invited editors cannot use its data from Claude Code; check from the owner account / the page itself.
 
+- 11.11.2026: old page 8cJP8wz6j5tYM5kRHK1rVx deleted (owner account abhi.wasu — plan ended; Abhi: not re-sharing, old page data not needed, drafts are in the repo). NEW page https://claude.ai/artifact/Hqf9Y7iKkDzNntsVCxXcB4 (owner abhiwasu007, Option 2 of docs/NEW_ACCOUNT_SETUP.md, pinned): version 2 = main build with VITE_PAGE_URL default changed, same files + capabilities (db rules stored); seeded meta/gr_library (asset a27433b18753b84b898378c5dcfaca8e, 964 PDFs), meta/register_index (asset 10a86483fb9c5dcb122d8e2706b226c0, 25 files), meta/config.trigger_id = trig_01YBZmHYbBax7nFYxzyduV4K (task prompt now points to the new page). Old URL replaced in SOP, DESK_WORKER, PROPOSAL_DESK, DESK_TASK_PROMPT, CaseTabs.tsx, vite.artifact.config.ts. Cases start empty (WP35697 not migrated). Not yet: first press of "▶ काम सुरू करा" on the new page (connector permission prompt) = the test.
+
 ## Pending
-29. **08.11.2026 page fix round leftovers:** page published 08.11.2026 (v6); db-read check from the owner account still open; then one live full run +
+29. **08.11.2026 page fix round leftovers:** page re-created 11.11.2026 as Hqf9Y7iKkDzNntsVCxXcB4 (db reads verified as owner); then one live full run +
     one edit run + one GR request (first real test of the retry, roles and odd/even ids); prune old `activity` rows
     (25,000-doc cap, A-M4); Low: A-L1, L2, L3, L6, L8; W-L2–L4, W-L6–L8; E-F11, E-F13–E-F16, E-F18 (phone CSS needs the
     audit screenshots); `/api/spend` still returns limit 1000 (unused in the page UI).

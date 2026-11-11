@@ -1,6 +1,6 @@
 # DESK_WORKER.md — App B runs queued on the प्रस्ताव कक्ष page (run by the scheduled task "प्रस्ताव कक्ष — काम")
 
-Abhi presses start on the page (https://claude.ai/artifact/8cJP8wz6j5tYM5kRHK1rVx = PAGE); that fires this task in a fresh
+Abhi presses start on the page (https://claude.ai/artifact/Hqf9Y7iKkDzNntsVCxXcB4 = PAGE); that fires this task in a fresh
 cloud session. The page runs App B's UI (dashboard-app/) in artifact mode: its db collections mirror the Supabase tables 1:1
 (`cases`, `case_files`, `runs`, `letters`, `activity`, `members`, `gr_library`; doc id = String(id); fields = SQL columns of
 supabase/migrations/ incl. later ones). The page contract is dashboard-app/src/lib/artifact/README.md — where it names a
