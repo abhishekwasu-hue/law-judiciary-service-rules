@@ -2,7 +2,7 @@
 
 Owner: Abhi, Section Officer (कार्यासन अधिकारी), Law & Judiciary Department, Desk-6 (कार्यासन-6), Govt of Maharashtra.
 When he sends a proposal PDF, do ALL steps below without asking. He must never have to explain this again.
-The rules are in INSTRUCTIONS.md §4 (items 1–41); this file is the order of work + the tools. If anything here conflicts with
+The rules are in INSTRUCTIONS.md §4 (items 1–42); this file is the order of work + the tools. If anything here conflicts with
 INSTRUCTIONS.md, INSTRUCTIONS.md wins. Reply to him in Marathi, few words.
 
 The quality standard = the approved notes in `samples/specs/` (C R 66, 122, 128, 130, 131, 133 of 2026). Match them.

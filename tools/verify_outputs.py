@@ -123,7 +123,7 @@ FONT_ATTRS = ("ascii", "hAnsi", "cs", "eastAsia")
 THEME_ATTRS = ("asciiTheme", "hAnsiTheme", "cstheme", "eastAsiaTheme")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 # shared rule definitions — ONE copy, in tools/lint_spec.py (pre-build lint uses the same rules)
-from lint_spec import (AMS, BANNED, BARE_CLOSING_RE, FIN, ID_RE, LH_EMAIL, RELATED, REF_NO, REPO_RE, REQUEST,  # noqa: E402,F401
+from lint_spec import (AMS, BANNED, BARE_CLOSING_RE, FIN, ID_RE, LH_EMAIL, RELATED, REF_NO, REPO_RE, REQUEST, has_request,  # noqa: E402,F401
                        MISSING_FORM, MISSING_HEAD, SIGNERS, banned_hits, desk_signers, finance_problems, heading_problems, id_hits,
                        lang_hits, ma_hits, ns, num, part_no, ref_problems, repo_hits, requests_info, signer_problems,
                        style_hits, unquoted, warn_hits, PKG_WORD, draft_word_hits, related_source_problems,
@@ -711,7 +711,7 @@ def main(argv):
             intro = next((t for t in lt if t.startswith(INTRO_HEAD)), None)
             rq = []
             if intro is None: rq.append("intro paragraph 'उपरोक्त विषयाबाबत …' missing")
-            elif requests_info(letter_info(lb, std_txt), intro) and REQUEST not in unquoted(intro): rq.append(f"intro lacks '{REQUEST}' — '…उपलब्ध करून देण्यात यावी, {REQUEST}.'")
+            elif requests_info(letter_info(lb, std_txt), intro) and not has_request(unquoted(intro)): rq.append(f"intro lacks '{REQUEST}' — '…उपलब्ध करून देण्यात यावी, {REQUEST}.'")
             check("letter intro request wording §4.18", rq)
             en = []
             if "आपला," not in lt: en.append("'आपला,' line missing")

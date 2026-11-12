@@ -38,7 +38,7 @@ AUDIT_KNOWN_WARNS = {
     },
     # CR130: the letter's intro sentence is the approved CR130 wording (the proposal PDF is not in the repo)
     'CR130_2026_old-pension_info-letter-via-HC': {
-        'letter.intro: sentence 1 has 44 words',
+        'letter.intro: sentence 1 has 45 words',   # 45 since §4.42 'मा.' (12.11.2026)
     },
     # HTE: the owner's own model note — the undertaking sentence "… उल्लेख नाही" is kept as written
     'HTE_2026_overpayment-waiver_finance-concurrence': {

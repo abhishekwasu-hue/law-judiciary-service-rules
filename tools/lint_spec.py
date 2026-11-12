@@ -239,6 +239,8 @@ FIN_ROUTE_RE = re.compile(rf"वित्त\s+विभागा{_ROUTE_TAIL}|�
 PHD_ROUTE_RE = re.compile(rf"सार्वजनिक\s+आरोग्य\s+विभागा{_ROUTE_TAIL}")
 INTRO_START = "उपरोक्त विषयाबाबत संदर्भाधीन"
 INTRO_HAS = "आपणांस कळविण्यात येते की,"
+# §4.42 (Abhi 12.11.2026, "विनंतीवजा वाक्य"): the request form "आपणांस विनंती करण्यात येते की, … कृपा करावी" is accepted too
+INTRO_HAS_ALT = ("आपणांस कळविण्यात येते की,", "आपणांस विनंती करण्यात येते की,")
 # Missing-information para (Abhi 05.11.2026, replaces the fixed opener "प्रस्तावासोबत खालील माहिती उपलब्ध नाही:-"):
 # "सदर प्रकरणी <प्राधिकारी> यांच्या दि. <DD.MM.YYYY> रोजीच्या प्रस्तावाचे अवलोकन केले असता, त्यामध्ये खालील माहिती आढळून
 # येत नाही:- (1) …; (2) …." — recognised by MISSING_NEW_RE; the old opener is still recognised (same §4.31 rules) + WARN.
@@ -342,11 +344,18 @@ STYLE_RULES = [
 LETTER_STYLE_RULES = [
     # GAD टिप्पणी लेखन व पत्रव्यवहार 12.3: letters to courts in "विशेष सौजन्यपूर्वक भाषा" (docs/STYLE_RESEARCH_LETTERS.md)
     (re.compile(r"अतितात्काळ|तात्काळ|तातडीने|त्वरित|ताबडतोब|विनाविलंब|अविलंब|सत्वर"),
-     "पत्राची भाषा — 'तात्काळ / तातडीने / त्वरित…' नको; 'लवकरात लवकर' वापरा (§4.18)"),
-    (re.compile(r"(?:करावी|करावा|करावे|द्यावी|द्यावा|द्यावे|यावी|यावीत|यावे|पाठवावी|पाठवावे|कळवावे)\s*\.(?!:-)"),
+     "पत्राची भाषा — 'तात्काळ / तातडीने / त्वरित…' नको; 'लवकरात लवकर' वापरा (§4.18); तातडीचे शब्द फक्त शासनाच्या "
+     "स्वतःच्या कामासाठी माहिती मागवताना — letter.urgent: true (§4.42)"),
+    (re.compile(r"(?<!कृपा )(?:करावी|करावा|करावे|द्यावी|द्यावा|द्यावे|यावी|यावीत|यावे|पाठवावी|पाठवावे|कळवावे)\s*\.(?!:-)"),
      "पत्राची भाषा — थेट आदेशात्मक शेवट; '…, ही विनंती.' अशी विनंतीपूर्वक मांडणी हवी (§4.18)"),
 ]
 REQUEST = "ही विनंती"
+REQUEST_ALT = ("ही विनंती", "कृपा करावी")   # §4.42: "… उपलब्ध करून देण्याची कृपा करावी" is a request too
+
+
+def has_request(t):
+    return any(r in t for r in REQUEST_ALT)
+URGENT_RE = LETTER_STYLE_RULES[0][0]
 ASK_RE = re.compile(r"उपलब्ध\s+करून\s+देण्यात\s+याव|पाठविण्यात\s+याव|कळविण्यात\s+याव|मागविण्यात\s+(?:आलेली|येत)")
 
 
@@ -376,11 +385,12 @@ def points_ask(points):
     return False
 
 
-def style_hits(text, letter=False):
+def style_hits(text, letter=False, urgent=False):
+    """urgent (letter.urgent, §4.42): the Government asks information for its own work — urgency words allowed."""
     t = unquoted(text)
     out = [msg for rx, msg in STYLE_RULES if (rx.search(unnamed(t)) if rx is DHD_RE else rx.search(t))]
     if letter:
-        out += [msg for rx, msg in LETTER_STYLE_RULES if rx.search(t)]
+        out += [msg for rx, msg in LETTER_STYLE_RULES if rx.search(t) and not (urgent and rx is URGENT_RE)]
     return out
 
 
@@ -462,6 +472,29 @@ WARN_RULES = [
      lambda mt: {"आपणास": "आपणांस", "यांनां": "यांना", "यानां": "यांना"}[mt.group(1)],
      lambda mt, fx: f"शुद्धलेखन नियम 1–4 (अनुस्वार, आदरार्थी) — '{mt.group(0)}' ऐवजी '{fx}' {_SRC}"),
 ]
+
+
+# §4.42 (Abhi 12.11.2026): "मा." before judicial officers too (प्रमुख जिल्हा व सत्र न्यायाधीश, जिल्हा न्यायाधीश, दिवाणी
+# न्यायाधीश …) — in the note and the letter, the addressee block included; WARN only (older approved samples lack it).
+# Urgency words ("लवकरात लवकर") only when the Government asks information for its own work (letter.urgent: true).
+JUDGE_RE = re.compile(r"(?<![ऀ-ॿ])((?:(?:प्रमुख|अपर|अतिरिक्त)\s+)?जिल्हा\s+व\s+सत्र\s+न्यायाधीश|सह\s+दिवाणी\s+न्यायाधीश)")
+
+
+def judge_ma_warns(spec, body, letter):
+    out = []
+    for path, t in body + letter:
+        u = unquoted(t)
+        for m in JUDGE_RE.finditer(u):
+            pre = u[max(0, m.start() - 12):m.start()]
+            if not re.search(r"मा\.\s?(?:[0-9]+\s*(?:वे|वा)\s+)?$", pre):
+                out.append(f"{path}: आदरार्थी उल्लेख — 'मा. {m.group(1)}' (§4.42)")
+                break
+    urgent = any(isinstance(L, dict) and L.get("urgent") for _, L in letters_of(spec))
+    if not urgent:
+        for path, t in letter:
+            if "लवकरात लवकर" in unquoted(t):
+                out.append(f"{path}: पत्राची भाषा — 'लवकरात लवकर' फक्त शासनाच्या स्वतःच्या कामासाठी (letter.urgent: true, §4.42)")
+    return out
 
 
 def warn_hits(text):
@@ -771,8 +804,9 @@ def lint_spec(spec, pages=None):
             P += [f"related[{i}].source: {x}" for x in related_source_problems(it["source"])]
     for path, t in body:
         P += [f"{path}: {m}" for m in style_hits(t)]
+    urgent = any(isinstance(L, dict) and L.get("urgent") for _, L in letters_of(spec))
     for path, t in letter:
-        P += [f"{path}: {m}" for m in style_hits(t, letter=True)]
+        P += [f"{path}: {m}" for m in style_hits(t, letter=True, urgent=urgent)]
     # §4.23: the letter's address-like fields (to, refs, copies) are not checked (audit A1, 02.11.2026)
     for path, t in body + [(pth, t) for pth, t in letter
                            if not re.match(r"letters?(?:\[\d+\])?\.(?:to|refs|copies)(?:\[|$)", pth)]:
@@ -903,9 +937,9 @@ def lint_letter(L, lp="letter", desk=None):
         it = ns(intro)
         if not it.startswith(INTRO_START):
             P.append(f"{lp}.intro: intro wording — must start with '{INTRO_START}'")
-        if INTRO_HAS not in it:
-            P.append(f"{lp}.intro: intro wording — must contain '{INTRO_HAS}'")
-        if requests_info(L, it) and REQUEST not in unquoted(it):
+        if not any(h in it for h in INTRO_HAS_ALT):
+            P.append(f"{lp}.intro: intro wording — must contain '{INTRO_HAS}' (or '{INTRO_HAS_ALT[1]}', §4.42)")
+        if requests_info(L, it) and not has_request(unquoted(it)):
             P.append(f"{lp}.intro: पत्राची भाषा — माहिती मागताना '…, {REQUEST}.' अशी विनंतीपूर्वक मांडणी हवी (§4.18)")
         if L.get("points") and not it.endswith(":-"):
             P.append(f"{lp}.intro: intro wording — must end with ':-' before the points")
@@ -914,7 +948,7 @@ def lint_letter(L, lp="letter", desk=None):
         r0 = (L.get("refs") or [""])[0] if isinstance(L.get("refs"), list) else ""
         if REMINDER_REF not in ns(str(r0)):
             P.append(f"{lp}.refs[0]: स्मरणपत्र (§4.21) — संदर्भ '{REMINDER_REF} दि. __'")
-        if isinstance(intro, str) and (REMINDER_HAS not in intro or REQUEST not in intro):
+        if isinstance(intro, str) and (REMINDER_HAS not in intro or not has_request(intro)):
             P.append(f"{lp}.intro: स्मरणपत्र (§4.21) — '… माहिती {REMINDER_HAS} आहे. … {REQUEST}.'")
     # §4.22 via the High Court, information from a District Judge -> copy line
     to_txt = " ".join(x for x in (L.get("to") or []) if isinstance(x, str))
@@ -1885,6 +1919,7 @@ def lint_warnings(spec):
     body = [x for k in ("first", "paras", "sub", "closing") if k in n for x in strings(n[k], f"note.{k}")]
     letter = letter_strings(spec)
     W = [f"{path}: {m}" for path, t in body + letter for m in warn_hits(t)]
+    W += judge_ma_warns(spec, body, letter)
     W += missing_scatter(note_seq(n))[1]   # §4.31 placement
     W += missing_inline_problems(n)[1]   # C2 (05.11.2026): a table after the missing-info para
     for path, t in body:   # 05.11.2026: the old opener is no longer used
