@@ -15,7 +15,7 @@ Library of Supreme Court and Bombay High Court judgments for Desk-6 (Law & Judic
 |---|---|
 | Pension is a right / property, not bounty | Deokinandan Prasad (1971); Iqbal Singh (1976); D.S. Nakara (1982); Poonamal (1985); Jitendra Kumar Srivastava (2013); Hira Lal (2020) |
 | Withholding of pension/gratuity needs statutory authority | Jitendra Kumar Srivastava (2013); Hira Lal (2020) |
-| Interest on delayed pension / gratuity / commuted pension | Padmanabhan Nair (1984); Prabhavati Devi (1996); Y.K. Singla (2012); D.D. Tewari (2014); Manilal Ambalal Patel (2019); Vinodkumar Dixit (Bom. 2018); Zamir Khan (Bom. 2020); Bhusnoor (Bom. 2017) |
+| Interest on delayed pension / gratuity / commuted pension | Padmanabhan Nair (1984); Prabhavati Devi (1996); Y.K. Singla (2012); D.D. Tewari (2014); Manilal Ambalal Patel (2019); Vijay L. Mehrotra (2000); Vinodkumar Dixit (Bom. 2018); Zamir Khan (Bom. 2020); Bhusnoor (Bom. 2017) |
 | Delay / limitation; arrears of pension; legal heirs | Mastan Bee (2002); Shiv Dass (2007); Tarsem Singh (2008); D.D. Tewari (2014) |
 | Recovery of excess payment | Rafiq Masih (2014) |
 | Presumption of death, S. 108 Evidence Act | N. Jayalakshmi Ammal (1994); LIC v. Anuradha (2004); Saroop Singh (2005); Nagpur Municipal Corp. v. Lalita (2025) |
@@ -601,8 +601,29 @@ Library of Supreme Court and Bombay High Court judgments for Desk-6 (Law & Judic
 
 - **Use in Desk-6 notes:** Interest on delayed commutation of pension under the Maharashtra Civil Services (Commutation of Pension) Rules, 1984 needs individual facts; mentions Rule 129[a] and 129[b] of the Maharashtra Civil Services (Pension) Rules and government circulars dated 31.05.2002 and 14.11.2002.
 
+## 27. Vijay L. Mehrotra v. State of U.P.
+
+- **Court / case no.:** Supreme Court of India; Civil Appeal No. 687 of 2000 (order on appeal limited to interest)
+- **Date:** 2000-01-31
+- **Citation:** (2000) 9 SCC 94 (as supplied by Desk-6; the saved copy prints no reporter citation). Later judgments cite the order as AIR 2000 SC 3513.
+- **Bench:** B.N. Kirpal, S. Rajendra Babu, JJ.
+- **File:** `pdf/judgments-service/A-pension/SC_2000-01-31_Vijay-L-Mehrotra-v-State-of-UP.txt`
+- **Source:** http://spotlawapp.com/judgementText/pdf/910012000/9100120000131007.pdf (third-party copy of the order; the first line of the file records the source; no official-site copy was located)
+- **Facts:** The appellant retired on 31.08.1997. Her GPF, GIS, leave encashment, arrears of pay, gratuity, commuted pension and a detained amount were paid between 27.11.1997 and 05.11.1999. Special leave was granted limited to the question of interest.
+- **Holding:** Retiral benefits are expected to be paid on the date of retirement or soon thereafter. As there was no reason or justification for the delay, the respondent was directed to pay simple interest at 18 per cent per annum from the date of retirement till the date of payment, within 12 weeks.
+- **Key paragraphs (verbatim):**
+
+  > “In case of an employee retiring after having rendered service, it is expected that all the payment of the retiral benefits should be paid on the date of retirement or soon thereafter if for some unforeseen circumstances the payments could not be made on the date of retirement.”
+  >
+  > — para 3
+
+  > “In this case, there is absolutely no reason or justification for not making the payments for months together. We, therefore, direct the respondent to pay to the appellant within 12 weeks from today simple interest at the rate of 18 per cent with effect from the date of her retirement, i.e., 31st August, 1997 till the date of payments.”
+  >
+  > — para 4
+
+- **Use in Desk-6 notes:** Interest on delayed payment of retiral benefits (GPF, gratuity, commuted pension, leave encashment) where no justification for the delay is on record. The order is a short order on its own facts; the rate (18 per cent) is as directed in that case.
+
 ## Not obtained / not included
 
-- Vijay L. Mehrotra v. State of U.P. ((2000) 9 SCC 94, interest on delayed pension): not obtained (indiankanoon search did not return it; no copy located).
 - Lal Chand Marwari v. Mahant Ramrup Gir (AIR 1926 PC 9) and Darshan Singh v. Gujjar Singh ((2002) 2 SCC 62): cited inside LIC v. Anuradha / Saroop Singh; not downloaded separately.
 - The Finance Department GR No. PEN-1089/491/SER-4 dated 05.07.1991 is discussed in the Bombay High Court judgments (Nos. Pramila Pandit Sagat, Shaikh Banubi, Asha Chafle) but is a Government Resolution, not a judgment, and is not part of this folder.
