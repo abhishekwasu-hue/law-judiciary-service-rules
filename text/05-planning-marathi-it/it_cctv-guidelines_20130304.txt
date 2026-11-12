@@ -1,0 +1,167 @@
+=== पृ. 1 (ocr) ===
+i
+|
+| (क)
+Government of Maharashtra
+Directorate of Information Technology
+7 Bloor, Mantralava, Mumbai
+Ref. No. Sankirna-20 12°C रे. 37/18
+Date: 04" March 2013
+Lo
+All Additional Chief Secretaries’ Pr Secretaries’Secretaries
+All Divisional Commissioners
+Subject: Guidelines for Implementation of CC PY Cameras in Government Offices
+Dear Ase fyb te
+
+As per the PH. filed at Mumbai High Court in the month of October 2011.
+regarding installation ef CCTV cameras in Government offices. the Hon. High Court
+has dirceted to assess the viability of installation of CCTV cameras in Government
+offices. This issue was subsequently discussed in cabinet meeting on 07" April 2012
+where it was decided to start with some selected Government altices.
+
+In view of this Chief Secretary has conducted mevtings/Video Conference with
+ACS Pr. Secretaries Secretaries of different departments and with all divisional
+commissioners. In these mectings t was discussed that there is a need to install
+CCTV in some Govt. departments and their divisiuns and districts level offiees’allied
+olfices institutes.
+
+During these meetings it was also discussed that broad guidelines will be issues
+by DIT and tendering process aleng with the provisions of funds shall be the
+responsibility of the respective departmenvoltice. Head of the departmentrespeclive
+divisional cammissioner shall take lead regarding undertaking proper tendering
+process and provisioning of finds,
+
+Please find enclosed broad technical guidelines.
+Thanking, You. dl ely.
+4
+(Rajesh Aggan ih )
+If Secretary
+
+=== पृ. 2 (ocr) ===
+Guidelines for _Implementation__of CCTV__Cameras हा
+
+Government Offices
+
+Areas to be covered by CCTV Cameras
+
+& Front Gate (Entry वि Points).
+
+% Corridors of Govt. offices
+
+& Arca offering citizen serives and where interaction with citizens is more,
+
+At hospitals, CCTV installation can he done especially in pediatric/gynecology wards but
+पाडत that patient privacy is not violated.
+
+क Ateducutional institutes, COTY iostullation t6 be done at exam halls.
+
+General & Operational Guidelines
+
+ब The CCTV cameras to be IP based.
+
+इ. जात that the Products and Solutions adhere to Open standards (Le. ensure that there
+are 16 proprietary standards leading to locking of techmelogy / solution).
+
+% Basic तिला Management System functionality needed to view reeorded videos, perform
+forward and rewind function ete. Designated officials should he able to see live feed or
+stored teed from their desktaps connected to CCTY system through LAN,
+
+% Video Data to be stored far 7 days on the primary storage (NAS / [isk Based Storage).
+
+@ In some cases if back-up of data is considered essential, then il can be stored at alternate
+place on DVAes / Paterna [ard Drives.
+
+Power backup to be ensured for cameras.
+
+4 Cameras to be mastly fixed pope. However, some Pan-Tilt-Zooam (P1Z) CCTV Cameras
+may be installed in ease: of specialized requirements.
+
+% Th open areas prone to heat/dust/raintall, the specifications are slightly different and
+also, the casing is af better specification (sce Annexure 1 Qutdoar Cameras).
+
+Integrated setution with camera, storage and video managment saftware, with 4 vears
+wartunty and maintenance should be purchased. Payment should be done only aller User
+Acceptance Test COAT) based em satisfactory functioning of cameras for a nionit, and
+proper training of statf to handle this.
+
+% None of the IT! Nen-IT equipments proposed by the vender should be End of Life
+product. Proposals to be accompanied by the OEM certificate that the product is not end
+of Jife prealuct & shall support for at least 5 vears from the date of Proposal Submission.
+
+च Recommended Techical Specifications for indeer, outdoor and PTZ CCTV cameras are
+enclosed at Annexure -1,
+
+* Proper financial procedures to be: followed.
+
+2 _
+| Te
+Sade
+
+=== पृ. 3 (ocr) ===
+जज्छे
+Annexure -1
+Reeommended Benchmark Specification for the CCTV Cameras
+S Undeor Came 1 1 हा...
+18 |Parameter | Recommended Minimum Specifications
+cL Video Compression iLebg
+त 2. Video Resolution : 1280 x 720 or above eee
+/ 2. : Frame rate न Minimum 25 fps in all resolutions |
+व. Image Sensors Minimum या Progressive Sean CCD/CMOS
+ह. Lens शिवी क$ digittwoom 11०
+7 Minimom Colour: tux, 3/W: 0.5 lux (at 30 IRE)
+रि Hlumination
+white balance. expesure control backlight compensation
+स. ताल | Built in Microphone ति री
+पळ Piutocal पणपगाड PIP SMTP RESP. RIVSTGP, UDP, RCP,
+DHCP, UPnP, OoS
+1. Security Password Protection, IP Address filtering, User Access Lag. .
+12. Operatingconditions छळत 11 र
+के. Casing “Tamper Resistant casing for Indoor Environment
+(Box er Dome}
+B. Outdoor Cameras
+L Video Compression | [L264
+2. | Video Resolution 1280 x 720 or above ee
+“pT Prame rates Minimum 2 fps in all resolutions शि वि
+“y | Image Sensor ~~)“ Minimum 1,3" Progressive Scan CCD/CMOS 7
+5. Lens Type | Fixed Foral/Varilocal, =
+6. | Lens | a.-Smun, 4x digital mon
+ii ति | Colour: 1 lux. B/W: 0.5 lux (at 20 किश्या
+| [यायाचा : त
+s. | Tmage settings Caripressian, colour, brightness sharpness, contrast, _ ~~
+| | white balance, exposure control, backlight compensation ;
+| 11.
+fhe
+
+=== पृ. 4 (ocr) ===
+®
+[aces ण कड lL i Microphone पणा
+to, Protocol FEREWVTTFIPS, tp, SMTP, शकता पताल RICE.
+न जाला, UPnP, Qos
+“rr Security “Password Protection, IP Address filtering, User Access Log,
+“12. | Operating conditions fowsoe शिश
+3. ता | Outdoor Cameras (in open sky) to inchude 1P66 Casing.
+i - (Box ar Domne} -
+C. PTZ Cameras
+|# Parameter "| Recommended Specifications “SATE
+1. Video Compression H.264
+“3. शिकता Minimum 2g fps in all resolutions — et
+व. Image Sensors” Progressive Sean CMOS CCD ~~
+5. Lens Type | Fixed Foeal/Varifocal_ वाया
+8. वळाड | कै digital am, 1ox Optical Zoom —
+ह. Minimum i Colaur: as Tax, BAW: 0.1 lay (ait 30 IRE} शिया
+Hlumination i
+: 8. ! Panning Range ~~" 21818) degeces लाचीहडी शि । शिया |
+ला ~ Tilting Range चि a deatees to 90 degrees eee त
+t
+tO lmage settings ति न Compression, colour, brightness, sharpness, contrast a
+white balance. exposure control, backlight compensation,
+Suto Tracking, Pre-Set Tour Settings
+uo Audio “Buik in Microphone शिया
+“iz. फळा पाण HIETPS, ETP, SMTP, राक, RTP, FCP, UDP, RTCP, .
+| | DHCP, एभा. Gos ;
+: i 1. ane 1111. डड
+13. Security - Password Protection, IP Address filtering, User Access Loy |
+“lq Operatingconditions olago’C
+(13. Casing Tamper Resistant casing for ndoor Environment
+eee
+

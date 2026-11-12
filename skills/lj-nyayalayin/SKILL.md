@@ -41,6 +41,7 @@ Abhi (कार्यासन अधिकारी, कार्यासन-6
 - पृष्ठ-संदर्भ = PDF पान क्रमांक.
 
 ## 3. तरतुदी, GR, पूर्वोदाहरणे (SOP Step 2; §4.14)
+- आधी तयार साहित्य: `docs/cards/00-INDEX.md` (मागणी-प्रकाराचे कार्ड), `python3 tools/gr_text.py grep …` (मजकूर-कोश; पान-प्रतिमा फक्त उद्धृत पानाची), `docs/gr_study/` (docs/RULES_DIGEST.md).
 - रेपो: `register/`, `pdf/`, `pdf/gr/INDEX.tsv`, `service-rules/`, `precedent-library/` (unzip, `00-INDEX.docx`), `working-notes/CASE-REGISTER.md`, `सन ... प्रकरणे.zip` (याच कर्मचाऱ्याची / विषयाची नस्ती — पूर्वीचा वित्त अभिप्राय).
 - GR नसेल तर स्वतः मिळवा: archive.org `advancedsearch.php?q=collection:maharashtragr+AND+date:[…]` (सांकेतांकाचे शेवटचे 2 अंक: 12 विधि व न्याय, 05 वित्त); PDF `archive.org/download/in.gov.maharashtra.gr.<code>/<code>.pdf` किंवा `gr.maharashtra.gov.in/Site/Upload/Government%20Resolutions/Marathi/<code>.pdf`; नाहीतर `tools/gr-request.txt` + `python3 tools/gr_request.py` / push. → `pdf/gr/` + `INDEX.tsv`. तरीही नाही → सांकेतांक एका ओळीत विचारा, काम चालू.
 - न्यायालयीन आदेश फक्त api.sci.gov.in / bombayhighcourt.nic.in (`pdf/sc/`); तृतीय-पक्ष स्रोत नाही (§1.3).

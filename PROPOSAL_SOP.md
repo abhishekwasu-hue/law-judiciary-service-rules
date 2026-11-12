@@ -39,6 +39,7 @@ Trigger: Abhi says "प्रस्ताव कक्षातील नवी�
 ## Step 2 — Find the provisions and precedents
 1. List every GR / rule / circular / court order mentioned in the proposal, plus those needed to decide it.
 2. Look in the repo: `pdf/`, `pdf/gr/INDEX.tsv`, `register/*.md` (verified extracts), `service-rules/`, `precedent-library/` (unzip; 00-INDEX), `medical-bill/` for medical cases.
+   - **First (12.11.2026, saves tokens):** the ready card `docs/cards/00-INDEX.md` -> card of the demand type (GR paras verbatim, verified enclosure + highlight entries, essential-information checklist); the text cache `python3 tools/gr_text.py grep <regex>` / `show <pdf> <page>` instead of OCR / page images of repo PDFs (image only for the quoted page); detailed studies `docs/gr_study/`. See docs/RULES_DIGEST.md.
 3. Missing GR → fetch it yourself (§4.14). No need to ask the user.
    - **Code known:** official URL `https://gr.maharashtra.gov.in/Site/Upload/Government%20Resolutions/Marathi/<code>.pdf`.
    - **Code unknown:** search the archive.org mirror by date and department: `https://archive.org/advancedsearch.php?q=collection:maharashtragr AND date:[YYYY-MM-DD TO YYYY-MM-DD]&fl[]=identifier&fl[]=description&fl[]=subject&rows=500&output=json`.

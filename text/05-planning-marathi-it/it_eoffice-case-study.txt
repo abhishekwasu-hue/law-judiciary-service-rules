@@ -1,0 +1,657 @@
+=== पृ. 1 (textlayer) ===
+GOVERNMENT OF MAHARASHTRA
+Case Study on
+implementation of eOffice in
+Mantralaya, Mumbai
+Rajesh Aggarwal (Secretary-IT, Mantralaya,  Mumbai), Virendra Singh (Director-IT, Mantralaya,
+Mumbai) & Sudhanshu Bohra (Consultant, Mantralaya, Mumbai)
+
+=== पृ. 2 (textlayer) ===
+Case Study on implementation of eOffice in Mantralaya, Mumbai
+Contents
+Abstract........................................................................................................................................... 2
+Keywords ........................................................................................................................................ 2
+Note to the Practitioners.................................................................................................................. 3
+Project Description.......................................................................................................................... 4
+Background................................................................................................................................. 5
+Project Overview ............................................................................................................................ 6
+Objectives ................................................................................................................................... 6
+Implementation Strategy............................................................................................................. 8
+Mode of transformation & Strategies adopted for transformation.............................................. 9
+Outcomes .................................................................................................................................. 12
+Key Lessons and Achievements ................................................................................................... 14
+Achievements............................................................................................................................ 14
+Lessons Learnt .......................................................................................................................... 14
+References..................................................................................................................................... 16
+Profile of the authors..................................................................................................................... 16
+Project Case Fact Sheet................................................................................................................. 18
+1
+
+=== पृ. 3 (textlayer) ===
+Case Study on implementation of eOffice in Mantralaya, Mumbai
+Abstract
+The need for effectiveness and transparency in Government processes and service delivery
+mechanism is a long-felt one. The physical file movement of these documents incurs a lot of
+time and requires a continuous monitoring from desk to desk before the final decision is made by
+the senior officials. Consequently, many crucial decisions get delayed due to the slow movement
+of files and/or unavailability or absence of the senior officials in the office for clearing these
+files. Theft and missing of files is also not uncommon in most of the government offices. The
+immediate need in this scenario was to have a system where an authorized employee can locate
+the required documents and/or files in the shortest possible time, update and share them with
+other relevant users and eventually store them with proper reference. This will make the system
+not only efficient by speeding up the decision making process but also make the office virtually
+paperless
+eOffice is a step forward into an era of paperless administration in Maharashtra. It is a Digital
+Workplace Solution that replaces the existing manual handling of files and documents with an
+efficient electronic system. Being an electronic system, it has its inherent advantages such as data
+is stored digitally with audit trails for every transaction being done. Regular backups and
+Disaster Recovery systems are in place which ensure that Government files are not damaged in
+case of any mishap. In addition, this being a web based application, people can access it from
+anywhere on VPN continue working while at offsite.
+Based on this case of eOffice implementation in Mantralaya, Mumbai, this document aims at
+creating a need for eOffice in the minds of readers while developing an understanding of the 3
+stage model of eOffice implementation and revealing the ways to overcome the challenges faced
+during the implementation.
+eywords
+eOffice, Mantralaya, DIT Government of Maharashtra, Paperless Administration
+2
+
+=== पृ. 4 (textlayer) ===
+Case Study on implementation of eOffice in Mantralaya, Mumbai
+Note to the Practitioners
+The first thing we see when we enter into the government office is stack of papers and lots of
+files, piled high on the desks, sometimes making it difficult to find a place or to find a person
+behind those files. Think about the about the people who work every day with these files –
+creating, retrieving, signing, moving, storing, and searching.
+In a sample study it was found that due to the large number of physical files, the average search
+time for any document is 18 -20 min minutes and sometimes these files are never found.
+Misplacement of files is a very common issue and at any given time about 3-5% of
+organisation‟s files are lost or misplaced. In organizations where there is lot of paper based work,
+half of the office‟s time is spent in handling paper or data entry. In spite of this effort, 92 percent
+of information is in manila folders.
+Physical file management has been a part of Government since ages.Mantralaya was no different
+in terms of the huge volumes of file movement within departments.Protecting the files kept in
+record rooms from wear and tear and any misuse was another challenge. In any unforeseen event
+such as fire, no backups were available for the physical files.
+Seeking a way to address the aforementioned factors, Directorate of IT decided to start a
+Document Journey Management System which involved scanning and digitization of files and
+receipts so that the same could be tracked with the help of an application. However, the scope of
+this document tracking application was limited to reducing the time to search a document or file
+in a particular Department.
+The big question was „how to ensure that intra and inter-departmental file movement is
+monitored closely so that the time consuming processes and nodal points are weeded out?‟ So,
+did Directorate of IT miss the trick? Could there be another solution which could bring a
+transformation in terms of functioning of State Government Office of Maharashtra comprising
+6000 employees? Was it possible to reengineer Government processes, while using standard
+operating procedures, in a manner that could result in narrowing down the quantum of
+unproductive and unyielding processes?
+3
+
+=== पृ. 5 (textlayer) ===
+Case Study on implementation of eOffice in Mantralaya, Mumbai
+The case study of eOffice implementation in Matralaya, Maharashtra will answer all the
+aforementioned questions and explain how this digital workplace solution has been the one stop
+solution to migrate into complete electronic File management system and how Government of
+Maharashtra has taken the leap of transforming the age old system of physical file movement to a
+fast, transparent and accountable file movement which is electronic in nature. This solution is
+highly replicable and would give tremendous benefits to Government administration, resulting in
+a better service delivery to citizens.
+Project Description
+eOffice, a product developed by National Informatics Center, is helping Government
+departments go paperless. It is aimed at improving internal efficiencies in an organization
+through electronic administration. eOffice is a software that defines workflow of Mantralaya and
+enables departments to work on files through the medium of computers connected via
+Maharashtra State Wide Area Network or NICNET, a point-to-point connectivity.
+At the planning stage of eOffice, Government of Maharashtra had to decide which departments
+should be taken on board for eOffice implementation on a pilot basis. Considering the fact that
+eOffice should begin in such a department which defines leadership to implement the change in
+Government Office functioning, it was decided that eOffice should begin with the Chief
+Minister‟s office and Governor‟s Office. This move helped in spreading the eOffice buzz and
+interestingly resulted in other departments requesting for speedy eOffice implementation in their
+offices and organizations. In order to drive an ICT based project like this one, it was imperative
+to include IT Department in the list of starters while considering the high number of files and
+letters received in an office, National Rural Health Mission‟s offices in Mumbai and Pune were
+selected for pilot implementation. Apart from the current implementation in all Mantralaya
+departments, the Government of Maharashtra is also planning for this paperless electronic
+solution of eOffice in districts of Konkan region, MCGM, MMRDA and ZP Sindhudurg etc.
+4
+
+=== पृ. 6 (textlayer) ===
+Case Study on implementation of eOffice in Mantralaya, Mumbai
+Background
+On 21st June 2012, an unforeseen incident of fire break out happened in Mantralaya, Mumbai
+resulting in loss of massive files belonging to 18 departments. Aftermath of this incident the
+Maharashtra government has taken an ambitious decision to go paperless. Government of
+Maharashtra, has undertaken the initiative of digitizing all the closed files since year 2009.
+However, after June 2012, decision has been taken to move into a end to end digital file
+management system.
+Directorate of IT under the guidance of Hon‟ble Secretary has done the study of eFile systems in
+various states and various products. Digigov from TCS and eOffice from NIC had been
+evaluated and it was decided to go with implementing eOffice. The decision was based on
+various reasons including the fact that eOffice is a product of a Central Government organization
+and hence is more reliable while also appreciating that eOffice, with its six modules covering file
+management, tour management, leave management, personnel information management system,
+Collaboration & Messaging Services andKnowledge Management System, has more number of
+utilitiesand hence will have a greater reach to users.
+The First File in e-office at Mantralaya was processed in October 2012 at CM office. Currently
+all departments of Mantralaya have completed the prerequisites and have started to use eOffice.
+More than 17,459 files and 1,33,901 receipts have been already been created in eOffice. About
+3,01,371 transactions have taken place in eOffice at Mantralaya so far. As on date, all
+departments are using eFile system in eOffice while a few have started using eLeave and KMS
+modules.
+5
+
+=== पृ. 7 (textlayer) ===
+Case Study on implementation of eOffice in Mantralaya, Mumbai
+Project Overview
+Objectives
+Bringing an institutional systemic change: eOffice is a complete digital work place solution
+for government offices that is built based on the Central Government Manual of Procedures. By
+taking up eOffice implementation, Government of Maharashtra, not only implementing the
+product, but also bringing the radical change in the way government offices function using ICT.
+In addition eOffice will bring standardization across department – standard file heads; standard
+way of writing notes; standard way sharing knowledge etc.
+eOffice provides an effective monitoring mechanism to monitor the performance of individuals,
+pendency of files, files cleared, files worked on, leave status etc. on finger tips which was not
+available earlier. Departments/sections submit their own reports which could not be cross
+verified. This monitoring mechanism will increase the accountability and responsibility of staff
+at all levels and bring a positive change in the administrative system.
+Making public delivery systems efficient and corruption free: eOffice brings avenues to
+improve the public delivery and eliminate malpractices in government offices. Speed and
+efficiency that eOffice brings enables informed and quicker decision making within government
+offices, which will lead to better public service delivery.
+-
+Empowers users to take faster and right decisions by providing information on finger tips.
+-
+All transactions are captured with audit trails and cannot tampered for ever
+-
+Unproductive, unintended touch points/dealing hands for any file movement are
+eliminated
+-
+Right file submission path can be tracked and monitored
+-
+Monitoring mechanism available to track file pendency and users can be made
+accountable for pending files
+-
+Ensure Authenticity of records with use digital signatures
+-
+Faster and efficient File tracking
+6
+
+=== पृ. 8 (textlayer) ===
+Case Study on implementation of eOffice in Mantralaya, Mumbai
+Readiness to Disasters: As stated in the background, fire accidents can cause loss of physical
+files, which can never be retrieved. Important decisions, files that can impact citizens or
+government can be hampered due to loss of files. eOffice as an alternative to physical file
+movement, will leave no chance for loosing files in disasters. While eOffice implementation is
+helping the state primarily as the disaster management, it also aims at significantly improving the
+operational efficiency.
+Be a leader in eGovernance and be a Role Model: Government of Maharashtra has always
+been a leader in ICT and eGovernance initiatives driven by Central and State, as confirmed
+officially by NASSCOM in its eGovReach initiative.Government of Maharashtra has been in the
+forefront of adapting to new technologies, new products and being a role model for fellow states.
+eOffice is a Mission Mode Project by Department of Administrative Reforms and Public
+Grievance as a part of National eGovernance Plan. Government offices across state provide
+various citizen services and drive key administrative decisions to run the government.
+Government of Maharashtra, a leader in eGovernance, shall always strive to lay foundation for
+eliminating inefficient practices with use of ICT. By implementing eOffice product suite,
+distance between offices, departments has reduced and file scan be exchanged instantly. This
+application also acts a global address book to know contact details of any user.
+Go paperless and Go Green: As per study, on an average, a document is photocopied 19 times.
+Paper files get doubled every 3.5 years and paper usage in an average office grows 22 percent a
+year and doubles every 3.3 years which keeps adding to the new filing cabinets and resources to
+manage these. A letter has to pass through 41 steps and entered in dozens of the registers before
+it is answered. The average time to retrieve and file a paper document is 10 minutes. Due to the
+large number of physical files, average search time for any document is 18 -20 min minutes and
+sometimes these files are never found. Misplacement of files is a very common issue and at any
+given time about 3-5% of organization‟s files are lost or misplaced. In organizations where there
+is lot of paper based work, half of the office‟s time is spent in handling paper or data entry. In
+spite of this effort, 92 percent of information is in manila folders.
+If we just glance at the environmental repercussions of the usage of the paper, it would be
+pertinent to note that only 12500 sheets of paper can be made from a fully grown tree. Now
+7
+
+=== पृ. 9 (textlayer) ===
+Case Study on implementation of eOffice in Mantralaya, Mumbai
+translating it into the “green damage”, it would be noteworthy that on an average 210 billion
+sheets of paper are sent by fax every year. Leave aside the other paper usage which if quantified
+will be sufficient to make one faint, imagining the number of trees that are sacrificed for meeting
+these requirements. What is more disturbing is that about 95% of this paper will eventually be
+thrown away.
+Implementation Strategy
+Implementation at Mantralaya has been done in very planned manner. Three phases of planning
+preparation and Implementation has been identified and activities in each of these are driven by
+DIT and head of the departments, under the guidance Hon‟ble Chief Secretary
+Planning
+e-Office core committee
+GAP assessment
+Procurement of hardware
+Preparation
+Categorization of  files/letters
+Standardization: File head
+and  categories
+Preparation of Employee
+Master Data
+Creation of NIC email ids and
+Digital Signature Certificates
+(DSC)
+Implementation
+Setting e-Office environment
+Capacity building
+Transition timetable
+Launching e-Office
+Fig 1: Three Stage Model of eOffice implementation
+Activity
+Description
+Jun-12
+Jul-12
+Aug-12
+Sep-12
+Oct-12
+Nov-12
+Dec-12
+Jan-13
+Feb-13
+Mar-13
+Apr-13
+eOffice Study and assessment
+Assessment of products
+Visit to other sites
+Commitment to eOffice and
+Agreement with NIC
+Meeting with DG, NIC
+Decision to go with eOffice
+Government Resolution issued for eOffice
+implementation and forming committees
+DNS registration and prep work
+Installation and Configuration of Servers and
+Application
+eOffice Overview training more than 3500 users
+Readiness at Pilot departments
+Data Collection of EMDs, file Heads
+DSC Creation and Configuration
+Implementation at Pilot Departments
+Preparation of Roadmap for Implementation
+Study of the working style , File Naming
+Convention, Process Mapping,
+Infrastructure Gap Analysis and filling the gaps;
+setting up central registry
+Readiness at other departments
+Data Collection of EMDs, file Heads
+DSC Creation and Configuration
+Implementation at other departments
+Preparation of Roadmap for Implementation
+Study of the working style , File Naming
+Convention, Process Mapping,
+Infrastructure Gap Analysis and filling the gaps;
+setting up central registry
+Beginning of Application support
+Set up support structure
+Capacity building
+Setting up of Training Room
+Training Design
+Training and Assessment
+8
+
+=== पृ. 10 (textlayer) ===
+Case Study on implementation of eOffice in Mantralaya, Mumbai
+Fig 2: snapshot of activities conducted as part of the eOffice Implementation at Mantralaya
+Mode of transformation &Strategies adopted for transformation
+eOffice project is a flagship project of Government of Maharashtra under the close monitoring of
+Hon‟ble Chief Minister and Hon‟ble Chief Secretary. RajBhavan (Governor House), Chief
+Minister‟s office, Chief Secretary‟s office are first few offices to start eOffice implementation.
+Hon‟ble Chief Secretary, former Additional Chief Secretary, Public Health Departments, has
+seen the benefits of eOffice at NRHM and has decided to implement eOffice in Mantralaya and
+all other offices of state government to bring a digital workplace in all government offices.
+Hon‟ble Chief Secretary, along with Director General NIC tracks the progress of the project
+periodically and issues orders and guidance to implementation. Chief Secretary‟s office issued
+circulars for making eOffice mandatory for all departments in Mantralaya.
+Fig 3: eFile Workflow
+9
+
+=== पृ. 11 (textlayer) ===
+Case Study on implementation of eOffice in Mantralaya, Mumbai
+Continuous Capacity Building and Change Management:eOffice at Mantralaya is one of the
+largest implementation in the countryand transformation from paper based office to a paperless
+office requires huge focus for capacity building and change Management. Using eOffice in day
+to day activities is a paradigm shift in government offices. Until users are comfortable with basic
+skills on computers and typing, taking a leap towards eOffice is not possible. Hence to bring the
+awareness and to encourage users to use computers more often DIT undertook several initiatives
+such as Workshops on basics of Computers are Workshops on Marathi typing , ISM tool
+training, Tech Saturday programs etc along with eOffice training at various levels.In Mantralaya,
+a dedicated state of the art training room has been set up DIT to provide eOffice training to all
+Mantralaya users.
+Overview training sessions 3500 employees during Phase 1
+Hands on training 5000 users during Phase II
+eOffice Champions training 20 nodal officers at Delhi
+Exposure /visits to other eOffice Implementations at other locations
+Role based trainings for all PA s, all Registry clerks, Minister Staff etc during Phase III
+Refresher courses for 500 users in Phase III
+Detailed training by Director IT to Secretaries, nodal officers
+In addition, on demand trainings, user manuals, FAQs, Usage Guidelines are developed and
+circulated to all users time to time.
+Support in Local Language: The system supports local level adaptation as the same is
+compatible with Unicode system. Key features of the system were made available the in Marathi.
+This gives users ease to work in eOffice. DIT, CDAC Marathi Center of Excellence and NIC
+working together to improve the localization in the application.
+Strong Support Mechanism: NIC as an implementation partner has deployed necessary
+manpower to implement eOffice. There is multi layered support available by NIC team for ever
+user. eOffice support portal is also made available online so that users can report the problems
+online and track the tickets. Support desk has been made operational on extended hours on week
+days and weekends and holidays.
+10
+
+=== पृ. 12 (textlayer) ===
+Case Study on implementation of eOffice in Mantralaya, Mumbai
+Stake holders Involvement: For all the eOffice implementations in the state of Maharashtra,
+nodal officer from the departments, and core implementation committees have been formed to
+ensure right stake holder participation and structured decision making. For Mantralaya
+implementation, at the beginning of the project 3 committees have been formed as listed below:
+Steering Committee
+Support Group
+Implementation Group
+& Task force
+Hon‟ble Chief Secretary
+Director General .NIC
+Principal Secretary, General
+Administration Department
+Secretary, IT
+Addl.
+Chief
+Secretary
+GAD(*O&M)
+Principle Secretary to Hon‟ble
+CM
+Director, NRHM
+District Collector, Sindhudurg
+Deputy Secretary,I.T
+Deputy
+Secretary,
+GAD,
+O&M
+Deputy
+Secretary
+,GAD,
+Services
+Under Secretary-IT
+Asst. Director NRHM
+One section officer from GAD
+(services)
+1-2 members from NIC
+Principal.Consultant, DIT
+And
+Project
+management
+consultants
+Monthly meetings of the committees under the chairmanship of Hon‟ble Chief Secretary, and
+weekly/bi-weekly meetings with nodal officers under the chairmanship of Director, I.T to track
+the progress and address issues.
+Phasing out of DJMS and integration with other applications
+All 7 Modules of eOffice provide a complete set of uniform and standard applications for
+running a government administrative procedures. Leave Management, Tour Management,
+Service Book maintenance, Leave management are simplified and automated in eOffice. In order
+to bring the unified standard approach, parallel systems are being phased out and Integration
+other applications is in progress.
+11
+
+=== पृ. 13 (textlayer) ===
+Case Study on implementation of eOffice in Mantralaya, Mumbai
+Mantralaya was using Document Journey Management System to track the file journey. File
+tracking is just one of the functionalities of eOffice. Other than file tracking, eOffice has resulted
+in shaping up a better administration since pendency reports can be generated for files and these
+can be used to monitor the time taken by an employee to work on the file. As eOffice has
+replaced the functionality of this application and has much more utilities, DJMS is phased out
+gradually. The integration of scanned files uploaded in DJMS server are being integrated with
+eOffice in a manner such that there is no data loss which also ensuring that files are properly
+indexed i.e. Noting and Correspondence sections of each file are placed correctly and
+sequentially. Similarly, in Sindhudurg District applications used to track the fileshave now been
+replaced with eOffice.
+Requirement analysis and study is underway to integrate eOffice with Sevarth (a payroll system
+of Government of Maharashtra), Biometric Attendance System, Budget Distribution system, etc.
+Outcomes
+Transparency & Accountability has been the one of the best advantages brought by eOffice.
+The documents or the files are preserved forever. There are no chances of the files being
+misplaced, modified or lost. There is an absolute transparency as anything once written on the
+file cannot be changed or undone. The files cannot be kept pending as the system is designed to
+give feedback and monitoring mechanism
+Quick disposal of files and systematic, timely Monitoring of pending files has been the other
+immediate advantage of eOffice. Exact position of receipts and files are available at any point
+time to all required employees, which made file tracing lot simpler and easier.
+Instant file exchange: The files from other districts can be received with in fraction of seconds,
+which previously use to take number of days. This has also reduced the financial burden related
+to transport expenditures of the staff moving to and fro with the documents. eOffice gives a
+Single Employee directory that aids better communication.
+12
+
+=== पृ. 14 (textlayer) ===
+Case Study on implementation of eOffice in Mantralaya, Mumbai
+Knowledge Repository: As we know Knowledge is wealth and now using KMS knowledge can
+be preserved in an organized fashion in KMS (Knowledge Management System),which has a
+centralized, easily accessible knowledge base for all our employees. Documents like GRs,
+circulars etc. can easily be accessed through KMS.
+Simplification and standardization of government processes and procedures, elimination of
+unproductive/ non-value-adding work, and reduction in paperwork has been other advantage of
+eOffice.
+Remote usage:High profile users work on files remotely when they are away from office.
+Commissioner (FW) & Mission Director, NRHM says “During my Uttar Pradesh tour, I
+approved around 360 files remotely related to both Mumbai and Pune NRHM offices. This was
+not possible during my earlier tours.”
+Instant leave approvals during emergency:In the leave management system, Leave Records
+are updated instantly and there is need to maintain a separate leave record. Also leave orders are
+generated immediately from the system. This saved lot of time and effort of establishment
+department.
+In addition to the above benefits long terms results of the eOffice have been as below
+ Seamless integration of various other applications with eOffice
+ Creating an e-environment for the employees
+ Simplifying the future with good infrastructure and increased awareness on computers
+ Building a Citizen interface to facilitate the whereabouts and action taken on grievances,
+applications, petitions, RTI, etc.
+ Paving a way for the transition to a Paperless/ Less Paper Office
+13
+
+=== पृ. 15 (textlayer) ===
+Case Study on implementation of eOffice in Mantralaya, Mumbai
+Key Lessons and Achievements
+Achievements
+  More than 6000 users in one instance, Maharashtra Secretariat is the largest ever eOffice
+implementation so far in the country. All levels of users from assistants, clerks to
+Secretaries, and Hon‟ble State Ministers and cabinet ministers and their staff have been
+brought on board
+  35 district collectors, 35 RDCs, 8 divisional commissioners, deputy Divisional
+commissioners exchange files with Mantralaya instantly. IAS officers across the state
+exchange files via eOffice. Even officers apply for leaves remotely using eOffice
+ Extensive capacity building ,change management, infrastructure support, implementation
+support provided by DIT
+ District consultants, District Project Managers, Departmental consultants appointed by
+DIT have been the extended arm for eOffice implementation team
+  Synergy in all eOffice implementations is being brought by hosting the application at
+SDC and sharing the resources and knowledge gained. Interoperability, integration,
+Innovation and technology advancement is the way ahead for eOffice in the state
+  During Session assembly (Adhiveshan) sending LAQ‟s has become so easy by e-file, it
+hardly takes any time. LAQ‟s are sent within 5 minutes!! Even the follow up of the same
+can be taken easily.
+eOffice at Mantralaya has won the Jury’s choice award for best G2G initiative of the year by
+eMaharashtra.
+eOffice at Mantralaya has been awarded Order of Merit by Skoch
+Lessons Learnt
+Phase-wise implementation:eOffice roll out should be planned in such a manner that it is
+implemented either department wise or subject wise. In department wise approach, departments
+should be categorized in terms of different phases of implementation and „Go Live‟ dates for
+each phase should be declared in advance. The alternate way is to implement eOffice for only a
+14
+
+=== पृ. 16 (textlayer) ===
+Case Study on implementation of eOffice in Mantralaya, Mumbai
+selected number of subjects in all departments so that file movement takes place end to end and
+atleastemployees start getting hands on experience on eOffice.
+Make Top Officials the Nodal Officers: Top officials should be assigned the role of eOffice
+Nodal Officers. They should review the progress of eOffice implementation in their respective
+departments. In Mantralaya, only Deputy Secretaries or Joint Secretaries have been appointed as
+Nodal Officers for each department.
+Top-down approach: eOffice cannot be implemented if it is not driven from the top. A bottom-
+up approach is not the right fit for the smooth implementation of eOffice. It may be noted that if
+Secretaries of each department instruct their staff to take up eOffice working style religiously, it
+is much easier for the operations team to drive the project in a lesser time frame.
+Issuance of GRs and circulars: The apex body in an organization must issue Government
+Resolutions and Circulars which define digitization strategy to be adopted and the necessary
+actions to be undertaken by organizations as initial steps towards eOffice. To facilitate the
+implementation of eOffice in the state government offices and departments, Chief Secretary‟s
+Office had issued a GR on 20th August, 2013 which is available on the official website and
+provides guidelines to the organizations interested in implementing eOffice for undertaking
+requisite preparations. Similarly many circulars were issued to departments as measures to
+implement eOffice.
+Discourage use of printers: Printers should not be used by departments unless due to
+emergency. There are several ways in which printer usage can be reduced in a Government set
+up. E.g. „paper less environment drive‟ was initiated by Director-IT as a result of which all staff
+members discarded unwanted papers, thus ensuring a clean and paperless desk; printers were
+also withdrawn from departments which had an excess number of printers and the same were
+redistributed to the ones with lesser than sufficient number of printers.
+Change Management and capacity building: Changing attitude of people at all levels to
+change a 200 year old file movement system has been a challenge. Re-engineering of mindset of
+employees is necessary in order to drive eOffice environment. In this regard, regular training
+programmesneed to be conducted. Initial trainings should be imparted to fresh users for
+demonstrating eOffice suite in detail while refresher trainings should beimparted to ensure that
+all queries of users, who have started using eOffice, are addressed.
+15
+
+=== पृ. 17 (textlayer) ===
+Case Study on implementation of eOffice in Mantralaya, Mumbai
+Setting up of an eOffice Support Team: An eOffice Support Team along with Facility
+Management Services team should be put in place for providing eOffice handholding and
+support services. There should also be an eOffice Support Help Desk which the users may
+contact via email or phone for reporting eOffice related issues
+Readiness Status and Gap Analysis: Departments should ensure that they meet the pre­
+requisites in terms of infrastructure (comprising scanners, computers, etc) and employee
+readiness status (comprising DSC issuance and eOffice login issuance) before implementing
+eOffice. A proper gap analysis report must be maintained and all the gaps must be filled before
+implementing eOffice.
+Parallel movement of physical files should stop: It was often noted that eOffice was used as a
+file tracking system for physical files only (which can be marked as received in the eOffice
+application) while physical files are actually processed. Since eOffice, in its real purpose,
+involves movement of only electronicfiles, departments must ensure that a cutoff time is set
+before moving into eOffice. This cutoff date should signify the date after whichno physical
+filemoves along with electronic file.
+Financial Provision for IT upgradation: Since technologies keep changing rapidly, it is
+imperative to ensure sufficient financial resources for upgradation of IT Infrastructure including
+computers, scanners, bandwidth of network connectivity, etc.
+References
+http://eoffice.gov.in
+http://darpg.gov.in/darpgwebsite_cms/Document/file/CSMOP.pdf
+http://eOffice.maharashtra.gov.in
+Profile of the authors
+1.  Shri Rajesh Aggarwal (IAS), Secretary IT, Government of Maharashtra
+Mr. Rajesh Aggarwal, an IAS officer of the 1989 batch, is presently Secretary IT and
+Accounts and Treasuries with Govt. of Maharashtra. A B.Tech. in Computer Science
+from IIT Delhi (1983-87), he has been a technology enthusiast focusing on a wide array
+of aspects including Natural Language Understanding, Algorithms, Artificial
+16
+
+=== पृ. 18 (textlayer) ===
+Case Study on implementation of eOffice in Mantralaya, Mumbai
+Intelligence, Fuzzy matching and de-duplication of databases, GIS, Analytics and has the
+experience of working with very large citizen databases.
+As Secretary to Government of Maharashtra over the last few years, he has been
+instrumental in successfully leading multiple large initiatives like implementation of
+UIDand Financial Inclusion, Direct Benefit Transfer, e-Office implementation, e-
+Tendering, implementation of State e-Governance Policy, focus on Accessibility and
+localization, Training and Capacity building in e-Governance, delivery of e-Services to
+citizens, implementation of Common Service Centers to ensure citizen services are
+available at the doorsteps of citizens and implementation of Govt. cloud. Under his
+leadership, the State Government has been rated as a leader in National e-Readiness
+Surveys of Govt. of India and has received more than 60 national and international
+awards for e-Governance in the last 2 years, including the prestigious National Award for
+Innovation in UID being conferred on him by the Hon. Prime Minister in 2012.
+He is also a prolific writer and has written numerous articles and papers on e-
+Governance, including the much acclaimed paper titled „e-Gov 0.0 – the fundamentals of
+e-Governance‟.
+2.  Shri Virendra Singh (IAS), Director IT, Government of Maharashtra
+Mr. Virendra Singh, an IAS officer of the 2006 batch, is presently Director IT with Govt.
+of Maharashtra. With over 15 years of experience of working with various Government
+organizations, he has been instrumental in implementation various large e-Governance
+initiatives including e-Office. Earlier, as District Collector Sindhudurg and CEO
+ZillaParishad in Solapur, he had successfully implemented various e-Governance
+initiatives including e-Drug Inventory for an entire district, which is now getting
+replicated across the State. He has won multiple awards at national forums for the work
+done in implementing e-Office, wherein Sindhudurg became the first district in the
+country to become paperless.
+3.  Sudhanshu Bohra (Consultant, DIT, Mantralaya, Mumbai)
+Mr. Sudhanshu Bohra is a Consultant handling the various facets of the e-Office project in
+Maharashtra
+17
+
+=== पृ. 19 (textlayer) ===
+Case Study on implementation of eOffice in Mantralaya, Mumbai
+Project Case Fact Sheet
+Fact Summary
+219973
+123590
+27717
+5990
+5544
+7421
+39
+Departments
+Number Of
+Number Of ElectronicFiles
+Electronic
+Receipts
+Electronic
+Users
+Active Users
+Created
+Files Moved
+Created
+Receipts
+Moved
+The list of top 10 performing departments is given below:
+S.No.
+Department Name
+Total Files moved
+Total
+Receipts
+moved
+Total Files &
+Receipts
+movement
+1 CM Office
+573
+47791
+48364
+2 Home Department
+1845
+31443
+33288
+3 CS Office
+107
+14522
+14629
+4 Finance Department
+984
+12024
+13008
+5 DIT
+958
+4401
+5359
+6 General Administration
+1155
+3554
+4709
+7 Rajbhawan
+1200
+3356
+4556
+8 School and Education
+689
+3400
+4089
+9 DGIPR
+1012
+2912
+3924
+10 Women and Child Development
+331
+3371
+3702
+18
+

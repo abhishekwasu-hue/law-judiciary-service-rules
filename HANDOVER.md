@@ -148,6 +148,18 @@
 
 - 11.11.2026: old page 8cJP8wz6j5tYM5kRHK1rVx deleted (owner account abhi.wasu — plan ended; Abhi: not re-sharing, old page data not needed, drafts are in the repo). NEW page https://claude.ai/artifact/Hqf9Y7iKkDzNntsVCxXcB4 (owner abhiwasu007, Option 2 of docs/NEW_ACCOUNT_SETUP.md, pinned): version 2 = main build with VITE_PAGE_URL default changed, same files + capabilities (db rules stored); seeded meta/gr_library (asset a27433b18753b84b898378c5dcfaca8e, 964 PDFs), meta/register_index (asset 10a86483fb9c5dcb122d8e2706b226c0, 25 files), meta/config.trigger_id = trig_01YBZmHYbBax7nFYxzyduV4K (task prompt now points to the new page). Old URL replaced in SOP, DESK_WORKER, PROPOSAL_DESK, DESK_TASK_PROMPT, CaseTabs.tsx, vite.artifact.config.ts. Cases start empty (WP35697 not migrated). Not yet: first press of "▶ काम सुरू करा" on the new page (connector permission prompt) = the test.
 
+- 12.11.2026 (Abhi: GR detailed study; then "कमी टोकन्स मध्ये … कॉलिटी आउटपुट … आधीच सर्व तयारी"; "Ho गरजेनुसार kra"): docs/gr_study/
+  (9 topic studies, verbatim paras with page/para, checklists; index 00-INDEX.md); docs/cards/ (20 ready cards per demand type,
+  enclosure + highlight entries verified with pkg3/highlight.py; 00-INDEX.md); text/ page-text cache of 597 service PDFs /
+  13,340 pages (tools/gr_text.py grep/show, tools/build_text_cache.py resumable, tests/test_gr_text.py); ~170 GRs fetched into
+  pdf/gr/ (procurement 01.12.2016 + amendments, medical 19.03.2005 / 17.12.2020 / 30.04.2021 / 17.01.2023 …, revenue land,
+  DFPR 17.04.2015, referred GRs). CLAUDE.md now auto-loads only OWNER_RULES + docs/RULES_DIGEST.md + tools/ENGINE_BRIEF.md
+  (~41 KB instead of ~290 KB); full INSTRUCTIONS / SOP / WORKFLOW / HANDOVER opened per the digest table. Skills (repo copies)
+  got the "prepared material first" line — Abhi re-uploads them to claude.ai if he wants it there. Gaps: 110 referred GRs not
+  found (list /tmp only — see the cards' "उणिवा" and gr_study "पुढे मिळवायचे"), e.g. compassionate GR 17.07.2025, MCS Medical
+  Attendance Rules 1961, Land Disposal Rules 1971. Card sizes 14–31 KB (Devanagari). Study-vs-image differences found by card
+  agents (C1-2 §15.2, C2-3 Transfer Act text, case desk-2 1991 para 5 "याजकडून") — cards use the printed text.
+
 ## Pending
 29. **08.11.2026 page fix round leftovers:** page re-created 11.11.2026 as Hqf9Y7iKkDzNntsVCxXcB4 (db reads verified as owner); then one live full run +
     one edit run + one GR request (first real test of the retry, roles and odd/even ids); prune old `activity` rows

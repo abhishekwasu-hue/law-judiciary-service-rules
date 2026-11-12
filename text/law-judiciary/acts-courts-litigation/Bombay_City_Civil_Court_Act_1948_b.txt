@@ -1,0 +1,409 @@
+=== पृ. 1 (textlayer) ===
+1948 : Bom. XL]
+
+1
+THE BOMBAY CITY CIVIL COURT ACT, 1948
+   [Text as on 30th April 2025]
+________________
+CONTENTS
+
+PREAMBLE.
+SECTIONS.
+
+1.
+Short title and commencement.
+
+2.
+Definitions.
+
+3.
+Constitution of City Court.
+
+4.
+[Deleted.]
+
+4A.
+Transfer of suits and proceedings cognizable under section 3, to City Court.
+
+4B.
+Power to make rules.
+
+5.
+Subordination to and superintendence by High Court.
+
+6.
+Appointment of Judges.
+
+7.
+Powers of Judges when City Court consists of more than one Judge.
+
+8.
+Registrars.
+
+9.
+Questions arising in suits, etc., under Act to be dealt with according to law administered by
+High Court.
+
+10.
+Fees for process.
+
+11.
+[Deleted.]
+
+12.
+High Court jurisdiction barred except in certain cases.
+
+13.
+[Deleted.]
+
+14.
+Allowance for fees paid in City Court in cases removed to High Court.
+
+15.
+Appeals and limitation.
+
+16.
+Seal of City Court.
+
+17.
+Holidays and vacations.
+
+18.
+Transfer of suits pending in High Court.
+
+=== पृ. 2 (ocr) ===
+2 The Bombay City Civil Court Act, 1948 [1948 : Bom. XL
+
+=== पृ. 3 (textlayer) ===
+1948 : Bom. XL]
+             The Bombay City Civil Court Act, 1948
+3
+LIST OF AMENDMENT ACTS
+
+1.
+Amended by Bom.
+26 of 1950
+
+2.
+Adapted and modified by the Adaptation of Laws Order, 1950.
+
+3.
+Amended by Bom.
+9 of 1951
+
+4.
+Amended by Bom.
+32 of 1954
+
+5.
+Amended by Mah.
+15 of 1968
+
+6.
+Amended by Mah.
+29 of 1968
+
+7.
+Amended by Mah.
+46 of l977 (1-1-1978)1
+
+8.
+Amended by Mah.
+15 of 1979 (1-7-1979)
+
+9.
+Amended by Mah.
+15 of 19872 (1-5-1992)
+
+10.
+Amended by Mah.
+25 of 2012 (1-9-2012) (1-10-2012)3,4
+
+11.
+Amended by Mah.
+46 of 20235 (16-1-2024)6
+
+1
+Section 19 of Mah. 46 of 1977 reads as follows :—
+
+  “19. Savings.— The amendment made by this Act in any of the Acts aforesaid shall not have any effect in respect of
+and apply to suits, appeals or other proceedings of a civil nature filed and pending before any Court on the date of
+commencement of this Act, and such proceedings shall be continued and disposed of by that court, as if this Act had not
+been passed ; and any appeal, revision application or other proceedings of a civil nature in respect of any decree or order
+passed by any Court before the date of commencement of this Act shall be filed before and heard and disposed of by the
+Court competent to entertain such proceedings before such commencement, as if this Act had not been passed.”.
+2
+This Act came into force vide G.N., L. and J.D., No. CCS. 2990/62 (12)/X, dated the 20th August 1991.
+3
+Sections 1, 2, 3, 5, 6 and 7 came into force on 1st September 2012 and section 4 came into force on 1st October 2012 vide
+G.N., L. and J.D., No. CCS. 2991/C.R.-58/D.-19, dated 28th August 2012.
+4
+Section 6 of Mah. 25 of 2012 reads as under :—
+
+    “6. Transitory provisions.— After the date of coming into force of section 4 of the Bombay City Civil Court
+(Amendment) Act, 2012 (Mah. XXV of 2012), in all the suits and proceedings which are liable to be transferred to the
+City Court under sub-section (1) of section 4A, in order to obviate the need for service of fresh notice upon the parties,
+the High Court shall list the matters on its Boards and notify the date on which the concerned matter shall be listed before
+the City Court. ”.
+5
+Section 4 of Mah. XLVI of 2023 reads as under :-
+
+“4. Power to remove difficulty.— (1) If any difficulty arises in giving effect to the provisions of the Bombay City Civil
+Court Act, 1948 (Bom. XL of 1948), as amended by this Act, the State Government may, as occasion arises, by an order
+published in the Official Gazette, do anything, not inconsistent with the provisions of the Bombay City Civil Court, Act,
+1948 (Bom. XL of 1948), as amended by this Act, which appears to it to be necessary or expedient for the purpose of
+removing the difficulty:
+
+Provided that, no such order shall be made after the expiry of a period of two years from the date of commencement of
+this Act.
+
+(2) Every order made under sub-section (1) shall be laid, as soon as may be, after it is made, before each House of the
+State Legislature.”.
+6
+This indicates the date of commencement of the Act vide the Law and Judiciary Department, Notification No. CCS-
+2923/CR/D-19 dated 16th January 2024.
+
+Note.- The date mentioned in the bracket indicates the date of commencement of the Act.
+
+=== पृ. 4 (ocr) ===
+4 The Bombay City Civil Court Act, 1948 [1948 : Bom. XL
+
+=== पृ. 5 (textlayer) ===
+1948 : Bom. XL]
+             The Bombay City Civil Court Act, 1948
+5
+BOMBAY ACT No. XL OF 19481
+[THE BOMBAY CITY CIVIL COURT ACT, 1948.]
+[This Act received the assent of the Governor on the 3rd May 1948; assent was
+first published in the Bombay Government Gazette, Part IV, on the 10th May 1948.]
+An Act to establish an additional Civil Court for Greater Bombay.
+WHEREAS, it is expedient to establish an additional Civil Court for the Greater Bombay; It is
+hereby enacted as follows :—
+1.  Short title and commencement.— (1) This Act may be called the Bombay City Civil Court
+Act, 1948.
+(2) It shall come into force on such 2date as the 3[State] Government may by notification in the
+Official Gazette, appoint in this behalf.
+2.  Definitions.— In this Act, unless there is anything repugnant in the subject or context,—
+(1) “City Court” means the court established under section 3;
+(2) “High Court” means the High Court of Judicature at Bombay;
+(3) “institution fee” means the court fee payable in respect of the plaint or application by
+which the court fee payable in respect of the plaint or application by which a suit or proceeding is
+instituted;
+4[(3A) “intellectual property matters” means the suits and civil proceedings relating to trade
+marks, copyright, patents, designs and geographical indications, plant varieties and the rights of
+farmers and plant breeders and Lay-out design (Topographies) of Integrated Circuits;]
+(4) “Small Cause Court” means the Court of Small Causes of Bombay;
+(5) “special law” means a law applicable to a particular subject.
+3.  Constitution of City Court.— The 5[State] Government may, by notification in the Official
+Gazette, establish for the Greater Bombay a court, to be called the Bombay City Civil Court.
+Notwithstanding anything contained in any law, such court shall have jurisdiction to receive, try and
+dispose of all suits and other proceedings of a civil nature 6[,not exceeding rupees ten crore in value,]
+7[* * *] arising within the Greater Bombay, except suits or proceedings which are cognizable—
+(a) by the High Court as a Court of Admiralty or Vice-Admiralty as a Colonial Court of
+Admiralty, or as a Court having testamentary, intestate or matrimonial Jurisdiction, or
+(b) by the High Court for the relief of insolvent debtors, or
+(c) by the High Court under any special law other than the Letters Patent, or
+8[(c -1) by the High Court under the Parsi Marriage and Divorce Act, 1936 (3 of 1936); or
+(c-2) by the High Court in respect of intellectual property matters; or]
+(d) by the Small Cause Court:
+ 9[*  *  *  *]
+
+1
+For Statement of Objects and Reasons of the L. A. Bill No. II of 1948, see Bombay Government Gazette, 1948,
+Extraordinary, Part V, page 7.
+2
+16th August 1948 vide G.N., H.D., No. 2346/5-(7), dated 14th August 1948.
+3
+The word “State” was substituted for the word “Provincial” by the Adaptation of Laws Order, 1950.
+4
+Clause (3A) was inserted by Mah. 25 of 2012, s. 2.
+5
+The word “State” was substituted for the word “Provincial” by the Adaptation of Laws Order, 1950.
+6
+There words were substituted for the words “, not exceeding rupees one crore in value” by Mah. 46 of 2023, s. 2(i).
+7
+The words “not exceeding fifty thousand rupees in value, and” were deleted by Mah. 15 of 1987, s. 2.
+8
+Clauses (c-1) and (c-2) were inserted by Mah. 25 of 2012, s. 3(b).
+9
+This proviso was deleted by Mah. 46 of 2023 s. 2(ii).
+
+=== पृ. 6 (textlayer) ===
+6
+The Bombay City Civil Court Act, 1948
+[1948 : Bom. XL
+4.  [Power of  1[State] Government to enhance jurisdiction of City Court.] Deleted by Mah. 46 of
+1977, s. 3.
+2[4A. 3[Transfer of suits and proceedings cognizable under section 3, to City
+Court].— 4[(1) Notwithstanding anything contained in section 9 of the Bombay City Civil Court and
+the Bombay Court of Small Causes (Enhancement of Pecuniary Jurisdiction and Amendment) Act,
+1986 (Mah. XV of 1987), all suits and proceedings cognizable by the City Court under section 3, and
+pending in the High Court on the date of coming into force of 5[section 2 of the Bombay City Civil
+Court (Amendment) Act, 2023 (Mah. XLVI of 2023)], not being suits or proceedings falling under
+clauses (a) to (d) of section 3, shall stand transferred to the City Court.]
+(2) Any suit or proceeding so transferred shall be heard and disposed of by the City Court and the
+City Court shall have all the powers and jurisdiction in respect thereof as if it had been originally
+instituted in that Court.
+(3) In any such suit or proceeding institution fees shall be paid credit being given to any Court-fee
+levied in the High Court and cost incurred in the High Court till the date of transfer shall be assessed
+by the City Court in such manner as the 6[State] Government may, after consultation with the High
+Court, determine by rules.]
+7[4B.  Power to make rules.— The High Court may, by notification in the Official Gazette, make
+rules for carrying out the purposes of this Act.]
+5.  Subordination to and superintendence by High Court.— The City Court shall be deemed
+to be a court subordinate to and subject to the superintendence of the High Court within the meaning of
+the Letters Patent of the High Court and of the Code of Civil Procedure, 1908 (V of 1908).
+6.  Appointment of Judges.— The 8[State] Government may, by notification in the Official
+Gazette, appoint as many persons as it thinks fit to be Judges of the City Court.
+7.  Powers of Judges when City Court consists of more than one Judge.— When the City
+Court consists of more than one Judge—
+(a) each of the Judge may exercise all or any of the powers conferred on the Court by this
+Act or any other law for the time being in force;
+(b) the 9[State] Government may appoint any one of the Judges to be the principal Judge
+10[and any two other Judges to be called the additional principal Judges];
+(c) the principal Judge may from time to time make such arrangements as he may think fit
+for the distribution of the business of the court among the various Judges thereof;
+11[(d) 12[any additional principal Judge] may exercise all or any of the powers conferred on
+the principal Judge by this Act or any other law for the time being in force, as the High Court
+may, from time to time, direct].
+
+1
+The word “State” was substituted for the word “Provincial” by the Adaptation of Laws Order, 1950.
+2
+This section was inserted by Bom. 26 of 1950, s. 3.
+3
+This marginal note was substituted by Mah. 25 of 2012, s. 4(b).
+4
+Sub-section (1) was substituted by Mah. 25 of 2012, s. 4(a).
+5
+These words, figures and brackets “section 4 of the Bombay City Civil Court (Amendment) Act, 2012” were substituted
+for the words, figures and brackets “section 2 of the Bombay City Civil Court (Amendment) Act, 2023” by Mah. 46 of
+2023, s. 3.
+6
+The word “State” was substituted for the word “Provincial” by Bom. 9 of 1951, s. 3, Second Schedule.
+7
+Section 4B was inserted by Mah. 25 of 2012, s. 5.
+8
+The word “State” was substituted for the word “Provincial” by the Adaptation of Laws Order, 1950.
+9
+The word “State” was substituted for the word “Provincial” by the Adaptation of Laws Order, 1950.
+10
+These words were substituted for the words “and any other Judge to be the additional principal Judge” by Mah. 15 of
+1979, s. 2(a).
+11
+Clause (d) was added by Mah. 29 of 1968, s. 2(b).
+12
+These words were substituted for the words “the additional principal Judge” by Mah. 15 of 1979, s. 2(b).
+
+=== पृ. 7 (textlayer) ===
+1948 : Bom. XL]
+             The Bombay City Civil Court Act, 1948
+7
+8.  1[Registrars].— (1) The 2[State] Government may appoint an officer to be called the Registrar
+of the City Court. He shall be the chief ministerial officer of the Court ; and shall exercise such powers
+and discharge such duties of a ministerial nature as the Judge of the City Court, or when the court
+consists of more than one Judge, the principal Judge may, from time to time, by rules direct. 3[The
+State Government may also appoint 4[two officers to be called the additional Registrars] of the City
+Court. 5[Any additional Registrar] shall exercise all or any of the powers and discharge all or any of the
+duties of the Registrar as the principal Judge may, from time to time, by rules direct].
+(2) The 6[State] Government may, with the previous approval of the High Court invest the
+Registrar and 7[any additional Registrar] 8[with all or any of the following powers of the Judge of the
+City Court, namely :—
+(a) the power to hear and dispose of all applications for permission to sue or defend as
+paupers or for dispaupering plaintiffs or defendants permitted to sue or defend as paupers;
+(b) the power to hear and dispose of all interlocutory applications or matters necessary for
+the progress of any suit or other proceedings;
+(c) the power to hear and dispose of all applications for execution of decrees (but in the case
+of any application referred to in Rule 22 of Order XXI in the First Schedule to the Code of Civil
+Procedure, 1908 (V of 1908), only when the person to whom the notice thereunder is served does
+not appear or offer any objections to the execution);
+(d) the other powers of the said judge, not being powers of trying suits and proceedings.
+9.  Questions arising in suits, etc., under Act to be dealt with according to law administered
+by High Court.— Save as otherwise provided in this Act all questions which arise in suits or other
+proceedings under this Act in the City Court shall be dealt with and determined according to the law
+for the time being administered by the High Court in the exercise of its ordinary original civil
+jurisdiction.
+10.  Fees for process.— (1) The High Court shall, from time to time, with the sanction of the
+9[State] Government prescribe and regulate the fees to be taken for any process issued by the City
+Court or by any officer of such court.
+(2) Table of the fees so prescribed shall be published in the Official Gazette.
+11.  [Repayment of institution fee under certain circumstances.] Deleted by Mah. 15 of l968, s. 3.
+12.  High Court jurisdiction barred except in certain cases.— Notwithstanding anything
+contained in any law, the High Court shall not have jurisdiction to try suits and proceedings cognizable
+by the City Court:
+Provided that the High Court may, for any special reason, and at any stage remove for trial by
+itself any suit or proceeding from the City Court.
+13.  [Costs to be disallowed when plaintiff sues in High Court instead of in City Court.] Deleted
+by Mah. 15 of 1987, s. 3.
+
+1
+This word was substituted for the word “Registrar” by Mah. 29 of 1968, s. 3(c).
+2
+This word was substituted for the word “Provincial” by the Adaptation of Laws Order, 1950.
+3
+This portion was added by Mah. 29 of 1968, s. 3(a).
+4
+These words were substituted for the words “an officer to be called the additional Registrar” by Mah. 15 of 1979,
+s. 3(a)(i).
+5
+The words “Any additional Registrar” were substituted for the words “The additional Registrar” by Mah. 15 of 1979,
+s. 3(a)(ii).
+6
+This word was substituted for the word “Provincial” by the Adaptation of Laws Order, 1950.
+7
+The words “any additional Registrar” were substituted for the words “the additional Registrar” Mah. 15 of 1979, s. 3(b).
+8
+This portion was substituted for the words “with any powers of the Judge of the City Court other than powers of trying
+suits and proceedings” by Mah. 15 of 1968, s. 2.
+9
+This word was substituted for the word “Provincial” by the Adaptation of Laws Order, 1950.
+
+=== पृ. 8 (textlayer) ===
+8
+The Bombay City Civil Court Act, 1948
+[1948 : Bom. XL
+14.  Allowance for fees paid in City Court in cases removed to High Court.— When any suit
+or proceeding is removed for trial to the High Court from the City Court under section 12—
+(a) it shall be heard and disposed of by the High Court in the exercise of its original civil
+jurisdiction and the said Court shall have all the powers and jurisdiction in respect thereof as if it
+had been originally instituted in such Court;
+(b) court fee on the scale for the time being in force in the High Court as a court of original
+civil jurisdiction shall be payable in that court in respect of the suit or proceeding therein:
+Provided that in the levy of any such fee which, according to the practice of the court, is credited
+to the 1[State] Government, credit shall be given for the institution fee already paid in the City Court.
+15.  Appeals and limitation.— (1) An appeal shall lie to the High Court from—
+(a) every decree passed by the Judge of the City Court, and
+(b) such orders passed by the said Judge as are specified in and to the extent provided for by
+section 104 of the Code of Civil Procedure, 1908 (V of 1908).
+(2) The period of limitation for an appeal from a decree or order of the City Court shall be thirty
+days from the day of such decree or order:
+2[Provided that the High Court may entertain the appeal after the expiry of the said period of
+thirty days, if it is satisfied that the appellant was prevented by sufficient cause from filing the appeal
+within the said period.]
+16.  Seal of City Court.— The City Court shall use a seal of such form and dimensions as may
+be for the time being prescribed by the 3[State] Government.
+17.  Holidays and vacations.— (1) The Judge of the City Court, or, when the Court consists of
+more than one Judge, the principal Judge, shall, at the commencement of each year, draw up a list of
+holidays and vacations to be observed in the court, and shall submit the same for the approval of the
+High Court.
+(2) Such list, when it has received such approval, shall be published in the Official Gazette, and
+the said holidays and vacations shall be observed accordingly.
+18.  Transfer of suits pending in High Court.— (1) All suits and proceedings cognizable by the
+City Court and pending in the High Court, in which issues have not been settled or evidence has not
+been recorded on or before the date of the coming into force of this Act, shall be transferred to the City
+Court and shall be heard and disposed of by the City Court and the City Court shall have all the powers
+and jurisdiction thereof as if they had been originally instituted in that Court.
+(2) In any suit or proceeding so transferred institution fee shall be paid, credit being given to any
+court fee levied in the High Court, and costs incurred in the High Court till the date of the transfer shall
+be assessed by the City Court in such manner as the 4[State] Government may, after consultation with
+the High Court, determine by rules.
+
+1
+This word was substituted for the word “Provincial” by the Adaptation of Laws Order, 1950.
+2
+This proviso was inserted by Bom. 32 of 1954, s. 3.
+3
+This word was substituted for the word “Provincial” by the Adaptation of Laws Order, 1950.
+4
+This word was substituted for the word “Provincial” by the Adaptation of Laws Order, 1950.
+
