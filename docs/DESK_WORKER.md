@@ -73,6 +73,19 @@ Step texts written to `runs.step` (exact keys of dashboard-app RUN_STEPS): "प�
    ticked drafts exactly (§4.28; null = decide by the rules; nothing ticked = note only). Package file name =
    `package_file`; PREFIX per SOP. GRs fetched in the run stay in /tmp (no pdf/gr commit; `case_state.py save` copies
    enclosure sources into `cases/`).
+   **Order of work: less time, better quality** (Abhi, 12.11.2026: "वेळ वाचवायचा आहे पण कामाची क्वालिटी मात्र
+   वाढवायची आहे". Run 2 audit: the lead spent 21 of 41 min only waiting for the Study part 1 agent):
+   - Right after the OCR, start Study part 1 as a BACKGROUND agent (`run_in_background: true`). Part 1 is the
+     page-wise rendering; its §4.8 rule is unchanged. Never wait for this agent.
+   - While it runs, the lead writes spec.json (note, letter, drafts), enclosures.json and Study parts 0 and 2–7.
+   - Once the spec passes lint, start a second BACKGROUND agent with a fresh read. Do not give it the lead's
+     conclusions. Give it only the drafts' text, the OCR and the page images the drafts cite.
+   - That agent checks every fact, date, amount, name and quote against the cited page. It also checks that every
+     demand and condition of the proposal is handled (§4.30 (1)), and the §4.39 A1–A12 list. It returns concrete
+     corrections only.
+   - The lead applies the justified corrections minimally. The lead's own self-review (§3.3) still runs.
+   - Build the Study only once part 1 is in. If part 1 is still not ready when everything else is done, wait for it.
+     This is the only wait.
 3. **Build + check.** State dir = `cases/desk-<case id>/`: `python3 tools/case_state.py save desk-<id> --work /tmp/work
    --proposal <the proposal input's local_path> --package-name "<package_file>" --prefix <PREFIX> --note "run <run id>"`
    (`package_file` = case.json's, cmd_fetch: the original proposal name with the upload prefix stripped, §4.16, shortened
