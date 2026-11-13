@@ -117,7 +117,7 @@ def test_build_letter_and_reminder(tmp_path):
     assert sum(t.startswith("क्रमांक:-") for t in texts) == 2
     assert texts.count("स्मरणपत्र-1") == 1
     assert texts.index("स्मरणपत्र-1") > next(i for i, t in enumerate(texts) if t.startswith("क्रमांक:-"))
-    assert texts.count("प्रत : निवड नस्ती") == 2 and texts.count("आपला,") == 2
+    assert texts.count("प्रत :\t1. निवड नस्ती") == 2 and texts.count("आपला,") == 2
 
 
 def test_old_single_letter_spec_unchanged(tmp_path):

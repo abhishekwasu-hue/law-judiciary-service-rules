@@ -8,4 +8,6 @@ Abhi approved these on 31.10.2026 as the standard for language, structure and ta
 | CR130_2026_old-pension_info-letter-via-HC.json | old pension (pre-2005 advertisement) re-submission → compliance table of earlier queries, service-period table, 2-point letter via HC |
 | CR131_2026_special-pay_info-letter.json | special pay for additional charge → facts table, GR conditions verbatim (competent authority), 5-point letter |
 | CR133_2026_DLI-insurance_info-letter.json | Deposit Linked Insurance → facts table, GPF rule 30 verbatim, 2-point letter |
+Letter format (Word, not a spec): `letter_format_2026-11-13.docx` — Abhi's own corrected letter of case 6, sent on 13.11.2026 as the letter setting and format for all future letters (INSTRUCTIONS §4.44; printed by tools/mkdocs.py build_letter).
+
 Note: these contain real case data — keep the repository PRIVATE.

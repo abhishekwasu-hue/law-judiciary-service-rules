@@ -93,15 +93,15 @@ class Profiles(unittest.TestCase):
         self.assertTrue(desk.letter_ref_re(p).fullmatch("संकीर्ण-2026/____/प्र.क्र.____/का.6"))
         self.assertEqual(build_order.DEPT, "विधि व न्याय विभाग,")
         self.assertEqual(build_order.SIGNER_DEFAULT, {"name": "( राजेश वडनेरकर )", "designation": "अवर सचिव, महाराष्ट्र शासन"})
-        self.assertEqual(desk.contact_line(p), "दूरध्वनी क्र. :- ०२२-२२793230\t\t\t\t   Email ID :- lnjd.desk6-mh@mah.gov.in")
+        self.assertEqual(desk.contact_line(p), "दूरध्वनी क्र. :- ०२२-२२793230\t\t             Email ID :- lnjd.desk6-mh@mah.gov.in")
 
     def test_hte_values(self):
         p = desk.load_desk(HTE)
         self.assertEqual(p["signers"], HTE_SIGNERS)
         self.assertEqual(p["finance_signer"], "मा. अ.मु.स. (वित्त)")
         self.assertEqual(p["note_header"], "उ.व तं.शि.वि. / मशि-5")
-        self.assertEqual(desk.contact_line(p), "दूरध्वनी क्र. :- ____\t\t\t\t   Email ID :- ____")
-        self.assertEqual(desk.letter_end_lines(p), ["(          )", "अवर सचिव, महाराष्ट्र शासन", "प्रत : निवड नस्ती (मशि-5)"])
+        self.assertEqual(desk.contact_line(p), "दूरध्वनी क्र. :- ____\t\t             Email ID :- ____")
+        self.assertEqual(desk.letter_end_lines(p), ["(          )", "अवर सचिव, महाराष्ट्र शासन", "प्रत : 1. निवड नस्ती (मशि-5)"])
         self.assertTrue(desk.letter_ref_re(p).fullmatch(HTE_REF))
         self.assertTrue(desk.letter_ref_re(p).fullmatch("संकीर्ण-2026/प्र.क्र.12/मशि-5"))
         self.assertFalse(desk.letter_ref_re(p).fullmatch("संकिर्ण-2026/931/प्र.क्र.122/का.6"))
@@ -217,7 +217,7 @@ class Build(unittest.TestCase):
         self.assertEqual(xa, xb)
         t = "\n".join(paras(a))
         for line in ("विधि व न्याय विभाग/का.6", "Email ID :- lnjd.desk6-mh@mah.gov.in", "( राजेश वडनेरकर )",
-                     "अवर सचिव ,महाराष्ट्र शासन", "प्रत :-", "निवड नस्ती", "हुतात्मा राजगुरु चौक, मादाम कामा मार्ग"):   # §4.38 copies numbered
+                     "अवर सचिव ,महाराष्ट्र शासन", "प्रत :", "1. निवड नस्ती", "हुतात्मा राजगुरु चौक, मादाम कामा मार्ग"):   # §4.38 copies numbered
             self.assertIn(line, t)
 
     def test_hte_note_letter(self):

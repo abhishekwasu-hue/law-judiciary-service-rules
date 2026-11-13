@@ -542,8 +542,8 @@ class TestBuildParawise(unittest.TestCase):
                 d = docx.Document(os.path.join(self.tmp, f"{pre}_Note_and_Letter.docx"))
                 text = "\n".join(x.text for x in d.paragraphs)
                 self.assertIn("आपला,", text)
-                # §4.38 (ई): "प्रत" once — "प्रत : निवड नस्ती", or "प्रत :-" + numbered lines ending "निवड नस्ती"
-                self.assertTrue("प्रत : निवड नस्ती" in text or re.search(r"प्रत :-\t1\)\t.*\n\t\d+\)\tनिवड नस्ती", text), text[-300:])
+                # §4.44 (ऊ) (13.11.2026): "प्रत" once — "प्रत :\t1. निवड नस्ती", other copies "\t2. …" (or "\t2....")
+                self.assertTrue(re.search(r"प्रत :\t1\. निवड नस्ती\n\t2\.", text), text[-300:])
                 self.assertEqual(text.count("प्रत :"), 1)
                 self.assertEqual(len(d.sections), 2)
 

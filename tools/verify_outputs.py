@@ -240,6 +240,8 @@ def p_bold(p):
         if not r.text.strip():
             continue
         b = r.bold
+        if not b and r._element.rPr is not None and r._element.rPr.find(qn("w:bCs")) is not None:
+            b = True   # §4.44 (उ): complex-script bold (w:bCs) — how Word bolds Devanagari (Abhi's letter of 13.11.2026)
         if b is None and p.style is not None:
             b = p.style.font.bold
         if not b:
@@ -255,7 +257,7 @@ def letter_body_for_ma(texts):
         n = ns(t)
         if n.startswith("विषय"): state = "subject"
         elif n.startswith("संदर्भ"): state = "refs"
-        elif n.startswith("महोदय") or n.startswith("प्रिय"): state = "body"   # "प्रिय …," = अर्धशासकीय पत्र
+        elif re.match(r"(?:मा\.\s*)?महोदय", n) or n.startswith("प्रिय"): state = "body"   # "प्रिय …," = अर्धशासकीय पत्र; "मा.महोदय," §4.44
         if state == "subject" or (state == "body" and not n.startswith("प्रत")):
             out.append(t)
     return "\n".join(out)
@@ -696,7 +698,7 @@ def main(argv):
                   [] if new_page_before(bl, std_start) else ["no page or section break before the letterhead"])
             vb = []
             vi = next((i for i, t in enumerate(lt) if t.startswith("विषय")), None)
-            mi = next((i for i, t in enumerate(lt) if t.startswith("महोदय")), None)
+            mi = next((i for i, t in enumerate(lt) if re.match(r"(?:मा\.\s*)?महोदय", t)), None)   # "मा.महोदय," §4.44
             if vi is None: vb.append("'विषय' paragraph missing")
             if not any(t.startswith("संदर्भ") for t in lt): vb.append("'संदर्भ' paragraph missing")
             if vi is not None:
@@ -719,9 +721,11 @@ def main(argv):
                 en.append("signature 'आपली,' present (must be 'आपला,')")  # "आपली पत्रे" in संदर्भ is grammatical
             for line in _desk.letter_end_lines(dk):   # C30: signature / post / copy line of the desk profile
                 if ns(line) in lt: continue
-                cf = ns(dk["letter"]["copy_file"])   # §4.38 (06.11.2026): "प्रत :- 1) …" once, the file copy last "n) निवड नस्ती"
-                if ns(line) == ns("प्रत : " + cf) and any(t.startswith("प्रत :-") for t in lt) \
-                        and any(re.fullmatch(r"\d+\)\s*" + re.escape(cf), t) for t in lt):
+                cf = ns(dk["letter"]["copy_file"])   # older layouts still accepted: "प्रत : निवड नस्ती" (§4.5) and
+                # "प्रत :- 1) …" with the file copy last "n) निवड नस्ती" (§4.38 (ई)); current: "प्रत : 1. निवड नस्ती" (§4.44)
+                if ns(line) == ns("प्रत : 1. " + cf) and (ns("प्रत : " + cf) in lt or (
+                        any(t.startswith("प्रत :-") for t in lt)
+                        and any(re.fullmatch(r"\d+\)\s*" + re.escape(cf), t) for t in lt))):
                     continue
                 en.append(f"line '{ns(line)}' missing")
             check("letter ending (§4.5)", en)

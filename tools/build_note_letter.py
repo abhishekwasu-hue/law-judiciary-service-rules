@@ -84,7 +84,16 @@ def main(spec, outdir, pre):
     secs = d.sections
     want = [margins(docx.Document(os.path.join(TPL, "NOTE_TEMPLATE.docx")).sections[0])]
     if has_letter:
-        want += [margins(docx.Document(os.path.join(TPL, "LETTER_TEMPLATE.docx")).sections[0])] * len(lps)
+        # §4.44 (13.11.2026): an ordinary letter's left margin is set by mkdocs.build_letter (4.0 cm, Abhi's letter);
+        # the अर्धशासकीय पत्र (kind "do") keeps LETTER_TEMPLATE's
+        from mkdocs import LET_MARGIN_LEFT, letters_of
+        from docx.shared import Twips
+        lsec = margins(docx.Document(os.path.join(TPL, "LETTER_TEMPLATE.docx")).sections[0])
+        lw = dict(zip(MARGINS, lsec)); lw["left_margin"] = Twips(LET_MARGIN_LEFT)
+        kinds = [L.get("kind") if isinstance(L, dict) else None
+                 for L in letters_of(json.load(open(spec, encoding="utf-8-sig")))]
+        want += [lsec if (kinds[i] if i < len(kinds) else None) == "do" else tuple(lw[a] for a in MARGINS)
+                 for i in range(len(lps))]
     got = [margins(s) for s in secs]
     if got != want:
         ok = False

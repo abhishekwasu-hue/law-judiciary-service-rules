@@ -132,13 +132,14 @@ def order_ref_re(p):
 def contact_line(p):
     """the letterhead phone / e-mail line (unknown values -> "____")."""
     L = p["letter"]
-    return f"दूरध्वनी क्र. :- {blank(L.get('phone'))}\t\t\t\t   Email ID :- {blank(L.get('email'))}"
+    # §4.44 (आ) (Abhi 13.11.2026, his letter): two tabs and 13 spaces between, so it stays on one line at the 4 cm margin
+    return f"दूरध्वनी क्र. :- {blank(L.get('phone'))}\t\t{' ' * 12} Email ID :- {blank(L.get('email'))}"
 
 
 def letter_end_lines(p):
     """the letter's closing lines that verify_outputs checks (whitespace as printed; compare after ns())."""
     L = p["letter"]
-    return [sign_name(L.get("sign_name")), blank(L.get("sign_post")), "प्रत : " + L["copy_file"]]
+    return [sign_name(L.get("sign_name")), blank(L.get("sign_post")), "प्रत : 1. " + L["copy_file"]]   # §4.44 (ऊ)
 
 
 def detect_desk(texts):

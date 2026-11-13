@@ -80,7 +80,7 @@ class EngineBriefTest(unittest.TestCase):
         self.assertIn("भाग 0 — वरिष्ठांसाठी ब्रीफिंग", self.text)
 
     def test_letter_and_ref_phrases(self):
-        for p in ("आपला,", "प्रत : निवड नस्ती", "( राजेश वडनेरकर )", "अवर सचिव ,महाराष्ट्र शासन",
+        for p in ("आपला,", "प्रत : 1. निवड नस्ती", "( राजेश वडनेरकर )", "अवर सचिव ,महाराष्ट्र शासन",
                   "संकिर्ण-<year>/<file no>/प्र.क्र.<n>/का.6", "lnjd.desk6-mh@mah.gov.in",
                   "(पॅकेज PDF पृ. N)", "(पॅकेज PDF मध्ये नाही)", "पृ.N/प.वि.", "वाचन अपूर्ण / उपलब्ध नाही",
                   "संबंधित माहिती (संदर्भासाठी)", "--original-name", "tools/lint_spec.py"):

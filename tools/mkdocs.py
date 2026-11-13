@@ -305,10 +305,10 @@ def build_note(spec, out):
             up.paragraph_format.right_indent = Cm(0); up.alignment = 0
     rel = spec.get("related", [])
     if rel:
-        from docx.enum.text import WD_BREAK
-        pb = add(body, sect, blank, d, "")
-        pb.runs[0].add_break(WD_BREAK.PAGE) if pb.runs else pb.add_run().add_break(WD_BREAK.PAGE)
-        add(body, sect, hdr, d, "संबंधित माहिती (संदर्भासाठी)", bold=True)
+        # new page via "page break before" on the heading (13.11.2026): a separate break paragraph spilled onto an empty
+        # page whenever the note filled its last page (case 6: a blank page 4)
+        rh = add(body, sect, hdr, d, "संबंधित माहिती (संदर्भासाठी)", bold=True)
+        rh.paragraph_format.page_break_before = True
         for j, it in enumerate(rel, 1):
             add(body, sect, numbered, d, f"{j}.\t{it['heading']}", bold=True)
             for tx in it.get("text", []):
@@ -416,23 +416,87 @@ def build_do_letter(spec, out, L):
 # Letter layout (INSTRUCTIONS §4.38, Abhi 06.11.2026), cm from the left margin
 SUBJ_LBL, SUBJ_TXT, REF_TXT = 2.5, 4.4, 5.2     # विषय / संदर्भ label, text, reference text after its number
 PT_NO, PT_TXT = 1.27, 2.2                         # requested point "(n)" and its text
-COPY_NO, COPY_TXT = 1.5, 2.2                      # copy list "n)" and its text
+COPY_NO = 1.15                                    # copy list "1. …" / "2. …" after "प्रत :" (§4.44 (ऊ))
 REF_NO_RE = re.compile(r"^\(?([0-9०-९]+)\)\s*")
 POINT_RE = re.compile(r"^\(?([0-9०-९]+|[अआइईउऊएऐओऔ])\)\s*")
+# §4.44 (Abhi 13.11.2026, his own corrected Word letter of case 6 — "letter setting and format, follow this in future
+# work"): page and table geometry in twips, exactly as in his file
+LET_MARGIN_LEFT = 2268                            # letter section left margin 4.0 cm (top / right / bottom: template)
+LET_TBL_W, LET_TBL_IND = 8505, 250                # letter table width and indent from the margin
+LET_TBL3 = (709, 5245, 2551)                      # three-column table अ.क्र. / तपशील / माहिती
+LET_INTRO_RIGHT = 283                             # right indent of the first (intro) paragraph
+LOGO2_EXT = (837210, 546265)                      # right logo size (EMU) in his letterhead
+LET_DATE_RE = re.compile(r"^\s*_+\s*\.\s*_+\s*\.\s*([0-9]{4})\s*$")
+
+
+def letter_date(raw):
+    """§4.44 (इ): an undated draft prints "दिनांक  :- .MM.YYYY" — the day left blank, the current month and year (his
+    letter: ".11.2026"); a full date in the spec is printed as given."""
+    import datetime
+    if LET_DATE_RE.match(raw or ""):
+        now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=5, minutes=30)))
+        return f".{now.month:02d}.{now.year}"
+    return (raw or "").strip()
+
+
+def _cs_bold(run, bold=True, underline=False):
+    """bold for Devanagari too: w:b + w:bCs (Word formats Devanagari with the complex-script properties)."""
+    run.bold = bold
+    rpr = run._element.get_or_add_rPr()
+    rpr._remove_bCs()
+    if bold:
+        rpr.get_or_add_bCs()   # inserted in schema order (Word rejects out-of-order rPr children)
+    if underline:
+        run.underline = True
+
+
+def _letter_table(t):
+    """§4.44 (ए): the letter's table as in his file — width 8505, indent 250, header row bold and centred, three
+    columns 709 / 5245 / 2551 (other column counts: the content widths scaled to 8505)."""
+    from docx.oxml import OxmlElement
+    from docx.enum.text import WD_ALIGN_PARAGRAPH as WA
+    tblPr = t._tbl.tblPr
+    tblPr.find(qn("w:tblW")).set(qn("w:w"), str(LET_TBL_W))
+    ind = tblPr.find(qn("w:tblInd"))
+    if ind is None:
+        ind = OxmlElement("w:tblInd"); tblPr.append(ind)
+    ind.set(qn("w:w"), str(LET_TBL_IND)); ind.set(qn("w:type"), "dxa")
+    grid = t._tbl.find(qn("w:tblGrid"))
+    cols = [int(g.get(qn("w:w"))) for g in grid]
+    ws = list(LET_TBL3) if len(cols) == 3 else [round(c * LET_TBL_W / sum(cols)) for c in cols]
+    for g, w in zip(grid, ws): g.set(qn("w:w"), str(w))
+    for row in t.rows:
+        for j, c in enumerate(row.cells):
+            tcW = c._tc.get_or_add_tcPr().find(qn("w:tcW"))
+            if tcW is not None: tcW.set(qn("w:w"), str(ws[j])); tcW.set(qn("w:type"), "dxa")
+    for c in t.rows[0].cells:
+        for p in c.paragraphs:
+            p.alignment = WA.CENTER
+            for r in p.runs:
+                if r.text.strip(): _cs_bold(r)
+    return t
 
 
 def build_letter(spec, out, L=None):
-    from docx.shared import Cm
+    from docx.shared import Cm, Twips
     L = spec["letter"] if L is None else L
     if isinstance(L, dict) and L.get("kind") == "do":
         return build_do_letter(spec, out, L)
     d = docx.Document(LET_T); body, P, sect = fresh(d); fix_styles(d)
+    sect.find(qn("w:pgMar")).set(qn("w:left"), str(LET_MARGIN_LEFT))   # §4.44 (अ)
     dk = desk_of(spec)["letter"]   # C30: the desk profile (tools/desks/<id>.json; spec "desk", default law-desk6)
     # 0..4 letterhead (0 holds the two logo drawings) ; 5 ref/date ; 6 blank
     from docx.text.paragraph import Paragraph as _P
     for i in range(0, 2):
         body_el = copy.deepcopy(P[i]); sect.addprevious(body_el)
         for r in _P(body_el, d).runs: setfont(r)
+        if i == 0:   # §4.44 (अ): the right-hand logo at his size
+            ext = body_el.findall(".//" + qn("wp:extent"))
+            if len(ext) > 1:
+                ext[1].set("cx", str(LOGO2_EXT[0])); ext[1].set("cy", str(LOGO2_EXT[1]))
+                a_ext = body_el.findall(".//{http://schemas.openxmlformats.org/drawingml/2006/main}ext")
+                if len(a_ext) > 1:
+                    a_ext[1].set("cx", str(LOGO2_EXT[0])); a_ext[1].set("cy", str(LOGO2_EXT[1]))
     # department / address lines: the template paragraph itself when the profile line equals it (Desk-6), else its text
     for j, line in enumerate(dk["office"]):
         proto = P[2] if j == 0 else P[3]
@@ -447,14 +511,21 @@ def build_letter(spec, out, L=None):
         r0 = pe.runs[0]
         for r in pe.runs[1:]: r._element.getparent().remove(r._element)
         r0.text = contact_line(desk_of(spec)); setfont(r0)   # unknown phone / e-mail -> "____"
+        _cs_bold(r0)   # §4.44 (आ): the phone / e-mail line bold
     rem = L.get("reminder")
     if rem:  # §4.21 स्मरणपत्र: heading above the क्रमांक line (the Section's old reminders, e.g. C R 170/2024)
         n_rem = int(rem) if str(rem).isdigit() and int(rem) > 0 else 1
         add(body, sect, P[5], d, f"स्मरणपत्र-{n_rem}", bold=True)
-    add(body, sect, P[5], d, f"क्रमांक:-{L['ref_no']}                                  दिनांक  :- {L['date']}")
+    # §4.44 (इ): the number / date line bold, 20 spaces between, "दिनांक  :- .MM.YYYY"
+    kp = add(body, sect, P[5], d, f"क्रमांक:-{L['ref_no']}{' ' * 20}दिनांक  :- {letter_date(L['date'])}")
+    for r in kp.runs: _cs_bold(r)
     add(body, sect, P[6], d, "")
-    add(body, sect, P[7], d, "प्रति,")
-    for line in L["to"]: add(body, sect, P[8], d, "\t" + line)
+    for r in add(body, sect, P[7], d, "प्रति,").runs: _cs_bold(r)   # §4.44 (ई)
+    for j, line in enumerate(L["to"]):
+        line = line.strip()
+        if j == 0 and not line.startswith("मा."):   # §4.44 (ई): "मा." before the addressee ("मा.प्रबंधक (निरीक्षण-1),")
+            line = "मा." + line
+        add(body, sect, P[8], d, "\t" + line)
     add(body, sect, P[10], d, "")
     # विषय व संदर्भ (INSTRUCTIONS §4.38, Abhi 06.11.2026 "अ मान्य … विषय आणि संदर्भ हे दोन शब्द बोल्ड करा"): bold, the block
     # shifted right like the office's own letters (CR 14 proposal pp. 4, 26): label at SUBJ_LBL, text and its wrapped lines
@@ -464,7 +535,23 @@ def build_letter(spec, out, L=None):
         p.alignment = WA.LEFT
         pf = p.paragraph_format; pf.left_indent = Cm(left); pf.right_indent = Cm(0); pf.first_line_indent = Cm(first)
         for t in tabs: pf.tab_stops.add_tab_stop(Cm(t))
-        for r in p.runs: r.bold = True; setfont(r)
+        # §4.44 (उ) — run formatting exactly as in his letter: the label word ("विषय" / "संदर्भ") w:bCs + w:cs +
+        # underline (bold, underlined); " :-" and the text w:b + w:cs, no w:bCs — so the Marathi text prints in normal
+        # weight (Word and LibreOffice format a w:cs run with the complex-script properties) and only Latin digits /
+        # punctuation in it print bold, as in his file
+        for r in p.runs:
+            setfont(r); r.bold = True
+            rp = r._element.get_or_add_rPr(); rp._remove_bCs(); rp.get_or_add_cs()
+        r0 = p.runs[0] if p.runs else None
+        m = re.match(r"(विषय|संदर्भ)( :-)(.*)$", r0.text, re.S) if r0 is not None else None
+        if m:
+            from docx.text.run import Run
+            prev = r0._element
+            for txt in (m.group(2), m.group(3)):
+                nr = copy.deepcopy(r0._element); prev.addnext(nr); prev = nr
+                Run(nr, p).text = txt
+            r0.text = m.group(1); r0.bold = None; r0.underline = True
+            r0._element.get_or_add_rPr().get_or_add_bCs()
         return p
     blk(add(body, sect, P[11], d, "विषय :-\t" + L["subject"].strip(), bold=True), SUBJ_TXT, SUBJ_LBL - SUBJ_TXT, [SUBJ_TXT])
     refs = [r for r in (L["refs"] or []) if str(r).strip()]
@@ -480,15 +567,16 @@ def build_letter(spec, out, L=None):
         else:
             blk(add(body, sect, P[13], d, f"{no}\t{txt}", bold=True), REF_TXT, SUBJ_TXT - REF_TXT, [REF_TXT])
     add(body, sect, P[15], d, "")
-    add(body, sect, P[16], d, "महोदय,")
-    add(body, sect, P[17], d, "\t" + L["intro"])
+    add(body, sect, P[16], d, "मा.महोदय,")   # §4.44 (ई)
+    ip = add(body, sect, P[17], d, "\t" + L["intro"])
+    ip.paragraph_format.right_indent = Twips(LET_INTRO_RIGHT)   # §4.44 (ए)
     # Requested points (§4.38, "आ एकाच क्रमाने"): "(1)", "(2)" … one sequence through the letter, inside the paragraph
     # (number at PT_NO, text at PT_TXT) so they never look like paragraph numbers. A line ending ":-" without a marker
     # (lead-in to a list) is a plain line; any other line without a marker is a new paragraph "2.", "3." … like the note.
     n_pt, n_para = 0, 2
     for pt in L["points"]:
         if isinstance(pt, dict):
-            add_table(d, sect, pt["table"], pt.get("bold_last", False)); continue
+            _letter_table(add_table(d, sect, pt["table"], pt.get("bold_last", False))); continue
         t = str(pt).strip()
         m = POINT_RE.match(t)
         if m:
@@ -502,22 +590,21 @@ def build_letter(spec, out, L=None):
     if L.get("closing"):
         add(body, sect, P[17], d, f"{n_para}.\t" + L["closing"].strip(), left=Cm(0), first=Cm(0))
     add(body, sect, P[18], d, "\t\t\t\t\t\t\t      \t     आपला,")
+    add(body, sect, P[18], d, "")   # §4.44 (ऐ): two blank lines before the name, as in his letter
     add(body, sect, P[19], d, "")
-    add(body, sect, P[20], d, "\t\t\t\t\t\t\t         " + _sign_name(dk.get("sign_name")))
+    add(body, sect, P[20], d, "\t\t\t\t\t\t\t    " + _sign_name(dk.get("sign_name")))   # §4.44 (ऐ): 7 tabs + 4 spaces
     add(body, sect, P[21], d, "\t\t\t\t\t\t       " + _blank(dk.get("sign_post")))
     if L.get("enclosure"): add(body, sect, P[17], d, L["enclosure"])
-    # Copy line (§4.38, "प्रत … एकदाच करून पुढे क्रमांक"): only the file copy -> "प्रत : निवड नस्ती"; with other copies
-    # (§4.22) "प्रत :-" once, then "1) …", "2) …", the file copy last.
-    cps = [c.strip() for c in (L.get("copies") or []) if isinstance(c, str) and c.strip()] + [dk["copy_file"]]
-    if len(cps) == 1:
-        add(body, sect, P[17], d, "प्रत : " + cps[0])
-    else:
-        for k, c in enumerate(cps, 1):
-            p = add(body, sect, P[17], d, (f"प्रत :-\t{k})\t" if k == 1 else f"\t{k})\t") + c,
-                    left=Cm(COPY_TXT), first=Cm(-COPY_TXT))
-            for tpos in (COPY_NO, COPY_TXT): p.paragraph_format.tab_stops.add_tab_stop(Cm(tpos))
-            p.paragraph_format.keep_together = True
-            if k < len(cps): p.paragraph_format.keep_with_next = True   # the copy list never splits across pages
+    # Copy line (§4.44 (ऊ), Abhi 13.11.2026, his letter: "प्रत : 1. निवड नस्ती" / "       2...."): "प्रत :" once, the
+    # file copy first as "1.", other copies (§4.22) "2.", "3." … below it; with no other copy a "2...." line is left
+    # for the desk to fill.
+    cps = [dk["copy_file"]] + [c.strip() for c in (L.get("copies") or []) if isinstance(c, str) and c.strip()]
+    rows = [f"{k}. {c}" for k, c in enumerate(cps, 1)] + ([] if len(cps) > 1 else ["2...."])
+    for k, c in enumerate(rows):
+        p = add(body, sect, P[17], d, ("प्रत :\t" if k == 0 else "\t") + c, left=Cm(COPY_NO), first=Cm(-COPY_NO))
+        p.paragraph_format.tab_stops.add_tab_stop(Cm(COPY_NO))
+        p.paragraph_format.keep_together = True
+        if k < len(rows) - 1: p.paragraph_format.keep_with_next = True   # the copy list never splits across pages
     nomirror(d); d.save(out); clean_docx(out, spec.get("doc_author"))
 
 if __name__ == "__main__":

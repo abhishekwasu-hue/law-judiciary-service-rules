@@ -90,17 +90,21 @@ class TestBuildNoteLetter(TmpCase):
                     self.assertNotIn("प्रत : निवड नस्ती", text)
                 elif has_letter:
                     self.assertIn("आपला,", text)
-                    # §4.38 (06.11.2026): only the file copy -> "प्रत : निवड नस्ती"; other copies -> "प्रत :-" once, numbered
+                    # §4.44 (ऊ) (13.11.2026): "प्रत :" once, "1. निवड नस्ती" first; other copies "2. …", none -> "2...."
+                    self.assertEqual(text.count("प्रत :"), 1)
+                    self.assertIn("प्रत :\t1. निवड नस्ती", text)   # desk profile copy_file, e.g. "निवड नस्ती (मशि-5)"
                     if jload(sp)["letter"].get("copies"):
-                        self.assertNotIn("प्रत : निवड नस्ती", text)
-                        self.assertEqual(text.count("प्रत :-"), 1)
-                        self.assertRegex(text, r"\n\t\d+\)\tनिवड नस्ती")
+                        self.assertRegex(text, r"प्रत :\t1\. निवड नस्ती[^\n]*\n\t2\. \S")
                     else:
-                        self.assertIn("प्रत : निवड नस्ती", text)
+                        self.assertRegex(text, r"प्रत :\t1\. निवड नस्ती[^\n]*\n\t2\.\.\.\.")
                 if has_letter:
                     self.assertEqual(len(d.sections), 2)
                     self.assertEqual(page_setup(d.sections[0]), note_m)
-                    self.assertEqual(page_setup(d.sections[1]), let_m)
+                    want = let_m   # §4.44 (13.11.2026): ordinary letters 4.0 cm left margin; D.O. letter = template
+                    if jload(sp)["letter"].get("kind") != "do":
+                        from docx.shared import Twips
+                        want = (Twips(2268),) + tuple(let_m[1:])
+                    self.assertEqual(page_setup(d.sections[1]), want)
                 else:
                     self.assertNotIn("आपला,", text)
                     self.assertEqual(len(d.sections), 1)

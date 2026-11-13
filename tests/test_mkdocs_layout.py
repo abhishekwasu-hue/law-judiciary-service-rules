@@ -109,15 +109,64 @@ def test_letter_layout_438(tmp_path):
     tx = [p.text for p in ps]
     sub = next(p for p in ps if p.text.startswith("विषय :-\t"))
     assert sub.paragraph_format.left_indent.cm > 4 and sub.paragraph_format.first_line_indent.cm < 0
-    assert all(r.bold for r in sub.runs if r.text.strip())
+    from docx.oxml.ns import qn   # §4.44 (उ): label w:bCs + underline, the rest w:b (as in Abhi's letter)
+    assert sub.runs[0]._element.rPr.find(qn("w:bCs")) is not None and all(r.bold for r in sub.runs[1:] if r.text.strip())
     assert any(t.startswith("संदर्भ :-\t1)\t") for t in tx) and "2)\tया विभागाचे पत्र दि. 30.03.2026." in tx
     pts = [t for t in tx if t.startswith("(")]
     assert [t.split("\t")[0] for t in pts] == ["(1)", "(2)", "(3)"]          # one sequence through the letter
     p1 = next(p for p in ps if p.text.startswith("(1)\t"))
     assert p1.paragraph_format.left_indent.cm > 2 and p1.paragraph_format.first_line_indent.cm < 0
     assert any(t.startswith("2.\tतसेच, एकत्रित प्रस्ताव") for t in tx)
-    assert sum(t.startswith("प्रत ") for t in tx) == 1 and tx[-1] == "\t2)\tनिवड नस्ती"
-    assert tx[-2].startswith("प्रत :-\t1)\tप्रमुख जिल्हा")
+    # §4.44 (ऊ) (13.11.2026) replaced §4.38 (ई): "प्रत :" once, the file copy first "1.", the other copies "2." …
+    assert sum(t.startswith("प्रत ") for t in tx) == 1 and tx[-1].startswith("\t2. प्रमुख जिल्हा")
+    assert tx[-2] == "प्रत :\t1. निवड नस्ती"
+
+
+def test_letter_format_444(tmp_path):
+    """INSTRUCTIONS §4.44 (Abhi 13.11.2026, his corrected Word letter of case 6): 4 cm left margin; bold phone / e-mail
+    and number / date lines, undated draft ".MM.YYYY"; bold "प्रति,"; "मा." before the addressee; label word underlined;
+    "मा.महोदय,"; letter table 8505 wide, indent 250, header centred, columns 709 / 5245 / 2551; two blank lines
+    before the name; "प्रत : 1. निवड नस्ती" then "2...."."""
+    import json, re, docx, datetime
+    from docx.oxml.ns import qn
+    sp = json.load(open(os.path.join(ROOT, "samples", "specs", "CR131_2026_special-pay_info-letter.json"), encoding="utf-8"))
+    L = sp["letter"]
+    L["date"] = "__.__.2026"
+    L["to"] = ["प्रबंधक (निरीक्षण-1),", "उच्च न्यायालय (अपील शाखा),", "मुंबई."]
+    L["points"] = [{"table": [["अ.क्र.", "तपशील", "माहिती"], ["1", "मंजूर पदे", ""]]}]
+    L.pop("copies", None)
+    out = str(tmp_path / "L.docx")
+    import mkdocs as M
+    M.build_letter(sp, out, L)
+    D = docx.Document(out)
+    assert D.sections[-1].left_margin.twips == 2268
+    ps = [p for p in D.paragraphs if p.text.strip()]
+    tx = [p.text for p in ps]
+    ph = next(p for p in ps if p.text.startswith("दूरध्वनी"))
+    assert all(r.bold for r in ph.runs if r.text.strip())
+    kr = next(p for p in ps if p.text.startswith("क्रमांक:-"))
+    assert all(r.bold for r in kr.runs if r.text.strip()) and " " * 20 + "दिनांक  :- ." in kr.text
+    assert re.search(r"दिनांक  :- \.\d\d\.\d{4}$", kr.text)
+    assert next(p for p in ps if p.text == "प्रति,").runs[0].bold
+    assert "\tमा.प्रबंधक (निरीक्षण-1)," in tx and "मा.महोदय," in tx
+    sub = next(p for p in ps if p.text.startswith("विषय :-\t"))
+    assert sub.runs[0].text == "विषय" and sub.runs[0].underline and not sub.runs[1].underline
+    # run flags exactly as his file: label w:bCs + w:cs + w:u (no w:b); " :-" and text w:b + w:cs (no w:bCs)
+    r0, r1, r2 = sub.runs[:3]
+    assert r0.bold is None and r0._element.rPr.find(qn("w:bCs")) is not None and r0._element.rPr.find(qn("w:cs")) is not None
+    for r in (r1, r2):
+        assert r.bold and r._element.rPr.find(qn("w:bCs")) is None and r._element.rPr.find(qn("w:cs")) is not None
+    t = D.tables[0]._tbl
+    assert t.tblPr.find(qn("w:tblW")).get(qn("w:w")) == "8505" and t.tblPr.find(qn("w:tblInd")).get(qn("w:w")) == "250"
+    assert [g.get(qn("w:w")) for g in t.find(qn("w:tblGrid"))] == ["709", "5245", "2551"]
+    assert D.tables[0].rows[0].cells[1].paragraphs[0].alignment == 1
+    allp = D.paragraphs
+    ia = next(i for i, p in enumerate(allp) if p.text.strip() == "आपला,")
+    assert [p.text.strip() for p in allp[ia + 1:ia + 3]] == ["", ""] and allp[ia + 3].text.strip().startswith("(")
+    assert tx[-2:] == ["प्रत :\t1. निवड नस्ती", "\t2...."]
+    # a full date is printed as given
+    L["date"] = "05.12.2026"; M.build_letter(sp, out, L)
+    assert any(p.text.endswith("दिनांक  :- 05.12.2026") for p in docx.Document(out).paragraphs)
 
 
 def test_letter_refs_without_numbers_438(tmp_path):
