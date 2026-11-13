@@ -25,6 +25,16 @@
 .docx-host { overflow-x: auto; }
 .docx-host .docx-wrapper { background: transparent !important; padding: 8px 0 !important; }
 .docx-host .docx-wrapper > section.docx { box-shadow: 0 1px 4px rgb(0 0 0 / .15); margin-bottom: 16px !important; }
+/* Abhi 13.11.2026 ("Word file cha sudha background dark krta aala pahije"): in dark mode the Word PREVIEW pages are dark
+   too. Display only — the stored / downloaded .docx stays white with black text. Yellow highlights keep their colour
+   (text on them turns dark); table shading and the letterhead logo are left as in the file. */
+.dark .docx-host .docx-wrapper > section.docx { background: #0f1b33 !important; box-shadow: 0 1px 4px rgb(0 0 0 / .5); }
+.dark .docx-host section.docx, .dark .docx-host section.docx * { color: #e2e8f0 !important; border-color: #64748b !important; }
+.dark .docx-host section.docx td, .dark .docx-host section.docx th { background-color: transparent !important; }
+.dark .docx-host section.docx img { background: #f8fafc; border-radius: 4px; }   /* the black state emblem stays visible */
+.dark .docx-host section.docx [style*="background-color: yellow"],
+.dark .docx-host section.docx [style*="background-color: #FFFF00"],
+.dark .docx-host section.docx [style*="background-color:yellow"] { color: #111827 !important; }
 @media print {
   .no-print { display: none !important; }
   body { background: #fff !important; color: #000 !important; }
