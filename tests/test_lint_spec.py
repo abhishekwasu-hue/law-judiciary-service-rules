@@ -1233,8 +1233,26 @@ class LintCR14MoreWarns(unittest.TestCase):
         self.assertTrue(self.warns(s, "§4.15 एकच")); self.assertTrue(self.warns(s, "§1.1 संबंधित"))
         self.assertEqual(L.lint_spec(s), L.lint_spec(self.s122))   # WARN only, never an error
 
-if __name__ == "__main__":
-    unittest.main()
+class NoteFormat445(unittest.TestCase):
+    """INSTRUCTIONS §4.45 (Abhi 13.11.2026, case 6 note): one sub-point level, no '*' marks, department of a GR in a table."""
+
+    def test_warns(self):
+        s = raw_load(os.path.join(ROOT, "samples", "specs", "CR131_2026_special-pay_info-letter.json"))
+        n = s["note"]
+        n["sub"] = {"1": ["(अ) मागण्या :-", "(1) पहिली मागणी.", "(ब) कारणे :-", "(1) पहिले कारण."]}
+        n["paras"].append("सदर शासन निर्णयात असे नमूद करण्यात आले आहे की, “** सदर भत्ता अनुज्ञेय राहिल.”")
+        n["paras"].append({"table": [["अ.क्र.", "आधार", "दर"], ["1", "शासन निर्णय दि. 20.10.2011", "200"],
+                                     ["2", "विधि व न्याय विभागाचा शासन निर्णय क्र. संकीर्ण-2011/प्र.क्र.167/का.06, दि. 20.10.2011", "200"]]})
+        ws = [w for w in L.lint_warnings(s) if "§4.45" in w]
+        self.assertTrue(any("(§4.45 (अ))" in w for w in ws), ws)
+        self.assertTrue(any("(§4.45 (आ))" in w for w in ws), ws)
+        self.assertEqual(sum("(§4.45 (इ))" in w for w in ws), 1, ws)   # only the row without the department
+
+    def test_case6_corrected_spec_clean(self):
+        s = raw_load(os.path.join(ROOT, "cases", "desk-6", "spec.json"))
+        self.assertEqual([w for w in L.lint_warnings(s) if "§4.45" in w], [])
+
+
 
 
 class LintCR50StageWarns(unittest.TestCase):
@@ -1264,3 +1282,7 @@ class LintCR50StageWarns(unittest.TestCase):
         s["note"]["first"] = ("प्रमुख जिल्हा व सत्र न्यायाधीश, भंडारा यांच्या पृ.1/प.वि. वरील दि. 01.01.2026 रोजीच्या पत्रास अनुसरून सादर. "
                               "तसेच, प्रबंधक, उच्च न्यायालय (अपील शाखा), मुंबई यांच्या पृ.2/प.वि. वरील दि. 02.01.2026 रोजीच्या पत्रास अनुसरून सादर.")
         self.assertTrue(self.new(s, "A12 परि. 1 एकच वाक्य"))
+
+
+if __name__ == "__main__":
+    unittest.main()

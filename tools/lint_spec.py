@@ -1911,6 +1911,35 @@ def stage_warnings(spec, seq):
     return W
 
 
+# §4.45 (Abhi 13.11.2026, case 6 note correction: "(अ) व (ब) ची मांडणी बरोबर दिसत नाही, सर्व points align करा …
+# ** अशी खूण नको, sentences पूर्ण हवीत … तक्त्यातील शासन निर्णय कोणत्या विभागाचा ते बोध होत नाही … विशेष समिती कुठली ते
+# कळत नाही"): a second level of sub-points, footnote marks, a GR in a table without its department
+SUB_HEAD_RE = re.compile(r"^\s*\(\s*[अ-औ]\s*\)\s*[^()]{0,60}:-\s*$")
+SUB_NUM_RE = re.compile(r"^\s*\(\s*[0-9०-९]{1,3}\s*\)")
+
+
+def note_format_warnings(n):
+    W = []
+    sub = n.get("sub") if isinstance(n.get("sub"), dict) else {}
+    for k, items in sub.items():
+        items = [x for x in items if isinstance(x, str)] if isinstance(items, list) else []
+        if any(SUB_HEAD_RE.match(x) for x in items) and any(SUB_NUM_RE.match(x) for x in items):
+            W.append(f"note.sub[{k}]: sub-heads '(अ) …:-' with '(1) …' points under them — the note has one level of "
+                     f"sub-points; give each sub-head its own numbered para with its points (§4.45 (अ))")
+    body = [x for kk in ("first", "paras", "sub", "closing") if kk in n for x in strings(n[kk], f"note.{kk}")]
+    for path, t in body:
+        if re.search(r"\*", t):
+            W.append(f"{path}: '*' footnote mark — quote the condition's own text without the source's footnote "
+                     f"mark; complete sentences (§4.45 (आ))")
+    for path, rows in note_table_rows(n):
+        for i, r in enumerate(rows[1:], 1):   # data rows; a GR named by its no. or date ("शासन निर्णय क्र. / दि. …")
+            for j, c in enumerate(r):
+                if isinstance(c, str) and re.search(r"शासन\s+निर्णय\s+(?:क्र\.|दि\.)", c) and "विभाग" not in c:
+                    W.append(f"{path}[{i}][{j}]: GR in a table without its department — 'विधि व न्याय विभागाचा शासन "
+                             f"निर्णय क्र. …, दि. …' (§4.45 (इ))")
+    return W
+
+
 def lint_warnings(spec):
     """WARN-level findings "<JSON path>: <message>" (note body and letter outside quotes); never errors."""
     if not isinstance(spec, dict) or not isinstance(spec.get("note"), dict):
@@ -1959,6 +1988,7 @@ def lint_warnings(spec):
     W += related_mismatch_warnings(spec)
     W += repeat_ask_warnings(spec, seq)
     W += stage_warnings(spec, seq)
+    W += note_format_warnings(n)   # §4.45 (13.11.2026)
     return W
 
 
