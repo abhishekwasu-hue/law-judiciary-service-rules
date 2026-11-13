@@ -1,0 +1,50 @@
+{
+ "proposal_parts": [
+  {
+   "path": "cases/desk-4/src/document (1).pdf",
+   "label": "नस्तीतील पत्रव्यवहार-भाग 1"
+  },
+  {
+   "path": "cases/desk-4/src/document.pdf",
+   "label": "नस्तीतील पत्रव्यवहार-भाग 2"
+  }
+ ],
+ "enclosures": [
+  {
+   "path": "pdf/gr/20050224143151001.pdf",
+   "pages": "1-2,4-5",
+   "label": "वित्त विभाग शा.नि. दि. 05.07.1991 (सेनिवे-1089/491/सेवा-4)",
+   "marks": []
+  },
+  {
+   "path": "pdf/gr/20090313142953001.pdf",
+   "pages": "1",
+   "label": "वित्त विभाग शा.नि. दि. 07.10.1993 (सेनिवे-1093/180/सेवा-4)",
+   "marks": []
+  },
+  {
+   "path": "pdf/gr/20051215163617001.pdf",
+   "pages": "1-2",
+   "label": "वित्त विभाग परिपत्रक दि. 26.06.1995 (सेनिवे-1094/156/सेवा-4)",
+   "marks": []
+  },
+  {
+   "path": "pdf/judgments-service/A-pension/Bombay-HC_2007-02-12_Pramila-Pandit-Sagat-v-State-of-Maharashtra.pdf",
+   "pages": "1-2",
+   "label": "मा. मुंबई उच्च न्यायालय, निकाल दि. 12.02.2007 (प्रमिला पंडित सगट)",
+   "marks": []
+  },
+  {
+   "path": "pdf/judgments-service/A-pension/Bombay-HC_2018-09-05_Shaikh-Banubi-v-State-of-Maharashtra.pdf",
+   "pages": "1-2",
+   "label": "मा. मुंबई उच्च न्यायालय, रिट याचिका क्र. 9928/2017, निकाल दि. 05.09.2018",
+   "marks": []
+  },
+  {
+   "path": "pdf/judgments-service/A-pension/SC_2025-10-29_Nagpur-Municipal-Corp-v-Lalita.pdf",
+   "pages": "1,5",
+   "label": "मा. सर्वोच्च न्यायालय, दिवाणी अपील क्र. 14786/2024, निकाल दि. 29.10.2025",
+   "marks": []
+  }
+ ]
+}

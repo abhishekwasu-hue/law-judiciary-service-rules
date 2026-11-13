@@ -1,0 +1,14 @@
+{
+ "case_id": "desk-4",
+ "prefix": "CR168_2024",
+ "package_name": "document (2).pdf",
+ "proposal_pages": 17,
+ "files": [
+  "spec.json",
+  "study.json",
+  "enclosures.json",
+  "marks.json",
+  "proposal.pdf"
+ ],
+ "saved_at": "2026-11-13 05:53"
+}
