@@ -15,6 +15,14 @@ the skills, the scheduled task, the प्रस्ताव कक्ष page (
 | GR index / register index for the page | tools/desk_gr_index.py, tools/desk_register_index.py | built per page |
 
 ## Option 1 — same page, second account (recommended: one set of cases)
+
+**Chosen 15.11.2026 (Abhi: "पर्याय 1 ठेवा").** Owner = abhiwasu007, page https://claude.ai/artifact/Hqf9Y7iKkDzNntsVCxXcB4.
+State checked 15.11.2026: `meta/config` = {trigger_id: trig_01YBZmHYbBax7nFYxzyduV4K} (no `triggers` map yet); `members` =
+only the owner (u_FdDuFeHzHonIe05Rk2Mhqg). Pending, in this order: (a) Abhi shares the page as Editor to the second
+login's e-mail (Share menu — a session cannot do it); (b) second-login session: steps 2–4 below, report its `trig_…` id;
+(c) owner-login session: read `members` (the new doc = the second login's viewer id) and write
+`meta/config.triggers = {"<that viewer id>": "<its trig id>"}` (update, pinned; keep `trigger_id`); then a test press
+from the second login.
 1. Account 1 (the owner) opens the page → Share → invite account 2's e-mail as **Editor** (the page's db rules give write
    access to Editors only; a Contributor or Viewer can read but not start work or change anything).
 2. Account 2 session (any chat/code session with this repo): create the scheduled task from docs/DESK_TASK_PROMPT.md
