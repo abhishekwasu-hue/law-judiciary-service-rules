@@ -100,7 +100,8 @@ def test_rebuild_passes_verify_args_and_lint_baseline(work, tmp_path, monkeypatc
     assert os.path.basename(cmds[0][1]) == "lint_compare.py" and cmds[0][2] == str(base)
     v = cmds[-1]
     assert os.path.basename(v[1]) == "verify_outputs.py"
-    assert v[-6:] == ["--original-name", "प्रस्ताव.pdf", "--desk", "law-desk6", "--case-meta", str(tmp_path / "m.json")]
+    assert v[-8:-2] == ["--original-name", "प्रस्ताव.pdf", "--desk", "law-desk6", "--case-meta", str(tmp_path / "m.json")]
+    assert v[-2] == "--enclosures" and v[-1].endswith("enclosures.json")   # §4.46 full-GR check
     cmds.clear()
     assert CS.rebuild([CID, str(out)]) == 0
     assert os.path.basename(cmds[0][1]) == "lint_spec.py" and "--original-name" not in cmds[-1]

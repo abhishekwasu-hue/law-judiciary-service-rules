@@ -207,6 +207,8 @@ def rebuild(args):
     if not no_study and os.path.exists(study):
         if _run([py, T("build_study.py"), study, os.path.join(out, prefix + "_Study.docx")]):
             return 1
+    encj = os.path.join(cdir, "enclosures.json")   # §4.46 full-GR check also for a map.json without "src"
+    vx = vx + (["--enclosures", encj] if os.path.exists(encj) and "--enclosures" not in vx else [])
     rc = _run([py, T("verify_outputs.py"), out, prefix, pkg, str(meta.get("proposal_pages") or 0)] + vx)
     prev = os.path.join(out, prefix + "_Note_and_Letter.pdf")
     if os.path.exists(prev):

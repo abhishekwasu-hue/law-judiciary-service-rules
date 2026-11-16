@@ -176,6 +176,8 @@ Fields: `edit_target` (note / letter / order / parawise / affidavit / lq / packa
    regex only): attachments (PDF as is; images -> PDF; Word -> left out with "Word फाइल … PDF करून जोडावी, ही विनंती") and
    GRs (repo pdf/gr/<code>.pdf, else the gr_request.py URLs) are APPENDED at the end of enclosures.json; earlier page
    numbers must stay identical (compare map.json), only the total changes. Target package = no text change.
+   §4.46 (ई): a package edit also appends the complete copy of every other GR of the package that is enclosed only in
+   part or named in the proposal and missing (same round; the message naming one GR does not limit it).
 3. **Rebuild + check.** Before step 2 copy the loaded spec: `cp /tmp/work/spec.json /tmp/work/spec_before.json`. Then
    `case_state.py save desk-<id> --work /tmp/work … --note "सुधारणा: <one line>"`, `rebuild desk-<id> /tmp/out
    --lint-baseline /tmp/work/spec_before.json --original-name "<package name>" --desk <desk> --case-meta

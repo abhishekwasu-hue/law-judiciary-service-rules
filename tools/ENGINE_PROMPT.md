@@ -96,7 +96,8 @@ Cost: measured $3.0–3.9 per full run, Opus 90–96 % of it (docs/AUDIT_2026-11
    that the COST RULE names — never every page; reply PDFs likewise. Write /tmp/work/facts.json (format below) for the
    pages you opened — every number/date/name/amount from the IMAGE, `clear:false` where not sure.
    RESEARCH FIRST (brief [I4.29]): from candidates.md, the GR PDFs, rules and judgments find every applicable para and
-   read it on the original page; quote verbatim. Then: decide letter or not, select the GR pages, write
+   read it on the original page; quote verbatim. Then: decide letter or not, select the pages (brief [I4.46]: every GR named in the proposal or note = its
+   complete copy, `"pages": ""`; rule books / judgments = page 1 + quoted pages), write
    /tmp/work/enclosures.json (pkg3 format; marks = exact text lines unique on the page), /tmp/work/spec.json (note +
    letter, `related` = []; पृ.N computed from the package order: proposal pages 1..n, then the enclosure pages in
    order; the note body DETAILED per brief [I4.29] — the 12 elements where they apply, nothing of the proposal left

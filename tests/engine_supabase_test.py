@@ -174,7 +174,7 @@ check({f["kind"]: (f["storage_path"], f["original_name"]) for f in new} == {
     "study": ("outputs/7/study/v2/file.docx", "CR130_2026_Study.docx"),
     "note_letter": ("outputs/7/note_letter/v1/file.docx", "CR130_2026_Note_and_Letter.docx"),
     "package_pdf": ("outputs/7/package_pdf/v1/file.pdf", PROP)}, "finish: case_files storage_path ASCII, original_name = real (Devanagari) name")
-check(run_row["state"] == "done" and run_row["step"] == "तयार" and run_row["summary"] == st["summary"] and run_row["letter_needed"] is True
+check(run_row["state"] == "done" and run_row["step"] == "तयार" and run_row["summary"] == "GR मिळाले नाहीत: 12.03.2014 t2 — " + st["summary"] and run_row["letter_needed"] is True
       and run_row["essential_points"] == st["essential_points"] and run_row["grs_attached"] == st["grs_attached"]
       and run_row["grs_missing"] == st["grs_missing"] and run_row["finished_at"], "finish: runs PATCH done + summary fields")
 check(DB["cases"][0]["stage"] == "मसुदा तयार", "finish: cases.stage मसुदा तयार")

@@ -150,7 +150,10 @@ class TestPkg3AndHighlight(TmpCase):
         self.assertEqual([t[2] for t in toc], [1, 3])
         mp = jload(out + ".map.json")
         self.assertEqual(mp["प्रस्ताव"]["pages"], [1, 2])
-        self.assertEqual(mp["GR 10.07.2013"], {"first_page": 3, "pages": [3]})
+        ent = mp["GR 10.07.2013"]
+        self.assertEqual({k: ent[k] for k in ("first_page", "pages")}, {"first_page": 3, "pages": [3]})
+        # §4.46: the source PDF and its page count (verify_outputs "full GR copies §4.46")
+        self.assertTrue(ent["src"].endswith("pdf/gr/201307101257022705.pdf")); self.assertEqual(ent["src_pages"], 4)
         self.assertEqual(len(mp["marks"]), 1)
         self.assertEqual(mp["marks"][0]["status"], "highlighted")
         self.assertGreaterEqual(mp["marks"][0]["hits"], 1)

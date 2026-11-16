@@ -202,7 +202,8 @@ def plan(argv):
               open(os.path.join(sync, "plan.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     if status and not kinds:
         lst = lambda k: status.get(k) if isinstance(status.get(k), list) else []
-        patch = {"state": "done", "step": "तयार", "summary": status.get("summary") or "",
+        import engine_supabase as E   # run_summary: the ONE §4.46 "GR मिळाले नाहीत" prefix rule (finish uses it too)
+        patch = {"state": "done", "step": "तयार", "summary": E.run_summary(status),
                  "letter_needed": bool(status.get("letter_needed")), "essential_points": lst("essential_points"),
                  "grs_attached": lst("grs_attached"), "grs_missing": lst("grs_missing"),
                  "warnings": [str(x).strip()[:300] for x in lst("warnings") if str(x).strip()],

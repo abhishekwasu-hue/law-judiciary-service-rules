@@ -9,7 +9,8 @@ Proposal returned WITH its GRs (Abhi's standing rule, INSTRUCTIONS.md §4.7, §4
   - PDF bookmarks (outline): proposal + each enclosure -> click jumps to its first page
   - marking: quoted text highlighted in yellow ONLY (search on the text layer). Never boxes. Pages whose text layer cannot be
     searched (scanned GR, legacy/garbled font, repeated strings): use tools/highlight.py on the finished package.
-  - writes <out>.map.json : {label: {"first_page": N, "pages": [..]}, "marks": [one record per mark, with "hits"]}
+  - writes <out>.map.json : {label: {"first_page": N, "pages": [..], "src": <enclosure path>, "src_pages": <its page
+    count>}, "marks": [one record per mark, with "hits"]}
     -> cite "(पृ.N/प.वि.)" in the note's संबंधित माहिती and "(पॅकेज PDF पृ. N)" in the Study (INSTRUCTIONS §4.27)
 
 enclosures.json:
@@ -169,7 +170,9 @@ def main(prop, js, out, also=()):
         start = len(dst) + 1; where = {}
         for p in sel:
             dst.insert_pdf(s, from_page=p - 1, to_page=p - 1); where[p] = len(dst)
-        toc.append([1, label, start]); mp[label] = {"first_page": start, "pages": [where[p] for p in sel]}
+        toc.append([1, label, start])
+        # "src" / "src_pages": the source PDF and its page count (verify_outputs "full GR copies §4.46")
+        mp[label] = {"first_page": start, "pages": [where[p] for p in sel], "src": e["path"], "src_pages": len(s)}
         for m in e.get("marks", []):
             if m.get("box"):
                 raise ValueError(f"{label}: 'box' marks are not allowed (INSTRUCTIONS §4.13) — use tools/highlight.py")

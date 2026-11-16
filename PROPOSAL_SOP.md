@@ -180,7 +180,7 @@ Both are optional keys of the same spec.json; engine detail: tools/ENGINE_PROMPT
   ids, repo paths, पृ. ranges of both files). App: kinds `order_draft` / `parawise` (Supabase migration 0006).
 
 ## Step 5 — Build the returned proposal PDF (GR सह प्रस्ताव)
-1. Choose only the relevant pages of each GR/rule/order: page 1 (title, number, date) + the pages with the quoted paras.
+1. Pages (§4.46, 16.11.2026): every Government Resolution (incl. GR-portal circular / corrigendum) mentioned in the proposal or the note is enclosed as the COMPLETE copy (`"pages": ""`) — never only page 1 + quoted pages, never left out as "not needed to decide" (only exception §4.40 (आ): its complete copy is already in the proposal). Rule books and court judgments / orders: page 1 (title, number, date) + the pages with the quoted paras. A GR not found after every route of §4.14 / §4.43 (इ) -> `grs_missing` (the run summary then starts "GR मिळाले नाहीत: …").
 2. Write `enclosures.json` (see the `tools/pkg3.py` docstring). Marks = exact text-layer line strings that occur only once on the page.
 3. `python3 tools/pkg3.py <proposal.pdf> enclosures.json "<outdir>/<ORIGINAL FILE NAME>.pdf"`. This gives page stamps and bookmarks, and leaves the proposal pages untouched.
 4. Pages pkg3 cannot mark (scanned GR, legacy/garbled font, repeated strings): use `python3 tools/highlight.py <pdf> marks.json` (modes: lines / ocr / rect). Yellow highlights on the quoted lines only. NEVER boxes. Nothing on the proposal pages.

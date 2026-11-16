@@ -714,5 +714,32 @@ def make_extra(path, paras, font=True, header=None, header_font=True, affidavit=
     clean_meta.clean_docx(path)   # as the builders do (C27 §4)
 
 
+
+class FullGrCopies(unittest.TestCase):
+    """§4.46 (16.11.2026): an enclosed GR must be complete; rule books / judgments keep relevant pages (soft FAIL)."""
+
+    def test_partial_full_and_excluded(self):
+        import verify_outputs as V
+        ents = {"शा.नि. दि. 05.08.2026": {"pages": [15], "src": "pdf/gr/202608051759229212.pdf", "src_pages": 2},
+                "शा.नि. दि. 19.04.2022": {"pages": [16, 17], "src": "pdf/gr/202204191851066912.pdf", "src_pages": 3},
+                "शा.नि. दि. 19.04.2022, संपूर्ण प्रत": {"pages": [18, 19, 20], "src": "pdf/gr/202204191851066912.pdf",
+                                                       "src_pages": 3},
+                "मा. सर्वोच्च न्यायालय, आदेश": {"pages": [21], "src": "pdf/sc/x.pdf", "src_pages": 70},
+                "महाराष्ट्र नागरी सेवा (निवृत्तिवेतन) नियम, 1982": {"pages": [22], "src": "pdf/04-x/1.pdf", "src_pages": 270},
+                "शासन निर्णय (अज्ञात स्रोत)": {"pages": [23], "src": "cases/none/missing.pdf"}}
+        self.assertEqual(V.full_gr_problems(ents, None, None), ["शा.नि. दि. 05.08.2026: पाने 2 पैकी 1"])
+        # older map without "src": label -> path from enclosures.json, page count from the repo PDF
+        old = {"शा.नि. दि. 05.08.2026": {"pages": [15]}}
+        encs = [{"path": "pdf/gr/202608051759229212.pdf", "pages": "1", "label": "शा.नि. दि. 05.08.2026"}]
+        if os.path.exists(os.path.join(os.path.dirname(TOOLS), "pdf/gr/202608051759229212.pdf")):
+            self.assertEqual(V.full_gr_problems(old, encs, None), ["शा.नि. दि. 05.08.2026: पाने 2 पैकी 1"])
+        self.assertEqual(V.full_gr_problems(old, None, None), [])   # source unknown -> skipped
+
+    def test_soft_for_engine(self):
+        import engine_supabase as E
+        hard, soft = E.classify_verify(["FAIL: full GR copies §4.46 — x: पाने 2 पैकी 1"])
+        self.assertEqual((hard, len(soft)), ([], 1))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -55,6 +55,12 @@ def test_full_run_plan_and_rows(full):
     assert (sync / "uploads.txt").read_text(encoding="utf-8").splitlines() == [u["path"] for u in up]
     patch = json.load(open(sync / "run_patch.json", encoding="utf-8"))
     assert patch["state"] == "done" and patch["letter_needed"] is True and patch["warnings"] == ["पडताळणी अपूर्ण — x"]
+    assert patch["summary"] == "स"                                          # grs_missing [] -> summary unchanged
+    st = json.load(open(out / "status.json", encoding="utf-8")); st["grs_missing"] = ["दि. 01.02.2020 शा.नि."]
+    json.dump(st, open(out / "status.json", "w", encoding="utf-8"), ensure_ascii=False)
+    assert run("plan", "7", str(out), "21", str(sync), "--files", str(fp), "--work", str(work)).returncode == 0
+    patch = json.load(open(sync / "run_patch.json", encoding="utf-8"))
+    assert patch["summary"] == "GR मिळाले नाहीत: दि. 01.02.2020 शा.नि. — स"   # §4.46: shown first
     # parts decode back to the exact docx bytes
     parts = rows[2]["paths"]
     assert base64.b64decode("".join(open(p, encoding="ascii").read() for p in parts)) == \

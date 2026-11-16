@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """verify_outputs.py <outdir> <PREFIX> "<package pdf>" <proposal pages> [--original-name NAME] [--desk ID]
-                    [--case-meta meta.json] [--details FILE]
+                    [--case-meta meta.json] [--enclosures enclosures.json] [--details FILE]
 Quality gate for one proposal's three outputs (PROPOSAL_SOP.md Step 7; rules INSTRUCTIONS.md §4).
 Prints one line per check ("OK: ..." / "FAIL: ...", plus "WARN: ..." lines that never fail) and "ALL OK" only when
 every check passes; exit code 1 otherwise.
@@ -103,6 +103,11 @@ Checks
     pages with an unusable text layer skipped; a package with no Highlight at all -> "OK: highlight coverage — skipped"
   - S-F3: --details FILE (or env CASE_DETAILS_FILE): full lines to FILE, stdout with each quoted segment replaced by its
     length (lint_spec.out / redact) — check names, block / page numbers and counts stay
+ §4.46 (Abhi 16.11.2026; FAIL, soft): "full GR copies §4.46" — every enclosed GR (source pdf/gr/<16-20 digits>.pdf, or a
+  label with "शा.नि." / "शासन निर्णय" / "शुद्धिपत्रक" / "परिपत्रक") is enclosed with all its pages ("पाने X पैकी Y" otherwise);
+  satisfied when the same source PDF is enclosed in full anywhere in the package. Not checked: pdf/sc/, pdf/judgments*/,
+  labels with "नियम," / "न्यायालय" (rule books, judgments / orders: relevant pages only). Source = map.json "src" /
+  "src_pages" (tools/pkg3.py) or, for older maps, --enclosures enclosures.json (label -> path); unresolvable -> skipped.
  The engine (tools/engine_supabase.py verify) treats only these FAILs as HARD (case failed): "… opens" (Study,
  Note_and_Letter, package PDF), "… internal ids", "… repo paths", "annotations on proposal pages"; every other FAIL is
  delivered with a "पडताळणी अपूर्ण — …" warning.
@@ -424,6 +429,57 @@ def highlight_findings(P, proposal_pages, ctx):
     return f"{len(hl)} highlighted page(s), {len(seen)} cited GR reference(s), {checked} highlight(s) compared", W
 
 
+GR_PATH_RE = re.compile(r"(?:^|/)pdf/gr/\d{16,20}\.pdf$")
+GR_LABEL_RE = re.compile(r"शा\.\s*नि\.|शासन\s+निर्णय|शुद्धिपत्रक|परिपत्रक")
+NOT_GR_PATH_RE = re.compile(r"(?:^|/)pdf/(?:sc|judgments[^/]*)/")
+NOT_GR_LABEL_RE = re.compile(r"नियम,|न्यायालय")
+REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+
+def _src_pages(path, base_dirs):
+    """page count of an enclosure's source PDF (path as in enclosures.json: cwd / repo / enclosures dir) or None."""
+    for d in base_dirs:
+        f = path if os.path.isabs(path) else os.path.join(d, path)
+        if os.path.isfile(f):
+            try:
+                with m.open(f) as d0:
+                    return len(d0)
+            except Exception:
+                return None
+    return None
+
+
+def full_gr_problems(ents, encs, enc_dir):
+    """§4.46 (Abhi 16.11.2026): every enclosed GR (शासन निर्णय / परिपत्रक / शुद्धिपत्रक) is its COMPLETE copy. ents = the
+    map.json enclosure entries {label: {pages, src?, src_pages?}}; encs = enclosures.json items (labels -> path when the
+    map has no "src"). Rule books and court judgments / orders keep relevant pages only (not checked). A GR counts as
+    complete when the same source PDF is enclosed in full anywhere in the package; an unresolvable source is skipped."""
+    by_label = {(e.get("label") or e.get("path")): e.get("path") for e in encs or [] if isinstance(e, dict) and e.get("path")}
+    bases = [os.getcwd(), REPO] + ([enc_dir] if enc_dir else [])
+    seen = {}   # source path -> [enclosed page count, source page count, first label]
+    for lab, v in ents.items():
+        if v.get("kind") == "reply" or lab == "प्रस्ताव":
+            continue
+        path = v.get("src") or by_label.get(lab)
+        if not path:
+            continue
+        sp = str(path).replace("\\", "/")
+        if NOT_GR_PATH_RE.search(sp):
+            continue
+        if not (GR_PATH_RE.search(sp) or (GR_LABEL_RE.search(lab) and not NOT_GR_LABEL_RE.search(lab))):
+            continue   # a pdf/gr/ file is a GR even when its label names a court ("उच्च न्यायालयाच्या आस्थापनेवरील …")
+        tot = v.get("src_pages") if isinstance(v.get("src_pages"), int) else _src_pages(sp, bases)
+        if not tot:
+            continue
+        key = os.path.basename(sp) if GR_PATH_RE.search(sp) else os.path.normpath(sp)   # rel / abs path = one GR
+        got = len(set(v.get("pages") or []))
+        if key not in seen:
+            seen[key] = [got, tot, lab]
+        else:
+            seen[key][0] = max(seen[key][0], got)
+    return [f"{lab}: पाने {tot} पैकी {got}" for got, tot, lab in seen.values() if got < tot]
+
+
 def main(argv):
     argv = list(argv); orig = None; desk_arg = None; meta = None
     set_details(details_arg(argv), "verify_outputs " + " ".join(argv[1:]))   # audit S-F3
@@ -435,6 +491,18 @@ def main(argv):
             meta = json.load(open(argv[i + 1], encoding="utf-8-sig"))
         except Exception as e:
             check("case meta opens", [f"{argv[i + 1]}: {e.__class__.__name__}"]); meta = {}
+        del argv[i:i + 2]
+    encs, enc_dir = None, None
+    if "--enclosures" in argv:   # §4.46: the enclosures.json pkg3 used (labels -> source paths; map.json "src" wins)
+        i = argv.index("--enclosures")
+        if i + 1 >= len(argv):
+            print(__doc__); return 2
+        try:
+            ej = json.load(open(argv[i + 1], encoding="utf-8-sig"))
+            encs = (ej.get("enclosures") or []) if isinstance(ej, dict) else ej
+            enc_dir = os.path.dirname(os.path.abspath(argv[i + 1]))
+        except Exception:
+            encs = None   # unreadable: the §4.46 check resolves sources from map.json only
         del argv[i:i + 2]
     if "--desk" in argv:   # C30: desk profile id (else detected from the note's header line, else law-desk6)
         i = argv.index("--desk")
@@ -799,6 +867,8 @@ def main(argv):
                 if "NOT FOUND" in stt.upper() or stt == "page not included" or ("hits" in mk and not mk["hits"]):
                     mp_pr.append(f"mark not placed: {mk.get('label', '')} p.{mk.get('pdf_page', mk.get('src_page', '?'))} ({stt or 'hits 0'})")
         check("map.json (page count, marks)", mp_pr)
+        if mp is not None:   # §4.46: enclosed GRs are complete copies (SOFT: not in engine_supabase HARD_CHECK)
+            check("full GR copies §4.46", full_gr_problems(ents, encs, enc_dir))
         an_prop, an_kind = [], []
         for i, pg in enumerate(P):
             an = [a.type[1] for a in pg.annots()]

@@ -937,7 +937,7 @@ def cmd_finish(out):
     uploaded += spec_up
     extra_warn += spec_warn
     lst = lambda k: st.get(k) if isinstance(st.get(k), list) else []
-    if not patch_run({"state": "done", "finished_at": now(), "step": "तयार", "summary": st.get("summary") or "",
+    if not patch_run({"state": "done", "finished_at": now(), "step": "तयार", "summary": run_summary(st),
                       "letter_needed": bool(st.get("letter_needed")), "essential_points": lst("essential_points"),
                       "grs_attached": lst("grs_attached"), "grs_missing": lst("grs_missing")}):
         # L-F8: the run was failed / closed meanwhile (sweep, cancel): it stays as it is (never resurrected); the files
@@ -1854,6 +1854,23 @@ def review_warning(why):
 def soft_line(check, detail):
     d = re.sub(r"\s+", " ", str(detail)).strip()[:160]
     return f"{SOFT_PREFIX}{check}: {d}"[:300]
+
+
+GRS_MISSING_HEAD = "GR मिळाले नाहीत"
+
+
+def run_summary(st):
+    """status.json -> the run summary. §4.46 (Abhi 16.11.2026): a GR named in the proposal that could not be found is
+    shown first: non-empty `grs_missing` -> "GR मिळाले नाहीत: <a>; <b> — <summary>" (unless the summary already begins
+    so). Used by finish and tools/desk_publish.py plan (run_patch.json)."""
+    summ = str(st.get("summary") or "").strip()
+    miss = st.get("grs_missing") if isinstance(st.get("grs_missing"), list) else []
+    items = [(" ".join(str(x) for x in g.values() if x not in (None, "")) if isinstance(g, dict) else str(g)).strip()
+             for g in miss]
+    items = [x for x in items if x]
+    if not items or summ.startswith(GRS_MISSING_HEAD):
+        return summ
+    return f"{GRS_MISSING_HEAD}: " + "; ".join(items) + (f" — {summ}" if summ else "")
 
 
 def classify_verify(lines):
