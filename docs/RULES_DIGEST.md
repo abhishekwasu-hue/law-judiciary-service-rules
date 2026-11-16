@@ -27,3 +27,7 @@ INSTRUCTIONS §3.2 and §6 apply (ask only policy / preference questions; decide
 4. **Inventories**: pdf/gr/INDEX.tsv, docs/GR_INVENTORY.tsv (971 PDFs by subject / department), judgments
    pdf/judgments-service/ + docs/judgments/.
 
+
+## Several proposals at once (Abhi, 16.11.2026)
+When Abhi has uploaded / queued more than one proposal: always one agent per proposal, all in parallel, and finish the
+whole job without losing time (INSTRUCTIONS §7.8; prastav kaksh page: docs/DESK_WORKER.md §2). Quality rules unchanged.

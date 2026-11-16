@@ -19,7 +19,7 @@ stop for a question — an open point becomes a run `warnings` line "पडत�
    another worker is active: stop at once (write nothing). Else set it (pinned) `{state:"running", at:<now ISO>, run_id:null,
    step:"सुरुवात", note:""}` and refresh `at` / `run_id` / `step` at every step below (heartbeat).
 3. Scratch per run: `/tmp/case` (inputs, = WORKDIR), `/tmp/work` (spec / study / enclosures / marks), `/tmp/out` (OUTDIR),
-   `/tmp/sync` (publish). Empty them before each run. Never write scratch files into the repo.
+   `/tmp/sync` (publish). Empty them before each run. Several runs in parallel: per-run dirs of §2 instead. Never write scratch files into the repo.
 
 ## 1. Data access (Supabase -> page)
 | Engine (Supabase) | Worker (PAGE) |
@@ -41,7 +41,21 @@ stop for a question — an open point becomes a run `warnings` line "पडत�
 - Order: GR requests (section 5: `pending`, and `processing` ones older than 2 h) -> runs. Runs: query `runs` where `state` in ["queued", "running"], `order_by id asc`
   (= oldest first). A `running` run here was interrupted (usage limit, session end): it is resumed first, from its
   beginning (§3.1 / §4.1), unless its result is already written.
-- One run at a time: claim, finish (done / failed / refused), then re-query and take the next. No queued run left -> section 6.
+- **Several runs queued -> always in parallel** (Abhi, 16.11.2026: "when there are multiple proposal uploaded by me, always run
+  multiple agent and finish the job without wasting time"; INSTRUCTIONS §7.8, OWNER_RULES A.13). Only the lock holder (§0.2)
+  works runs; a session that finds the lock held stops at once and never works runs "on the side" (16.11.2026: three side
+  agents of a second session built runs 16/18/20 unclaimed, and the lock holder claimed them meanwhile — the work was lost).
+  The lock holder: (1) claims EVERY queued / interrupted run at once (§2 claim, one pinned update each, or one batch);
+  (2) starts ONE agent per run in the same message (Agent tool, parallel), each doing §3 / §4 for its run end-to-end incl.
+  its own Study part 1 and fresh-read review (no further sub-agents), the finish batch and the commit; (3) per-run private
+  dirs: `/tmp/r<run id>/case.json` + `case_meta.json`, `/tmp/r<run id>/work` (export `ENGINE_WORK_DIR`), `/tmp/r<run id>/out`,
+  `/tmp/r<run id>/sync`; inputs stay at `E.input_layout(files, "/tmp/case")` (`/tmp/case/in/<kind>/<name>`, the path form
+  edit runs resolve) — `/tmp/case` is emptied only before the agents start, never while they run; OCR with
+  `OMP_THREAD_LIMIT=1 nice -n 15`; (4) odd ids: agents write concurrently — a batch refused for an existing id -> re-query
+  the highest id, renumber, resend (§1); (5) git: `git add cases/desk-<id> && git commit -m … -- cases/desk-<id> && git pull
+  --rebase --autostash -q && git push`, on `index.lock` / push refusal wait 20 s and retry up to 3 times; (6) the lead
+  refreshes the lock heartbeat (`step` e.g. "समांतर: runs 12, 14, 16"), takes each agent's report, re-checks each run row
+  is done / failed, then re-queries (§6). One queued run only -> the lead does it itself.
 - `kind` "edit" -> section 4; `kind` null / "full" -> section 3.
 - The page already set `dispatched_at` (and, for a full run, case stage "अभ्यास चालू" + activity `run_started`) when it
   fired this task; a queued run with `dispatched_at` null (a failed firing) is taken too.
