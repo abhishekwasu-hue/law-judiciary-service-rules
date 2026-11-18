@@ -1,0 +1,14 @@
+{
+ "case_id": "CR13_2020",
+ "prefix": "CR13_2020",
+ "package_name": "FILE PART CR 13 2020 FALTANKAR LOWER LEVEL_0001.pdf",
+ "proposal_pages": 85,
+ "files": [
+  "spec.json",
+  "study.json",
+  "enclosures.json",
+  "marks.json",
+  "proposal.pdf"
+ ],
+ "saved_at": "2026-11-18 12:34"
+}
