@@ -281,7 +281,7 @@ class TestLintParawise(unittest.TestCase):
         s["parawise"]["background"].append("याचिकाकर्ता ____ आहे.")
         s["parawise"]["paras"][0]["remarks"] += " Designation “वरिष्ठ लिपिक” as in the order."
         W = LP.warnings_parawise(s)
-        self.assertEqual(len([w for w in W if "Devanagari" in w]), 1, W)
+        self.assertEqual(len([w for w in W if "Devanagari" in w]), 2, W)   # §4.47: quoted Marathi too
         self.assertEqual(LP.lint_parawise(s), [])   # warning only
 
     def test_draft_words(self):

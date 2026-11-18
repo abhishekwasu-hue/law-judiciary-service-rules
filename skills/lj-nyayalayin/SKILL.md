@@ -50,6 +50,7 @@ Abhi (कार्यासन अधिकारी, कार्यासन-6
 ## 4. कोणते मसुदे? (SOP Step 4b; §4.28, §4.33, §4.35)
 - श्रेणी-नियम: `tools/work_rules/court.md` (डिफॉल्ट मसुदे: परिच्छेदनिहाय अभिप्राय + सरकारी वकिलांना पत्र).
 - spec-key → साधन → फाइल:
+  - परिच्छेदनिहाय अभिप्राय व शपथपत्र पूर्णपणे इंग्रजीत — मराठी GR / अभिप्रायांचे उतारेही इंग्रजी भाषांतरात, एकही देवनागरी शब्द नाही (§4.47).
   - `parawise` → `tools/build_parawise.py` (कार्यासनाचा format, default; `"layout": "rule58"` फक्त सांगितल्यास) → `_Parawise.docx`
   - `letter` (सरकारी वकिलांना पत्र) → `tools/build_note_letter.py` → `_Note_and_Letter.docx`
   - `affidavit` (इंग्रजी, Times New Roman) → `tools/build_affidavit.py` → `_Affidavit.docx`

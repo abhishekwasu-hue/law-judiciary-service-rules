@@ -20,7 +20,7 @@ Errors
   - cryptic reply ("denied", "not admitted", … alone — Rule 58 Note (ii); lint_parawise.cryptic)
   - internal ids / repo paths; C27 draft words (package / warning / working / AI words, "—", "→", web addresses)
 Warnings
-  - Devanagari outside “…” quotes (the affidavit is in English; Marathi GR text stays in quotes, §4.30 (4))
+  - Devanagari anywhere (§4.47, 18.11.2026: the affidavit is wholly English, quoted GR / opinion text translated)
   - no reply row on the prayer clauses (Rule 58(3): every point of the petition)
   - a reply shorter than 8 words (Rule 58 Note (ii)); §4.30 contempt-prone wording (lint_parawise.contempt_hits)
 Audit 05.11.2026: WARN Q-F12 — affidavit.on_behalf_of names the High Court Registry (Registrar / High Court / महाप्रबंधक /
@@ -126,9 +126,9 @@ def warnings_affidavit(spec):
     af = spec["affidavit"]
     W = []
     for p, t in lint_spec.strings(af, "affidavit"):
-        if DEV_RE.search(lint_spec.unquoted(t)):
-            W.append(f"{p}: Devanagari outside quotes — the affidavit is in English (INSTRUCTIONS §3.1); put Marathi "
-                     "GR text / names in “…”")
+        if DEV_RE.search(t):   # §4.47 (Abhi 18.11.2026): wholly English, quoted Marathi GR / opinion text too
+            W.append(f"{p}: Devanagari — the affidavit is wholly in English (INSTRUCTIONS §3.1, §4.47); translate quoted "
+                     "Marathi GR / opinion text into English and write names / designations in English")
     path, items, rk = reply_source(spec)
     rows = [(i, it) for i, it in enumerate(items) if isinstance(it, dict) and "section" not in it]
     for i, it in rows:

@@ -19,7 +19,7 @@ binding rules exactly (pointers, not copies — the rule text is in INSTRUCTIONS
   respondent, is NOT part of it: no remarks, no request, no copy on its behalf.
 - PROPOSAL_SOP.md Step 4b "Court cases and order drafts" (para 1 from the GP/AGP letter, else "सादर.", `parawise` spec in the
   Section's office format, letter to the GP/AGP forwarding it, Rule 58(4) time limit).
-- INSTRUCTIONS.md §3.1 (affidavit / parawise reply in English, explanation in Marathi), §4.28 / §4.33 (ticked drafts incl.
+- INSTRUCTIONS.md §3.1 (affidavit / parawise reply wholly in English, quoted Marathi GR / opinion text translated — §4.47; explanation in Marathi), §4.28 / §4.33 (ticked drafts incl.
   parawise, affidavit), §4.30 (quality checks, respectful language to courts, every para and prayer answered), §4.27 and
   all other §4 items.
 - Models: samples/specs/WP35697_2026_old-pension_finance-opinion.json (note: §4.32 paras 2/3) and

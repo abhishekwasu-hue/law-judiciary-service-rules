@@ -27,7 +27,7 @@ Warnings — default (office) layout
   - keys of the rule58 layout present (court, respondents, respondent_no, subject, prepared_for, relief_sought,
     background, enclosures, recommendation, recommendation_reason, officer, designation, place, date, verification) —
     not printed in the office format
-  - Devanagari outside quotes; remarks shorter than 8 words; para label not "1", "21 to 24", "5 (a) to (e)",
+  - Devanagari anywhere (§4.47: wholly English, quotes too); remarks shorter than 8 words; para label not "1", "21 to 24", "5 (a) to (e)",
     "Para No.1", "Ground (a)", "Prayer Clauses (a) to (h)"; §4.30 contempt-prone wording in the remarks (as below)
 
 Errors — "layout": "rule58"
@@ -45,7 +45,7 @@ Errors — "layout": "rule58"
     and the AI words (lint_spec.draft_word_hits)
 Warnings — "layout": "rule58"
   - recommendation "____" (blank: no basis in the record — the Section fills it; Rule 58(4)(a) still applies)
-  - Devanagari outside “…” / "…" quotes (the parawise text is English; names/designations in quotes are fine)
+  - Devanagari anywhere (§4.47, 18.11.2026: the parawise text is wholly English, quoted GR / opinion text translated)
   - remarks shorter than 8 words (Note (ii): "elaborate factual position")
   - no enclosures (Note (ii): "invariably accompanied by copies of relevant notifications, rules and orders")
   - background empty; para label not of the forms "1", "1 to 3", "1-3", "1, 2", optionally followed by "(…)"
@@ -212,9 +212,9 @@ def _lint_office(pw):
 def _warn_office(pw):
     W = []
     for path, t in _strings(pw):
-        if DEV_RE.search(lint_spec.unquoted(t)):
-            W.append(f"{path}: Devanagari outside quotes — the parawise remarks are in English (INSTRUCTIONS §3.1); "
-                     "put Marathi names/designations in “…”")
+        if DEV_RE.search(t):   # §4.47 (Abhi 18.11.2026): wholly English, quoted Marathi GR / opinion text too
+            W.append(f"{path}: Devanagari — the parawise / affidavit is wholly in English (INSTRUCTIONS §3.1, §4.47); "
+                     "translate quoted Marathi GR / opinion text into English and write names / designations in English")
     rows = [it for it in pw.get("paras") or [] if isinstance(it, dict) and "section" not in it]
     for i, it in enumerate(pw.get("paras") or []):
         if not isinstance(it, dict) or "section" in it:
@@ -320,9 +320,9 @@ def warnings_parawise(spec):
         return _warn_office(pw) + registry_warnings(pw)
     W = registry_warnings(pw)
     for path, t in _strings(pw):
-        if DEV_RE.search(lint_spec.unquoted(t)):
-            W.append(f"{path}: Devanagari outside quotes — the parawise remarks are in English (INSTRUCTIONS §3.1); "
-                     "put Marathi names/designations in “…”")
+        if DEV_RE.search(t):   # §4.47 (Abhi 18.11.2026): wholly English, quoted Marathi GR / opinion text too
+            W.append(f"{path}: Devanagari — the parawise / affidavit is wholly in English (INSTRUCTIONS §3.1, §4.47); "
+                     "translate quoted Marathi GR / opinion text into English and write names / designations in English")
     for i, it in enumerate(pw.get("paras") or []):
         if not isinstance(it, dict):
             continue

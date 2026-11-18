@@ -348,8 +348,8 @@ on the page images):
   `relief_sought` / `background` / `enclosures` / `recommendation` below exist only with `"layout": "rule58"`.
 - Parawise quality (INSTRUCTIONS §4.30, Abhi 03.11.2026; brief [I4.30]): only with `"layout": "rule58"` —
   `relief_sought` = the prayer in brief (printed "Relief sought:") and a chronology / service / amounts table as a
-  `background` item {"title", "table"} where it is clearer (the office format prints neither); always: every para AND the prayer answered; State GR/rule text quoted in its original language (Marathi in “…”,
-  never translated); respectful wording to the Court (lint_parawise WARN "contempt-prone wording" -> rephrase); GP/AGP
+  `background` item {"title", "table"} where it is clearer (the office format prints neither); always: every para AND the prayer answered; wholly English (brief [I4.47]: quoted Marathi GR /
+  opinion text translated in full into English, no Devanagari); respectful wording to the Court (lint_parawise WARN "contempt-prone wording" -> rephrase); GP/AGP
   or other-department opinions stated as recorded, not as binding.
 - Essential facts missing (§4.15) -> NO `parawise`; the information-letter first (to the HC / District Court as usual).
 - Time limit: Rule 58(4) — papers to the GP within two weeks of receipt, in any case before the date in the notice.
