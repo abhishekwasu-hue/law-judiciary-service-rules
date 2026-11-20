@@ -340,6 +340,10 @@ def fix_docx(path):
             root = _parse(data); cnt[0] += fix_dml_xml(root); return _dump(root)
         return None
     rewrite(path, fn)
+    # text runs: the common rule of tools/font_rule.py (Marathi text incl. its digits DVOT-SurekhMR x4, English text
+    # Times New Roman ascii / hAnsi) — the same rule as the proposal Word files (Abhi 20.11.2026, §4.2 / §4.48 (इ))
+    import font_rule
+    cnt[0] += font_rule.apply_docx(path)
     return cnt[0]
 
 

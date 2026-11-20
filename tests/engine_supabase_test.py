@@ -155,6 +155,8 @@ run_row["warnings"] = ["पडताळणी अपूर्ण — note पृ
 r = run("finish", out); check(r.returncode == 0, f"finish exit 0 ({r.stderr.strip()[:300]})")
 import io, zipfile
 sx = zipfile.ZipFile(io.BytesIO(STORE["outputs/7/study/v2/file.docx"])).read("word/document.xml").decode("utf-8")
+import re as _re   # the font rule (tools/font_rule.py) splits English stretches into own runs: compare the paragraph texts
+sx = "\n".join("".join(_re.findall(r"<w:t(?: [^>]*)?>([^<]*)</w:t>", p_)) for p_ in _re.findall(r"<w:p[ >].*?</w:p>", sx, _re.S))
 check("अंतिम तपासणीचे इशारे (वापरण्यापूर्वी तपासा)" in sx and "1. पडताळणी अपूर्ण — note पृ. references: x" in sx
       and "2. पडताळणी अपूर्ण — C R क्र. निर्देशपत्रावर नाही" in sx and "मॉडेल" not in sx and "DVOT-SurekhMR" in sx,
       "finish: final warnings written into the uploaded Study (end of भाग 7), owner-only lines left out")

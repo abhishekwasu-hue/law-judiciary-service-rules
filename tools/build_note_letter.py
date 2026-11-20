@@ -27,15 +27,9 @@ def margins(section):
 
 
 def bad_font_runs(d):
-    bad = 0
-    for el in d.element.body.iter(qn("w:r")):
-        t = "".join(x.text or "" for x in el.iter(qn("w:t")))
-        if not t.strip():
-            continue
-        rp = el.find(qn("w:rPr")); f = rp.find(qn("w:rFonts")) if rp is not None else None
-        if f is None or any(f.get(qn("w:" + k)) != FONT for k in ("ascii", "hAnsi", "cs", "eastAsia")):
-            bad += 1
-    return bad
+    """text runs not per the common font rule (tools/font_rule.py, §4.2: Marathi DVOT-SurekhMR, English Times New Roman)."""
+    import font_rule
+    return font_rule.problems([d.element.body])
 
 
 def compose(note, let):

@@ -35,6 +35,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import clean_meta as CM  # noqa: E402
 import office_fonts as OF  # noqa: E402
+import font_rule  # noqa: E402 — the common Word font rule
 from lint_spec import AI_WORDS  # noqa: E402 — the ONE AI word list (C27 §4; verify_outputs / lint_spec use it)
 
 OUT_EXT = (".xlsx", ".docx", ".pptx", ".pdf")
@@ -139,17 +140,12 @@ def check_docx(p, f):
                     bad_st += 1
             continue
         text.append("".join(t.text or "" for t in root.iter(f"{{{W}}}t")))
-        for r in root.iter(f"{{{W}}}r"):
-            t = "".join(x.text or "" for x in r.iter(f"{{{W}}}t"))
-            if not t.strip():
-                continue
-            rf = r.find(f"{{{W}}}rPr/{{{W}}}rFonts")
-            if rf is None or any(rf.get(f"{{{W}}}{k}") != v for k, v in want.items()) or \
-                    any(rf.get(f"{{{W}}}{k}") is not None for k in OF.THEME_ATTRS):
-                bad += 1
+        if name != "word/comments.xml":
+            bad += font_rule.problems([root])
     P = []
     if bad:
-        P.append(f"{bad} text run(s) without ascii/hAnsi = {OF.LATIN}, cs/eastAsia = {OF.COMPLEX}")
+        P.append(f"{bad} text run(s) not per the font rule (English ascii/hAnsi = {OF.LATIN}, cs/eastAsia = {OF.COMPLEX}; "
+                 f"Marathi text {OF.COMPLEX} on all four)")
     if bad_st:
         P.append(f"{bad_st} style / docDefaults font(s) not per the rule")
     rec(f, "fonts (Times New Roman + DVOT-SurekhMR)", P)

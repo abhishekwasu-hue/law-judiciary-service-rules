@@ -193,12 +193,17 @@ def blocks_of(d):
 
 
 def font_problems(d, label, fonts=None):
-    """fonts: {rFonts attribute: font} expected on every text run (default: the four attributes = DVOT-SurekhMR)."""
-    fonts = fonts or {a: FONT for a in FONT_ATTRS}
+    """fonts: {rFonts attribute: font} expected on every text run (the _Affidavit rule). Default (fonts None): the common
+    rule of tools/font_rule.py (Abhi 20.11.2026, §4.2) — Marathi text DVOT-SurekhMR on all four attributes, English
+    text ascii / hAnsi Times New Roman + cs / eastAsia DVOT-SurekhMR."""
     roots = [d.element.body]
     for part in d.part.package.iter_parts():
         if re.search(r"/word/(header|footer)\d*\.xml$", str(part.partname)):
             roots.append(part.element)
+    if fonts is None:
+        import font_rule
+        bad = font_rule.problems(roots)
+        return [f"{label}: {bad} text runs not in the font rule (Marathi {FONT} x4; English ascii/hAnsi Times New Roman, cs/eastAsia {FONT})"] if bad else []
     bad = 0
     for root in roots:
         for r in root.iter(qn("w:r")):
