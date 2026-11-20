@@ -4,7 +4,7 @@ import { sb } from './supabase';
 import { api, humanError } from './api';
 import { useAuth, useCanWrite } from './auth';
 import type { Case, Letter, Run } from './types';
-import { isEditRun, RUNS_RELOAD_EVENT } from './constants';
+import { isEditRun, isOfficeCase, RUNS_RELOAD_EVENT } from './constants';
 import { addDaysISO, crLabel, ownerDetail, setViewerIsOwner, todayISO } from './format';
 import { isMissingColumn, latestRunPerCase, RUN_LIST_COLUMNS } from './perf';
 import { useToast } from '../components/Toast';
@@ -44,7 +44,10 @@ export function prefetchData() {
 }
 
 interface DataState {
+  /** proposal cases only (office tasks, work_type 'office', are in officeCases) */
   cases: Case[];
+  /** कार्यालयीन काम tasks (separate tab, never in proposal lists) */
+  officeCases: Case[];
   letters: Letter[];
   loading: boolean;
   error: string;
@@ -164,8 +167,16 @@ export function DataProvider({ children }: { children: ReactNode }) {
         runState.current.set(row.id, row.state);
         if ((prev === 'queued' || prev === 'running') && (row.state === 'done' || row.state === 'failed')) {
           const c = casesRef.current.find(x => x.id === row.case_id);
+          if (c && isOfficeCase(c)) {
+            // कार्यालयीन काम: its own wording (no C R, results on the task page)
+            const t = c.subject || `काम क्र. ${c.id}`;
+            if (row.state === 'done') toast(`${t}: काम पूर्ण — तयार फाइल कार्यालयीन काम पानावर उपलब्ध आहेत.`, 'ok');
+            else toast(`${t}: काम पूर्ण होऊ शकले नाही. कृपया कारण कामाच्या पानावर पाहावे, ही विनंती.`, 'err');
+          }
           const label = c ? crLabel(c) : `प्रकरण क्र. ${row.case_id}`;
-          if (isEditRun(row)) {
+          if (c && isOfficeCase(c)) {
+            /* toast given above */
+          } else if (isEditRun(row)) {
             if (row.state === 'done') toast(`${label}: ${row.edit_result?.refused ? 'सुधारणा नाकारली. कृपया कारण प्रकरणात पाहावे, ही विनंती.' : 'सुधारणा तयार — नवीन आवृत्ती उपलब्ध आहे.'}`, row.edit_result?.refused ? 'err' : 'ok');
             else toast(`${label}: सुधारणा अयशस्वी. कृपया कारण प्रकरणात पाहावे, ही विनंती.`, 'err');
           } else if (row.state === 'done') toast(`${label}: प्रक्रिया पूर्ण — फाइल प्रकरणात उपलब्ध आहेत.`, 'ok');
@@ -217,9 +228,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // कार्यालयीन काम tasks live in the same store but never in the proposal lists, counters or pickers
+  const proposalCases = useMemo(() => cases.filter(c => !isOfficeCase(c)), [cases]);
+  const officeCases = useMemo(() => cases.filter(isOfficeCase), [cases]);
   const value = useMemo(
-    () => ({ cases, letters, loading, error, refresh, setStage, patchLocal, setCaseLetters }),
-    [cases, letters, loading, error, refresh, setStage, patchLocal, setCaseLetters],
+    () => ({ cases: proposalCases, officeCases, letters, loading, error, refresh, setStage, patchLocal, setCaseLetters }),
+    [proposalCases, officeCases, letters, loading, error, refresh, setStage, patchLocal, setCaseLetters],
   );
   return (
     <Ctx.Provider value={value}>

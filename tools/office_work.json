@@ -1,0 +1,25 @@
+{
+ "id": "office",
+ "label": "कार्यालयीन काम",
+ "note": "Abhi 20.11.2026 (INSTRUCTIONS §4.48): everyday clerical office tasks on the page's own tab; NOT a proposal category (tools/work_types/ stays proposals only; office tasks never appear in proposal lists). Rules: tools/work_rules/office.md; worker: docs/DESK_WORKER.md §3b.",
+ "work_type": "office",
+ "rules_file": "tools/work_rules/office.md",
+ "outputs": {"xlsx": "Excel", "docx": "Word", "pptx": "PPT", "pdf": "PDF"},
+ "output_kind": "office_output",
+ "input_kinds": ["extra_doc", "template"],
+ "previous_output_kind": "office_output",
+ "upload_types": ["pdf", "doc", "docx", "xls", "xlsx", "csv", "ppt", "pptx", "txt", "jpg", "jpeg", "png", "tif", "tiff"],
+ "fonts": {
+  "latin": "Times New Roman",
+  "complex": "DVOT-SurekhMR",
+  "docx_rfonts": {"ascii": "Times New Roman", "hAnsi": "Times New Roman", "cs": "DVOT-SurekhMR", "eastAsia": "DVOT-SurekhMR"},
+  "pptx": {"latin": "Times New Roman", "cs": "DVOT-SurekhMR"},
+  "xlsx": {"latin": "Times New Roman", "cs": "DVOT-SurekhMR", "cell_rule": "a cell style has one font: a cell (or rich-text run) with Devanagari text -> DVOT-SurekhMR, else Times New Roman; theme latin = Times New Roman, cs / Deva = DVOT-SurekhMR"}
+ },
+ "check_sheet": "पडताळणी",
+ "steps": ["फाइल्स वाचत आहे", "माहिती जुळवत आहे", "फाइल तयार करत आहे", "तपासणी चालू"],
+ "step_done": "तयार",
+ "stage_done": "मसुदा तयार",
+ "summary_max": 2000,
+ "warning_prefix": "पडताळणी अपूर्ण — "
+}

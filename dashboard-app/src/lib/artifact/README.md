@@ -14,8 +14,8 @@ This file is the contract the cloud worker (the session the trigger starts) read
 
 | collection   | doc id             | notes |
 |--------------|--------------------|-------|
-| `cases`      | `String(id)`       | columns of `cases` (+ `desk`, `work_type`, `nasti_no`). Defaults: category `इतर`, stage `प्राप्त`, priority `सामान्य`. |
-| `case_files` | `String(id)`       | `case_id, kind, storage_path, original_name, version, uploaded_by, created_at` + file fields below. `kind` = the `file_kind` enum values (`proposal, extra_doc, reply, approval, court_notice, gr` uploads; outputs `study, note_letter, package_pdf, order_draft, parawise, affidavit, lq_answer, spec`). |
+| `cases`      | `String(id)`       | columns of `cases` (+ `desk`, `work_type`, `nasti_no`). Defaults: category `इतर`, stage `प्राप्त`, priority `सामान्य`. `work_type: "office"` = an office task (tab कार्यालयीन काम, see below), never a proposal. |
+| `case_files` | `String(id)`       | `case_id, kind, storage_path, original_name, version, uploaded_by, created_at` + file fields below. `kind` = the `file_kind` enum values (`proposal, extra_doc, reply, approval, court_notice, gr` uploads, + `template` for office tasks; outputs `study, note_letter, package_pdf, order_draft, parawise, affidavit, lq_answer, spec`, + `office_output` for office tasks). |
 | `runs`       | `String(id)`       | all `runs` columns: `state, step, last_step, step_at, started_at, finished_at, dispatched_at, instructions, outputs, kind ('full' / 'edit'), edit_target, edit_message, edit_attachments, edit_result, summary, letter_needed, essential_points, grs_attached, grs_missing, warnings, cost_usd, num_turns, duration_s, log_url, created_by, created_at`; page-only (the worker ignores them): `dispatch_error, dispatch_unsure, dispatch_tries` (see Run lifecycle). |
 | `letters`    | `String(id)`       | `case_id, ref_no, addressed_to, sent_date, reply_due, reply_received_date, status, created_at`. |
 | `activity`   | `String(id)`       | `case_id, actor, action, detail, at` — one doc per row. Limited reads go to the store newest-first (`orderBy(<col>, dir).limit(n)`, + `where` for simple filters such as `case_id == <number>`); the realtime channel watches `orderBy('at','desc').limit(200)`. Pruning old rows (25,000-doc cap) is still pending. |
@@ -69,6 +69,25 @@ under `meta/` for ids (`meta` is owner-only).
 
 Worker outputs (`study`, `note_letter`, `package_pdf`, `order_draft`, `parawise`, `affidavit`, `lq_answer`, `spec`
 with `original_name: "spec.json"`) use the same fields; the edit chat needs the `spec` row of the last full run.
+
+## Office tasks (tab "कार्यालयीन काम", INSTRUCTIONS §4.48, Abhi 20.11.2026)
+
+* Task = a `cases` doc with `work_type: "office"`, `subject` = the task title typed by the owner; no C R / file no.; never
+  listed with proposals.
+* Inputs = `case_files` of kind `extra_doc` (source documents) and `template` (the format / sample to fill). Upload
+  types: pdf, doc, docx, xls, xlsx, csv, ppt, pptx, txt, jpg / jpeg, png, tif / tiff (stored as above: PDF / jpeg / png
+  ≤ 19 MiB one asset, the rest base64 parts).
+* Run = `runs` doc `kind: "full"`, `instructions` (always), `outputs` ⊆ `["xlsx", "docx", "pptx", "pdf"]` (labels
+  Excel / Word / PPT / PDF; `[]` = answer only, in `summary`). A later run on the same task takes the newest
+  `office_output` rows as inputs too (correction / continuation).
+* Outputs = `case_files` kind `office_output`, one row per file, `original_name` = a meaningful file name; the same name
+  again = the next `version`. `content_type` xlsx `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`,
+  pptx `application/vnd.openxmlformats-officedocument.presentationml.presentation`, docx / pdf as above.
+* `step` texts: `फाइल्स वाचत आहे`, `माहिती जुळवत आहे`, `फाइल तयार करत आहे`, `तपासणी चालू`; done `तयार`.
+* Finish: `state: 'done'`, `summary` (≤ 2000 chars), `warnings` ("पडताळणी अपूर्ण — …"), `letter_needed: null`,
+  `essential_points: []`, `grs_attached: []`, `grs_missing: []`; case stage `मसुदा तयार` + activity `run_done` /
+  `stage_changed` as for a full run; `failed` only when nothing could be produced. Worker: `docs/DESK_WORKER.md` §3b;
+  config `tools/office_work.json`.
 
 ## Run lifecycle (what the worker must set)
 

@@ -44,6 +44,30 @@ export const workTypeLabel = (id: string | null | undefined) =>
 /** Chip colour per category (fixed per category so it is recognised at a glance; red/green stay for failed/done). */
 export const WORK_TYPE_TONE: Record<WorkType, Tone> = { service: 'navy', court: 'amber', legislature: 'blue', procurement: 'slate' };
 
+/** कार्यालयीन काम (Abhi 20.11.2026: a separate tab for everyday office work — collate documents into a format, calculations,
+ *  tables, PPT). An office task is a `cases` doc with work_type OFFICE_WORK_TYPE; it is NOT a proposal category (not in
+ *  WORK_TYPES), never listed with the proposals, and handled by the worker per docs/DESK_WORKER.md §3b
+ *  (tools/office_work.json, tools/work_rules/office.md). Artifact build only. */
+export const OFFICE_WORK_TYPE = 'office';
+export const isOfficeCase = (c: { work_type?: string | null }) => c.work_type === OFFICE_WORK_TYPE;
+/** Output files an office task can ask for (runs.outputs; same keys as tools/office_work.json). */
+export const OFFICE_OUTPUT_KEYS = ['xlsx', 'docx', 'pptx', 'pdf'] as const;
+export type OfficeOutputKey = (typeof OFFICE_OUTPUT_KEYS)[number];
+export const OFFICE_OUTPUT_LABEL: Record<OfficeOutputKey, string> = {
+  xlsx: 'Excel (सूत्रांसह)', docx: 'Word', pptx: 'PPT (सादरीकरण)', pdf: 'PDF',
+};
+/** Files the user may attach to an office task (also .xls/.xlsx/.csv/.ppt/.pptx/.txt besides the proposal types). */
+export const OFFICE_ACCEPT = '.pdf,.doc,.docx,.xls,.xlsx,.csv,.ppt,.pptx,.txt,.jpg,.jpeg,.png,.tif,.tiff';
+/** Progress texts the worker writes for an office run (runs.step), in order. */
+export const OFFICE_STEPS: { key: string; label: string }[] = [
+  { key: 'queued', label: 'प्रतीक्षेत' },
+  { key: 'फाइल्स वाचत आहे', label: 'फाइल्स वाचन' },
+  { key: 'माहिती जुळवत आहे', label: 'माहिती जुळवणी' },
+  { key: 'फाइल तयार करत आहे', label: 'फाइल तयार' },
+  { key: 'तपासणी चालू', label: 'पडताळणी' },
+  { key: 'done', label: 'पूर्ण' },
+];
+
 export const PRIORITIES = ['सामान्य', 'तातडीचे'] as const;
 export const LETTER_STATUSES = ['मसुदा', 'पाठवले', 'उत्तर प्राप्त', 'स्मरणपत्र'] as const;
 
@@ -113,6 +137,7 @@ export const FILE_KIND_LABEL: Record<string, string> = {
   approval: 'मान्यता (वित्त/सा.प्र.वि.)', court_notice: 'न्यायालयीन नोटीस',
   order_draft: 'शासन निर्णय-प्रारूप', parawise: 'परिच्छेदनिहाय अभिप्राय (इंग्रजी)',
   affidavit: 'शपथपत्र (इंग्रजी)', lq_answer: 'विधानमंडळ प्रश्नाचे उत्तर',
+  template: 'साचा (नमुना फाइल)', office_output: 'तयार फाइल',
 };
 
 /** Files the user uploads, with the type selector's short labels (C28; migration 0008 adds approval / court_notice). */

@@ -24,6 +24,14 @@ every row gets the next version of its kind and a new id; rows only after every 
        > 19 MiB) -> base64 text parts <syncdir>/parts/<case>__r<run>_<n>_<kind>_v<version>.b64.<k>.txt (text/plain,
        desk_sync.split_b64; every part decodes on its own; no row id in the name, so a renumber needs no re-upload),
        row field asset_parts = [ids] in order. Rows also carry content_type and size_bytes.
+  plan <case_id> <outdir> <run_id> <syncdir> --files FILES.json --office
+       office task run (case work_type "office", INSTRUCTIONS §4.48, DESK_WORKER §3b): every top-level .xlsx / .docx /
+       .pptx / .pdf of <outdir> (tools/office_check.py outputs(): not status.json, ".", "~$" files or the preview/
+       subfolder) -> one row of kind office_output each, original_name = the file name, version = 1 + the highest
+       version of an office_output row of this case with the SAME original_name (else 1); no package / Study / note
+       required, no spec rows (--kinds / --add / --package-name / --work refused). No output file (outputs [] = answer
+       only) -> 0 rows. With <outdir>/status.json: run_patch.json {state done, step "तयार", summary (≤ 2000 chars),
+       letter_needed null, essential_points [], grs_attached [], grs_missing [], warnings, status_state, case null}.
   rows <syncdir> --assets ASSETS.json --first-id N [--now ISO]
        ASSETS.json = {"<uploaded path or its basename>": "<asset id>", ...} (from the Artifact publish results).
        N           = the first case_files id, ODD (the worker's half of the id space, contract §6 / DESK_WORKER §1): the
@@ -97,12 +105,29 @@ def pick(out, suffix, prefix=""):
 
 
 DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+PPTX = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+OFFICE_KIND = "office_output"   # tools/office_work.json output_kind
+OFFICE_SUMMARY_MAX = 2000       # tools/office_work.json summary_max
 
 
 def ctype(name):
     """content_type field of a row (the file's own type, not the parts' text/plain)."""
     e = os.path.splitext(name)[1].lower()
-    return {".pdf": "application/pdf", ".json": "application/json", ".docx": DOCX}.get(e, "application/octet-stream")
+    return {".pdf": "application/pdf", ".json": "application/json", ".docx": DOCX, ".xlsx": XLSX,
+            ".pptx": PPTX}.get(e, "application/octet-stream")
+
+
+def office_version(files, name):
+    """office task: next version of the office_output row with this original_name (a new name starts at 1)."""
+    vs = [int(r.get("version") or 0) for r in files if r.get("kind") == OFFICE_KIND and r.get("original_name") == name]
+    return (max(vs) + 1) if vs else 1
+
+
+def collect_office(out):
+    """-> [(office_output, path, name)]: every output file of an office task run (office_check.outputs, one rule)."""
+    from office_check import outputs
+    return [(OFFICE_KIND, p, os.path.basename(p)) for p in outputs(out)[0]]
 
 
 def collect(case_id, out, files, work, kinds, pkg_name, adds, no_spec, status):
@@ -163,6 +188,11 @@ def plan(argv):
     no_spec = "--no-spec" in argv
     if no_spec:
         argv.remove("--no-spec")
+    office = "--office" in argv
+    if office:
+        argv.remove("--office")
+        if kinds or adds or pkg or work:
+            sys.exit("desk_publish: --office takes no --kinds / --add / --package-name / --work (office outputs only)")
     if len(argv) != 4 or not files_p:
         sys.exit(__doc__)
     if pkg and pkg.endswith(BAD_PKG):
@@ -177,11 +207,13 @@ def plan(argv):
     bad = [k for k in (kinds or []) if k not in KINDS]
     if bad:
         sys.exit(f"desk_publish: unknown --kinds {','.join(bad)} (known: {','.join(sorted(KINDS))})")
-    items = collect(cid, out, files, work, kinds, pkg, adds, no_spec, status)
+    items = collect_office(out) if office else collect(cid, out, files, work, kinds, pkg, adds, no_spec, status)
     os.makedirs(sync, exist_ok=True)
     uploads, rows, vers = [], [], {}
     for pos, (kind, path, name) in enumerate(items):
-        if kind not in vers:
+        if office:
+            vers[kind] = office_version(files, name)   # per original_name (a new file name = version 1)
+        elif kind not in vers:
             vers[kind] = next_version(files, kind)   # spec.json + enclosures.json share one version
         big = os.path.getsize(path) > ASSET_MAX
         meta = {"content_type": ctype(name), "size_bytes": os.path.getsize(path)}
@@ -200,7 +232,14 @@ def plan(argv):
         f.write("".join(u["path"] + "\n" for u in uploads))
     json.dump({"case_id": int(cid) if str(cid).isdigit() else cid, "run_id": run_id, "rows": rows},
               open(os.path.join(sync, "plan.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)
-    if status and not kinds:
+    if status and office:
+        lst = lambda k: status.get(k) if isinstance(status.get(k), list) else []   # noqa: E731
+        patch = {"state": "done", "step": "तयार", "summary": str(status.get("summary") or "").strip()[:OFFICE_SUMMARY_MAX],
+                 "letter_needed": None, "essential_points": [], "grs_attached": [], "grs_missing": [],
+                 "warnings": [str(x).strip()[:300] for x in lst("warnings") if str(x).strip()],
+                 "status_state": status.get("state"), "case": None}
+        json.dump(patch, open(os.path.join(sync, "run_patch.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+    elif status and not kinds:
         lst = lambda k: status.get(k) if isinstance(status.get(k), list) else []
         import engine_supabase as E   # run_summary: the ONE §4.46 "GR मिळाले नाहीत" prefix rule (finish uses it too)
         patch = {"state": "done", "step": "तयार", "summary": E.run_summary(status),

@@ -67,7 +67,7 @@ export function useRunsShownHere(caseIds: (number | null | undefined)[]) {
  *  S3: the same runs were shown twice there); the प्रकरणे page keeps this bar and has no card. On /nasti the नस्ती bar shows
  *  them (dot on the phone, a short link on desktop) — above the full-height frame this bar overlapped / pushed it. */
 function ActiveRunsBar({ className = '' }: { className?: string }) {
-  const { cases } = useData();
+  const { cases, officeCases } = useData();
   const hidden = useSyncExternalStore(subscribeShown, () => shownHere);
   const active = useActiveRuns().filter(r => !hidden.has(r.case_id));
   if (!active.length) return null;
@@ -79,9 +79,10 @@ function ActiveRunsBar({ className = '' }: { className?: string }) {
       <span className="flex w-full gap-2 overflow-x-auto [scrollbar-width:none] sm:w-auto sm:flex-wrap sm:overflow-visible">
         {active.map(r => {
           const c = cases.find(x => x.id === r.case_id);
+          const o = c ? undefined : officeCases.find(x => x.id === r.case_id);
           return (
-            <NavLink key={r.id} to={`/cases/${r.case_id}`} className="inline-flex min-h-tap shrink-0 items-center whitespace-nowrap rounded-md bg-white px-2.5 py-1 text-sm font-semibold text-blue-800 underline-offset-2 hover:underline dark:bg-navy-800 dark:text-blue-200">
-              {ARTIFACT && runNeedsFire(r) ? '⚠ ' : ''}{c ? crLabel(c) : `प्रकरण क्र. ${r.case_id}`} → उघडा
+            <NavLink key={r.id} to={o ? `/office/${r.case_id}` : `/cases/${r.case_id}`} className="inline-flex min-h-tap shrink-0 items-center whitespace-nowrap rounded-md bg-white px-2.5 py-1 text-sm font-semibold text-blue-800 underline-offset-2 hover:underline dark:bg-navy-800 dark:text-blue-200">
+              {ARTIFACT && runNeedsFire(r) ? '⚠ ' : ''}{c ? crLabel(c) : o ? (o.subject || `काम क्र. ${o.id}`).slice(0, 30) : `प्रकरण क्र. ${r.case_id}`} → उघडा
             </NavLink>
           );
         })}
@@ -111,6 +112,8 @@ const NAV = [
   { to: '/cases', label: 'प्रकरणे', short: 'प्रकरणे', icon: '🗂️' },
   { to: '/gr', label: 'GR ग्रंथालय', short: 'GR', icon: '📚' },
   { to: '/search', label: 'नियम-उतारे शोध', short: 'नियम-उतारे', icon: '📖' },
+  // कार्यालयीन काम (20.11.2026): artifact build only (the worker side is docs/DESK_WORKER.md §3b)
+  ...(ARTIFACT ? [{ to: '/office', label: 'कार्यालयीन काम', short: 'कार्यालयीन', icon: '🧾' }] : []),
 ];
 
 const ROLE_LABEL: Record<string, string> = { owner: 'मालक', staff: 'कार्यासन कर्मचारी', senior: 'वरिष्ठ (फक्त वाचन)' };
@@ -346,7 +349,7 @@ export default function Layout() {
           {pathname !== '/' && !nasti && <ActiveRunsBar />}
           <RouteBoundary />
         </main>
-        <nav className={`no-print fixed inset-x-0 bottom-0 z-30 grid ${nav0.length === 5 ? 'grid-cols-5' : 'grid-cols-6'} border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)] dark:border-navy-800 dark:bg-navy-900 md:hidden ${nasti ? 'hidden' : ''}`} aria-label="मुख्य">
+        <nav className={`no-print fixed inset-x-0 bottom-0 z-30 grid ${nav0.length <= 5 ? 'grid-cols-5' : nav0.length === 6 ? 'grid-cols-6' : 'grid-cols-7'} border-t border-slate-200 bg-white pb-[env(safe-area-inset-bottom)] dark:border-navy-800 dark:bg-navy-900 md:hidden ${nasti ? 'hidden' : ''}`} aria-label="मुख्य">
           {nav0.map(i => (
             <NavLink
               key={i.to}

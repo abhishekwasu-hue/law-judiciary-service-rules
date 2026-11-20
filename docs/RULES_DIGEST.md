@@ -11,6 +11,7 @@ when the task needs them:
 | A correction round on a saved case | INSTRUCTIONS §4.41 + only the §4 items the correction touches |
 | Abhi corrects the style / gives a new rule | the whole INSTRUCTIONS.md §4 (to number the new item and avoid conflicts), then SOP, brief, samples (§8.4 of SOP) |
 | App B / engine / प्रस्ताव कक्ष page / worker / pending work | HANDOVER.md, docs/DESK_WORKER.md, docs/PROPOSAL_DESK.md, docs/NEW_ACCOUNT_SETUP.md |
+| Office task (कार्यालयीन काम, case `work_type` "office") | tools/work_rules/office.md + docs/DESK_WORKER.md §3b (INSTRUCTIONS §4.48) |
 | Any doubt whether a brief line covers a case | the INSTRUCTIONS.md item its tag names |
 
 tools/ENGINE_BRIEF.md section 0 ("never stop / never ask") applies to automatic engine runs only; in a chat session

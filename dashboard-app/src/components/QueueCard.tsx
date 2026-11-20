@@ -65,7 +65,7 @@ export function queueRows(runs: Run[], typicalSec: number | null, now: number, p
 }
 
 export default function QueueCard({ className = '' }: { className?: string }) {
-  const { cases } = useData();
+  const { cases, officeCases } = useData();
   const latestRuns = useLatestRuns();
   const typical = useTypicalRunSeconds();
   const [now, setNow] = useState(() => Date.now());
@@ -80,7 +80,11 @@ export default function QueueCard({ className = '' }: { className?: string }) {
     void getSpend().then(s => { if (live) setParallel(slotsOf(s.max_parallel)); }, () => undefined);
     return () => { live = false; };
   }, []);
-  const runs = useMemo(() => [...latestRuns.values()], [latestRuns]);
+  // कार्यालयीन काम runs are shown on their own tab, not in the proposals' queue
+  const runs = useMemo(() => {
+    const office = new Set(officeCases.map(c => c.id));
+    return [...latestRuns.values()].filter(r => !office.has(r.case_id));
+  }, [latestRuns, officeCases]);
   const rows = useMemo(() => queueRows(runs, typical?.sec ?? null, now, parallel), [runs, typical, now, parallel]);
   const today = new Date(now);
   const ready = runs.filter(r => r.state === 'done' && sameDay(r.finished_at, today)).length;

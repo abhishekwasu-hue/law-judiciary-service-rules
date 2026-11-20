@@ -540,4 +540,30 @@ await t('(h) activity channel subscribes to the limited query; downloads rate_li
   assert.equal(saves.at(-1).filename, 'a.csv');
 });
 
+await t('कार्यालयीन काम: office task — xlsx/template upload, instruction required, office outputs only, no proposal needed', async () => {
+  store.set('meta/config', { trigger_id: 'trig_test' });
+  const c = await api('/api/cases', { body: { subject: 'जिल्हानिहाय विवरणपत्र', work_type: 'office' } });
+  assert.equal(c.work_type, 'office');
+  const zip = new Uint8Array([0x50, 0x4B, 0x03, 0x04, ...new Uint8Array(200).fill(1)]);
+  const x = await uploadFile(c.id, 'template', new File([zip], 'साचा.xlsx'));
+  assert.equal(store.get(`case_files/${x.id}`).kind, 'template');
+  assert.match(store.get(`case_files/${x.id}`).storage_path, /^asset-parts:/);
+  await uploadFile(c.id, 'extra_doc', new File([new TextEncoder().encode('जिल्हा,पदे\nपुणे,4\n')], 'माहिती.csv'));
+  await rejects(uploadFile(c.id, 'proposal', new File([zip], 'p.xlsx')), 400, 'kind not allowed for this case');
+  // a proposal case keeps its old file types and never takes a template
+  await rejects(uploadFile(caseId, 'extra_doc', new File([zip], 'a.xlsx')), 400, 'हा फाइल-प्रकार स्वीकारता येत नाही. कृपया PDF, Word (DOC / DOCX) किंवा प्रतिमा (JPG / PNG / TIF) फाइल जोडावी, ही विनंती.');
+  await rejects(uploadFile(caseId, 'template', new File([new Uint8Array([...Buffer.from('%PDF-1.4\n')])], 't.pdf')), 400, 'kind not allowed for this case');
+  await rejects(api('/api/run', { body: { case_id: c.id, outputs: ['xlsx'] } }), 400, 'कृपया कामाची सूचना नमूद करावी, ही विनंती.');
+  await rejects(api('/api/run', { body: { case_id: c.id, instructions: 'x', outputs: ['letter'] } }), 400, 'तयार करावयाच्या फाइलची निवड योग्य नाही. कृपया पान पुन्हा उघडून निवड करावी, ही विनंती.');
+  const r = await api('/api/run', { body: { case_id: c.id, instructions: 'साच्यात माहिती भरा, बेरीज करा', outputs: ['pptx', 'xlsx'] } });
+  const run = store.get(`runs/${r.id}`);
+  assert.deepEqual(run.outputs, ['xlsx', 'pptx']);
+  assert.equal(run.kind, 'full');
+  assert.ok(r.dispatched_at);
+  assert.equal(store.get(`cases/${c.id}`).stage, 'अभ्यास चालू');
+  const c2 = await api('/api/cases', { body: { subject: 'फक्त उत्तर', work_type: 'office' } });
+  const r2 = await api('/api/run', { body: { case_id: c2.id, instructions: 'एकूण किती?' } });
+  assert.deepEqual(store.get(`runs/${r2.id}`).outputs, []);
+});
+
 console.log(`ALL ${n} PASSED`);

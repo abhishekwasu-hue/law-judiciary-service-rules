@@ -195,7 +195,7 @@ export async function api<T = unknown>(path: string, opt: { method?: string; bod
 }
 
 /** Raw-body upload with progress (XHR so upload.onprogress works). */
-export async function uploadFile(caseId: number, kind: InputKind | 'gr', file: File, onProgress?: (pct: number) => void): Promise<{ id: number }> {
+export async function uploadFile(caseId: number, kind: InputKind | 'gr' | 'template', file: File, onProgress?: (pct: number) => void): Promise<{ id: number }> {
   if (ARTIFACT) return artifactUpload(caseId, kind, file, onProgress);
   const t = await token();
   return new Promise((resolve, reject) => {

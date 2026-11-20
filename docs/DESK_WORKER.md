@@ -8,7 +8,8 @@ field, collection or value differently from this file, THE CONTRACT WINS. This w
 does for App B (.github/workflows/process-proposal.yml + tools/engine_supabase.py for full runs, edit-drafts.yml +
 tools/edit_drafts.py for edit runs) with ArtifactData / Artifact on PAGE instead of Supabase. Everything below is binding
 together with CLAUDE.md (OWNER_RULES, INSTRUCTIONS, PROPOSAL_SOP, PROPOSAL_WORKFLOW). Abhi is not watching: never ask, never
-stop for a question — an open point becomes a run `warnings` line "पडताळणी अपूर्ण — …" and Study part 4 / 7.
+stop for a question — an open point becomes a run `warnings` line "पडताळणी अपूर्ण — …" and Study part 4 / 7. Besides
+proposals the page queues office tasks (tab "कार्यालयीन काम", case `work_type` "office", INSTRUCTIONS §4.48): section 3b.
 
 ## 0. Start
 1. Repo: `/home/claude/law-judiciary-service-rules` (pre-cloned) — `git pull -q`. If absent, clone
@@ -46,8 +47,8 @@ stop for a question — an open point becomes a run `warnings` line "पडत�
   works runs; a session that finds the lock held stops at once and never works runs "on the side" (16.11.2026: three side
   agents of a second session built runs 16/18/20 unclaimed, and the lock holder claimed them meanwhile — the work was lost).
   The lock holder: (1) claims EVERY queued / interrupted run at once (§2 claim, one pinned update each, or one batch);
-  (2) starts ONE agent per run in the same message (Agent tool, parallel), each doing §3 / §4 for its run end-to-end incl.
-  its own Study part 1 and fresh-read review (no further sub-agents), the finish batch and the commit; (3) per-run private
+  (2) starts ONE agent per run in the same message (Agent tool, parallel), each doing §3 / §3b / §4 for its run end-to-end incl.
+  its own Study part 1 (proposals) and fresh-read review (no further sub-agents), the finish batch and the commit; (3) per-run private
   dirs: `/tmp/r<run id>/case.json` + `case_meta.json`, `/tmp/r<run id>/work` (export `ENGINE_WORK_DIR`), `/tmp/r<run id>/out`,
   `/tmp/r<run id>/sync`; inputs stay at `E.input_layout(files, "/tmp/case")` (`/tmp/case/in/<kind>/<name>`, the path form
   edit runs resolve) — `/tmp/case` is emptied only before the agents start, never while they run; OCR with
@@ -56,8 +57,9 @@ stop for a question — an open point becomes a run `warnings` line "पडत�
   --rebase --autostash -q && git push`, on `index.lock` / push refusal wait 20 s and retry up to 3 times; (6) the lead
   refreshes the lock heartbeat (`step` e.g. "समांतर: runs 12, 14, 16"), takes each agent's report, re-checks each run row
   is done / failed, then re-queries (§6). One queued run only -> the lead does it itself.
-- `kind` "edit" -> section 4; `kind` null / "full" -> section 3.
-- The page already set `dispatched_at` (and, for a full run, case stage "अभ्यास चालू" + activity `run_started`) when it
+- `kind` "edit" -> section 4; `kind` null / "full" -> section 3, except a run whose case has `work_type` "office" ->
+  section 3b (office tasks are taken like full runs: same claim, same parallel rule, one agent per run).
+- The page already set `dispatched_at` (and, for a full or office run, case stage "अभ्यास चालू" + activity `run_started`) when it
   fired this task; a queued run with `dispatched_at` null (a failed firing) is taken too.
 - Claim = one pinned `runs` update `{state:"running", started_at:<now> (keep the old one on resume), step:<first step>,
   step_at, last_step}`; on resume also `dispatched_at:<now>` (the app marks a run stale 3.5 h after it). The pin failing on
@@ -151,6 +153,51 @@ Step texts written to `runs.step` (exact keys of dashboard-app RUN_STEPS): "प�
 6. **Fail** (cmd_fail): run `{state:"failed", step:<one Marathi line why + next step>, finished_at, last_step}` + activity
    `run_failed`; an already failed run keeps its earlier reason. Then the next run.
 
+## 3b. Office task run (case `work_type` "office" — tab "कार्यालयीन काम", INSTRUCTIONS §4.48)
+Test = the case row's own `work_type` field equals "office" (never `E.case_work_type`: it maps every id outside
+tools/work_types/ to service). Binding: tools/work_rules/office.md + OWNER_RULES; config tools/office_work.json. Not a
+proposal: no PREFIX, C R / file no., lj-* skill, GR search, Study, note, letter, package, spec, case_state, lint / verify.
+Steps (`runs.step`, exact texts): "फाइल्स वाचत आहे" -> "माहिती जुळवत आहे" -> "फाइल तयार करत आहे" -> "तपासणी चालू"; done
+"तयार". Dirs: `/tmp/r<run id>/` (`in/`, `work/`, `out/`, `sync/`), also for a single run.
+1. **Claim + fetch** (step "फाइल्स वाचत आहे"). Claim as §2. Read the case, the run (`instructions` = Abhi's task,
+   always present; `outputs` ⊆ ["xlsx", "docx", "pptx", "pdf"], [] = answer only in the summary; an unknown key ->
+   dropped + warning) and all `case_files` of the case. Inputs = `E.newest(files, ("extra_doc", "template",
+   "office_output"))` (newest version of each name), each downloaded (§1) to `E.unique_dst("/tmp/r<run id>", kind,
+   original_name, taken)` = `/tmp/r<run id>/in/<kind>/<name>`. `template` = Abhi's format to fill; `office_output` = the
+   previous result: a later run on the task is a correction / continuation of it (the instruction says what changes).
+2. **Read** every input completely (office.md §1.1): PDF / image -> `tools/prep_pages.py <file> /tmp/r<run id>/work/<n>`
+   and read EVERY page image (OCR `OMP_THREAD_LIMIT=1 nice -n 15` only as a cross-check); .doc / .xls / .ppt -> first
+   `soffice --headless --convert-to docx|xlsx|pptx` (private profile `-env:UserInstallation=file:///tmp/r<run id>/lo`);
+   Excel with openpyxl (every sheet incl. hidden; formulas and, `data_only=True`, the cached values); Word with
+   python-docx (paragraphs, tables, headers / footers); PPT with python-pptx (slides + notes); csv / txt as text.
+   Numbers / dates / names read twice. An unreadable file -> warning "पडताळणी अपूर्ण — <name>: वाचता आली नाही", go on.
+3. **Do the work** (steps "माहिती जुळवत आहे", then "फाइल तयार करत आहे"): only what the instruction asks, by office.md
+   (figures traced, "____" + warning for a missing value, live formulas, sheet "पडताळणी", template filled not
+   redesigned, Marathi official language, numbers first, colours by meaning), with the anthropic xlsx / docx / pptx / pdf
+   skills; files into `/tmp/r<run id>/out/` with meaningful names (office.md §7; a correction keeps the previous
+   `original_name` -> next version); previews only under `out/preview/`. Then `python3 tools/office_fonts.py
+   /tmp/r<run id>/out/*.{xlsx,docx,pptx,pdf}` (fonts per §4.48 + blank metadata, in place).
+4. **Check** (step "तपासणी चालू"): `python3 tools/office_check.py /tmp/r<run id>/out --expect <outputs, comma-separated>
+   --json /tmp/r<run id>/work/check.json` until ALL OK. HARD (`FAIL [HARD]`: asked file missing, unreadable, AI trace) is
+   fixed, never delivered (2 attempts; still HARD -> that file is left out, warning; nothing at all -> fail). Any other
+   FAIL / WARN left after 2 fix rounds -> warning "पडताळणी अपूर्ण — <file>: <check>: <detail>". Self-review against the
+   inputs: every figure of every output and of the summary = its source (re-read the page / cell), every point of the
+   instruction done; minimal corrections, then office_fonts + office_check again.
+5. **status.json** `/tmp/r<run id>/out/status.json` = {"state": "done" | "failed", "summary": <Marathi, ≤ 2000 chars,
+   office.md §7; answer-only tasks: the answer>, "warnings": [..]} (no letter / GR fields).
+6. **Finish**: `python3 tools/desk_publish.py plan <case id> /tmp/r<run id>/out <run id> /tmp/r<run id>/sync --files
+   <case_files.json> --office` -> upload every path of `uploads.txt` (§1) -> `assets.json` -> `desk_publish.py rows
+   /tmp/r<run id>/sync --assets … --first-id <N>` -> ONE batch as §3.4: the `office_output` rows + `runs/<id>` from
+   `run_patch.json` without `status_state` / `case` (state done, step "तयार", summary, letter_needed null,
+   essential_points [], grs_attached [], grs_missing [], warnings = current list + its lines, finished_at, duration_s,
+   cost_usd / num_turns null) + `cases/<id>` {stage "मसुदा तयार", updated_at} (no C R / file no. / subject / category
+   fill) + activity `run_done` {run_id, files} + `stage_changed`. Upload error / refused id -> as §3.4. Failed (state
+   "failed" only when nothing could be produced) -> §3.6.
+7. **State**: `cases/desk-<id>/office/run-<run id>.json` = {"run_id", "at", "instructions", "outputs", "inputs":
+   [{kind, name, version}], "files": [{name, version}], "warnings"} — no input or output file itself, no proposal PDF;
+   commit + push only that folder as §3.5 (`git add cases/desk-<id>/office && git commit -m "desk worker: office case
+   <id> run <run id>" -- cases/desk-<id>/office`).
+
 ## 4. Edit run (`kind` "edit" — सुधारणा-चॅट; tools/edit_drafts.py + INSTRUCTIONS §4.41 (इ))
 Fields: `edit_target` (note / letter / order / parawise / affidavit / lq / package), `edit_message`, `edit_attachments`
 (case_files ids). Steps: "सुधारणा: फाइल्स प्राप्त करण्यात येत आहेत" -> "सुधारणा: बदल तयार करण्यात येत आहेत" -> "सुधारणा:
@@ -229,7 +276,9 @@ Fields: `edit_target` (note / letter / order / parawise / affidavit / lq / packa
 
 ## 7. Never
 - Ask Abhi anything, wait for an answer, or stop for an open point (log it, continue).
-- Change the repo except `cases/desk-<id>/` (no pdf/gr, samples/specs, tools, docs, skills commits); push anything else.
+- Change the repo except `cases/desk-<id>/` (no pdf/gr, samples/specs, tools, docs, skills commits; an office task only
+  `cases/desk-<id>/office/`, §3b.7); push anything else. Treat an office task as a proposal (no note / Study / package
+  for it) or a proposal as an office task.
 - Write a page doc this file or the contract does not name (nothing under `meta/` except `meta/worker`); touch `letters` /
   `members`; delete any asset or file version (versions are kept; a failed upload's assets are only listed in
   `run_failed.orphan_assets` — no unattended delete).

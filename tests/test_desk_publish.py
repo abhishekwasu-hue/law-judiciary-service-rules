@@ -137,3 +137,49 @@ def test_edit_run_kinds_and_add(full, tmp_path):
     rows = json.load(open(sync / "plan.json", encoding="utf-8"))["rows"]
     assert [x["kind"] for x in rows] == ["note_letter", "gr", "spec", "spec"]
     assert not (sync / "run_patch.json").exists()   # edit run: the worker writes edit_result itself
+
+
+def test_office_run(tmp_path):
+    """INSTRUCTIONS §4.48 / DESK_WORKER §3b: every office output file -> one office_output row, version per name."""
+    out = tmp_path / "out"; out.mkdir(); (out / "preview").mkdir()
+    (out / "जिल्हानिहाय_विवरण.xlsx").write_bytes(os.urandom(3000))
+    (out / "आढावा.pptx").write_bytes(os.urandom(2000))
+    (out / "विवरण.pdf").write_bytes(PDF)
+    (out / "preview" / "x.pdf").write_bytes(PDF)          # previews / other files are not outputs
+    (out / "notes.txt").write_text("x", encoding="utf-8")
+    json.dump({"state": "done", "summary": "स" * 2500, "letter_needed": True, "essential_points": ["अ"],
+               "grs_missing": ["x"], "warnings": ["पडताळणी अपूर्ण — y", ""]},
+              open(out / "status.json", "w", encoding="utf-8"), ensure_ascii=False)
+    files = [{"id": 3, "case_id": 9, "kind": "office_output", "original_name": "जिल्हानिहाय_विवरण.xlsx", "version": 2},
+             {"id": 5, "case_id": 9, "kind": "template", "original_name": "नमुना.xlsx", "version": 1},
+             {"id": 7, "case_id": 4, "kind": "office_output", "original_name": "आढावा.pptx", "version": 5}]
+    fp = tmp_path / "files.json"; json.dump(files, open(fp, "w", encoding="utf-8"), ensure_ascii=False)
+    sync = tmp_path / "sync"
+    r = run("plan", "9", str(out), "31", str(sync), "--files", str(fp), "--office")
+    assert r.returncode == 0, r.stderr
+    rows = json.load(open(sync / "plan.json", encoding="utf-8"))["rows"]
+    got = {x["name"]: (x["kind"], x["version"], x["store"], x["content_type"]) for x in rows}
+    assert got == {
+        "जिल्हानिहाय_विवरण.xlsx": ("office_output", 3, "asset_parts",
+                                  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+        "आढावा.pptx": ("office_output", 1, "asset_parts",          # case 4's row is another case
+                       "application/vnd.openxmlformats-officedocument.presentationml.presentation"),
+        "विवरण.pdf": ("office_output", 1, "asset", "application/pdf")}
+    patch = json.load(open(sync / "run_patch.json", encoding="utf-8"))
+    assert patch["letter_needed"] is None and patch["essential_points"] == [] and patch["grs_missing"] == []
+    assert patch["grs_attached"] == [] and patch["case"] is None and patch["state"] == "done" and patch["step"] == "तयार"
+    assert len(patch["summary"]) == 2000 and patch["warnings"] == ["पडताळणी अपूर्ण — y"]
+    up = json.load(open(sync / "uploads.json", encoding="utf-8"))
+    ap = sync / "assets.json"; json.dump({os.path.basename(u["path"]): f"{i:032x}" for i, u in enumerate(up)}, open(ap, "w"))
+    r = run("rows", str(sync), "--assets", str(ap), "--first-id", "11")
+    assert r.returncode == 0, r.stderr
+    w = json.load(open(sync / "writes.json", encoding="utf-8"))
+    assert [x["data"]["kind"] for x in w] == ["office_output"] * 3 and [x["data"]["id"] for x in w] == [11, 13, 15]
+    # answer only (outputs []): no file -> 0 rows, run_patch still written; proposal flags refused with --office
+    for f in ("जिल्हानिहाय_विवरण.xlsx", "आढावा.pptx", "विवरण.pdf"):
+        os.remove(out / f)
+    r = run("plan", "9", str(out), "32", str(sync), "--files", str(fp), "--office")
+    assert r.returncode == 0 and json.load(open(sync / "plan.json", encoding="utf-8"))["rows"] == []
+    assert (sync / "run_patch.json").exists()
+    r = run("plan", "9", str(out), "32", str(sync), "--files", str(fp), "--office", "--kinds", "study")
+    assert r.returncode != 0 and "--office" in r.stderr

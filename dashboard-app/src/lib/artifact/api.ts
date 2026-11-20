@@ -9,14 +9,14 @@
 //   nothing reserved, max_parallel 1; /api/engine/* → not served (the cloud worker writes the db directly);
 //   monthly budget gate (402) and the GitHub/AI-key "Settings" gate (412) → never refused.
 import { ApiError } from '../api';
-import { DESKS, WORK_TYPES } from '../constants';
+import { DESKS, OFFICE_OUTPUT_KEYS, OFFICE_WORK_TYPE, WORK_TYPES } from '../constants';
 import { cap, isDbFail, needDb, nowIso, type McpErr } from './runtime';
 import { getRow, grFiles, grStoragePath, insertRow, listRows, patchRow, queryRows, setActor, viewer, type GrFile, type Row } from './db';
 
 // ---------- texts (same as worker.js) ----------
 const CASE_FIELDS = ['cr_no', 'cr_year', 'file_no', 'subject', 'category', 'priority', 'employee_name', 'post', 'office', 'received_from', 'received_via', 'inward_date', 'due_date', 'desk', 'work_type', 'nasti_no'];
 const DESK_IDS: readonly string[] = DESKS.map(d => d.id);
-const WORK_IDS: readonly string[] = WORK_TYPES.map(w => w.id);
+const WORK_IDS: readonly string[] = [...WORK_TYPES.map(w => w.id), OFFICE_WORK_TYPE];
 const BAD_DESK = 'विभाग / कार्यासन योग्य नाही. कृपया यादीतील पर्याय निवडावा, ही विनंती.';
 const BAD_WORK_TYPE = 'कामाची श्रेणी योग्य नाही. कृपया यादीतील पर्याय निवडावा, ही विनंती.';
 const NASTI_NO_MAX = 100;
@@ -24,7 +24,14 @@ const BAD_NASTI_NO = `नस्ती क्रमांक योग्य न�
 const PROFILE_KEYS = ['display_name', 'designation', 'office', 'mine'] as const;
 const PROFILE_MAX = 120;
 const PROFILE_LABELS: Record<string, string> = { display_name: 'नाव', designation: 'पदनाम', office: 'कार्यालय', mine: 'आपल्याकडे असलेले स्थान' };
-const FILE_KINDS = ['proposal', 'extra_doc', 'reply', 'approval', 'court_notice', 'gr'];
+const FILE_KINDS = ['proposal', 'extra_doc', 'reply', 'approval', 'court_notice', 'gr', 'template'];
+/** कार्यालयीन काम (office task): its inputs are extra_doc / template rows; the run's outputs are OFFICE_OUTPUT_KEYS. */
+const OFFICE_INPUT_KINDS = ['extra_doc', 'template'];
+const OFFICE_ONLY_EXT = ['.xls', '.xlsx', '.csv', '.ppt', '.pptx', '.txt'];
+const OFFICE_NEED = 'कृपया कामाची सूचना नमूद करावी, ही विनंती.';
+const OFFICE_INSTR_MAX = 4000;
+const OFFICE_INSTR_LONG = `कृपया सूचना ${OFFICE_INSTR_MAX} अक्षरांच्या मर्यादेत नमूद करावी, ही विनंती.`;
+const BAD_OFFICE_OUTPUTS = 'तयार करावयाच्या फाइलची निवड योग्य नाही. कृपया पान पुन्हा उघडून निवड करावी, ही विनंती.';
 const DRAFT_KEYS = ['letter', 'reminder', 'gr', 'corrigendum', 'circular', 'memo', 'notification', 'parawise',
   'do_letter', 'uo_note', 'endorsement', 'office_order', 'press_note', 'addendum', 'affidavit', 'lq'];
 const BAD_OUTPUTS = 'मसुद्यांची निवड योग्य नाही. कृपया पान पुन्हा उघडून निवड करावी, ही विनंती.';
@@ -32,7 +39,12 @@ const LETTER_STATUS = ['मसुदा', 'पाठवले', 'उत्तर
 const MAX_UPLOAD = 50 * 1024 * 1024;
 const UPLOAD_TYPES: Record<string, string> = { '.pdf': 'application/pdf', '.doc': 'application/msword',
   '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.tif': 'image/tiff', '.tiff': 'image/tiff' };
+  '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.tif': 'image/tiff', '.tiff': 'image/tiff',
+  // office tasks only (OFFICE_ONLY_EXT)
+  '.xls': 'application/vnd.ms-excel', '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  '.csv': 'text/csv', '.ppt': 'application/vnd.ms-powerpoint',
+  '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation', '.txt': 'text/plain' };
+const BAD_OFFICE_FILE_TYPE = 'हा फाइल-प्रकार स्वीकारता येत नाही. कृपया PDF, Word, Excel, CSV, PPT, TXT किंवा प्रतिमा फाइल जोडावी, ही विनंती.';
 const BAD_FILE_TYPE = 'हा फाइल-प्रकार स्वीकारता येत नाही. कृपया PDF, Word (DOC / DOCX) किंवा प्रतिमा (JPG / PNG / TIF) फाइल जोडावी, ही विनंती.';
 const CLOSED_STAGE = 'बंद';
 const CASE_CLOSED = 'हे प्रकरण बंद आहे. प्रक्रिया सुरू करण्यापूर्वी कृपया प्रकरणाचा टप्पा बदलावा, ही विनंती.';
@@ -299,15 +311,24 @@ async function startRun(b: Row) {
   const { case_id, instructions, outputs } = b;
   if (!isId(case_id)) bad('case_id required');
   const caseId = Number(case_id);
-  let outs: string[] | null = null;
-  if (outputs !== undefined && outputs !== null) {
-    if (!Array.isArray(outputs) || outputs.length > 32 || outputs.some(k => typeof k !== 'string' || !DRAFT_KEYS.includes(k))) bad(BAD_OUTPUTS);
-    outs = DRAFT_KEYS.filter(k => (outputs as string[]).includes(k));
-  }
   const c = await caseRow(caseId);
+  const office = !!c && c.work_type === OFFICE_WORK_TYPE;
+  const keys: readonly string[] = office ? OFFICE_OUTPUT_KEYS : DRAFT_KEYS;
+  let outs: string[] | null = office ? [] : null;
+  if (outputs !== undefined && outputs !== null) {
+    if (!Array.isArray(outputs) || outputs.length > 32 || outputs.some(k => typeof k !== 'string' || !keys.includes(k))) bad(office ? BAD_OFFICE_OUTPUTS : BAD_OUTPUTS);
+    outs = keys.filter(k => (outputs as string[]).includes(k));
+  }
   if (c && c.stage === CLOSED_STAGE) fail(409, 'case_closed', { reason: CASE_CLOSED });
-  const files = await listRows('case_files');
-  if (!files.some(f => Number(f.case_id) === caseId && f.kind === 'proposal')) bad('upload the proposal PDF first');
+  if (office) {
+    // office task: the instruction is the work; files are optional (the instruction may carry the data itself)
+    const t = typeof instructions === 'string' ? instructions.trim() : '';
+    if (!t) bad(OFFICE_NEED);
+    if (t.length > OFFICE_INSTR_MAX) bad(OFFICE_INSTR_LONG);
+  } else {
+    const files = await listRows('case_files');
+    if (!files.some(f => Number(f.case_id) === caseId && f.kind === 'proposal')) bad('upload the proposal PDF first');
+  }
   if (!c) return bad('case not found', 404);
   const active = await activeRun(caseId);
   if (active) {
@@ -397,7 +418,9 @@ function magicOk(ext: string, b: Uint8Array): boolean {
   const asc = (s: string) => [...s].map(c => c.charCodeAt(0));
   if (ext === '.pdf') { const p = asc('%PDF-'); for (let i = 0; i + p.length <= b.length; i++) if (sw(p, i)) return true; return false; }
   if (ext === '.doc') return sw([0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1]) || sw(asc('{\\rtf'));
-  if (ext === '.docx') return sw([0x50, 0x4B, 0x03, 0x04]);
+  if (ext === '.docx' || ext === '.xlsx' || ext === '.pptx') return sw([0x50, 0x4B, 0x03, 0x04]);
+  if (ext === '.xls' || ext === '.ppt') return sw([0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1]);
+  if (ext === '.csv' || ext === '.txt') return !b.subarray(0, 512).includes(0);
   if (ext === '.jpg' || ext === '.jpeg') return sw([0xFF, 0xD8, 0xFF]);
   if (ext === '.png') return sw([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
   if (ext === '.tif' || ext === '.tiff') return sw([0x49, 0x49, 0x2A, 0x00]) || sw([0x4D, 0x4D, 0x00, 0x2A]);
@@ -474,10 +497,13 @@ async function artifactUploadRaw(caseId: number, kind: string, file: File, onPro
   if (file.size > MAX_UPLOAD) bad('file over 50 MB', 413);
   const ext = (/\.[A-Za-z0-9]{1,8}$/.exec(name) || [''])[0].toLowerCase();
   const ctype = UPLOAD_TYPES[ext];
-  if (!ctype) bad(BAD_FILE_TYPE);
   const c = await caseRow(caseId);
   if (!c) return bad('case not found', 404);
-  if (!magicOk(ext, new Uint8Array(await file.slice(0, 1024).arrayBuffer()))) bad(BAD_FILE_TYPE);
+  const office = c.work_type === OFFICE_WORK_TYPE;
+  const badType = office ? BAD_OFFICE_FILE_TYPE : BAD_FILE_TYPE;
+  if (!ctype || (!office && OFFICE_ONLY_EXT.includes(ext))) bad(badType);
+  if (office ? !OFFICE_INPUT_KINDS.includes(kind) : kind === 'template') bad('kind not allowed for this case');
+  if (!magicOk(ext, new Uint8Array(await file.slice(0, 1024).arrayBuffer()))) bad(badType);
   const stored = await storeBlob(file, ctype, onProgress);
   const prev = (await listRows('case_files')).filter(f => Number(f.case_id) === caseId && f.kind === kind && f.original_name === name);
   const version = prev.length ? Math.max(...prev.map(f => Number(f.version) || 0)) + 1 : 1;
