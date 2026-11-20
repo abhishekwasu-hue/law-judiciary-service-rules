@@ -162,6 +162,7 @@
   found (list /tmp only — see the cards' "उणिवा" and gr_study "पुढे मिळवायचे"), e.g. compassionate GR 17.07.2025, MCS Medical
   Attendance Rules 1961, Land Disposal Rules 1971. Card sizes 14–31 KB (Devanagari). Study-vs-image differences found by card
   agents (C1-2 §15.2, C2-3 Transfer Act text, case desk-2 1991 para 5 "याजकडून") — cards use the printed text.
+- 20.11.2026 (Abhi: everyday office work not covered by the page; decisions: separate tab, outputs Excel/Word/PPT/PDF, English text Times New Roman): "कार्यालयीन काम" tab — office task = cases work_type 'office' (hidden from proposal lists), inputs extra_doc / template, outputs case_files kind office_output; UI pages/OfficeWork.tsx (#/office, #/office/:id); worker DESK_WORKER §3b + tools/work_rules/office.md, office_check.py, office_fonts.py, desk_publish --office; INSTRUCTIONS §4.48. Page Hqf9Y7iKkDzNntsVCxXcB4 republished (version 5, id 1795191213-b90c) from main e02cc66. Not yet: a real office run by the worker (Abhi's first task = the test); Supabase mode has no office path (no migration for the new file kinds). ENGINE_BRIEF size limit raised to 33,536 bytes (was already over before §4.48).
 
 ## Pending
 29. **08.11.2026 page fix round leftovers:** page re-created 11.11.2026 as Hqf9Y7iKkDzNntsVCxXcB4 (db reads verified as owner); then one live full run +
