@@ -3,15 +3,17 @@
 // the proposals); outputs Excel (formulas) / Word / PPT / PDF; English text Times New Roman, Marathi DVOT-SurekhMR.
 // An office task = a `cases` doc with work_type 'office' (subject = title); inputs = case_files extra_doc / template; a run
 // = runs kind 'full' with instructions + outputs ⊆ OFFICE_OUTPUT_KEYS; results = case_files kind office_output
-// (docs/DESK_WORKER.md §3b). A later run on the same task = a correction that starts from the newest results.
+// (docs/DESK_WORKER.md §3b). A later run on the same task = a correction that starts from the newest results; it is asked
+// in the task's AI सुधारणा-चॅट (components/OfficeChat.tsx, 21.11.2026).
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { api, downloadFile, humanError, uploadFile } from '../lib/api';
+import { api, downloadFile, humanError } from '../lib/api';
+import { newestByName, uploadAndRun } from '../lib/office';
 import { sb } from '../lib/supabase';
 import { useData, useLatestRuns } from '../lib/data';
 import { useCanWrite } from '../lib/auth';
 import {
-  OFFICE_ACCEPT, OFFICE_OUTPUT_KEYS, OFFICE_OUTPUT_LABEL, OFFICE_STEPS, OFFICE_WORK_TYPE, RUN_STATE_LABEL, RUNS_RELOAD_EVENT,
+  OFFICE_ACCEPT, OFFICE_OUTPUT_KEYS, OFFICE_OUTPUT_LABEL, OFFICE_STEPS, OFFICE_WORK_TYPE, RUN_STATE_LABEL,
   runActive, runNeedsFire, runTone, type OfficeOutputKey,
 } from '../lib/constants';
 import { fmtBytes, fmtDateTime, runWarningTexts } from '../lib/format';
@@ -19,6 +21,7 @@ import type { Case, CaseFile, Run } from '../lib/types';
 import { useToast } from '../components/Toast';
 import { useRuns, RunNotStarted } from '../components/RunProgress';
 import { Chip, Empty, Field, Progress, Section, Spinner } from '../components/ui';
+import OfficeChat from '../components/OfficeChat';
 
 const ARTIFACT = import.meta.env.VITE_BACKEND === 'artifact';
 const TITLE_MAX = 200;
@@ -89,18 +92,6 @@ function FilePick({ label, hint, files, onChange, multiple = true }: { label: st
       )}
     </div>
   );
-}
-
-/** Uploads the source files (extra_doc) and the template, then starts the run. Returns the started run. */
-async function uploadAndRun(caseId: number, docs: File[], tpl: File[], instructions: string, outputs: OfficeOutputKey[], onStatus: (s: string) => void) {
-  const all: [File, 'extra_doc' | 'template'][] = [...docs.map(f => [f, 'extra_doc'] as [File, 'extra_doc']), ...tpl.map(f => [f, 'template'] as [File, 'template'])];
-  for (let i = 0; i < all.length; i++) {
-    const [f, kind] = all[i];
-    onStatus(`फाइल अपलोड (${i + 1}/${all.length}): ${f.name}`);
-    await uploadFile(caseId, kind, f, pct => onStatus(`फाइल अपलोड (${i + 1}/${all.length}): ${f.name} — ${pct}%`));
-  }
-  onStatus('काम सुरू करत आहे…');
-  return api<Run>('/api/run', { method: 'POST', body: { case_id: caseId, instructions, outputs } });
 }
 
 function NewTask() {
@@ -205,18 +196,6 @@ function TaskList() {
   );
 }
 
-/** Newest version of each file name of the given kinds. */
-function newestByName(files: CaseFile[], kinds: string[]): CaseFile[] {
-  const m = new Map<string, CaseFile>();
-  for (const f of files) {
-    if (!kinds.includes(f.kind)) continue;
-    const k = `${f.kind}|${f.original_name}`;
-    const cur = m.get(k);
-    if (!cur || f.version > cur.version || (f.version === cur.version && f.id > cur.id)) m.set(k, f);
-  }
-  return [...m.values()].sort((a, b) => b.id - a.id);
-}
-
 function FileRow({ f, label }: { f: CaseFile; label?: string }) {
   const toast = useToast();
   const [busy, setBusy] = useState(false);
@@ -289,52 +268,8 @@ function RunBox({ run }: { run: Run }) {
   );
 }
 
-function FollowUp({ caseId, initial, onStarted }: { caseId: number; initial: OfficeOutputKey[]; onStarted: () => void }) {
-  const toast = useToast();
-  const [instr, setInstr] = useState('');
-  const [docs, setDocs] = useState<File[]>([]);
-  // the files asked last time stay ticked (a correction usually wants the same files back)
-  const [outs, setOuts] = useState<OfficeOutputKey[]>(initial);
-  const [busy, setBusy] = useState('');
-  async function submit(e: FormEvent) {
-    e.preventDefault();
-    if (!instr.trim()) {
-      toast('कृपया बदल / पुढील सूचना नमूद करावी, ही विनंती.', 'err');
-      return;
-    }
-    try {
-      await uploadAndRun(caseId, docs, [], instr.trim(), outs, setBusy);
-      toast('काम सुरू झाले.');
-      setInstr('');
-      setDocs([]);
-      onStarted();
-    } catch (err) {
-      toast(humanError(err), 'err');
-      onStarted();
-    } finally {
-      setBusy('');
-    }
-  }
-  return (
-    <form className="space-y-3" onSubmit={e => void submit(e)}>
-      <Field label="बदल / पुढील सूचना" hint="मागील तयार फाइलवरूनच बदल केले जातील.">
-        <textarea className="input min-h-[6rem]" maxLength={INSTR_MAX} value={instr} onChange={e => setInstr(e.target.value)} placeholder="उदा. एकूण रकमेचा स्तंभ जोडावा; PPT मध्ये आलेख द्यावा." />
-      </Field>
-      <FilePick label="आणखी फाइल्स (असल्यास)" hint="PDF, Word, Excel, CSV, PPT, TXT किंवा प्रतिमा." files={docs} onChange={setDocs} />
-      <OutputPicker value={outs} onChange={setOuts} />
-      <div className="flex flex-wrap items-center gap-3">
-        <button type="submit" className="btn-primary" disabled={!!busy}>
-          {busy ? <Spinner className="h-4 w-4" /> : <span aria-hidden="true">▶</span>} पुन्हा तयार करा
-        </button>
-        {busy && <span className="text-sm text-slate-600 dark:text-slate-300" role="status">{busy}</span>}
-      </div>
-    </form>
-  );
-}
-
 function TaskDetail({ id }: { id: number }) {
   const { officeCases, loading, refresh } = useData();
-  const canWrite = useCanWrite();
   const c = officeCases.find(x => x.id === id);
   const runs = useRuns(id);
   const [files, setFiles] = useState<CaseFile[] | null>(null);
@@ -353,7 +288,6 @@ function TaskDetail({ id }: { id: number }) {
   }
   const outputs = files ? newestByName(files, ['office_output']) : [];
   const inputs = files ? newestByName(files, ['extra_doc', 'template']) : [];
-  const busyRun = latest && runActive(latest);
   return (
     <div className="space-y-4">
       <div>
@@ -370,15 +304,7 @@ function TaskDetail({ id }: { id: number }) {
           <p className="text-sm text-slate-500 dark:text-slate-400">अजून तयार फाइल नाही.</p>
         )}
       </Section>
-      {canWrite && (
-        <Section title="बदल हवा आहे?">
-          {busyRun && !(ARTIFACT && latest && runNeedsFire(latest)) ? (
-            <p className="text-sm">काम चालू आहे — पूर्ण झाल्यावर बदल सुचवता येतील.</p>
-          ) : (
-            <FollowUp caseId={id} initial={OFFICE_OUTPUT_KEYS.filter(k => (latest?.outputs ?? ['xlsx']).includes(k))} onStarted={() => { void refresh(); void loadFiles(); window.dispatchEvent(new Event(RUNS_RELOAD_EVENT)); }} />
-          )}
-        </Section>
-      )}
+      <OfficeChat caseId={id} onChanged={() => { void refresh(); void loadFiles(); }} />
       <Section title={`दिलेल्या फाइल्स (${inputs.length})`}>
         {!files ? <Spinner /> : inputs.length ? (
           <ul className="divide-y divide-slate-200 dark:divide-navy-800">{inputs.map(f => <FileRow key={f.id} f={f} label={f.kind === 'template' ? 'साचा' : undefined} />)}</ul>
@@ -386,21 +312,6 @@ function TaskDetail({ id }: { id: number }) {
           <p className="text-sm text-slate-500 dark:text-slate-400">फाइल दिलेली नाही.</p>
         )}
       </Section>
-      {runs && runs.length > 0 && (
-        <Section title={`सूचनांचा इतिहास (${runs.length})`}>
-          <ol className="space-y-3">
-            {runs.map(r => (
-              <li key={r.id} className="rounded-lg border border-slate-200 p-3 text-sm dark:border-navy-800">
-                <div className="mb-1 flex flex-wrap items-center gap-2">{stateChip(r)}<span className="text-slate-500">{fmtDateTime(r.created_at)}</span></div>
-                <div className="whitespace-pre-wrap break-words">{r.instructions}</div>
-                {Array.isArray(r.outputs) && r.outputs.length > 0 && (
-                  <div className="mt-1 text-slate-500">फाइल: {r.outputs.map(k => OFFICE_OUTPUT_LABEL[k as OfficeOutputKey] || k).join(', ')}</div>
-                )}
-              </li>
-            ))}
-          </ol>
-        </Section>
-      )}
     </div>
   );
 }

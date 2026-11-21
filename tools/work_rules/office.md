@@ -85,6 +85,10 @@ a line below names them.
   template is English (then the same rules, English official style, Times New Roman).
 - A later run on the same task = correction / continuation: start from the newest `office_output` files, change only
   what the instruction asks, keep everything else identical (same layout, same figures, same sources).
+  Corrections come from the task's AI सुधारणा-चॅट (Abhi 21.11.2026, dashboard-app components/OfficeChat.tsx): when the
+  instruction's first line is "बदल करायच्या फाइल्स: <name>, <name>", only those `office_output` files are changed
+  (the rest of the line = the message); the other result files stay as they are and are not re-delivered unless the
+  instruction asks. No such line = decide the files from the instruction.
 - Run summary (≤ 2000 chars, Marathi): what was produced (file names, sheets / slides, key totals as numbers), or the
   answer itself for `outputs` [], each figure with its source in brackets; then the count of open points. Never a
   figure in the summary that is not in an input or computed by a formula from them.

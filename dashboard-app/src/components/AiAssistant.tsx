@@ -7,15 +7,31 @@ import { useLocation } from 'react-router-dom';
 import { sb } from '../lib/supabase';
 import { useData } from '../lib/data';
 import { useCanWrite } from '../lib/auth';
-import { isEditRun, isHiddenFile } from '../lib/constants';
+import { isEditRun, isHiddenFile, isOfficeCase } from '../lib/constants';
 import { caseSubject, crFromFileName, crLabel } from '../lib/format';
 import type { CaseFile } from '../lib/types';
 import type { CaseCtx } from '../pages/CaseDetail';
 import { useRuns } from './RunProgress';
 import EditChat from './EditChat';
+import OfficeChat from './OfficeChat';
 import { Spinner } from './ui';
 
+function OfficeTaskChat({ id, onBack }: { id: number; onBack: () => void }) {
+  return (
+    <div className="space-y-3">
+      <button type="button" className="btn-ghost text-sm" onClick={onBack}>← कृपया दुसरे प्रकरण / काम निवडावे</button>
+      <OfficeChat caseId={id} />
+    </div>
+  );
+}
+
 function CaseChat({ id, onBack }: { id: number; onBack: () => void }) {
+  const { officeCases } = useData();
+  if (officeCases.some(x => x.id === id)) return <OfficeTaskChat id={id} onBack={onBack} />;
+  return <ProposalChat id={id} onBack={onBack} />;
+}
+
+function ProposalChat({ id, onBack }: { id: number; onBack: () => void }) {
   const { cases } = useData();
   const canWrite = useCanWrite();
   const c = cases.find(x => x.id === id) || null;
@@ -49,13 +65,14 @@ function CaseChat({ id, onBack }: { id: number; onBack: () => void }) {
 }
 
 /** Where the floating AI button is shown (owner decision 04.11.2026): every page for writers, except the नस्ती page and the
- *  case page (/cases/:id — there the header "AI सुधारणा" button is the one entry). Layout uses it for the bottom padding. */
+ *  case page (/cases/:id — there the header "AI सुधारणा" button is the one entry) and an office task page (/office/:id —
+ *  its own AI सुधारणा-चॅट is on the page, 21.11.2026). Layout uses it for the bottom padding. */
 export const aiFabShown = (pathname: string, canWrite: boolean) =>
-  canWrite && !pathname.startsWith('/nasti') && !/^\/cases\/\d+/.test(pathname);
+  canWrite && !pathname.startsWith('/nasti') && !/^\/(cases|office)\/\d+/.test(pathname);
 
 export default function AiAssistant() {
   const canWrite = useCanWrite();
-  const { cases } = useData();
+  const { cases, officeCases } = useData();
   const loc = useLocation();
   const [open, setOpen] = useState(false);
   const [caseId, setCaseId] = useState<number | null>(null);
@@ -68,8 +85,9 @@ export default function AiAssistant() {
   }, [open]);
   const list = useMemo(() => {
     const t = q.trim().toLowerCase();
-    return cases.filter(c => !t || `${crLabel(c)} ${c.cr_no ?? ''} ${c.subject ?? ''} ${c.file_no ?? ''}`.toLowerCase().includes(t)).slice(0, 40);
-  }, [cases, q]);
+    // proposals and कार्यालयीन काम tasks (21.11.2026); a task is shown by its title
+    return [...cases, ...officeCases].filter(c => !t || `${isOfficeCase(c) ? '' : crLabel(c)} ${c.cr_no ?? ''} ${c.subject ?? ''} ${c.file_no ?? ''}`.toLowerCase().includes(t)).slice(0, 40);
+  }, [cases, officeCases, q]);
   const shown = aiFabShown(loc.pathname, canWrite);
   // the page changed to one without the button (e.g. a case was opened from the list) → close the panel
   useEffect(() => { if (!shown) setOpen(false); }, [shown]);
@@ -83,10 +101,10 @@ export default function AiAssistant() {
       {!open && (
         // phone: one 56 px round "AI" button (the label only from sm), so it does not cover the content; Layout adds
         // bottom padding while it is shown, and toasts sit above it (index.css .ai-fab-on)
-        <button type="button" onClick={() => setOpen(true)} aria-label="AI सहाय्यक — प्रस्तावात बदल" title="AI सहाय्यक — प्रस्तावात बदल"
+        <button type="button" onClick={() => setOpen(true)} aria-label="AI सहाय्यक — प्रस्ताव / कार्यालयीन कामात बदल" title="AI सहाय्यक — प्रस्ताव / कार्यालयीन कामात बदल"
           className="ai-fab no-print fixed bottom-[calc(4.25rem+env(safe-area-inset-bottom))] right-3 z-40 flex h-14 w-14 items-center justify-center rounded-full text-white sm:h-auto sm:w-auto sm:justify-start sm:gap-2 sm:py-2 sm:pl-2 sm:pr-4 md:bottom-6 md:right-6">
           <span className="flex h-11 w-11 items-center justify-center rounded-full bg-white text-lg font-black text-orange-700 shadow sm:h-12 sm:w-12">AI</span>
-          <span className="hidden text-left leading-tight sm:block"><b className="block text-base">AI सहाय्यक</b><span className="text-xs text-white/90">प्रस्तावात बदल हवा?</span></span>
+          <span className="hidden text-left leading-tight sm:block"><b className="block text-base">AI सहाय्यक</b><span className="text-xs text-white/90">बदल हवा?</span></span>
         </button>
       )}
       {open && (
@@ -96,7 +114,7 @@ export default function AiAssistant() {
               <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white text-base font-black text-orange-700">AI</span>
               <div className="min-w-0 flex-1">
                 <div className="text-lg font-bold">AI सहाय्यक</div>
-                <div className="text-sm text-white/90">टिप्पणी किंवा मसुद्यातील बदलासाठी</div>
+                <div className="text-sm text-white/90">टिप्पणी, मसुदा किंवा कार्यालयीन कामातील बदलासाठी</div>
               </div>
               <button type="button" className="min-h-tap min-w-tap rounded-full text-2xl font-bold text-white hover:bg-white/20" aria-label="बंद करावे" onClick={() => setOpen(false)}>✕</button>
             </div>
@@ -104,16 +122,25 @@ export default function AiAssistant() {
               {caseId ? <CaseChat id={caseId} onBack={() => setCaseId(null)} /> : (
                 <div className="space-y-3">
                   <div className="rounded-2xl rounded-tl-sm bg-white p-3 shadow-sm dark:bg-navy-900">
-                    नमस्कार! पूर्वीच्या प्रस्तावामध्ये बदल हवा असल्यास कृपया आधी प्रकरण निवडावे.
+                    नमस्कार! पूर्वीच्या प्रस्तावामध्ये किंवा कार्यालयीन कामामध्ये बदल हवा असल्यास कृपया आधी प्रकरण / काम निवडावे.
                   </div>
-                  <input className="input" autoFocus placeholder="C R क्र. / विषय / नस्ती क्र. शोधावा" value={q} onChange={e => setQ(e.target.value)} aria-label="प्रकरण शोधा" />
+                  <input className="input" autoFocus placeholder="C R क्र. / विषय / नस्ती क्र. / कामाचे शीर्षक शोधावा" value={q} onChange={e => setQ(e.target.value)} aria-label="प्रकरण शोधा" />
                   {list.length === 0 ? <p className="text-sm text-slate-500">या शोधानुसार प्रकरण आढळले नाही.</p> : (
                     <ul className="space-y-1.5">
                       {list.map(c => (
                         <li key={c.id}>
                           <button type="button" className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-left hover:border-orange-400 dark:border-navy-800 dark:bg-navy-900" onClick={() => setCaseId(c.id)}>
-                            <div className="font-bold">{crLabel(c)}</div>
-                            <div className="line-clamp-2 text-sm text-slate-600 dark:text-slate-300">{caseSubject(c)}</div>
+                            {isOfficeCase(c) ? (
+                              <>
+                                <div className="flex items-center gap-2 font-bold"><span className="rounded bg-orange-100 px-1.5 py-0.5 text-xs text-orange-900 dark:bg-orange-900/40 dark:text-orange-100">कार्यालयीन काम</span></div>
+                                <div className="line-clamp-2 text-sm text-slate-600 dark:text-slate-300">{c.subject || `काम क्र. ${c.id}`}</div>
+                              </>
+                            ) : (
+                              <>
+                                <div className="font-bold">{crLabel(c)}</div>
+                                <div className="line-clamp-2 text-sm text-slate-600 dark:text-slate-300">{caseSubject(c)}</div>
+                              </>
+                            )}
                           </button>
                         </li>
                       ))}
