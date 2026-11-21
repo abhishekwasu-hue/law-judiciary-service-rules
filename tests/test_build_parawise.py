@@ -352,15 +352,10 @@ def all_text(d):
 
 def bad_fonts(d):
     roots = [d.element.body] + [part._element for s in d.sections for part in (s.header, s.footer)]
-    bad = 0
-    for root in roots:
-        for el in root.iter(qn("w:r")):
-            if not "".join(x.text or "" for x in el.iter(qn("w:t"))).strip():
-                continue
-            rp = el.find(qn("w:rPr")); f = rp.find(qn("w:rFonts")) if rp is not None else None
-            if f is None or any(f.get(qn("w:" + k)) != FONT for k in ("ascii", "hAnsi", "cs", "eastAsia")):
-                bad += 1
-    return bad
+    if TOOLS not in sys.path:
+        sys.path.insert(0, TOOLS)
+    import font_rule   # the common rule (§4.49): Marathi DVOT-SurekhMR x4, English ascii/hAnsi Times New Roman
+    return font_rule.problems(roots)
 
 
 @unittest.skipIf(docx is None, "python-docx not installed")

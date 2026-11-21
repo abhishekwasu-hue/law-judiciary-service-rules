@@ -108,13 +108,19 @@ class StudyWarnings(unittest.TestCase):
     def test_fonts_and_verify(self):
         d, st = self.case("verify")
         SW.append(st, WARNS)
-        for r in docx.Document(st).element.body.iter(qn("w:r")):
-            if not "".join(t.text or "" for t in r.iter(qn("w:t"))).strip():
-                continue
-            rf = r.find(qn("w:rPr") + "/" + qn("w:rFonts"))
-            self.assertIsNotNone(rf)
-            for k in ("ascii", "hAnsi", "cs", "eastAsia"):
-                self.assertEqual(rf.get(qn("w:" + k)), "DVOT-SurekhMR")
+        import font_rule   # the common rule (§4.49): Marathi DVOT-SurekhMR x4, English ascii/hAnsi Times New Roman
+        body = docx.Document(st).element.body
+        self.assertEqual(font_rule.bad_runs([body]), [])
+        for p in body.iter(qn("w:p")):
+            pt = "".join(x.text or "" for x in p.iter(qn("w:t")))
+            for r in p.iter(qn("w:r")):
+                t = "".join(x.text or "" for x in r.iter(qn("w:t")))
+                if not t.strip():
+                    continue
+                rf = r.find(qn("w:rPr") + "/" + qn("w:rFonts"))
+                self.assertIsNotNone(rf)
+                self.assertEqual({k: rf.get(qn("w:" + k)) for k in ("ascii", "hAnsi", "cs", "eastAsia")},
+                                 font_rule.expected(t, pt), t)
         rc, out = self.run_verify(d)
         self.assertIn("OK: Study headings भाग 0-7", out)
         self.assertIn("OK: Study fonts", out)

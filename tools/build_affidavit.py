@@ -355,7 +355,7 @@ def build(spec, out):
     st = d.settings.element
     for e in st.findall(qn("w:mirrorMargins")):
         st.remove(e)
-    d.save(out); clean_docx(out, spec.get("doc_author"))
+    d.save(out); clean_docx(out, spec.get("doc_author"), fonts=False)   # §4.2: the affidavit keeps its own rule
     return last
 
 

@@ -94,8 +94,16 @@ def clean_app(x):
     return x[:m.end()] + f"<TotalTime>0</TotalTime><Application>{APP_NAME}</Application>" + x[m.end():]
 
 
-def clean_docx(path, author=None):
-    """Office-like core / app properties for a saved .docx, in place (C27 §4)."""
+def clean_docx(path, author=None, fonts=True):
+    """Office-like core / app properties for a saved .docx, in place (C27 §4). fonts=True (default): also the common font
+    rule of tools/font_rule.py (Marathi DVOT-SurekhMR, English text Times New Roman — Abhi 20.11.2026, §4.2); the
+    _Affidavit builder passes fonts=False (its own §4.2 rule: every run ascii / hAnsi Times New Roman)."""
+    if fonts:
+        here = os.path.dirname(os.path.abspath(__file__))
+        if here not in sys.path:
+            sys.path.insert(0, here)
+        import font_rule  # noqa: E402 — same folder (tools/)
+        font_rule.apply_docx(path)
     au = doc_author(author)
     fd, tmp = tempfile.mkstemp(suffix=".docx", dir=os.path.dirname(os.path.abspath(path)))
     os.close(fd)

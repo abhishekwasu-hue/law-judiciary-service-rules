@@ -111,8 +111,9 @@ def test_layout_fonts_and_paper_book(tmp_path):
         f = r.find(qn("w:rPr")).find(qn("w:rFonts"))
         assert {a: f.get(qn("w:" + a)) for a in want} == want
         assert r.find(qn("w:rPr")).find(qn("w:szCs")) is not None
-    from build_parawise import bad_font_runs as all_surekh
-    assert all_surekh(d) == len(runs)   # no run is DVOT-SurekhMR on all four attributes any more
+    # no run is DVOT-SurekhMR on all four attributes (the common §4.49 rule is not applied to the affidavit)
+    assert not any(all(r.find(qn("w:rPr")).find(qn("w:rFonts")).get(qn("w:" + a)) == FONT
+                       for a in ("ascii", "hAnsi", "cs", "eastAsia")) for r in runs)
     sizes = {r.font.size.pt for p in d.paragraphs for r in p.runs if r.text.strip() and r.font.size}
     assert sizes == {14.0}
     assert d.core_properties.author in ("", None)

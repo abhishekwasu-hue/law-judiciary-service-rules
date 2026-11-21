@@ -46,14 +46,12 @@ def read_text(path):
 
 
 def bad_font_runs(d):
-    bad = 0
-    for el in d.element.body.iter(qn("w:r")):
-        if not "".join(x.text or "" for x in el.iter(qn("w:t"))).strip():
-            continue
-        rp = el.find(qn("w:rPr")); f = rp.find(qn("w:rFonts")) if rp is not None else None
-        if f is None or any(f.get(qn("w:" + k)) != FONT for k in ("ascii", "hAnsi", "cs", "eastAsia")):
-            bad += 1
-    return bad
+    """runs not per the common font rule (§4.49, tools/font_rule.py: Marathi DVOT-SurekhMR x4, English ascii/hAnsi
+    Times New Roman + cs/eastAsia DVOT-SurekhMR)."""
+    if TOOLS not in sys.path:
+        sys.path.insert(0, TOOLS)
+    import font_rule
+    return font_rule.problems([d.element.body])
 
 
 def page_setup(s):

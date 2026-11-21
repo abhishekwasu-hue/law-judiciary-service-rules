@@ -409,18 +409,10 @@ def build(spec, out):
 
 
 def bad_font_runs(d):
-    """text runs (body, headers, footers) whose four rFonts attributes are not all DVOT-SurekhMR."""
+    """text runs (body, headers, footers) not per the common font rule (tools/font_rule.py, §4.2)."""
+    import font_rule
     roots = [d.element.body] + [part._element for s in d.sections for part in (s.header, s.footer)]
-    bad = 0
-    for root in roots:
-        for el in root.iter(qn("w:r")):
-            t = "".join(x.text or "" for x in el.iter(qn("w:t")))
-            if not t.strip():
-                continue
-            rp = el.find(qn("w:rPr")); f = rp.find(qn("w:rFonts")) if rp is not None else None
-            if f is None or any(f.get(qn("w:" + k)) != FONT for k in ("ascii", "hAnsi", "cs", "eastAsia")):
-                bad += 1
-    return bad
+    return font_rule.problems(roots)
 
 
 def lint(spec):

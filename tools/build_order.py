@@ -424,14 +424,9 @@ def english_block(D, e, dk=None):
 
 
 def bad_font_runs(path):
-    d = docx.Document(path); bad = 0
-    for el in d.element.body.iter(qn("w:r")):
-        if not "".join(x.text or "" for x in el.iter(qn("w:t"))).strip():
-            continue
-        rp = el.find(qn("w:rPr")); f = rp.find(qn("w:rFonts")) if rp is not None else None
-        if f is None or any(f.get(qn("w:" + a)) != FONT for a in ("ascii", "hAnsi", "cs", "eastAsia")):
-            bad += 1
-    return bad
+    """text runs not per the common font rule (tools/font_rule.py, §4.2)."""
+    import font_rule
+    return font_rule.problems([docx.Document(path).element.body])
 
 
 

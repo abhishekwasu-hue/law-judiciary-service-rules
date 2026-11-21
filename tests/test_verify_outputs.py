@@ -683,18 +683,34 @@ class VerifyOutputs(unittest.TestCase):
 
     def test_affidavit_all_surekh_fails(self):
         d = self.case("x_aff_surekh")
-        make_extra(os.path.join(d, f"{PRE}_Affidavit.docx"), ["AFFIDAVIT IN REPLY"])   # old four-DVOT form
+        make_extra(os.path.join(d, f"{PRE}_Affidavit.docx"), ["AFFIDAVIT IN REPLY"], old_dvot=True)   # old four-DVOT form
         self.must_fail(d, "Affidavit fonts")
 
-    def test_parawise_times_new_roman_fails(self):
+    def test_parawise_marathi_times_new_roman_fails(self):
         d = self.case("x_pw_tnr")
-        make_extra(os.path.join(d, f"{PRE}_Parawise.docx"), ["Para 1"], affidavit=True)   # only the affidavit is TNR
+        # §4.49: outside the affidavit, Marathi text is DVOT-SurekhMR on all four (TNR ascii/hAnsi only for English)
+        make_extra(os.path.join(d, f"{PRE}_Parawise.docx"), ["परिच्छेद 1"], affidavit=True)
         self.must_fail(d, "Parawise fonts")
 
+    def test_parawise_english_old_dvot_fails(self):
+        d = self.case("x_pw_dvot")
+        # §4.49 (21.11.2026): English text ascii/hAnsi Times New Roman — the old four-DVOT form fails for new outputs
+        make_extra(os.path.join(d, f"{PRE}_Parawise.docx"), ["Para 1"], old_dvot=True)
+        self.must_fail(d, "Parawise fonts")
 
-def make_extra(path, paras, font=True, header=None, header_font=True, affidavit=False):
-    """A small Word file like build_order / build_parawise output: every run with DVOT-SurekhMR on all four rFonts
-    (affidavit=True: as build_affidavit — ascii/hAnsi Times New Roman, cs/eastAsia DVOT-SurekhMR)."""
+    def test_parawise_english_times_new_roman_ok(self):
+        d = self.case("x_pw_ok")
+        make_extra(os.path.join(d, f"{PRE}_Parawise.docx"), ["Para 1 of the petition", "परिच्छेद 2 Rule 58 नुसार"])
+        rc, out = self.run_verify(d)
+        self.assertIn("OK: Parawise fonts", out)
+
+
+def make_extra(path, paras, font=True, header=None, header_font=True, affidavit=False, old_dvot=False):
+    """A small Word file like build_order / build_parawise output: the common font rule of tools/font_rule.py applied by
+    clean_meta.clean_docx as the builders do (§4.49: Marathi DVOT-SurekhMR x4, English ascii/hAnsi Times New Roman).
+    affidavit=True: as build_affidavit — every run ascii/hAnsi Times New Roman, cs/eastAsia DVOT-SurekhMR, rule not
+    applied; font / header_font False: Calibri left as it is; old_dvot=True: the pre-21.11.2026 form (every run
+    DVOT-SurekhMR on all four), rule not applied."""
     def setf(run, ok):
         rpr = run._element.get_or_add_rPr()
         fo = rpr.find(qn("w:rFonts"))
@@ -711,7 +727,7 @@ def make_extra(path, paras, font=True, header=None, header_font=True, affidavit=
         setf(hp.add_run(header), header_font)
     d.save(path)
     import clean_meta
-    clean_meta.clean_docx(path)   # as the builders do (C27 §4)
+    clean_meta.clean_docx(path, fonts=font and header_font and not affidavit and not old_dvot)   # as the builders do (C27 §4)
 
 
 

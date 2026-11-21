@@ -10,8 +10,10 @@ uploads; status.json, files starting with "." or "~$" and the subfolder preview/
               the other lint_spec AI_WORDS (model, engine, automatic, generated, मॉडेल, स्वयंचलित, प्रणालीने तयार), TODO and
               "पडताळणी अपूर्ण" -> WARN); metadata (docx: clean_meta.docx_meta_problems; xlsx / pptx: the same core rules + an
               Office-like Application, no tool name; pdf: clean_meta.pdf_meta_problems) -> FAIL.
-  .docx       fonts: every text run in body, headers, footers, footnotes, endnotes and every rFonts of styles.xml (incl.
-              docDefaults, which must exist) = ascii / hAnsi Times New Roman, cs / eastAsia DVOT-SurekhMR, no theme font.
+  .docx       fonts: every rFonts of styles.xml (incl. docDefaults, which must exist) = ascii / hAnsi Times New Roman,
+              cs / eastAsia DVOT-SurekhMR, no theme font; every text run in body, headers, footers, footnotes, endnotes
+              by the common rule (tools/font_rule.py, INSTRUCTIONS §4.49: Marathi text DVOT-SurekhMR on all four,
+              English text ascii / hAnsi Times New Roman + cs / eastAsia DVOT-SurekhMR).
   .xlsx       recalculated with LibreOffice headless (a converted copy in a temp dir; the file itself is not changed): no
               #REF! #DIV/0! #VALUE! #NAME? #N/A #NUM! #NULL! in any cell (soffice missing / conversion failed -> WARN); a
               sheet "पडताळणी" with at least 2 filled rows when any other sheet has a number or a formula; fonts: a cell with
@@ -35,6 +37,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import clean_meta as CM  # noqa: E402
 import office_fonts as OF  # noqa: E402
+import font_rule  # noqa: E402 — the common Word font rule
 from lint_spec import AI_WORDS  # noqa: E402 — the ONE AI word list (C27 §4; verify_outputs / lint_spec use it)
 
 OUT_EXT = (".xlsx", ".docx", ".pptx", ".pdf")
@@ -139,17 +142,12 @@ def check_docx(p, f):
                     bad_st += 1
             continue
         text.append("".join(t.text or "" for t in root.iter(f"{{{W}}}t")))
-        for r in root.iter(f"{{{W}}}r"):
-            t = "".join(x.text or "" for x in r.iter(f"{{{W}}}t"))
-            if not t.strip():
-                continue
-            rf = r.find(f"{{{W}}}rPr/{{{W}}}rFonts")
-            if rf is None or any(rf.get(f"{{{W}}}{k}") != v for k, v in want.items()) or \
-                    any(rf.get(f"{{{W}}}{k}") is not None for k in OF.THEME_ATTRS):
-                bad += 1
+        if name != "word/comments.xml":
+            bad += font_rule.problems([root])
     P = []
     if bad:
-        P.append(f"{bad} text run(s) without ascii/hAnsi = {OF.LATIN}, cs/eastAsia = {OF.COMPLEX}")
+        P.append(f"{bad} text run(s) not per the font rule (English ascii/hAnsi = {OF.LATIN}, cs/eastAsia = {OF.COMPLEX}; "
+                 f"Marathi text {OF.COMPLEX} on all four)")
     if bad_st:
         P.append(f"{bad_st} style / docDefaults font(s) not per the rule")
     rec(f, "fonts (Times New Roman + DVOT-SurekhMR)", P)
