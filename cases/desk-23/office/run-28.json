@@ -1,0 +1,117 @@
+{
+ "run_id": 28,
+ "at": "2026-11-21T05:39:18Z",
+ "instructions": "mantrimandal baithaki sathi detail tippani ani ppt tayar kra, arears che yearwise breakdown pahije, anawshyak goshti dakhwu nkos",
+ "outputs": [
+  "docx",
+  "pptx"
+ ],
+ "inputs": [
+  {
+   "kind": "extra_doc",
+   "name": "CMO_meeting_letter_26.11.2026.pdf",
+   "version": 1
+  },
+  {
+   "kind": "extra_doc",
+   "name": "CR28_updated_summary_02.11.2026.pdf",
+   "version": 1
+  },
+  {
+   "kind": "extra_doc",
+   "name": "Note_28.07.2025_to_Finance.pdf",
+   "version": 1
+  },
+  {
+   "kind": "extra_doc",
+   "name": "Special_Committee_Report_pay_scales.pdf",
+   "version": 1
+  },
+  {
+   "kind": "extra_doc",
+   "name": "CR28_correspondence.pdf",
+   "version": 1
+  },
+  {
+   "kind": "extra_doc",
+   "name": "screenshot_asst_supdt_table.jpg",
+   "version": 1
+  },
+  {
+   "kind": "extra_doc",
+   "name": "screenshot_registrar_table.jpg",
+   "version": 1
+  },
+  {
+   "kind": "extra_doc",
+   "name": "CR28_2025_नियम_व_माहिती.txt",
+   "version": 1
+  },
+  {
+   "kind": "template",
+   "name": "user_Labh_Letter_format.pdf",
+   "version": 1
+  },
+  {
+   "kind": "office_output",
+   "name": "Baithak_26.11.2026_Video.mp4",
+   "version": 1
+  },
+  {
+   "kind": "office_output",
+   "name": "CR28_2025_Baithak_Note.docx",
+   "version": 1
+  },
+  {
+   "kind": "office_output",
+   "name": "CR28_2025_Labh_Letter.docx",
+   "version": 1
+  },
+  {
+   "kind": "office_output",
+   "name": "CR28_2025_Letter.docx",
+   "version": 1
+  },
+  {
+   "kind": "office_output",
+   "name": "CR28_2025_Parigana_Note.docx",
+   "version": 1
+  },
+  {
+   "kind": "office_output",
+   "name": "CR28_Presentation_BW.pptx",
+   "version": 1
+  },
+  {
+   "kind": "office_output",
+   "name": "CR28_Presentation_colour.pptx",
+   "version": 1
+  },
+  {
+   "kind": "office_output",
+   "name": "Parishishta-7_CR28_2025.pdf",
+   "version": 1
+  }
+ ],
+ "files": [
+  {
+   "name": "CR28_2025_Baithak_Note.docx",
+   "version": 2
+  },
+  {
+   "name": "CR28_Presentation_colour.pptx",
+   "version": 2
+  }
+ ],
+ "warnings": [
+  "पडताळणी अपूर्ण — आर्थिक वर्षनिहाय थकबाकी: परिशिष्ट-7, परिशिष्ट X-5, अद्ययावत सारांश व पत्रव्यवहार (261 पृ.) यांपैकी कोणत्याही कागदपत्रात वर्षनिहाय रक्कम नाही; टिप्पणी परि. 9 व PPT स्लाइड 8 मध्ये \"____\" (केवळ एकूण रु. 4,545.40 / 5,131.62 कोटी).",
+  "पडताळणी अपूर्ण — सूचना 'arrears che yearwise breakdown' पूर्णतः लागू केली नाही: मागील PPT मधील महागाई भत्ता दरानुसार केलेली वर्षनिहाय वाटणी स्रोतातील आकडे नसल्याने (office.md §1.2) वगळली.",
+  "पडताळणी अपूर्ण — वित्त विभागाच्या (सेवा-9 / व्यय-10) अभिप्रायाचा दिनांक कागदपत्रांत नाही (घटनाक्रम अ.क्र. 7: \"____\").",
+  "पडताळणी अपूर्ण — दि. 17.11.2026 च्या शासन पत्राचा विषय कागदपत्रांत नाही (केवळ user_Labh_Letter_format.pdf मधील संदर्भ क्र. 2); घटनाक्रमात फक्त \"मा. उच्च न्यायालयास शासन पत्र\".",
+  "पडताळणी अपूर्ण — परिशिष्ट-7 (टिप्पणी पृ. 3): लघुवाद न्यायालय वार्षिक खर्च 4,92,828.316 हजार (मासिक x 12 = 4,92,528.312) व जि.वि.से.प्रा. वार्षिक भार 36,129.859 हजार (मासिक x 12 = 26,129.856); मुद्रित मूल्ये व दोन्ही फरक टिप्पणीत नमूद.",
+  "पडताळणी अपूर्ण — सध्याचा वार्षिक खर्च: परिशिष्ट-7 रु. 2,330.61 कोटी / परिशिष्ट X-5 (सारांश पृ. 4) रु. 1,917.52 कोटी; मंजूर पदे: परिशिष्ट-7 25,685 / सारांश पृ. 3 (2025-26) 25,717 — दोन्ही दर्शविले.",
+  "पडताळणी अपूर्ण — सूचना 'मंत्रिमंडळ बैठक': मुख्यमंत्री सचिवालयाच्या दि. 20.11.2026 च्या पत्रानुसार बैठक मा. मुख्यमंत्री यांच्या अध्यक्षतेखाली (स्थळ: मंत्रिमंडळ सभागृह); टिप्पणी व PPT मध्ये तसेच नमूद.",
+  "पडताळणी अपूर्ण — PPT ची कृष्णधवल (BW) आवृत्ती या फेरीत तयार केलेली नाही; फक्त रंगीत आवृत्ती (CR28_Presentation_colour.pptx).",
+  "पडताळणी अपूर्ण — PDF/पूर्वावलोकन क्लाउडमध्ये DVOT-SurekhMR फॉन्टशिवाय तपासले; Word/PPT मध्ये फॉन्ट नियमानुसार सेट."
+ ]
+}
