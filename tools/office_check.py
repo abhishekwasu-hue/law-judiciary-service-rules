@@ -10,8 +10,10 @@ uploads; status.json, files starting with "." or "~$" and the subfolder preview/
               the other lint_spec AI_WORDS (model, engine, automatic, generated, मॉडेल, स्वयंचलित, प्रणालीने तयार), TODO and
               "पडताळणी अपूर्ण" -> WARN); metadata (docx: clean_meta.docx_meta_problems; xlsx / pptx: the same core rules + an
               Office-like Application, no tool name; pdf: clean_meta.pdf_meta_problems) -> FAIL.
-  .docx       fonts: every text run in body, headers, footers, footnotes, endnotes and every rFonts of styles.xml (incl.
-              docDefaults, which must exist) = ascii / hAnsi Times New Roman, cs / eastAsia DVOT-SurekhMR, no theme font.
+  .docx       fonts: every rFonts of styles.xml (incl. docDefaults, which must exist) = ascii / hAnsi Times New Roman,
+              cs / eastAsia DVOT-SurekhMR, no theme font; every text run in body, headers, footers, footnotes, endnotes
+              by the common rule (tools/font_rule.py, INSTRUCTIONS §4.49: Marathi text DVOT-SurekhMR on all four,
+              English text ascii / hAnsi Times New Roman + cs / eastAsia DVOT-SurekhMR).
   .xlsx       recalculated with LibreOffice headless (a converted copy in a temp dir; the file itself is not changed): no
               #REF! #DIV/0! #VALUE! #NAME? #N/A #NUM! #NULL! in any cell (soffice missing / conversion failed -> WARN); a
               sheet "पडताळणी" with at least 2 filled rows when any other sheet has a number or a formula; fonts: a cell with

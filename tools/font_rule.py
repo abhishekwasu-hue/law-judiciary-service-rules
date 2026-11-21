@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
-"""font_rule.py — the ONE font rule for Word text (Abhi 20.11.2026, INSTRUCTIONS §4.2 / §4.48 (इ): "इंग्रजी मजकुरासाठी
-डिफॉल्ट फॉन्ट Times New Roman", "हे सगळे इकडे कॉमन असू द्या" — common to every Word file: note, letter, Study, orders,
-parawise, LQ, office-task outputs).
+"""font_rule.py — the ONE font rule for Word text (Abhi 20.11.2026, confirmed 21.11.2026 for the proposals made from then
+on; INSTRUCTIONS §4.49, §4.2, §4.48 (इ): "English material साठी डिफॉल्ट फॉन्ट Times New Roman", "हे सगळे कॉमन असू
+द्या" — common to every Word file: note, letter, Study, orders, parawise, LQ, office-task outputs; the _Affidavit keeps
+its own rule; delivered proposals are not rebuilt).
 
 Rule (per piece of text):
   * Devanagari text (and the digits / punctuation inside a Marathi sentence, e.g. "दि. 17.09.2026", "पृ.13/प.वि.")
     -> DVOT-SurekhMR on all four w:rFonts attributes (ascii, hAnsi, cs, eastAsia) — unchanged from before;
   * English text (a stretch that starts with a Latin letter: words, "PB-2", "B-4(1)/15/2009", "Email ID", an e-mail
-    address) -> ascii = hAnsi = Times New Roman, cs = eastAsia = DVOT-SurekhMR;
+    address; an opening / closing bracket or quote right at its edges goes with it) -> ascii = hAnsi = Times New
+    Roman, cs = eastAsia = DVOT-SurekhMR;
   * a run of only digits / punctuation -> Times New Roman when its paragraph has no Devanagari (an English paragraph),
     else DVOT-SurekhMR.
 A run that mixes Devanagari and English is split at the English stretches (same rPr, only the fonts differ), so an
@@ -15,9 +17,10 @@ English phrase inside a Marathi sentence ("(purely temporary and ad-hoc)") is Ti
 drawing, object or footnote reference are not split (fonts by their whole text).
 
 Functions: apply_docx(path, parts=DEFAULT_PARTS) rewrites a saved .docx in place -> number of runs changed;
-apply_root(root) on one lxml part root; expected(run_text, para_text) -> dict of the four attributes, or None (any font
-accepted: empty / whitespace-only); segments(text) -> [(piece, english)]. Used by tools/clean_meta.clean_docx (every
-builder), tools/office_fonts.py, tools/verify_outputs.py and tools/office_check.py."""
+apply_root(root) on one lxml part root; problems(roots) / bad_runs(roots) check roots; expected(run_text, para_text)
+-> dict of the four attributes, or None (any font accepted: empty / whitespace-only); segments(text) -> [(piece,
+english)]. Used by tools/clean_meta.clean_docx (every builder), tools/office_fonts.py, tools/verify_outputs.py and
+tools/office_check.py."""
 import copy
 import os
 import re
@@ -38,10 +41,11 @@ W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 XML_NS = "http://www.w3.org/XML/1998/namespace"
 DEVA_RE = re.compile(r"[ऀ-ॿ꣠-ꣿ᳐-᳿]")
 LATIN_RE = re.compile(r"[A-Za-z]")
-# an English stretch: starts with a Latin letter; words / codes joined by spaces and the punctuation of English text,
-# numbers and codes; ends on a letter / digit (or a closing bracket / dot that belongs to it)
-ENG_RE = re.compile(r"[A-Za-z][A-Za-z0-9]*(?:[ \t.,;'’&/:@_+%#()\[\]\-]+[A-Za-z0-9]+)*[.)\]]?")
-SPLITTABLE = {"t", "tab", "br", "cr", "noBreakHyphen", "softHyphen"}
+# an English stretch: starts with a Latin letter (an opening bracket / quote right before it goes with it); words /
+# codes joined by spaces and the punctuation of English text, numbers and codes; ends on a letter / digit (or a closing
+# bracket / quote / dot that belongs to it)
+ENG_RE = re.compile(r"[(\[“‘\"']?[A-Za-z][A-Za-z0-9]*(?:[ \t.,;'’&/:@_+%#()\[\]\-]+[A-Za-z0-9]+)*[.)\]”’\"']?")
+SPLITTABLE = {"t", "tab", "br", "cr", "noBreakHyphen", "softHyphen", "lastRenderedPageBreak"}
 DEFAULT_PARTS = re.compile(r"word/(document|header\d*|footer\d*|footnotes|endnotes)\.xml")
 
 
@@ -109,19 +113,38 @@ def _set_fonts(r, fonts):
 
 
 def _run_text(r):
-    return "".join(t.text or "" for t in r.iter(w("t")))
+    """Text of the run itself (its own w:t children; not the runs of a text box drawn inside it)."""
+    return "".join(t.text or "" for t in r.iterchildren(w("t")))
 
 
-def _para_text(r, cache):
-    p = r.getparent()
+def _para_of(e):
+    p = e.getparent()
     while p is not None and p.tag != w("p"):
         p = p.getparent()
-    if p is None:
-        return ""
-    k = id(p)
-    if k not in cache:
-        cache[k] = "".join(t.text or "" for t in p.iter(w("t")))
-    return cache[k]
+    return p
+
+
+def _para_texts(root):
+    """{w:p element: its text} in one pass (a text box's paragraphs are their own; the element is the key, which keeps
+    the lxml proxy alive — an id() key could be reused by another paragraph)."""
+    out = {}
+    for t in root.iter(w("t")):
+        p = _para_of(t)
+        if p is not None:
+            out[p] = out.get(p, "") + (t.text or "")
+    return out
+
+
+def _para_text(r, texts):
+    p = _para_of(r)
+    return texts.get(p, "") if p is not None else ""
+
+
+def _splittable(r, txt):
+    """True when run r mixes Devanagari and English text and holds only text / tabs / breaks (split by apply_root)."""
+    if not deva(txt) or not any(e for _, e in segments(txt)):
+        return False
+    return {etree.QName(c).localname for c in r if c.tag != w("rPr")} <= SPLITTABLE
 
 
 def _new_t(text):
@@ -138,7 +161,7 @@ def _split(r, para):
     kids = [c for c in r if c.tag != w("rPr")]
     pieces = []   # [(fonts, [elements])]
     for c in kids:
-        if c.tag == w("t"):
+        if c.tag == w("t") and segments(c.text or ""):
             for txt, eng in segments(c.text or ""):
                 f = ENGLISH_FONTS if eng else (DEVA_FONTS if deva(txt) or deva(para) or not txt.strip() else ENGLISH_FONTS)
                 if not txt.strip() and pieces:
@@ -188,20 +211,16 @@ def _merge_ts(r):
 def apply_root(root):
     """Apply the rule to every text run under root; returns the number of runs changed / written."""
     n = 0
-    cache = {}
+    texts = _para_texts(root)
     for r in list(root.iter(w("r"))):
         txt = _run_text(r)
         if not txt.strip():
             continue
-        para = _para_text(r, cache)
-        kids = {etree.QName(c).localname for c in r if c.tag != w("rPr")}
-        if deva(txt) and kids <= SPLITTABLE and any(e for t, e in segments(txt)):
+        para = _para_text(r, texts)
+        if _splittable(r, txt):
             n += _split(r, para)
         else:
-            f = expected(txt, para) or DEVA_FONTS
-            if deva(txt):
-                f = DEVA_FONTS
-            n += 1 if _set_fonts(r, f) else 0
+            n += 1 if _set_fonts(r, expected(txt, para)) else 0
     return n
 
 
@@ -229,23 +248,31 @@ def apply_docx(path, parts=DEFAULT_PARTS):
 
 
 def problems(root_iter):
-    """Number of text runs (from an iterable of lxml roots) whose fonts break the rule."""
-    bad = 0
+    """Number of text runs (from an iterable of lxml roots) whose fonts break the rule: wrong / theme fonts, or a run
+    that mixes Marathi and English text without being split (apply_root splits every such run)."""
+    return len(bad_runs(root_iter))
+
+
+def bad_runs(root_iter):
+    """The texts of the runs counted by problems() (for messages and tests)."""
+    bad = []
     for root in root_iter:
-        cache = {}
+        texts = _para_texts(root)
         for r in root.iter(w("r")):
             txt = _run_text(r)
-            want = expected(txt, _para_text(r, cache))
+            want = expected(txt, _para_text(r, texts))
             if want is None:
+                continue
+            if _splittable(r, txt):
+                bad.append(txt)
                 continue
             rpr = r.find(w("rPr"))
             fo = rpr.find(w("rFonts")) if rpr is not None else None
             if fo is None or any(fo.get(w(a)) is not None for a in THEME_ATTRS):
-                bad += 1
+                bad.append(txt)
                 continue
-            got = {a: fo.get(w(a)) for a in ATTRS}
-            if got != want and not (not deva(txt) and not LATIN_RE.search(txt) and got in (DEVA_FONTS, ENGLISH_FONTS)):
-                bad += 1
+            if {a: fo.get(w(a)) for a in ATTRS} != want:
+                bad.append(txt)
     return bad
 
 

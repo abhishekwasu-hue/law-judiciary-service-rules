@@ -83,9 +83,10 @@ def test_fixer_docx_pptx_pdf(tmp_path):
     assert [r for r in res if r["level"] == "FAIL"] == []
     # every run carries the decided fonts; the files still open
     d = docx.Document(str(tmp_path / "a.docx"))
-    rf = d.paragraphs[0].runs[0]._element.rPr.rFonts
+    # the common rule (§4.49): the mixed run is split — Marathi DVOT-SurekhMR on all four, English ascii/hAnsi TNR
     from docx.oxml.ns import qn
-    assert {k: rf.get(qn("w:" + k)) for k in OF.DOCX_FONTS} == OF.DOCX_FONTS
+    got = [(r.text, {k: r._element.rPr.rFonts.get(qn("w:" + k)) for k in OF.DOCX_FONTS}) for r in d.paragraphs[0].runs]
+    assert got == [("सदर माहिती ", {k: OF.COMPLEX for k in OF.DOCX_FONTS}), ("Annual report", OF.DOCX_FONTS)], got
     with zipfile.ZipFile(tmp_path / "b.pptx") as z:
         x = z.read("ppt/slides/slide1.xml").decode()
         th = z.read("ppt/theme/theme1.xml").decode()

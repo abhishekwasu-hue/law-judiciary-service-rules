@@ -204,7 +204,7 @@ Both are optional keys of the same spec.json; engine detail: tools/ENGINE_PROMPT
 
 ## Step 7 — Verify (must print ALL OK)
 `python3 tools/verify_outputs.py <outdir> <PREFIX> "<package pdf>" <number of proposal pages>`. It prints one line per check (01.11.2026 सुसंगती; tests: `tests/test_verify_outputs.py`):
-- fonts: ascii/hAnsi/cs/eastAsia = DVOT-SurekhMR on every text run, incl. headers/footers (Study, note, letter);
+- fonts: the common rule INSTRUCTIONS §4.49 (tools/font_rule.py) on every text run, incl. headers/footers (Study, note, letter, orders, parawise, LQ): Marathi text ascii/hAnsi/cs/eastAsia = DVOT-SurekhMR; English text ascii/hAnsi = Times New Roman, cs/eastAsia = DVOT-SurekhMR (no mixed Marathi+English run); a digits-only run follows its paragraph; _Affidavit: every run ascii/hAnsi Times New Roman (§4.2);
 - no internal ids (`z<digit>_<4 digits>`) anywhere; no repo paths (register/, service-rules/, precedent-library/, pdf/, repo) in the note/letter;
 - every "पृ.N/प.वि." (also lists 5,7, ranges 5-7 / 5 ते 7, Devanagari digits) in note, letter and Study and "पॅकेज PDF पृ. N" in the Study is within 1..package pages;
 - no "पॅकेज PDF" and no warning word (§4.27 list) anywhere in the note (body + related) or the letter; no banned word (Step 4 list) in the note body or the letter;

@@ -9,8 +9,10 @@ Windows: `py tools/verify_outputs.py ...`; runner: `python3 tools/verify_outputs
 
 Checks
  Word (<PREFIX>_Study.docx, <PREFIX>_Note_and_Letter.docx):
-  - fonts: every text run (body, tables, text boxes, headers, footers) has w:rFonts ascii, hAnsi, cs, eastAsia = DVOT-SurekhMR
-    and no theme-font override attribute
+  - fonts: every text run (body, tables, text boxes, headers, footers) per the common rule (INSTRUCTIONS §4.49,
+    tools/font_rule.py): Marathi text w:rFonts ascii, hAnsi, cs, eastAsia = DVOT-SurekhMR; English text ascii / hAnsi =
+    Times New Roman, cs / eastAsia = DVOT-SurekhMR (no unsplit Marathi+English run); a digits-only run follows its
+    paragraph; no theme-font override attribute
   - no internal file ids (z<digit>_<4 digits>) anywhere
   - पृ. references "पृ.N/प.वि." (also "पृ. N / प.वि.", lists 5,7, ranges 5-7 / 5 ते 7, Devanagari digits) and
     "पॅकेज PDF पृ. N": every N with 1 <= N <= package pages; a पृ.…/प.वि. that cannot be parsed fails.
@@ -77,7 +79,7 @@ Checks
  Optional outputs (02.11.2026; only when the file exists — absent = no line, ALL OK unaffected):
   <PREFIX>_Order_Draft.docx (शासन आदेश-मसुदा), <PREFIX>_Parawise.docx (परिच्छेदनिहाय अभिप्राय, English) and (audit
   05.11.2026 Q-F13) <PREFIX>_Affidavit.docx (शपथपत्र) / <PREFIX>_LQ_Answer.docx (विधानमंडळ प्रश्नाचे उत्तर):
-  fonts (four rFonts = DVOT-SurekhMR incl. headers/footers; the _Affidavit file instead: ascii / hAnsi = Times New Roman,
+  fonts (the §4.49 rule above incl. headers/footers; the _Affidavit file instead: ascii / hAnsi = Times New Roman,
   cs / eastAsia = DVOT-SurekhMR — Abhi 05.11.2026, C7 option अ, INSTRUCTIONS §4.2 / §4.36), no internal ids, no repo paths, पृ. references within
   1..package pages (text inside “ ” skipped); C27: no "पॅकेज" / warning / AI word (outside quotes), metadata blank
  Package PDF:

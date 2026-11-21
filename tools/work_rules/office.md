@@ -61,7 +61,10 @@ a line below names them.
 
 ## 5. Fonts (decision 3, all office outputs)
 - Marathi / Devanagari text: DVOT-SurekhMR. English / Latin text: Times New Roman (the default font for English).
-- Word: every run w:rFonts ascii = hAnsi = Times New Roman, cs = eastAsia = DVOT-SurekhMR (styles, headers, footers too).
+- Word: the common font rule of the proposal Word files (INSTRUCTIONS §4.49, tools/font_rule.py; styles, headers,
+  footers too): Marathi text (with its digits / punctuation) DVOT-SurekhMR on all four w:rFonts attributes; English text
+  ascii = hAnsi = Times New Roman, cs = eastAsia = DVOT-SurekhMR (a mixed run is split); a digits-only run follows its
+  paragraph (Times New Roman when the paragraph has no Devanagari).
 - PPT: a:latin = Times New Roman, a:cs = DVOT-SurekhMR. Excel: a cell has one font — a cell with Devanagari text
   DVOT-SurekhMR, any other cell Times New Roman (theme latin / cs likewise).
 - After building with any tool: `python3 tools/office_fonts.py <every output file>` (fixes fonts AND blanks metadata in

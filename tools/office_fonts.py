@@ -6,7 +6,9 @@ skills, openpyxl, python-docx, python-pptx, LibreOffice) before tools/office_che
 
   .docx  every run / paragraph-mark / style / docDefaults / numbering rPr in document, styles, headers, footers,
          footnotes, endnotes, comments, numbering: w:rFonts ascii = hAnsi = Times New Roman, cs = eastAsia = DVOT-SurekhMR
-         (theme-font attributes removed; a run without rPr gets one); theme fonts latin / cs / Deva set likewise.
+         (theme-font attributes removed; a run without rPr gets one); theme fonts latin / cs / Deva set likewise; the
+         text runs of document / headers / footers / footnotes / endnotes then by the common rule of tools/font_rule.py
+         (INSTRUCTIONS §4.49: Marathi text DVOT-SurekhMR on all four, English text as above; mixed runs split).
   .pptx  every a:rPr / a:defRPr / a:endParaRPr (slides, layouts, masters, notes, charts, presentation defaults; a run or
          field without rPr gets one): a:latin = Times New Roman, a:cs = DVOT-SurekhMR, in schema order; theme likewise.
   .xlsx  a cell style has ONE font (no complex-script slot): a cell whose text has Devanagari -> DVOT-SurekhMR, every other
@@ -107,7 +109,9 @@ def _docx_rfonts(rpr):
     return n
 
 
-def fix_word_xml(root, styles=False):
+def fix_word_xml(root, styles=False, text_runs=True):
+    """rFonts = DOCX_FONTS on every rPr (styles, docDefaults, numbering, paragraph marks, runs). text_runs=False: the
+    rPr of runs holding text are left to tools/font_rule.py (the common rule splits Marathi / English text)."""
     n = 0
     for r in root.iter(w("r")):
         if r.find(w("rPr")) is None:
@@ -122,6 +126,10 @@ def fix_word_xml(root, styles=False):
         if rd.find(w("rPr")) is None:
             rd.append(etree.Element(w("rPr"))); n += 1
     for rpr in list(root.iter(w("rPr"))):
+        par = rpr.getparent()
+        if not text_runs and par is not None and par.tag == w("r") and \
+                "".join(t.text or "" for t in par.iterchildren(w("t"))).strip():
+            continue
         n += _docx_rfonts(rpr)
     return n
 
@@ -330,10 +338,14 @@ def fix_xlsx(path):
 # ---------------------------------------------------------------- per type
 def fix_docx(path):
     cnt = [0]
+    import font_rule
 
     def fn(name, data, *_):
         if re.fullmatch(r"word/(document|styles|header\d*|footer\d*|footnotes|endnotes|comments|numbering)\.xml", name):
-            root = _parse(data); cnt[0] += fix_word_xml(root, styles=name == "word/styles.xml"); return _dump(root)
+            root = _parse(data)
+            cnt[0] += fix_word_xml(root, styles=name == "word/styles.xml",
+                                   text_runs=not font_rule.DEFAULT_PARTS.fullmatch(name))
+            return _dump(root)
         if re.fullmatch(r"word/theme/theme\d*\.xml", name):
             root = _parse(data); cnt[0] += fix_theme_xml(root); return _dump(root)
         if re.fullmatch(r"word/(charts|diagrams)/[^/]+\.xml", name):
@@ -341,8 +353,7 @@ def fix_docx(path):
         return None
     rewrite(path, fn)
     # text runs: the common rule of tools/font_rule.py (Marathi text incl. its digits DVOT-SurekhMR x4, English text
-    # Times New Roman ascii / hAnsi) — the same rule as the proposal Word files (Abhi 20.11.2026, §4.2 / §4.48 (इ))
-    import font_rule
+    # Times New Roman ascii / hAnsi) — the same rule as the proposal Word files (Abhi 20.11.2026, §4.49 / §4.48 (इ))
     cnt[0] += font_rule.apply_docx(path)
     return cnt[0]
 

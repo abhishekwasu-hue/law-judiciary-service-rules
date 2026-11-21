@@ -154,11 +154,13 @@ LOG.clear()
 run_row["warnings"] = ["पडताळणी अपूर्ण — note पृ. references: x", "मॉडेल: खर्च — Opus 5 $1.20"]  # verify + owner lines so far
 r = run("finish", out); check(r.returncode == 0, f"finish exit 0 ({r.stderr.strip()[:300]})")
 import io, zipfile
-sx = zipfile.ZipFile(io.BytesIO(STORE["outputs/7/study/v2/file.docx"])).read("word/document.xml").decode("utf-8")
-import re as _re   # the font rule (tools/font_rule.py) splits English stretches into own runs: compare the paragraph texts
-sx = "\n".join("".join(_re.findall(r"<w:t(?: [^>]*)?>([^<]*)</w:t>", p_)) for p_ in _re.findall(r"<w:p[ >].*?</w:p>", sx, _re.S))
+sx_raw = zipfile.ZipFile(io.BytesIO(STORE["outputs/7/study/v2/file.docx"])).read("word/document.xml")
+from lxml import etree as _et   # the font rule (tools/font_rule.py) splits English stretches into own runs:
+_W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"   # compare the paragraph texts
+sx = "\n".join("".join(t.text or "" for t in p_.iter(_W + "t")) for p_ in _et.fromstring(sx_raw).iter(_W + "p"))
 check("अंतिम तपासणीचे इशारे (वापरण्यापूर्वी तपासा)" in sx and "1. पडताळणी अपूर्ण — note पृ. references: x" in sx
-      and "2. पडताळणी अपूर्ण — C R क्र. निर्देशपत्रावर नाही" in sx and "मॉडेल" not in sx and "DVOT-SurekhMR" in sx,
+      and "2. पडताळणी अपूर्ण — C R क्र. निर्देशपत्रावर नाही" in sx and "मॉडेल" not in sx
+      and "DVOT-SurekhMR" in sx_raw.decode("utf-8"),
       "finish: final warnings written into the uploaded Study (end of भाग 7), owner-only lines left out")
 check(run_row["warnings"] == ["पडताळणी अपूर्ण — note पृ. references: x", "मॉडेल: खर्च — Opus 5 $1.20",
                               "पडताळणी अपूर्ण — C R क्र. निर्देशपत्रावर नाही"], f"finish: runs.warnings unchanged + status warnings ({run_row['warnings']})")
