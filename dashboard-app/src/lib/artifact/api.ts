@@ -12,6 +12,7 @@ import { ApiError } from '../api';
 import { DESKS, OFFICE_OUTPUT_KEYS, OFFICE_WORK_TYPE, WORK_TYPES } from '../constants';
 import { cap, isDbFail, needDb, nowIso, type McpErr } from './runtime';
 import { getRow, grFiles, grStoragePath, insertRow, listRows, patchRow, queryRows, setActor, viewer, type GrFile, type Row } from './db';
+import { UPLOAD_MAX_BYTES, UPLOAD_MAX_MB } from '../limits';
 
 // ---------- texts (same as worker.js) ----------
 const CASE_FIELDS = ['cr_no', 'cr_year', 'file_no', 'subject', 'category', 'priority', 'employee_name', 'post', 'office', 'received_from', 'received_via', 'inward_date', 'due_date', 'desk', 'work_type', 'nasti_no'];
@@ -36,7 +37,7 @@ const DRAFT_KEYS = ['letter', 'reminder', 'gr', 'corrigendum', 'circular', 'memo
   'do_letter', 'uo_note', 'endorsement', 'office_order', 'press_note', 'addendum', 'affidavit', 'lq'];
 const BAD_OUTPUTS = 'मसुद्यांची निवड योग्य नाही. कृपया पान पुन्हा उघडून निवड करावी, ही विनंती.';
 const LETTER_STATUS = ['मसुदा', 'पाठवले', 'उत्तर प्राप्त', 'स्मरणपत्र'];
-const MAX_UPLOAD = 50 * 1024 * 1024;
+const MAX_UPLOAD = UPLOAD_MAX_BYTES;
 const UPLOAD_TYPES: Record<string, string> = { '.pdf': 'application/pdf', '.doc': 'application/msword',
   '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.tif': 'image/tiff', '.tiff': 'image/tiff',
@@ -494,7 +495,7 @@ export const artifactUpload = guard(artifactUploadRaw);
 async function artifactUploadRaw(caseId: number, kind: string, file: File, onProgress?: (pct: number) => void): Promise<{ id: number }> {
   const name = file.name;
   if (!caseId || !FILE_KINDS.includes(kind) || !name || /[\\/]/.test(name)) bad('case_id, kind, x-file-name required');
-  if (file.size > MAX_UPLOAD) bad('file over 50 MB', 413);
+  if (file.size > MAX_UPLOAD) bad(`file over ${UPLOAD_MAX_MB} MB`, 413);
   const ext = (/\.[A-Za-z0-9]{1,8}$/.exec(name) || [''])[0].toLowerCase();
   const ctype = UPLOAD_TYPES[ext];
   const c = await caseRow(caseId);

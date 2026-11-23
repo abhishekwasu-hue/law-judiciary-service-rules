@@ -66,6 +66,8 @@ under `meta/` for ids (`meta` is owner-only).
   `.tif`, `spec.json`, PDFs over 19 MiB): the raw bytes cut into 14,400,000-byte pieces, each piece base64-encoded on
   its own and uploaded as a `text/plain` asset. Bytes = concat(base64decode(part) for part in order).
 * also `content_type`, `size_bytes`. `original_name` is the name the user sees and downloads (§4.16, never renamed).
+* Upload limit on the page: 100 MB per file (`src/lib/limits.ts`, Abhi 23.11.2026); a 100 MB file = 7 parts. The
+  Supabase build keeps 50 MB (bucket `file_size_limit`, cloudflare/worker.js).
 
 Worker outputs (`study`, `note_letter`, `package_pdf`, `order_draft`, `parawise`, `affidavit`, `lq_answer`, `spec`
 with `original_name: "spec.json"`) use the same fields; the edit chat needs the `spec` row of the last full run.

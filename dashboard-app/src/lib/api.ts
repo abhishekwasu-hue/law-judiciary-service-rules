@@ -4,6 +4,7 @@ import type { InputKind } from './constants';
 import type { Me, Profile } from './types';
 import { artifactApi, artifactDownload, artifactFileBytes, artifactFileUrl, artifactUpload } from './artifact/api';
 import { OWNER_DISPATCH_TEXT, RUN_START_FAIL_TEXT, TECH_TROUBLE_TEXT, DEV_WORDS, looksMarathi, ownerDetail, viewerOwner } from './format';
+import { UPLOAD_MAX_MB } from './limits';
 
 export class ApiError extends Error {
   constructor(public status: number, message: string, public data?: unknown) {
@@ -31,7 +32,7 @@ export const MARATHI: [RegExp, string, string?, boolean?][] = [
   [/already configured/i, 'सेटअप आधीच पूर्ण झाला आहे.'],
   [/not configured/i, 'कक्षाची सेटिंग्ज अजून पूर्ण नाहीत. कृपया मालकांना कळवावे, ही विनंती.', 'कक्षाची सेटिंग्ज अजून पूर्ण नाहीत. कृपया सेटिंग्ज भरावीत, ही विनंती.'],
   [/bad token/i, "प्रक्रियेची परवानगी संपली. कृपया 'पुन्हा तयार करा' वापरावे, ही विनंती."],
-  [/file over 50 MB|\b413\b/i, 'फाइल 50 MB पेक्षा मोठी आहे. कृपया लहान फाइल निवडावी, ही विनंती.'],
+  [/file over \d+ MB|\b413\b/i, `फाइल ${UPLOAD_MAX_MB} MB पेक्षा मोठी आहे. कृपया लहान फाइल निवडावी, ही विनंती.`],
   [/upload the proposal PDF first/i, 'कृपया आधी प्रस्ताव PDF अपलोड करावा, ही विनंती.'],
   [/^Settings: GitHub repo\/token/i, 'प्रक्रिया सुरू होऊ शकली नाही — सेटिंग्ज अपूर्ण आहेत. कृपया मालकांना कळवावे, ही विनंती.',
     'कृपया सेटिंग्जमध्ये GitHub repo/token व AI key (Anthropic किंवा निवडलेल्या AI ची) भरावी, ही विनंती.'],

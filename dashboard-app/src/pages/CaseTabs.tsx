@@ -15,6 +15,7 @@ import RunProgress, { FireButton, OwnerRunLines, RunCost } from '../components/R
 import PdfViewer from '../components/PdfViewer';
 import DocxView, { docxParagraphs } from '../components/DocxView';
 import type { CaseCtx } from './CaseDetail';
+import { UPLOAD_MAX_BYTES, UPLOAD_MAX_MB } from '../lib/limits';
 
 /** claude.ai artifact build (lib/artifact): runs whose firing failed, page link for WhatsApp (FIX_CONTRACT §2, E-F6). */
 const ARTIFACT = import.meta.env.VITE_BACKEND === 'artifact';
@@ -566,7 +567,7 @@ function AddFile({ ctx }: { ctx: CaseCtx }) {
   const [pct, setPct] = useState<number | null>(null);
   const ref = useRef<HTMLInputElement>(null);
   async function up(file: File) {
-    if (file.size > 50 * 1024 * 1024) return toast('फाइल 50 MB पेक्षा मोठी आहे — कृपया लहान फाइल जोडावी.', 'err');
+    if (file.size > UPLOAD_MAX_BYTES) return toast(`फाइल ${UPLOAD_MAX_MB} MB पेक्षा मोठी आहे — कृपया लहान फाइल जोडावी.`, 'err');
     setPct(0);
     try {
       await uploadFile(ctx.c.id, kind, file, setPct);
@@ -666,7 +667,7 @@ function ReplyForm({ ctx, l, onDone }: { ctx: CaseCtx; l: Letter; onDone: (withF
   const ref = useRef<HTMLInputElement>(null);
   async function save(e: FormEvent) {
     e.preventDefault();
-    if (file && file.size > 50 * 1024 * 1024) return toast('फाइल 50 MB पेक्षा मोठी आहे — कृपया लहान फाइल जोडावी.', 'err');
+    if (file && file.size > UPLOAD_MAX_BYTES) return toast(`फाइल ${UPLOAD_MAX_MB} MB पेक्षा मोठी आहे — कृपया लहान फाइल जोडावी.`, 'err');
     setBusy(true);
     try {
       if (file) {

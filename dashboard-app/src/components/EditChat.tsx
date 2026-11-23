@@ -16,12 +16,13 @@ import { Chip, Modal, Spinner } from './ui';
 import CasePicker from './CasePicker';
 import { useToast } from './Toast';
 import DocxView from './DocxView';
+import { UPLOAD_MAX_BYTES, UPLOAD_MAX_MB } from '../lib/limits';
 import { FireButton, RunNotStarted } from './RunProgress';
 
 /** claude.ai artifact build: an edit run whose firing failed shows "▶ पुन्हा सुरू करा" (FIX_CONTRACT §2). */
 const ARTIFACT = import.meta.env.VITE_BACKEND === 'artifact';
 
-const MAX_BYTES = 50 * 1024 * 1024;
+const MAX_BYTES = UPLOAD_MAX_BYTES;
 /** Failure reason via the lib helper (C13): the owner flag is passed for the isOwner-aware version; the older one-argument
  *  version ignores it. */
 const reasonText = (s: string | null | undefined, isOwner: boolean) =>
@@ -206,7 +207,7 @@ export default function EditChat({ ctx }: { ctx: CaseCtx }) {
     const add: Att[] = [];
     for (const f of Array.from(list)) {
       if (!okExt(f.name)) { toast(`${f.name}: फक्त PDF / JPG / PNG / Word फाइल जोडता येते.`, 'err'); continue; }
-      if (f.size > MAX_BYTES) { toast(`${f.name}: फाइल 50 MB पेक्षा मोठी आहे — कृपया लहान फाइल जोडावी.`, 'err'); continue; }
+      if (f.size > MAX_BYTES) { toast(`${f.name}: फाइल ${UPLOAD_MAX_MB} MB पेक्षा मोठी आहे — कृपया लहान फाइल जोडावी.`, 'err'); continue; }
       add.push({ key: `${f.name}-${f.size}-${Math.random()}`, file: f, kind: guessKind(f.name), pct: null });
     }
     setAtts(s => {

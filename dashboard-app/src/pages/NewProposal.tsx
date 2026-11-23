@@ -10,6 +10,7 @@ import { CATEGORIES, DEFAULT_DESK, DEFAULT_WORK_TYPE, DESKS, INPUT_KINDS, INPUT_
 import { draftLabels, sameDrafts, suggestDrafts } from '../lib/drafts';
 import { fmtBytes } from '../lib/format';
 import { guessSubject } from '../lib/pdf';
+import { UPLOAD_MAX_BYTES, UPLOAD_MAX_MB } from '../lib/limits';
 import type { Case, Run } from '../lib/types';
 import { Field, Progress, Section, Spinner } from '../components/ui';
 import { useToast } from '../components/Toast';
@@ -18,7 +19,7 @@ import { useRunsShownHere } from '../components/Layout';
 import DraftPicker, { CompactDraftPicker } from '../components/DraftPicker';
 import BulkUpload, { BULK_MAX, startText, userError } from '../components/BulkUpload';
 
-const MAX = 50 * 1024 * 1024;
+const MAX = UPLOAD_MAX_BYTES;
 /** claude.ai artifact build: no Worker queue — a run left queued means its firing failed (FIX_CONTRACT §2). */
 const ARTIFACT = import.meta.env.VITE_BACKEND === 'artifact';
 /** Types for the other files (the proposal has its own drop zone). */
@@ -158,8 +159,8 @@ export default function NewProposal() {
       return toast(m, 'err');
     }
     if (p.size > MAX) {
-      setMainErr('फाइल 50 MB पेक्षा मोठी आहे. कृपया लहान PDF निवडावा.');
-      return toast('फाइल 50 MB पेक्षा मोठी आहे.', 'err');
+      setMainErr(`फाइल ${UPLOAD_MAX_MB} MB पेक्षा मोठी आहे. कृपया लहान PDF निवडावा.`);
+      return toast(`फाइल ${UPLOAD_MAX_MB} MB पेक्षा मोठी आहे.`, 'err');
     }
     setMainErr('');
     setProposal(p);
@@ -173,7 +174,7 @@ export default function NewProposal() {
   }
   function addExtras(files: File[]) {
     const ok = files.filter(x => x.size <= MAX);
-    if (ok.length < files.length) toast('50 MB पेक्षा मोठ्या फाइल वगळल्या आहेत.', 'err');
+    if (ok.length < files.length) toast(`${UPLOAD_MAX_MB} MB पेक्षा मोठ्या फाइल वगळल्या आहेत.`, 'err');
     setExtras(s => [...s, ...ok.map(file => ({ file, kind: 'extra_doc' as InputKind }))]);
   }
 
@@ -401,7 +402,7 @@ export default function NewProposal() {
                 </div>
               ) : (
                 <>
-                  <DropZone label="प्रस्ताव PDF येथे ओढा किंवा निवडा" hint="मुख्य PDF (हवे असल्यास त्याच प्रस्तावाच्या इतर फाइलसह) • कमाल 50 MB • फाइलनाव तेच राहील" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" multiple onFiles={pickProposal} />
+                  <DropZone label="प्रस्ताव PDF येथे ओढा किंवा निवडा" hint={`मुख्य PDF (हवे असल्यास त्याच प्रस्तावाच्या इतर फाइलसह) • कमाल ${UPLOAD_MAX_MB} MB • फाइलनाव तेच राहील`} accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" multiple onFiles={pickProposal} />
                   {mainErr && <div className="rounded-lg bg-amber-100 px-3 py-2 text-sm font-semibold text-amber-900 dark:bg-amber-900/40 dark:text-amber-100" role="alert">{mainErr}</div>}
                 </>
               )}

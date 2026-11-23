@@ -20,9 +20,10 @@ import { CompactDraftPicker } from './DraftPicker';
 import { RunStateBadge } from './RunProgress';
 import { Progress, Spinner } from './ui';
 import { useToast } from './Toast';
+import { UPLOAD_MAX_BYTES, UPLOAD_MAX_MB } from '../lib/limits';
 
 export const BULK_MAX = 10;
-const MAX_BYTES = 50 * 1024 * 1024;
+const MAX_BYTES = UPLOAD_MAX_BYTES;
 const isPdf = (f: File) => f.type === 'application/pdf' || /\.pdf$/i.test(f.name);
 /** Default drafts of a category (same rule as suggestDrafts for a new court case). */
 export const draftsForWork = (w: string): DraftKey[] => (w === 'court' ? ['letter', 'parawise'] : ['letter']);
@@ -84,7 +85,7 @@ export default function BulkUpload({ overBudget }: { overBudget: boolean }) {
   // other file of the same proposal (type "इतर", changeable)
   function addProposal(files: File[]) {
     const ok = files.filter(f => f.size <= MAX_BYTES);
-    if (ok.length < files.length) toast('50 MB पेक्षा मोठ्या फाइल वगळल्या आहेत.', 'err');
+    if (ok.length < files.length) toast(`${UPLOAD_MAX_MB} MB पेक्षा मोठ्या फाइल वगळल्या आहेत.`, 'err');
     const main = ok.find(isPdf);
     if (!main) return ok.length ? toast('मुख्य प्रस्ताव PDF स्वरूपात असावा. कृपया प्रस्तावाचा PDF निवडावा (फोटो / Word असल्यास आधी PDF करावा).', 'err') : undefined;
     if (rowsRef.current.length >= BULK_MAX) return toast(`एका वेळी कमाल ${BULK_MAX} प्रस्ताव पाठविता येतात.`, 'err');
@@ -99,7 +100,7 @@ export default function BulkUpload({ overBudget }: { overBudget: boolean }) {
   }
   function addExtras(key: number, files: File[]) {
     const ok = files.filter(f => f.size <= MAX_BYTES && /\.(pdf|docx?|jpe?g|png)$/i.test(f.name));
-    if (ok.length < files.length) toast('50 MB पेक्षा मोठ्या / वेगळ्या प्रकारच्या फाइल वगळल्या आहेत.', 'err');
+    if (ok.length < files.length) toast(`${UPLOAD_MAX_MB} MB पेक्षा मोठ्या / वेगळ्या प्रकारच्या फाइल वगळल्या आहेत.`, 'err');
     setRows(s => s.map(r => (r.key === key ? { ...r, extras: [...r.extras, ...ok.map(file => ({ file, kind: 'extra_doc' as InputKind }))] } : r)));
   }
   const setAll = (w: WorkType) => {
