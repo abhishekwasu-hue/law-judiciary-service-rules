@@ -59,7 +59,7 @@ pres.addSection({ title: 'प्रस्ताव' });
 s = pres.addSlide({ masterName: 'CONTENT', sectionTitle: 'प्रस्ताव' });
 s.addText('प्रस्ताव थोडक्यात', { placeholder: 'title' });
 stat(s, 0.6, 1.5, 3.8, '197', 'संवर्ग, 8 आस्थापना', 'st-cadre', C.accent1);
-stat(s, 4.75, 1.5, 3.8, '25,685', 'मंजूर पदे (25,040 कार्यरत)', 'st-posts', C.accent3);
+stat(s, 4.75, 1.5, 3.8, '26,558', 'मंजूर पदे (24,565 कार्यरत)', 'st-posts', C.accent3);
 stat(s, 8.9, 1.5, 3.8, '01.01.2006', 'पासून प्रत्यक्ष लाभ — मा. उच्च न्यायालयाच्या विशेष समितीची शिफारस', 'st-date', C.accent2);
 T(s, [
   { text: 'प्रस्ताव: उच्च न्यायालय कर्मचाऱ्यांप्रमाणे (शासन निर्णय 19.04.2022 व 11.01.2023) सुधारित वेतनश्रेणी', options: { bullet: true, breakLine: true } },
@@ -71,12 +71,12 @@ T(s, [
 // 3 Key figures
 pres.addSection({ title: 'आर्थिक भार' });
 s = pres.addSlide({ masterName: 'CONTENT', sectionTitle: 'आर्थिक भार' });
-s.addText('वार्षिक वेतन खर्च ₹2,330.61 कोटीवरून ₹2,930.42 कोटी', { placeholder: 'title' });
-stat(s, 0.6, 1.5, 5.9, '₹599.82 कोटी', 'वार्षिक वेतन खर्चातील फरक (दरमहा ₹49.98 कोटी) • 2025 च्या आकडेवारीनुसार (मा. उच्च न्यायालयाचे परिशिष्ट-7)', 'k1', C.accent2);
-stat(s, 6.8, 1.5, 5.9, '25,040', 'कार्यरत पदे (मंजूर पदे 25,685)', 'k2', C.accent3);
-s.addChart(pres.charts.BAR, [{ name: 'वार्षिक वेतन खर्च', labels: ['आजचा वार्षिक खर्च', 'सुधारणेनंतर वार्षिक खर्च'], values: [2330.61, 2930.42] }], Object.assign({
+s.addText('वार्षिक वेतन खर्च ₹2,081.35 कोटीवरून ₹2,735.43 कोटी', { placeholder: 'title' });
+stat(s, 0.6, 1.5, 5.9, '₹654.08 कोटी', 'वार्षिक वेतन खर्चातील फरक (दरमहा ₹54.51 कोटी) • मा. उच्च न्यायालयाचे दि. 23.11.2026 चे पत्र (परिशिष्ट-अ)', 'k1', C.accent2);
+stat(s, 6.8, 1.5, 5.9, '24,565', 'कार्यरत पदे (मंजूर पदे 26,558)', 'k2', C.accent3);
+s.addChart(pres.charts.BAR, [{ name: 'वार्षिक वेतन खर्च', labels: ['आजचा वार्षिक खर्च', 'सुधारणेनंतर वार्षिक खर्च'], values: [2081.35, 2735.43] }], Object.assign({
   x: 0.6, y: 3.65, w: 12.1, h: 3.2, barDir: 'col', chartColors: ['A6A6A6', '404040'], showValue: true, dataLabelPosition: 'outEnd', dataLabelFormatCode: '₹#,##0.00 "कोटी"',
-  valAxisHidden: true, valGridLine: { style: 'none' }, catGridLine: { style: 'none' }, showLegend: false, showTitle: true, title: 'वार्षिक वेतन खर्च (₹ कोटी) — 2025 च्या आकडेवारीनुसार', titleFontSize: 14, titleColor: '000000', catAxisLabelFontSize: 14, valAxisMaxVal: 3600,
+  valAxisHidden: true, valGridLine: { style: 'none' }, catGridLine: { style: 'none' }, showLegend: false, showTitle: true, title: 'वार्षिक वेतन खर्च (₹ कोटी) — मा. उच्च न्यायालयाच्या दि. 23.11.2026 च्या पत्रानुसार', titleFontSize: 14, titleColor: '000000', catAxisLabelFontSize: 14, valAxisMaxVal: 3300,
 }, chartTxt));
 
 // 4 Options
@@ -84,21 +84,21 @@ s = pres.addSlide({ masterName: 'CONTENT', sectionTitle: 'आर्थिक भ
 s.addText('थकबाकी: पर्याय अ विरुद्ध पर्याय ब', { placeholder: 'title' });
 card(s, 0.6, 1.45, 5.9, 2.0, 'optA', 'F2F2F2'); card(s, 6.8, 1.45, 5.9, 2.0, 'optB', 'F2F2F2');
 T(s, 'पर्याय अ — 01.04.2011 पासून', { x: 0.85, y: 1.6, w: 5.4, h: 0.45, fontSize: 16, bold: true, color: C.accent3, objectName: 'optA-h' });
-T(s, '₹4,545.40 कोटी', { x: 0.85, y: 2.1, w: 5.4, h: 0.8, fontSize: 36, bold: true, color: C.accent3, objectName: 'optA-v' });
+T(s, '₹5,117.39 कोटी', { x: 0.85, y: 2.1, w: 5.4, h: 0.8, fontSize: 36, bold: true, color: C.accent3, objectName: 'optA-v' });
 T(s, 'उच्च न्यायालय कर्मचाऱ्यांप्रमाणे', { x: 0.85, y: 2.9, w: 5.4, h: 0.4, fontSize: 14, color: C.text2, objectName: 'optA-l' });
 T(s, 'पर्याय ब — 01.01.2006 पासून (समितीची शिफारस)', { x: 7.05, y: 1.6, w: 5.4, h: 0.45, fontSize: 16, bold: true, color: C.accent2, objectName: 'optB-h' });
-T(s, '₹5,131.62 कोटी', { x: 7.05, y: 2.1, w: 5.4, h: 0.8, fontSize: 36, bold: true, color: C.accent2, objectName: 'optB-v' });
+T(s, '₹5,448.27 कोटी', { x: 7.05, y: 2.1, w: 5.4, h: 0.8, fontSize: 36, bold: true, color: C.accent2, objectName: 'optB-v' });
 T(s, 'मा. उच्च न्यायालयाच्या विशेष समितीची शिफारस', { x: 7.05, y: 2.9, w: 5.4, h: 0.4, fontSize: 14, color: C.text2, objectName: 'optB-l' });
 {
   const rows = [[hdr('बाब (₹ कोटी)'), hdr('पर्याय अ'), hdr('पर्याय ब'), hdr('फरक')]];
-  const LBL = ['वार्षिक वेतन खर्चातील फरक (दरवर्षी तेवढाच)', 'थकबाकी (एकदाच)', 'लाभ लागू करण्याच्या वर्षी एकूण भार (थकबाकी + त्या वर्षाचा फरक)', 'लाभ लागू केल्यापासून 5 वर्षांचा एकूण भार (थकबाकी + 5 वर्षांचा फरक)', 'लाभ लागू केल्यापासून 10 वर्षांचा एकूण भार (थकबाकी + 10 वर्षांचा फरक)'];
+  const LBL = ['वार्षिक वेतन खर्चातील फरक (दरवर्षी तेवढाच)', 'थकबाकी (31.03.2027 पर्यंत, एकदाच)', 'लाभ लागू करण्याच्या वर्षी एकूण भार (थकबाकी + त्या वर्षाचा फरक)', 'लाभ लागू केल्यापासून 5 वर्षांचा एकूण भार (थकबाकी + 5 वर्षांचा फरक)', 'लाभ लागू केल्यापासून 10 वर्षांचा एकूण भार (थकबाकी + 10 वर्षांचा फरक)'];
   D.opts.filter(r => !r[0].startsWith('दरमहा')).slice(0, 3).forEach((r, i) => rows.push([cell(LBL[i], { bold: i === 2 }), cell(r[1], { align: 'right', bold: i === 2 }), cell(r[2], { align: 'right', bold: i === 2 }), cell(r[3], { align: 'right' })]));
   s.addTable(zebra(rows), Object.assign(tblOpts(0.6, 3.75, 12.1, [6.1, 2.0, 2.0, 2.0]), { rowH: 0.5 }));
 }
 
 // 5 Year-wise
 s = pres.addSlide({ masterName: 'CONTENT', sectionTitle: 'आर्थिक भार' });
-s.addText('वर्षनिहाय थकबाकी, 2006 ते 2025', { placeholder: 'title' });
+s.addText('वर्षनिहाय थकबाकी, 2006 ते 2027', { placeholder: 'title' });
 {
   const yr = D.year.slice(0, -1);
   const labels = yr.map(r => r[0]);
@@ -110,13 +110,11 @@ s.addText('वर्षनिहाय थकबाकी, 2006 ते 2025', { 
     showValAxisTitle: true, valAxisTitle: '₹ कोटी', valAxisTitleFontSize: 12, valAxisTitleColor: '000000', valAxisTitleFontFace: '+mn-lt',
   }, chartTxt));
   s.addShape(pres.shapes.RECTANGLE, { x: 0.8, y: 6.2, w: 0.25, h: 0.25, fill: { color: '737373' }, line: { color: '737373' }, objectName: 'lg6' });
-  T(s, 'सहावा वेतन आयोग', { x: 1.15, y: 6.15, w: 2.4, h: 0.35, fontSize: 12, objectName: 'lg6t' });
-  s.addShape(pres.shapes.RECTANGLE, { x: 3.6, y: 6.2, w: 0.25, h: 0.25, fill: { color: 'BFBFBF' }, line: { color: 'BFBFBF' }, objectName: 'lgt' });
-  T(s, 'संक्रमण 2015-16', { x: 3.95, y: 6.15, w: 2.2, h: 0.35, fontSize: 12, objectName: 'lgtt' });
-  s.addShape(pres.shapes.RECTANGLE, { x: 6.2, y: 6.2, w: 0.25, h: 0.25, fill: { color: '404040' }, line: { color: '404040' }, objectName: 'lg7' });
-  T(s, 'सातवा वेतन आयोग', { x: 6.55, y: 6.15, w: 2.4, h: 0.35, fontSize: 12, objectName: 'lg7t' });
-  T(s, '2006–11: ₹586.22 कोटी  •  2011–25: ₹4,545.40 कोटी  •  एकूण ₹5,131.62 कोटी', { x: 0.6, y: 6.5, w: 6.2, h: 0.35, fontSize: 12, bold: true, objectName: 'yr-sum' });
-  T(s, 'वर्षवार वाटणी महागाई भत्ता दर व सातव्या वेतन आयोगाच्या 2.57 गुणकानुसार; एकूण बेरजा उच्च न्यायालयाच्या आकड्यांप्रमाणे.', { x: 6.9, y: 6.45, w: 5.8, h: 0.45, fontSize: 10, color: C.text2, objectName: 'yr-basis' });
+  T(s, '2006–11 (फक्त पर्याय ब)', { x: 1.15, y: 6.15, w: 2.4, h: 0.35, fontSize: 12, objectName: 'lg6t' });
+  s.addShape(pres.shapes.RECTANGLE, { x: 3.6, y: 6.2, w: 0.25, h: 0.25, fill: { color: '404040' }, line: { color: '404040' }, objectName: 'lg7' });
+  T(s, '2011–27 (पर्याय अ व ब)', { x: 3.95, y: 6.15, w: 2.4, h: 0.35, fontSize: 12, objectName: 'lg7t' });
+  T(s, '2006–11: ₹330.88 कोटी  •  2011–27: ₹5,117.39 कोटी  •  एकूण ₹5,448.27 कोटी', { x: 0.6, y: 6.5, w: 6.2, h: 0.35, fontSize: 12, bold: true, objectName: 'yr-sum' });
+  T(s, 'स्रोत: मा. उच्च न्यायालयाचे दि. 23.11.2026 चे पत्र, परिशिष्ट-ब', { x: 6.9, y: 6.45, w: 5.8, h: 0.45, fontSize: 10, color: C.text2, objectName: 'yr-basis' });
 }
 
 // 6 Year-wise table
@@ -124,12 +122,12 @@ s = pres.addSlide({ masterName: 'CONTENT', sectionTitle: 'आर्थिक भ
 s.addText('वर्षनिहाय थकबाकी — तक्ता', { placeholder: 'title' });
 {
   const yr = D.year.slice(0, -1);
-  const mk = (part) => { const rows = [[hdr('आर्थिक वर्ष'), hdr('वेतन आयोग'), hdr('महागाई भत्ता'), hdr('थकबाकी'), hdr('एकत्रित')]];
-    part.forEach(r => rows.push([cell(r[0], { fontSize: 12 }), cell(r[1], { fontSize: 12 }), cell(r[2], { fontSize: 11 }), cell(r[4], { align: 'right', fontSize: 12 }), cell(r[5], { align: 'right', fontSize: 12 })])); return rows; };
-  const o = (x) => Object.assign(tblOpts(x, 1.35, 5.95, [1.15, 1.2, 1.4, 1.1, 1.1]), { rowH: 0.47 });
-  s.addTable(zebra(mk(yr.slice(0, 10))), o(0.6));
-  s.addTable(zebra(mk(yr.slice(10))), o(6.75));
-  T(s, 'रक्कम ₹ कोटीत • एकूण ₹5,131.62 कोटी', { x: 0.6, y: 6.55, w: 12.1, h: 0.35, fontSize: 12, bold: true, objectName: 'yt-note' });
+  const mk = (part) => { const rows = [[hdr('आर्थिक वर्ष'), hdr('थकबाकी'), hdr('एकत्रित')]];
+    part.forEach(r => rows.push([cell(r[0], { fontSize: 12 }), cell(r[4], { align: 'right', fontSize: 12 }), cell(r[5], { align: 'right', fontSize: 12 })])); return rows; };
+  const o = (x) => Object.assign(tblOpts(x, 1.35, 5.95, [2.15, 1.9, 1.9]), { rowH: 0.42 });
+  s.addTable(zebra(mk(yr.slice(0, 11))), o(0.6));
+  s.addTable(zebra(mk(yr.slice(11))), o(6.75));
+  T(s, 'रक्कम ₹ कोटीत • एकूण ₹5,448.27 कोटी • स्रोत: परिशिष्ट-ब', { x: 0.6, y: 6.55, w: 12.1, h: 0.35, fontSize: 12, bold: true, objectName: 'yt-note' });
 }
 
 // 7 Establishments
@@ -141,13 +139,13 @@ s.addText('आस्थापनानिहाय वार्षिक वे�
   const rev = [...e].reverse();
   s.addChart(pres.charts.BAR, [{ name: 'वार्षिक वाढीव भार', labels: rev.map(r => short[r[0]] || r[0]), values: rev.map(r => +r[4].replace(/,/g, '')) }], Object.assign({
     x: 0.6, y: 1.35, w: 5.6, h: 5.4, barDir: 'bar', chartColors: ['000000'], showValue: true, dataLabelPosition: 'outEnd', dataLabelFormatCode: '#,##0.00',
-    valAxisHidden: true, valGridLine: { style: 'none' }, catGridLine: { style: 'none' }, showLegend: false, valAxisMaxVal: 560,
+    valAxisHidden: true, valGridLine: { style: 'none' }, catGridLine: { style: 'none' }, showLegend: false, valAxisMaxVal: 640,
     showTitle: true, title: 'वार्षिक वेतन खर्चातील फरक (₹ कोटी)', titleFontSize: 14, titleColor: '000000', catAxisLabelFontSize: 12,
   }, chartTxt));
   const n = v => +v.replace(/,/g, ''); const f2 = v => v.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   const rows = [[hdr('आस्थापना'), hdr('आजचा वार्षिक खर्च'), hdr('सुधारणेनंतर वार्षिक खर्च'), hdr('फरक')]];
   e.forEach(r => rows.push([cell(short[r[0]] || r[0], { fontSize: 12 }), cell(r[3], { align: 'right', fontSize: 12 }), cell(f2(n(r[3]) + n(r[4])), { align: 'right', fontSize: 12 }), cell(r[4], { align: 'right', fontSize: 12, bold: true })]));
-  rows.push([cell('एकूण', { bold: true, fontSize: 12 }), cell('2,330.61', { align: 'right', bold: true, fontSize: 12 }), cell('2,930.42', { align: 'right', bold: true, fontSize: 12 }), cell('599.82', { align: 'right', bold: true, fontSize: 12 })]);
+  rows.push([cell('एकूण', { bold: true, fontSize: 12 }), cell('2,081.35', { align: 'right', bold: true, fontSize: 12 }), cell('2,735.43', { align: 'right', bold: true, fontSize: 12 }), cell('654.08', { align: 'right', bold: true, fontSize: 12 })]);
   s.addTable(zebra(rows), Object.assign(tblOpts(6.4, 1.45, 6.3, [2.4, 1.3, 1.5, 1.1]), { rowH: 0.48 }));
   T(s, 'रक्कम ₹ कोटी', { x: 6.4, y: 6.4, w: 6.3, h: 0.3, fontSize: 11, color: C.text2, objectName: 'est-unit' });
 }
@@ -193,10 +191,10 @@ s = pres.addSlide({ masterName: 'CONTENT', sectionTitle: 'निर्णया�
 s.addText('निर्णय आवश्यक असलेले मुद्दे', { placeholder: 'title' });
 {
   const items = [
-    ['लाभ कोणत्या तारखेपासून?', 'विशेष समितीची शिफारस: 01.01.2006 पासून (थकबाकी ₹5,131.62 कोटी) • उच्च न्यायालय कर्मचाऱ्यांप्रमाणे: 01.04.2011 पासून (₹4,545.40 कोटी)'],
-    ['वार्षिक वेतन खर्च', '₹2,330.61 कोटीवरून ₹2,930.42 कोटी (फरक ₹599.82 कोटी)'],
-    ['लाभ लागू करण्याच्या वर्षीची तरतूद', 'थकबाकी + त्या वर्षाचा फरक ₹599.82 कोटी = ₹5,145.22 कोटी (अ) किंवा ₹5,731.44 कोटी (ब)'],
-    ['वेळ', 'दरमहा उशिरामागे थकबाकी ₹49.98 कोटीने वाढते'],
+    ['लाभ कोणत्या तारखेपासून?', 'विशेष समितीची शिफारस: 01.01.2006 पासून (थकबाकी ₹5,448.27 कोटी) • उच्च न्यायालय कर्मचाऱ्यांप्रमाणे: 01.04.2011 पासून (₹5,117.39 कोटी)'],
+    ['वार्षिक वेतन खर्च', '₹2,081.35 कोटीवरून ₹2,735.43 कोटी (फरक ₹654.08 कोटी)'],
+    ['लाभ लागू करण्याच्या वर्षीची तरतूद', 'थकबाकी + त्या वर्षाचा फरक ₹654.08 कोटी = ₹5,771.46 कोटी (अ) किंवा ₹6,102.35 कोटी (ब)'],
+    ['वेळ', 'दरमहा उशिरामागे थकबाकी ₹54.51 कोटीने वाढते'],
   ];
   items.forEach((it, i) => {
     const x = 0.6 + (i % 2) * 6.2, y = 1.45 + Math.floor(i / 2) * 2.65;
